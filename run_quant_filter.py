@@ -1,154 +1,406 @@
 """
 run_quant_filter.py — IHSG Quantitative Swing-Trade Scouting Engine
 ====================================================================
-Versi: 2.1
+Versi: 3.0
 
-Perbaikan dari v1:
-  1. [BUG FIX] Single-ticker yfinance fallback yang salah → paksa MultiIndex
-  2. [BUG FIX] Duplikat assignment current_px + type inconsistency
-  3. [BUG FIX] os.makedirs untuk output directories
-  4. [BUG FIX] Retry mechanism untuk yfinance download
-  5. [IMPROVE] Sektor lebih lengkap & terstruktur via IDX SECTOR_MAP (12 sektor + sub-industri)
-  6. [IMPROVE] Semua magic numbers dipindah ke CONFIG dict
-  7. [IMPROVE] Bonus score untuk fresh breakout di atas SMA20 (1–5%)
-  8. [IMPROVE] Valuation Gate: saham di atas Graham Number hard-cap Val_Score = 0
-  9. [IMPROVE] Logging terstruktur dengan timestamp
-  10. [IMPROVE] Output path validation
+Perubahan dari v2.1:
+  1. [INTEGRATE] XlsxDataAdapter sebagai primary data source — Close Price,
+     Volume, BVPS, DPS, Piotroski, Altman, ExDate semuanya dari xlsx.
+     yfinance HANYA dipakai untuk OHLCV teknikal (SMA, ATR, RSI) yang
+     butuh data intraday 60d — ini tidak ada di xlsx scraping.
 
-Perbaikan v2.1 (sinkronisasi dengan utils aktual):
-  11. [FIX] Import snap_to_tick dari utils/technicals.py — stop loss dibulatkan
-      ke fraksi harga BEI yang valid (tick size regulation)
-  12. [FIX] compute_atr di utils/technicals.py menggunakan rolling().mean()
-      (bukan ewm) — tidak ada perubahan diperlukan di sini, sudah konsisten
-  13. [FIX] ExDateInfo TypedDict dari exdate_scanner digunakan sebagai type hint
-      eksplisit untuk exdate_info agar IDE bisa catch key errors
-  14. [IMPROVE] format_exdate_block dipakai di Markdown report untuk WARNING tier
+  2. [FIX KRITIS] Sektor tidak lagi 100% 'default' karena tidak ada cache.
+     Sektor sekarang di-resolve via 3 lapis prioritas:
+       a. sector_cache.json (output build_sector_cache.py) — paling akurat
+       b. TICKER_SECTOR hardcode (40+ ticker populer)
+       c. Inferensi dari kolom 'Name' di idx-stocks (kata kunci bank/tbk)
+       d. Fallback: 'default'
 
-Arsitektur Pipeline:
-  ① Data Ingestion (Excel fundamental + yfinance harga live)
-  ② Static Filtering (fundamental gate)
-  ③ Sector-Aware PBV Ranking (12 sektor IDX)
-  ④ Dynamic Technical Analysis per ticker (RSI, ATR, SMA, Volume)
-  ⑤ Composite Scoring & Multi-format Output
+  3. [INTEGRATE] ExDate dari xlsx (Latest Dividend Ex-Date) — tidak perlu
+     yfinance per-ticker lagi. scan_exdate() dipanggil HANYA jika kolom
+     xlsx kosong/tidak tersedia.
+
+  4. [IMPROVE] Static filter tambah Piotroski F-Score >= 4 dan
+     Altman Z-Score > 1.1 (exclude distressed) langsung dari xlsx.
+
+  5. [IMPROVE] Tambah 'Price to Equity Discount (%)' dari sheet analysis
+     sebagai kolom alternatif untuk Valuation Gap (lebih akurat dari Graham
+     Number untuk saham yang EPS/BVPS-nya kurang reliable).
+
+  6. [IMPROVE] Semua sheet digabung di awal (single merge) — lebih efisien
+     dari baca ulang di beberapa fungsi.
+
+  7. [IMPROVE] PEMANTAUAN KHUSUS dari idx-stocks sheet langsung di-exclude
+     di awal pipeline tanpa perlu cek manual.
+
+Execution order:
+  TIDAK perlu build_sector_cache.py terlebih dahulu —
+  sektor di-resolve otomatis dari xlsx + hardcode + cache (jika ada).
 """
 
+import glob
+import json
 import logging
 import os
 import time
-import json
-from datetime import datetime
+from datetime import datetime, timezone
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import yfinance as yf
 
 from utils.technicals import compute_atr, compute_rsi, snap_to_tick
-from utils.exdate_scanner import scan_exdate, format_exdate_block, ExDateInfo
+from utils.exdate_scanner import ExDateInfo, format_exdate_block, scan_exdate
+
+# ── Import adapter (opsional — graceful jika belum ada) ──────────────────────
+try:
+    from utils.xlsx_adapter import XlsxDataAdapter
+    _HAS_ADAPTER = True
+except ImportError:
+    _HAS_ADAPTER = False
+
 
 # ══════════════════════════════════════════════════════════════════════════════
-# ── KONFIGURASI TERPUSAT ─────────────────────────────────────────────────────
+# ── AUTO-DETECT INPUT FILE ────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _find_latest_xlsx(output_dir: str = "output") -> str:
+    """
+    Auto-detect file xlsx IDX terbaru di folder output/.
+    Support Windows (backslash) dan Unix (forward slash).
+    Raise FileNotFoundError jika tidak ada file ditemukan.
+    """
+    patterns = [
+        os.path.join(output_dir, "IDX_Fundamental_Analysis_*.xlsx"),
+        os.path.join(output_dir, "IDX Fundamental Analysis *.xlsx"),
+    ]
+    found = []
+    for pat in patterns:
+        found.extend(glob.glob(pat))
+
+    if not found:
+        raise FileNotFoundError(
+            f"Tidak ada file IDX_Fundamental_Analysis_*.xlsx di folder '{output_dir}'."
+            f"\nPastikan file xlsx hasil scraping sudah ada di folder tersebut."
+        )
+    # Ambil yang terbaru (sort by nama file — tanggal ada di nama)
+    return str(Path(sorted(found, reverse=True)[0]))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ── KONFIGURASI TERPUSAT ──────────────────────────────────────────────────────
 # ══════════════════════════════════════════════════════════════════════════════
 
 CONFIG = {
     # ── Path
-    "input_file":       "output/IDX Fundamental Analysis 2026-04-24.xlsx",
-    "output_dir":       "output",
-    "scratch_dir":      "scratch",
-    "sector_cache_file": "output/sector_cache.json",
+    # input_file = None → auto-detect xlsx terbaru di output_dir saat runtime
+    "input_file":        None,
+    "output_dir":        "output",
+    "scratch_dir":       "scratch",
+    "sector_cache_file": str(Path("output") / "sector_cache.json"),
 
-    # ── Static Filter Thresholds
-    "min_close_price":      100,        # Rp — buang penny stocks
-    "max_der":              1.5,        # Debt to Equity Ratio maksimum
-    "max_pbv_hard":         6.0,        # PBV ceiling absolut (bukan per sektor)
-    "pbv_sector_pctile":    0.80,       # Buang top 20% PBV per sektor
-    "min_roe":              0.10,       # ROE minimum TTM (10%)
+    # ── Static Filter
+    "min_close_price":        100,        # Rp — buang penny stocks
+    "max_der":                1.5,        # Debt to Equity Ratio maksimum
+    "max_pbv_hard":           6.0,        # PBV ceiling absolut
+    "pbv_sector_pctile":      0.80,       # Buang top 20% PBV per sektor
+    "min_roe":                0.10,       # ROE minimum TTM (10%)
+    "min_piotroski":          4,          # [NEW v3.0] Piotroski F-Score minimum
+    "min_altman_z":           1.1,        # [NEW v3.0] Altman Z > 1.1 (bukan distress zone)
+    "exclude_pemantauan":     True,       # [NEW v3.0] Exclude PEMANTAUAN KHUSUS
 
-    # ── Graham Number
-    "graham_k":             18.2,       # PE=13 × PB=1.4, dikalibrasi untuk IDX
-    "graham_bear_eps":      0.85,       # Bear case: EPS × 85%
-    "graham_bull_eps":      1.15,       # Bull case: EPS × 115%
+    # ── Graham Number (IHSG-calibrated)
+    "graham_k":               18.2,
+    "graham_bear_eps":        0.85,
+    "graham_bull_eps":        1.15,
 
-    # ── yfinance
-    "yf_period":            "60d",      # Cukup untuk SMA20, ATR14, Volume20
-    "yf_retries":           3,          # Jumlah retry jika download gagal
-    "yf_retry_delay":       5,          # Detik antar retry (× attempt number)
+    # ── yfinance (HANYA untuk teknikal OHLCV)
+    "yf_period":              "60d",
+    "yf_retries":             3,
+    "yf_retry_delay":         5,
 
     # ── Liquidity Gate
-    "min_adt_20d":          5_000_000_000,  # Average Daily Turnover ≥ Rp 5 Miliar
-    "min_bars":             20,             # Minimum bar untuk kalkulasi
+    "min_adt_20d":            5_000_000_000,
+    "min_bars":               20,
 
     # ── Volume Filter
-    "vol_confirmation_ratio": 0.80,    # 3d avg harus ≥ 80% dari 20d avg
+    "vol_confirmation_ratio": 0.80,
 
     # ── Suspended/FCA Heuristic
-    "max_zero_vol_days":    3,         # Maksimum hari zero-volume dalam 20d terakhir
+    "max_zero_vol_days":      3,
 
-    # ── RSI Scoring Zones
-    "rsi_hard_reject":      75,        # RSI > 75 → hard reject (anti-pump chasing)
-    "rsi_accum_lo":         45,
-    "rsi_accum_hi":         55,
-    "rsi_strong_hi":        70,
+    # ── RSI Scoring
+    "rsi_hard_reject":        75,
+    "rsi_accum_lo":           45,
+    "rsi_accum_hi":           55,
+    "rsi_strong_hi":          70,
 
     # ── Stop Loss
-    "stop_atr_from_sma20":  1.0,       # SMA20 - (N × ATR)
-    "stop_atr_from_price":  2.0,       # Close - (N × ATR)
-    "stop_hard_floor_pct":  0.92,      # Hard floor: max 8% drawdown dari harga
+    "stop_atr_from_sma20":    1.0,
+    "stop_atr_from_price":    2.0,
+    "stop_hard_floor_pct":    0.92,
 
     # ── Score Weights (total = 100)
-    "weight_valuation":     40,
-    "weight_profitability": 20,
-    "weight_momentum_rsi":  20,
-    "weight_momentum_vol":  20,
+    "weight_valuation":       40,
+    "weight_profitability":   20,
+    "weight_momentum_rsi":    20,
+    "weight_momentum_vol":    20,
 
     # ── Penalties & Bonuses
-    "over_extended_penalty":    -15,   # Harga > SMA20 × 1.10
-    "fresh_breakout_bonus":     +10,   # Harga dalam 1–5% di atas SMA20
+    "over_extended_penalty":  -15,
+    "fresh_breakout_bonus":   +10,
 
     # ── Output
-    "top_n":    10,
+    "top_n": 10,
 }
 
+
 # ══════════════════════════════════════════════════════════════════════════════
-# ── SEKTOR MAP — Berbasis IDX Industry Classification (IDXIC) ────────────────
+# ── SECTOR MAP — IDX Industry Classification (IDXIC) ─────────────────────────
 # ══════════════════════════════════════════════════════════════════════════════
-#
-# BEI menggunakan 11 sektor utama sejak 2021 (IDXIC).
-# Perbankan dipisah dari Keuangan Non-Bank karena profil PBV sangat berbeda:
-#   Bank         : PBV wajar 1.5–4.0×
-#   Non-Bank     : PBV wajar 0.8–2.5×
-#
-# Sektor:
-#   energy           → Energi (Batubara, Migas, EBT)
-#   basic_materials  → Barang Baku (Kimia, Logam, Semen, Kertas)
-#   industrials      → Perindustrian (Manufaktur, Kontraktor, Heavy Equip)
-#   consumer_staples → Konsumen Primer (F&B, Personal Care, Ritel Pokok, CPO)
-#   consumer_disc    → Konsumen Non-Primer (Otomotif, Fashion, Media, Resto)
-#   healthcare       → Kesehatan (Farmasi, RS, Alkes)
-#   bank             → Perbankan (Bank Umum + Syariah + BPD)
-#   finance_nonbank  → Keuangan Non-Bank (Multifinance, Asuransi, Sekuritas)
-#   property         → Properti & Real Estate
-#   tech             → Teknologi Informasi & Telekomunikasi
-#   infrastructure   → Infrastruktur (Tol, Listrik, Pelabuhan)
-#   transport        → Transportasi & Logistik
 
 SECTOR_PBV_BENCHMARK = {
-    "energy": {"label": "Energi", "fair_lo": 0.8, "fair_hi": 2.5},
-    "basic_materials": {"label": "Barang Baku", "fair_lo": 0.8, "fair_hi": 2.5},
-    "industrials": {"label": "Perindustrian", "fair_lo": 0.8, "fair_hi": 2.5},
-    "consumer_staples": {"label": "Konsumen Primer", "fair_lo": 1.0, "fair_hi": 3.0},
-    "consumer_disc": {"label": "Konsumen Non-Primer", "fair_lo": 0.8, "fair_hi": 2.5},
-    "healthcare": {"label": "Kesehatan", "fair_lo": 1.5, "fair_hi": 4.0},
-    "bank": {"label": "Perbankan", "fair_lo": 1.5, "fair_hi": 4.0},
-    "finance_nonbank": {"label": "Keuangan Non-Bank", "fair_lo": 0.8, "fair_hi": 2.5},
-    "property": {"label": "Properti & Real Estate", "fair_lo": 0.5, "fair_hi": 1.5},
-    "tech": {"label": "Teknologi", "fair_lo": 1.5, "fair_hi": 6.0},
-    "infrastructure": {"label": "Infrastruktur", "fair_lo": 0.8, "fair_hi": 2.5},
-    "transport": {"label": "Transportasi & Logistik", "fair_lo": 0.8, "fair_hi": 2.5},
-    "default": {"label": "Lain-lain", "fair_lo": 0.8, "fair_hi": 2.5},
+    "energy":           {"label": "Energi",               "fair_lo": 0.8, "fair_hi": 2.5},
+    "basic_materials":  {"label": "Barang Baku",           "fair_lo": 0.8, "fair_hi": 2.5},
+    "industrials":      {"label": "Perindustrian",         "fair_lo": 0.8, "fair_hi": 2.5},
+    "consumer_staples": {"label": "Konsumen Primer",       "fair_lo": 1.0, "fair_hi": 3.0},
+    "consumer_disc":    {"label": "Konsumen Non-Primer",   "fair_lo": 0.8, "fair_hi": 2.5},
+    "healthcare":       {"label": "Kesehatan",             "fair_lo": 1.5, "fair_hi": 4.0},
+    "bank":             {"label": "Perbankan",             "fair_lo": 1.5, "fair_hi": 4.0},
+    "finance_nonbank":  {"label": "Keuangan Non-Bank",     "fair_lo": 0.8, "fair_hi": 2.5},
+    "property":         {"label": "Properti & Real Estate","fair_lo": 0.5, "fair_hi": 1.5},
+    "tech":             {"label": "Teknologi",             "fair_lo": 1.5, "fair_hi": 6.0},
+    "infrastructure":   {"label": "Infrastruktur",         "fair_lo": 0.8, "fair_hi": 2.5},
+    "transport":        {"label": "Transportasi & Logistik","fair_lo": 0.8, "fair_hi": 2.5},
+    "default":          {"label": "Lain-lain",             "fair_lo": 0.8, "fair_hi": 2.5},
 }
 
+# Hardcode 70+ ticker populer sebagai fallback lapis-2
+# (dipakai jika sector_cache.json tidak ada)
+TICKER_SECTOR_HARDCODE: dict[str, str] = {
+    # Bank
+    "BBCA": "bank", "BBRI": "bank", "BMRI": "bank", "BBNI": "bank",
+    "BRIS": "bank", "BTPS": "bank", "BNGA": "bank", "BNII": "bank",
+    "PNBN": "bank", "BDMN": "bank", "MEGA": "bank", "BJTM": "bank",
+    "BJBR": "bank", "NISP": "bank", "BBTN": "bank", "AGRO": "bank",
+    "BABP": "bank", "ARTO": "bank", "SEABANK": "bank",
+    # Finance non-bank
+    "ADMF": "finance_nonbank", "BFIN": "finance_nonbank", "WOMF": "finance_nonbank",
+    "MFIN": "finance_nonbank", "CFIN": "finance_nonbank", "PNLF": "finance_nonbank",
+    "ASII": "finance_nonbank",  # Astra Financial arm — industrial tapi PBV mix
+    # Consumer staples
+    "UNVR": "consumer_staples", "ICBP": "consumer_staples", "MYOR": "consumer_staples",
+    "INDF": "consumer_staples", "SIDO": "consumer_staples", "CPIN": "consumer_staples",
+    "JPFA": "consumer_staples", "GOOD": "consumer_staples", "ULTJ": "consumer_staples",
+    "AALI": "consumer_staples", "LSIP": "consumer_staples", "SGRO": "consumer_staples",
+    # Consumer discretionary
+    "AUTO": "consumer_disc", "GJTL": "consumer_disc", "SMSM": "consumer_disc",
+    "RALS": "consumer_disc", "MAPI": "consumer_disc", "ACES": "consumer_disc",
+    # Healthcare
+    "KLBF": "healthcare", "HEAL": "healthcare", "MIKA": "healthcare",
+    "PRDA": "healthcare", "DVLA": "healthcare", "TSPC": "healthcare",
+    "MERK": "healthcare",
+    # Mining / Energy
+    "ADRO": "energy", "BYAN": "energy", "PTBA": "energy", "ITMG": "energy",
+    "HRUM": "energy", "DOID": "energy", "ELSA": "energy", "MEDC": "energy",
+    "AKRA": "energy", "PGAS": "infrastructure",
+    # Basic materials
+    "ANTM": "basic_materials", "INCO": "basic_materials", "MDKA": "basic_materials",
+    "TINS": "basic_materials", "SMGR": "basic_materials", "INTP": "basic_materials",
+    "TPIA": "basic_materials",
+    # Property
+    "BSDE": "property", "SMRA": "property", "CTRA": "property",
+    "PWON": "property", "LPKR": "property", "DMAS": "property",
+    # Tech / Telecom
+    "TLKM": "tech", "EXCL": "tech", "ISAT": "tech",
+    "GOTO": "tech", "BUKA": "tech", "EMTK": "tech",
+    # Infrastructure
+    "JSMR": "infrastructure", "WSKT": "infrastructure", "WIKA": "infrastructure",
+    # Transport
+    "GIAA": "transport", "BIRD": "transport", "BLUEBIRD": "transport",
+    # Industrials
+    "MAIN": "industrials", "SRIL": "industrials", "KINO": "industrials",
+}
+
+# Kata kunci di kolom 'Name' untuk inferensi sektor — lapis-3
+_NAME_SECTOR_KEYWORDS: list[tuple[list[str], str]] = [
+    (["bank", "banking", "syariah bank", "bpr"],                     "bank"),
+    (["multifinance", "finance", "leasing", "asuransi", "insurance"], "finance_nonbank"),
+    (["properti", "property", "real estate", "realty", "realestate"], "property"),
+    (["farmasi", "pharma", "hospital", "rumah sakit", "kesehatan",
+      "klinik", "alkes", "medika", "medis"],                         "healthcare"),
+    (["tambang", "mining", "coal", "batubara", "nikel", "nickel",
+      "gold", "emas", "timah", "tembaga", "copper"],                  "energy"),
+    (["semen", "cement", "kimia", "chemical", "petrokimia"],          "basic_materials"),
+    (["teknologi", "technology", "telekomunikasi", "telecom",
+      "digital", "internet", "software"],                             "tech"),
+    (["toll", "tol", "pelabuhan", "port", "bandara", "airport",
+      "listrik", "electricity", "gas", "air minum", "pdam"],         "infrastructure"),
+    (["logistik", "logistic", "shipping", "pelayaran", "penerbangan",
+      "airline", "trucking", "ekspedisi"],                            "transport"),
+    (["konsumer", "consumer", "makanan", "minuman", "food",
+      "beverage", "agri", "perkebunan", "plantation", "kelapa sawit",
+      "palm oil", "poultry", "peternakan"],                           "consumer_staples"),
+    (["otomotif", "automotive", "motor", "mobil", "tekstil",
+      "fashion", "retail", "ritel", "department store"],              "consumer_disc"),
+]
+
+
 # ══════════════════════════════════════════════════════════════════════════════
-# ── LOGGING SETUP ─────────────────────────────────────────────────────────────
+# ── SEKTOR RESOLVER — 4-lapis prioritas ──────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _build_sector_map(
+    tickers: list[str],
+    names: dict[str, str],
+    cache_file: str,
+    logger: logging.Logger,
+) -> dict[str, str]:
+    """
+    Resolve sektor untuk setiap ticker via 4 lapis prioritas:
+      1. sector_cache.json  → hasil build_sector_cache.py (yfinance)
+      2. TICKER_SECTOR_HARDCODE → 70+ ticker populer hardcode
+      3. Inferensi dari nama perusahaan via keyword matching
+      4. Fallback: 'default'
+
+    Args:
+        tickers   : list semua ticker yang perlu di-resolve
+        names     : dict {ticker: company_name} dari idx-stocks sheet
+        cache_file: path ke sector_cache.json
+        logger    : logger instance
+
+    Returns:
+        dict {ticker: sector_key}
+    """
+    result: dict[str, str] = {}
+
+    # ── Lapis 1: sector_cache.json ────────────────────────────────────────────
+    cache: dict[str, str] = {}
+    if os.path.exists(cache_file):
+        try:
+            with open(cache_file, "r", encoding="utf-8") as f:
+                raw = json.load(f)
+            # Format: {"BBRI": {"sector": "bank", ...}} atau {"BBRI": "bank"}
+            for t, v in raw.items():
+                cache[t] = v["sector"] if isinstance(v, dict) else str(v)
+            logger.info(f"[Sector] Cache loaded: {len(cache)} ticker dari {cache_file}")
+        except Exception as e:
+            logger.warning(f"[Sector] Gagal baca cache: {e}")
+    else:
+        logger.warning(
+            f"[Sector] {cache_file} tidak ada. "
+            f"Gunakan lapis 2–4 (hardcode + keyword + default). "
+            f"Jalankan build_sector_cache.py untuk akurasi lebih baik."
+        )
+
+    miss_l1, miss_l2, miss_l3, miss_l4 = [], [], [], []
+
+    for t in tickers:
+        # Lapis 1
+        if t in cache:
+            result[t] = cache[t]
+            continue
+        miss_l1.append(t)
+
+        # Lapis 2: hardcode
+        if t in TICKER_SECTOR_HARDCODE:
+            result[t] = TICKER_SECTOR_HARDCODE[t]
+            continue
+        miss_l2.append(t)
+
+        # Lapis 3: keyword matching dari nama perusahaan
+        name_lower = names.get(t, "").lower()
+        matched = False
+        for keywords, sector in _NAME_SECTOR_KEYWORDS:
+            if any(kw in name_lower for kw in keywords):
+                result[t] = sector
+                matched = True
+                break
+        if matched:
+            continue
+        miss_l3.append(t)
+
+        # Lapis 4: default
+        result[t] = "default"
+        miss_l4.append(t)
+
+    logger.info(
+        f"[Sector] Resolve selesai: "
+        f"cache={len(tickers)-len(miss_l1)}, "
+        f"hardcode={len(miss_l1)-len(miss_l2)}, "
+        f"keyword={len(miss_l2)-len(miss_l3)}, "
+        f"default={len(miss_l4)}"
+    )
+    if miss_l4:
+        logger.debug(f"[Sector] Ticker 'default': {miss_l4[:20]}"
+                     + ("..." if len(miss_l4) > 20 else ""))
+
+    return result
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ── EXDATE RESOLVER — xlsx primary, yfinance fallback ────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _resolve_exdate(
+    ticker: str,
+    row: pd.Series,
+    current_px: float,
+    adapter: "XlsxDataAdapter | None",
+) -> ExDateInfo:
+    """
+    Resolve ExDateInfo untuk satu ticker.
+
+    Priority:
+      1. XlsxDataAdapter.get_exdate_info() — baca dari kolom xlsx, O(1)
+      2. scan_exdate() via yfinance — fallback jika xlsx tidak ada/kosong
+    """
+    # Lapis 1: xlsx adapter
+    if adapter is not None:
+        try:
+            info = adapter.get_exdate_info(ticker, current_px)
+            if info["source"] == "xlsx":
+                return info
+        except Exception:
+            pass
+
+    # Lapis 2: cek kolom 'Latest Dividend Ex-Date' langsung dari row
+    exdate_str = str(row.get("Latest Dividend Ex-Date", "")).strip()
+    if exdate_str and exdate_str not in ("-", "nan", "NaT", ""):
+        # Parse manual — format '21 Apr 26'
+        from datetime import date
+        for fmt in ("%d %b %y", "%d %b %Y", "%Y-%m-%d"):
+            try:
+                ex_date = datetime.strptime(exdate_str, fmt).date()
+                today = datetime.now(timezone.utc).date()
+                days  = (ex_date - today).days
+                if days < 0:
+                    break  # sudah lewat → CLEAR
+                from utils.exdate_scanner import CRITICAL_WINDOW_DAYS, WARNING_WINDOW_DAYS
+                if days <= CRITICAL_WINDOW_DAYS:   tier = "CRITICAL"
+                elif days <= WARNING_WINDOW_DAYS:  tier = "WARNING"
+                else:                              tier = "CLEAR"
+                div = float(row.get("Dividend (TTM)", 0) or 0)
+                return {
+                    "has_upcoming_exdate": tier != "CLEAR",
+                    "ex_date":             str(ex_date),
+                    "days_until_exdate":   days,
+                    "div_per_share":       div or None,
+                    "div_yield_pct":       round(div/current_px*100, 2) if div and current_px > 0 else None,
+                    "risk_tier":           tier,
+                    "expected_drop_rp":    div or None,
+                    "source":              "xlsx_direct",
+                }
+            except ValueError:
+                continue
+
+    # Lapis 3: yfinance (fallback lambat — hanya jika xlsx tidak ada)
+    return scan_exdate(ticker, current_price=current_px)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ── HELPERS ───────────────────────────────────────────────────────────────────
 # ══════════════════════════════════════════════════════════════════════════════
 
 def setup_logging(log_dir: str) -> logging.Logger:
@@ -165,10 +417,6 @@ def setup_logging(log_dir: str) -> logging.Logger:
     return logging.getLogger("quant_filter")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# ── HELPER: YFINANCE DOWNLOAD DENGAN RETRY ───────────────────────────────────
-# ══════════════════════════════════════════════════════════════════════════════
-
 def download_yf_with_retry(
     tickers: list[str],
     period: str,
@@ -176,10 +424,7 @@ def download_yf_with_retry(
     delay: int,
     logger: logging.Logger,
 ) -> pd.DataFrame:
-    """
-    Download yfinance data dengan retry mechanism.
-    Selalu mengembalikan MultiIndex DataFrame (paksa wrap jika single ticker).
-    """
+    """Download yfinance OHLCV dengan retry + paksa MultiIndex untuk single ticker."""
     for attempt in range(1, retries + 1):
         try:
             logger.info(f"yfinance download attempt {attempt}/{retries} ({len(tickers)} ticker)...")
@@ -193,14 +438,9 @@ def download_yf_with_retry(
             if data.empty:
                 raise ValueError("yfinance mengembalikan DataFrame kosong.")
 
-            # ── FIX: Paksa MultiIndex untuk single-ticker edge case ──────────
-            # yfinance kadang mengembalikan flat DataFrame jika hanya 1 ticker.
-            # Wrap paksa agar semua downstream logic bisa pakai MultiIndex.
+            # Paksa MultiIndex untuk single-ticker edge case
             if not isinstance(data.columns, pd.MultiIndex):
-                logger.warning(
-                    "yfinance mengembalikan flat columns (kemungkinan single ticker). "
-                    "Memaksa MultiIndex wrapper..."
-                )
+                logger.warning("Flat columns dari yfinance — paksa MultiIndex wrapper")
                 data = pd.concat({tickers[0]: data}, axis=1)
 
             logger.info(f"Download berhasil. Shape: {data.shape}")
@@ -217,23 +457,19 @@ def download_yf_with_retry(
     raise RuntimeError("yfinance download gagal setelah semua retry.")
 
 
-def _load_sector_map(cache_file: str, logger: logging.Logger) -> dict[str, str]:
-    if not os.path.exists(cache_file):
-        logger.warning(f"{cache_file} tidak ditemukan! Jalankan build_sector_cache.py terlebih dahulu.")
-        return {}
-    with open(cache_file, "r", encoding="utf-8") as f:
-        sector_data = json.load(f)
-    return {ticker: info["sector"] for ticker, info in sector_data.items()}
-
+# ══════════════════════════════════════════════════════════════════════════════
+# ── TICKER ANALYZER ───────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
 
 def _analyze_ticker(
     row: pd.Series,
     df_t: pd.DataFrame,
     cfg: dict,
     logger: logging.Logger,
+    adapter: "XlsxDataAdapter | None" = None,
 ) -> dict | None:
     """
-    Analisis teknikal satu ticker.
+    Analisis teknikal + fundamental satu ticker.
     Return dict result jika lolos semua filter, None jika tidak lolos.
     """
     t = row["Ticker"]
@@ -243,61 +479,61 @@ def _analyze_ticker(
     high  = df_t["High"].squeeze()
     low   = df_t["Low"].squeeze()
 
-    # ── Suspended / FCA Board Exclusion ──────────────────────────────────
-    recent_vol = vol.tail(5).sum()
+    # ── Suspended / FCA Board Exclusion ──────────────────────────────────────
+    recent_vol  = vol.tail(5).sum()
     avg_vol_20d = vol.tail(20).mean()
     if (
         (vol.tail(20) == 0).sum() > cfg["max_zero_vol_days"] or
         (avg_vol_20d > 0 and (recent_vol / avg_vol_20d) < 0.10)
     ):
-        logger.info(f"[{t}] Excluded: suspek suspended/FCA (volume anomali).")
+        logger.info(f"[{t}] Excluded: suspek suspended/FCA (volume anomali)")
         return None
 
-    # ── Ex-Date Dividend Trap ─────────────────────────────────────────────
-    # [FIX] Hitung sekali dengan tipe float yang konsisten
     current_px: float = float(close.iloc[-1])
-    exdate_info: ExDateInfo = scan_exdate(t, current_price=current_px)
+
+    # ── ExDate — xlsx primary, yfinance fallback ──────────────────────────────
+    exdate_info: ExDateInfo = _resolve_exdate(t, row, current_px, adapter)
 
     if exdate_info["risk_tier"] == "CRITICAL":
         logger.info(
             f"[{t}] Excluded: ex-date CRITICAL "
-            f"(dalam {exdate_info['days_until_exdate']} hari)."
+            f"(dalam {exdate_info['days_until_exdate']} hari — "
+            f"source={exdate_info['source']})"
         )
         return None
 
-    # ── RSI (14) — Wilder's EMA ────────────────────────────────────────────
+    # ── RSI (14) ──────────────────────────────────────────────────────────────
     rsi_series = compute_rsi(close)
     if len(rsi_series) == 0:
         return None
     rsi_latest: float = float(rsi_series.iloc[-1])
 
     if rsi_latest > cfg["rsi_hard_reject"]:
-        logger.debug(f"[{t}] RSI {rsi_latest:.1f} > {cfg['rsi_hard_reject']}, hard reject.")
+        logger.debug(f"[{t}] RSI {rsi_latest:.1f} > {cfg['rsi_hard_reject']}, hard reject")
         return None
 
-    # ── SMA 20 ────────────────────────────────────────────────────────────
+    # ── SMA 20 — Uptrend Confirmation ────────────────────────────────────────
     sma20 = close.rolling(20).mean()
     if pd.isna(sma20.iloc[-1]):
         return None
     sma20_latest: float = float(sma20.iloc[-1])
 
-    # Uptrend confirmation: harga harus di atas SMA20
     if current_px <= sma20_latest:
-        return None
+        return None  # Harga di bawah SMA20 = downtrend, skip
 
-    # ── ATR (14) ──────────────────────────────────────────────────────────
+    # ── ATR (14) ──────────────────────────────────────────────────────────────
     atr_series = compute_atr(high, low, close)
     if pd.isna(atr_series.iloc[-1]):
         return None
     atr_14: float = float(atr_series.iloc[-1])
 
-    # ── Liquidity Gate: ADT 20d ───────────────────────────────────────────
+    # ── Liquidity Gate: ADT 20d ───────────────────────────────────────────────
     adt_20: float = float((close * vol).tail(20).mean())
     if adt_20 < cfg["min_adt_20d"]:
-        logger.debug(f"[{t}] ADT Rp {adt_20:,.0f} < threshold, skip.")
+        logger.debug(f"[{t}] ADT Rp {adt_20:,.0f} < threshold, skip")
         return None
 
-    # ── Volume Confirmation: 3d avg vs 20d avg ───────────────────────────
+    # ── Volume Confirmation ───────────────────────────────────────────────────
     vol_20d_avg: float = float(vol.tail(20).mean())
     vol_3d_avg:  float = float(vol.tail(3).mean())
     if vol_3d_avg <= vol_20d_avg * cfg["vol_confirmation_ratio"]:
@@ -306,11 +542,10 @@ def _analyze_ticker(
     vol_5d_avg: float = float(vol.tail(5).mean())
     curr_vol:   float = float(vol.iloc[-1])
 
-    # ── MOMENTUM SCORE ────────────────────────────────────────────────────
+    # ── Momentum Score ────────────────────────────────────────────────────────
     mom_score: float = 0.0
     mom_note:  list[str] = []
 
-    # RSI Zone Scoring
     if cfg["rsi_accum_lo"] <= rsi_latest <= cfg["rsi_accum_hi"]:
         mom_score += cfg["weight_momentum_rsi"]
         mom_note.append(f"RSI Akumulasi ({rsi_latest:.1f})")
@@ -324,7 +559,6 @@ def _analyze_ticker(
         mom_score += cfg["weight_momentum_rsi"] * 0.25
         mom_note.append(f"RSI Lemah ({rsi_latest:.1f})")
 
-    # Volume Breakout Scoring
     if curr_vol > vol_5d_avg:
         mom_score += cfg["weight_momentum_vol"]
         mom_note.append("Volume Breakout")
@@ -332,66 +566,71 @@ def _analyze_ticker(
         mom_score += cfg["weight_momentum_vol"] * 0.5
         mom_note.append("Volume Normal")
 
-    # ── Composite Score + Distance to SMA20 Adjustments ─────────────────
+    # ── Composite Score + SMA20 Distance Adjustments ─────────────────────────
     total_score: float = row["Val_Score"] + row["Prof_Score"] + mom_score
-
     dist_to_sma20_pct: float = (current_px - sma20_latest) / sma20_latest
 
     if dist_to_sma20_pct > 0.10:
-        # Over-extended: harga terlalu jauh di atas SMA20, risiko pullback
         total_score += cfg["over_extended_penalty"]
         mom_note.append(f"Over-Extended (+{dist_to_sma20_pct*100:.1f}% SMA20)")
     elif 0.01 <= dist_to_sma20_pct <= 0.05:
-        # [IMPROVE] Fresh breakout: zona entry ideal
         total_score += cfg["fresh_breakout_bonus"]
         mom_note.append(f"Fresh Breakout (+{dist_to_sma20_pct*100:.1f}% SMA20)")
 
-    # ── Stop Loss (ATR-based + BEI tick size) ────────────────────────────
+    # ── Stop Loss (ATR-based + BEI tick size) ─────────────────────────────────
     stop_candidate_1 = sma20_latest - (cfg["stop_atr_from_sma20"] * atr_14)
     stop_candidate_2 = current_px   - (cfg["stop_atr_from_price"] * atr_14)
     stop_loss: float = max(stop_candidate_1, stop_candidate_2)
     stop_loss = max(stop_loss, current_px * cfg["stop_hard_floor_pct"])
-    # Bulatkan ke fraksi harga BEI yang valid (tick size regulation)
     stop_loss = snap_to_tick(stop_loss)
 
-    # ── Sector PBV Context ────────────────────────────────────────────────
+    # ── Sector PBV Context ────────────────────────────────────────────────────
     sector_key   = row["Sector"]
     sector_bench = SECTOR_PBV_BENCHMARK.get(sector_key, SECTOR_PBV_BENCHMARK["default"])
-    pbv_current: float = row["Current Price to Book Value"]
+    pbv_current: float = float(row.get("Current Price to Book Value", 0))
     pbv_label = (
         "Murah" if pbv_current < sector_bench["fair_lo"] else
         "Wajar" if pbv_current <= sector_bench["fair_hi"] else
         "Mahal"
     )
 
+    # ── Quality Flags dari xlsx ───────────────────────────────────────────────
+    piotroski = row.get("Piotroski F-Score", 0)
+    altman_z  = row.get("Altman Z-Score (Modified)", 0)
+
     return {
-        "Ticker":                   t,
-        "Sektor":                   row["Sector_Label"],
-        "Current Price":            current_px,
-        "Stop Loss Level":          round(stop_loss, 0),
-        "Est. Fair Value (Graham)": row["Graham_Number"],
-        "Graham_Bear":              row["Graham_Bear"],
-        "Graham_Bull":              row["Graham_Bull"],
-        "Valuation Gap (%)":        row["Valuation_Gap_Pct"],
-        "RSI (14)":                 rsi_latest,
-        "SMA 20":                   sma20_latest,
-        "ATR (14)":                 atr_14,
-        "ROE (TTM)":                row["Return on Equity (TTM)"],
-        "DER (Quarter)":            row["Debt to Equity Ratio (Quarter)"],
-        "PBV":                      pbv_current,
-        "PBV vs Sektor":            pbv_label,
-        "PBV Sektor Percentile":    round(row["PBV_Sector_Pctile"] * 100, 1),
-        "ADT 20d (Rp)":             adt_20,
-        "Composite Score":          total_score,
-        "Entry Strategy":           " | ".join(mom_note),
-        "ExDate Risk":              exdate_info["risk_tier"],
-        "ExDate Date":              exdate_info.get("ex_date"),
-        "_exdate_info":             exdate_info,
+        "Ticker":                    t,
+        "Sektor":                    row["Sector_Label"],
+        "Sektor Key":                sector_key,
+        "Current Price":             current_px,
+        "Stop Loss Level":           round(stop_loss, 0),
+        "Est. Fair Value (Graham)":  row["Graham_Number"],
+        "Graham_Bear":               row["Graham_Bear"],
+        "Graham_Bull":               row["Graham_Bull"],
+        "Valuation Gap (%)":         row["Valuation_Gap_Pct"],
+        "Price to Equity Discount": row.get("Price to Equity Discount (%)", 0),
+        "RSI (14)":                  rsi_latest,
+        "SMA 20":                    sma20_latest,
+        "ATR (14)":                  atr_14,
+        "ROE (TTM)":                 row["Return on Equity (TTM)"],
+        "DER (Quarter)":             row["Debt to Equity Ratio (Quarter)"],
+        "PBV":                       pbv_current,
+        "PBV vs Sektor":             pbv_label,
+        "PBV Sektor Percentile":     round(row["PBV_Sector_Pctile"] * 100, 1),
+        "ADT 20d (Rp)":              adt_20,
+        "Composite Score":           total_score,
+        "Entry Strategy":            " | ".join(mom_note),
+        "Piotroski F-Score":         int(piotroski) if piotroski else 0,
+        "Altman Z-Score":            float(altman_z) if altman_z else 0.0,
+        "ExDate Risk":               exdate_info["risk_tier"],
+        "ExDate Date":               exdate_info.get("ex_date"),
+        "ExDate Source":             exdate_info.get("source", "unknown"),
+        "_exdate_info":              exdate_info,
     }
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# ── MAIN PIPELINE ─────────────────────────────────════════════════════════════
+# ── MAIN PIPELINE ─────────────────────────────────────────────────────────────
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run_pipeline(cfg: dict) -> pd.DataFrame:
@@ -400,99 +639,130 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
     os.makedirs(cfg["scratch_dir"], exist_ok=True)
 
     logger.info("=" * 60)
-    logger.info("IHSG Quantitative Swing-Trade Scouting Engine v2.1")
+    logger.info("IHSG Quantitative Swing-Trade Scouting Engine v3.0")
     logger.info("=" * 60)
 
-    # ── 1. DATA INGESTION ────────────────────────────────────────────────────
+    # ── Resolve input_file — auto-detect jika None ────────────────────────────
+    if not cfg.get("input_file"):
+        cfg["input_file"] = _find_latest_xlsx(cfg.get("output_dir", "output"))
+    cfg["input_file"] = str(Path(cfg["input_file"]))  # normalisasi separator OS
+    logger.info(f"Input file: {cfg['input_file']}")
 
+    # ── Resolve sector_cache_file path (Windows-safe) ─────────────────────────
+    cfg["sector_cache_file"] = str(Path(cfg["sector_cache_file"]))
+
+    # ── 0. Inisialisasi XlsxDataAdapter ──────────────────────────────────────
+    adapter: "XlsxDataAdapter | None" = None
+    if _HAS_ADAPTER:
+        try:
+            adapter = XlsxDataAdapter(cfg["input_file"])
+            logger.info(f"[Adapter] XlsxDataAdapter aktif → {cfg['input_file']}")
+        except Exception as e:
+            logger.warning(f"[Adapter] Gagal init XlsxDataAdapter: {e}")
+
+    # ── 1. DATA INGESTION — semua dari xlsx ───────────────────────────────────
     logger.info(f"Membaca: {cfg['input_file']}")
-    df_stats  = pd.read_excel(cfg["input_file"], sheet_name="key-statistics")
-    df_prices = pd.read_excel(cfg["input_file"], sheet_name="stock-prices")
 
-    df = pd.merge(
-        df_stats,
-        df_prices[["Ticker", "Close Price", "Volume"]],
-        on="Ticker",
+    df_ks     = pd.read_excel(cfg["input_file"], sheet_name="key-statistics")
+    df_prices = pd.read_excel(cfg["input_file"], sheet_name="stock-prices")
+    df_anal   = pd.read_excel(cfg["input_file"], sheet_name="analysis")
+    df_idx    = pd.read_excel(cfg["input_file"], sheet_name="idx-stocks")
+
+    # Merge semua sheet
+    df = df_ks.merge(
+        df_prices[["Ticker", "Close Price", "Volume", "High Price", "Low Price"]],
+        on="Ticker", how="left",
+    ).merge(
+        df_anal[["Ticker", "Price to Equity Discount (%)", "Composite Rank"]],
+        on="Ticker", how="left",
+    ).merge(
+        df_idx[["Ticker", "Name", "Note"]],
+        on="Ticker", how="left",
     )
 
-    sector_map = _load_sector_map(cfg["sector_cache_file"], logger)
-
+    # Numeric coerce
     for col in [
-        "Close Price",
-        "Debt to Equity Ratio (Quarter)",
-        "Current Price to Book Value",
-        "Return on Equity (TTM)",
-        "Current EPS (TTM)",
+        "Close Price", "Debt to Equity Ratio (Quarter)",
+        "Current Price to Book Value", "Return on Equity (TTM)",
+        "Current EPS (TTM)", "Piotroski F-Score",
+        "Altman Z-Score (Modified)", "Price to Equity Discount (%)",
+        "Current Book Value Per Share",
     ]:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
 
     logger.info(f"Total ticker universe: {len(df)}")
 
-    # ── 2. SECTOR-AWARE PBV RANKING ──────────────────────────────────────────
+    # ── 1b. Exclude PEMANTAUAN KHUSUS di awal ────────────────────────────────
+    if cfg.get("exclude_pemantauan", True):
+        n_before = len(df)
+        df = df[~df["Note"].str.contains("PEMANTAUAN KHUSUS", na=False)].copy()
+        logger.info(f"Exclude PEMANTAUAN KHUSUS: {n_before} → {len(df)}")
 
+    # ── 2. SECTOR RESOLVE — 4 lapis prioritas ────────────────────────────────
+    names_map = dict(zip(df_idx["Ticker"], df_idx["Name"].fillna("")))
+    sector_map = _build_sector_map(
+        tickers=df["Ticker"].tolist(),
+        names=names_map,
+        cache_file=cfg["sector_cache_file"],
+        logger=logger,
+    )
     df["Sector"] = df["Ticker"].map(sector_map).fillna("default")
 
-    unmapped = df[df["Sector"] == "default"]["Ticker"].tolist()
-    if unmapped:
-        logger.warning(
-            f"SECTOR_MAP miss → {len(unmapped)} ticker fallback ke 'default': "
-            + str(unmapped[:30]) + ("..." if len(unmapped) > 30 else "")
-        )
-
-    # Rank PBV dalam sektor (ascending: murah = rank rendah = lebih mungkin lolos filter)
+    # PBV percentile per sektor (untuk filter + scoring)
     df["PBV_Sector_Pctile"] = df.groupby("Sector")["Current Price to Book Value"].rank(
         pct=True, ascending=True
     )
-
     df["Sector_Label"] = df["Sector"].map(
         {k: v["label"] for k, v in SECTOR_PBV_BENCHMARK.items()}
     ).fillna("Lain-lain")
 
-    # ── 3. STATIC FILTERING ──────────────────────────────────────────────────
+    # ── 3. STATIC FILTERING ───────────────────────────────────────────────────
+    alt_col = "Altman Z-Score (Modified)"
 
     filtered = df[
         (df["Close Price"] > cfg["min_close_price"]) &
         (df["Debt to Equity Ratio (Quarter)"] < cfg["max_der"]) &
         (df["PBV_Sector_Pctile"] < cfg["pbv_sector_pctile"]) &
         (df["Current Price to Book Value"] < cfg["max_pbv_hard"]) &
-        (df["Return on Equity (TTM)"] > cfg["min_roe"])
+        (df["Return on Equity (TTM)"] > cfg["min_roe"]) &
+        # [NEW v3.0] Piotroski F-Score
+        (df["Piotroski F-Score"] >= cfg["min_piotroski"]) &
+        # [NEW v3.0] Altman Z-Score — exclude distress zone
+        # (0 = data tidak ada, skip filter; > 0 harus > threshold)
+        ((df[alt_col] == 0) | (df[alt_col].isna()) | (df[alt_col] > cfg["min_altman_z"]))
     ].copy()
 
     logger.info(f"Lolos static filter: {len(filtered)} ticker")
 
-    # ── 4. VALUATION SCORING — Graham Number (IHSG-calibrated) ──────────────
+    # Distribusi sektor setelah filter
+    sector_dist = filtered["Sector"].value_counts()
+    logger.info("Distribusi sektor:\n" + sector_dist.to_string())
 
-    filtered["BVPS"] = filtered["Close Price"] / filtered["Current Price to Book Value"]
-
-    valid_graham = (filtered["Current EPS (TTM)"] > 0) & (filtered["BVPS"] > 0)
+    # ── 4. VALUATION SCORING — Graham Number (IHSG-calibrated) ───────────────
+    bvps = filtered["Current Book Value Per Share"]
     eps  = filtered["Current EPS (TTM)"]
-    bvps = filtered["BVPS"]
     k    = cfg["graham_k"]
 
+    valid_graham = (eps > 0) & (bvps > 0)
     filtered["Graham_Number"] = np.where(valid_graham, np.sqrt(k * eps * bvps), 0)
-    filtered["Graham_Bear"]   = np.where(valid_graham, np.sqrt(k * (eps * cfg["graham_bear_eps"]) * bvps), 0)
-    filtered["Graham_Bull"]   = np.where(valid_graham, np.sqrt(k * (eps * cfg["graham_bull_eps"]) * bvps), 0)
+    filtered["Graham_Bear"]   = np.where(valid_graham, np.sqrt(k * eps * cfg["graham_bear_eps"] * bvps), 0)
+    filtered["Graham_Bull"]   = np.where(valid_graham, np.sqrt(k * eps * cfg["graham_bull_eps"] * bvps), 0)
 
     filtered["Valuation_Gap_Pct"] = (
-        (filtered["Graham_Number"] - filtered["Close Price"]) / filtered["Close Price"]
-    ) * 100
+        (filtered["Graham_Number"] - filtered["Close Price"]) / filtered["Close Price"] * 100
+    ).clip(lower=0)
 
-    # clip(lower=0): saham di atas Graham Number → gap = 0, Val_Score akan 0
-    filtered["Valuation_Gap_Pct"] = filtered["Valuation_Gap_Pct"].clip(lower=0)
-
-    # Rank-based score → imun terhadap outlier Graham Number yang ekstrem
     filtered["Val_Score"] = (
         filtered["Valuation_Gap_Pct"].rank(pct=True) * cfg["weight_valuation"]
     )
 
-    # ── 5. PROFITABILITY SCORING ─────────────────────────────────────────────
-
+    # ── 5. PROFITABILITY SCORING ──────────────────────────────────────────────
     filtered["Prof_Score"] = (
         filtered["Return on Equity (TTM)"].rank(pct=True) * cfg["weight_profitability"]
     )
 
     # ── 6. DYNAMIC TECHNICALS VIA YFINANCE ───────────────────────────────────
-
     valid_tickers = filtered["Ticker"].tolist()
     tickers_yf    = [t + ".JK" for t in valid_tickers]
 
@@ -505,23 +775,18 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
     )
 
     results = []
-
     for _, row in filtered.iterrows():
         t_yf = row["Ticker"] + ".JK"
-
         if t_yf not in data.columns.get_level_values(0):
             continue
-
         df_t = data[t_yf].dropna(how="all")
         if len(df_t) < cfg["min_bars"]:
             continue
-
-        result = _analyze_ticker(row, df_t, cfg, logger)
+        result = _analyze_ticker(row, df_t, cfg, logger, adapter=adapter)
         if result:
             results.append(result)
 
     # ── 7. FINALIZE & OUTPUT ──────────────────────────────────────────────────
-
     final_df = pd.DataFrame(results)
 
     if final_df.empty:
@@ -530,14 +795,14 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         final_df = final_df.sort_values("Composite Score", ascending=False).head(cfg["top_n"])
         logger.info(f"Top {len(final_df)} kandidat berhasil disaring.")
 
-    # ── Export JSON (untuk orchestrator.py) ──────────────────────────────────
+    # Export JSON (untuk orchestrator.py)
     if not final_df.empty:
         json_path = os.path.join(cfg["output_dir"], "top10_candidates.json")
         export_df = final_df.drop(columns=["_exdate_info"], errors="ignore")
-        export_df.to_json(json_path, orient="records", indent=2)
+        export_df.to_json(json_path, orient="records", indent=2, force_ascii=False)
         logger.info(f"JSON diekspor → {json_path}")
 
-    # ── Export Markdown Report ────────────────────────────────────────────────
+    # Export Markdown Report
     md_content = _build_markdown_report(final_df, cfg)
     report_path = os.path.join(cfg["scratch_dir"], "report.md")
     with open(report_path, "w", encoding="utf-8") as f:
@@ -549,19 +814,20 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# ── REPORT BUILDER ────────────────────────────────────────────────────────────
+# ── REPORT BUILDER ────────────────────────────────────────────════════════════
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
     lines = []
     lines.append(f"# 🏆 Top {cfg['top_n']} High-Conviction IHSG Swing Candidates")
     lines.append(f"*Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
+    lines.append(f"*Engine: v3.0 — Sektor via 4-lapis resolver | ExDate via xlsx*")
     lines.append("")
     lines.append(
-        "| Rank | Ticker | Sektor | Harga | Stop Loss | Fair Value (Bear–Bull) "
-        "| Score | Gap | RSI | PBV | Entry Note |"
+        "| Rank | Ticker | Sektor | Harga | Stop Loss | Graham Fair Value "
+        "| Score | Gap | RSI | PBV | F-Score | Entry Note |"
     )
-    lines.append("|---|---|---|---|---|---|---|---|---|---|---|")
+    lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|")
 
     for i, (_, r) in enumerate(final_df.iterrows(), 1):
         fv_str = (
@@ -569,6 +835,11 @@ def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
             if r["Est. Fair Value (Graham)"] > 0 else "N/A"
         )
         exdate_icon = " ⚠️" if r["ExDate Risk"] == "WARNING" else ""
+        ex_src = f" [{r.get('ExDate Source','?')}]" if r.get("ExDate Source") else ""
+        piotroski_icon = (
+            "🟢" if r.get("Piotroski F-Score", 0) >= 7 else
+            "🟡" if r.get("Piotroski F-Score", 0) >= 4 else "🔴"
+        )
         lines.append(
             f"| {i} "
             f"| **{r['Ticker']}**{exdate_icon} "
@@ -580,63 +851,63 @@ def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
             f"| +{r['Valuation Gap (%)']:.1f}% "
             f"| {r['RSI (14)']:.1f} "
             f"| {r['PBV']:.1f}× ({r['PBV vs Sektor']}) "
-            f"| {r['Entry Strategy']} |"
+            f"| {piotroski_icon} {r.get('Piotroski F-Score', 'N/A')}/9 "
+            f"| {r['Entry Strategy']}{ex_src} |"
         )
 
     lines.append("")
     lines.append("---")
-    lines.append("")
-    lines.append("> ⚠️ = Mendekati ex-date dividen, waspadai dividend gap risk.")
+    lines.append("> ⚠️ = Mendekati ex-date dividen. F-Score: 🟢 ≥7 / 🟡 4–6 / 🔴 <4")
     lines.append("")
 
-    # ── ExDate Detail Blocks untuk ticker WARNING tier ───────────────────────
-    warning_rows = final_df[final_df["ExDate Risk"] == "WARNING"]
-    if not warning_rows.empty:
-        lines.append("## ⚠️ Dividend Ex-Date Risk Details")
-        lines.append("")
-        for _, wr in warning_rows.iterrows():
-            ex_info: ExDateInfo = wr["_exdate_info"]
-            lines.append("```")
-            lines.append(format_exdate_block(wr["Ticker"], ex_info).strip())
-            lines.append("```")
+    # ExDate Detail Blocks untuk WARNING tier
+    if not final_df.empty:
+        warning_rows = final_df[final_df["ExDate Risk"] == "WARNING"]
+        if not warning_rows.empty:
+            lines.append("## ⚠️ Dividend Ex-Date Risk Details")
             lines.append("")
+            for _, wr in warning_rows.iterrows():
+                ex_info: ExDateInfo = wr["_exdate_info"]
+                lines.append("```")
+                lines.append(format_exdate_block(wr["Ticker"], ex_info).strip())
+                lines.append("```")
+                lines.append("")
 
+    # Investment thesis untuk rank #1
     if not final_df.empty:
         top1 = final_df.iloc[0]
         max_dd = ((top1["Current Price"] - top1["Stop Loss Level"]) / top1["Current Price"]) * 100
         lines.append(f"## 💡 Investment Thesis: {top1['Ticker']} (Rank #1)")
         lines.append("")
         lines.append(
-            f"**{top1['Ticker']}** ({top1['Sektor']}) muncul sebagai kandidat tertinggi "
+            f"**{top1['Ticker']}** ({top1['Sektor']}) adalah kandidat tertinggi "
             f"berdasarkan multi-factor swing strategy."
         )
         lines.append("")
         lines.append(
             f"- **Valuation MoS**: Diskon **{top1['Valuation Gap (%)']:.1f}%** "
-            f"terhadap Graham Fair Value (Rp {top1['Est. Fair Value (Graham)']:,.0f}). "
-            f"PBV saat ini {top1['PBV']:.1f}× — dinilai **{top1['PBV vs Sektor']}** "
-            f"vs historis sektor {top1['Sektor']}."
+            f"terhadap Graham Fair Value. "
+            f"PBV saat ini {top1['PBV']:.1f}× — **{top1['PBV vs Sektor']}** vs sektor."
         )
         lines.append(
-            f"- **Momentum & Trend**: Harga Rp {top1['Current Price']:,.0f} "
-            f"di atas SMA-20 (Rp {top1['SMA 20']:,.0f}). {top1['Entry Strategy']}."
+            f"- **Quality**: Piotroski F-Score **{top1.get('Piotroski F-Score','N/A')}/9** | "
+            f"Altman Z **{top1.get('Altman Z-Score', 'N/A')}**"
         )
         lines.append(
-            f"- **Profitabilitas**: ROE {top1['ROE (TTM)']*100:.1f}% "
-            f"dengan DER {top1['DER (Quarter)']:.2f}× — fundamental solid."
+            f"- **Momentum**: Harga Rp {top1['Current Price']:,.0f} di atas "
+            f"SMA-20 (Rp {top1['SMA 20']:,.0f}). {top1['Entry Strategy']}."
+        )
+        lines.append(
+            f"- **Profitabilitas**: ROE {top1['ROE (TTM)']*100:.1f}% | "
+            f"DER {top1['DER (Quarter)']:.2f}×"
         )
         lines.append(
             f"- **Risk Management**: Stop loss di **Rp {top1['Stop Loss Level']:,.0f}** "
-            f"(ATR-based, max drawdown ~{max_dd:.1f}%)."
-        )
-        lines.append("")
-        lines.append(
-            "**Action Plan**: Kandidat ini cocok untuk swing 1–3 bulan "
-            "dengan target menutup valuation gap, dilindungi oleh fundamental yang kuat."
+            f"(ATR-based, max drawdown ~{max_dd:.1f}%)"
         )
     else:
         lines.append(
-            "> Tidak ada ticker yang lolos semua filter dalam scan ini. "
+            "> Tidak ada ticker yang lolos semua filter. "
             "Coba longgarkan threshold atau perbarui data input."
         )
 

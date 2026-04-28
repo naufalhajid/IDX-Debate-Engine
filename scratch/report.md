@@ -1,43 +1,29 @@
 # 🏆 Top 10 High-Conviction IHSG Swing Candidates
-*Generated: 2026-04-26 14:53:32*
+*Generated: 2026-04-28 16:00:01*
+*Engine: v3.0 — Sektor via 4-lapis resolver | ExDate via xlsx*
 
-| Rank | Ticker | Sektor | Harga | Stop Loss | Fair Value (Bear–Bull) | Score | Gap | RSI | PBV | Entry Note |
-|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | **GJTL** | Konsumen Non-Primer | Rp 1,175 | **Rp 1,105** | Rp 4,078 – Rp 4,743 | **89.9/100** | +276.4% | 58.4 | 0.4× (Murah) | RSI Uptrend Kuat (58.4) | Volume Breakout | Fresh Breakout (+2.9% SMA20) |
-| 2 | **ERAA** | Konsumen Non-Primer | Rp 404 | **Rp 382** | Rp 818 – Rp 952 | **89.6/100** | +119.7% | 58.9 | 0.7× (Murah) | RSI Uptrend Kuat (58.9) | Volume Breakout | Fresh Breakout (+4.3% SMA20) |
-| 3 | **BUKA** | Konsumen Non-Primer | Rp 159 | **Rp 146** | Rp 340 – Rp 395 | **88.6/100** | +131.6% | 55.9 | 0.7× (Murah) | RSI Uptrend Kuat (55.9) | Volume Breakout | Fresh Breakout (+3.4% SMA20) |
-| 4 | **ASII** ⚠️ | Perindustrian | Rp 6,325 | **Rp 6,025** | Rp 8,409 – Rp 9,781 | **79.0/100** | +44.2% | 52.1 | 1.1× (Wajar) | RSI Akumulasi (52.1) | Volume Normal | Fresh Breakout (+1.3% SMA20) |
-| 5 | **BBNI** | Perbankan | Rp 3,770 | **Rp 3,620** | Rp 6,182 – Rp 7,191 | **76.7/100** | +77.9% | 47.9 | 0.8× (Murah) | RSI Akumulasi (47.9) | Volume Breakout |
-| 6 | **ELSA** | Energi | Rp 780 | **Rp 720** | Rp 1,054 – Rp 1,225 | **73.8/100** | +46.5% | 59.8 | 1.1× (Wajar) | RSI Uptrend Kuat (59.8) | Volume Breakout |
-| 7 | **BBTN** | Perbankan | Rp 1,400 | **Rp 1,290** | Rp 3,285 – Rp 3,821 | **73.6/100** | +154.5% | 59.2 | 0.5× (Murah) | RSI Uptrend Kuat (59.2) | Volume Breakout |
-| 8 | **LSIP** | Konsumen Primer | Rp 1,670 | **Rp 1,535** | Rp 2,971 – Rp 3,456 | **68.0/100** | +93.0% | 67.9 | 0.8× (Murah) | RSI Uptrend Kuat (67.9) | Volume Normal |
-| 9 | **RAJA** | Infrastruktur | Rp 4,340 | **Rp 3,990** | Rp 1,177 – Rp 1,369 | **65.1/100** | +0.0% | 48.5 | 5.2× (Mahal) | RSI Akumulasi (48.5) | Volume Breakout | Fresh Breakout (+1.3% SMA20) |
-| 10 | **DGWG** | Barang Baku | Rp 402 | **Rp 372** | Rp 323 – Rp 375 | **63.6/100** | +0.0% | 54.7 | 2.2× (Wajar) | RSI Akumulasi (54.7) | Volume Breakout |
+| Rank | Ticker | Sektor | Harga | Stop Loss | Graham Fair Value | Score | Gap | RSI | PBV | F-Score | Entry Note |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | **SRTG** | Keuangan Non-Bank | Rp 1,830 | **Rp 1,710** | Rp 6,020 – Rp 7,002 | **90.7/100** | +272.0% | 61.8 | 0.4× (Murah) | 🟢 7/9 | RSI Uptrend Kuat (61.8) | Volume Breakout | Fresh Breakout (+3.7% SMA20) [xlsx] |
+| 2 | **GJTL** | Konsumen Non-Primer | Rp 1,195 | **Rp 1,120** | Rp 4,070 – Rp 4,734 | **90.1/100** | +275.7% | 61.2 | 0.4× (Murah) | 🟡 5/9 | RSI Uptrend Kuat (61.2) | Volume Breakout | Fresh Breakout (+3.3% SMA20) [xlsx] |
+| 3 | **WIIM** | Konsumen Primer | Rp 1,840 | **Rp 1,740** | Rp 1,804 – Rp 2,098 | **87.5/100** | +16.8% | 50.7 | 1.6× (Wajar) | 🟢 7/9 | RSI Akumulasi (50.7) | Volume Breakout | Fresh Breakout (+2.0% SMA20) [xlsx] |
+| 4 | **BUKA** | Konsumen Non-Primer | Rp 158 | **Rp 148** | Rp 340 – Rp 395 | **83.7/100** | +131.9% | 52.8 | 0.7× (Murah) | 🟢 7/9 | RSI Akumulasi (52.8) | Volume Normal | Fresh Breakout (+1.5% SMA20) [xlsx] |
+| 5 | **AUTO** | Konsumen Non-Primer | Rp 2,640 | **Rp 2,520** | Rp 4,937 – Rp 5,743 | **79.3/100** | +92.6% | 61.3 | 0.8× (Wajar) | 🟡 6/9 | RSI Uptrend Kuat (61.3) | Volume Normal | Fresh Breakout (+4.9% SMA20) [xlsx] |
+| 6 | **DSNG** | Konsumen Primer | Rp 1,765 | **Rp 1,625** | Rp 1,706 – Rp 1,984 | **76.1/100** | +8.5% | 58.3 | 1.6× (Wajar) | 🟢 9/9 | RSI Uptrend Kuat (58.3) | Volume Breakout | Fresh Breakout (+3.6% SMA20) [xlsx] |
+| 7 | **MAPI** | Konsumen Non-Primer | Rp 1,295 | **Rp 1,240** | Rp 1,323 – Rp 1,539 | **72.5/100** | +11.7% | 54.3 | 1.5× (Wajar) | 🟢 8/9 | RSI Akumulasi (54.3) | Volume Normal | Fresh Breakout (+1.2% SMA20) [xlsx] |
+| 8 | **UNTR** | Barang Baku | Rp 30,225 | **Rp 29,500** | Rp 40,125 – Rp 46,672 | **69.3/100** | +36.6% | 52.3 | 1.2× (Wajar) | 🟡 5/9 | RSI Akumulasi (52.3) | Volume Normal [xlsx] |
+| 9 | **ANTM** | Barang Baku | Rp 4,020 | **Rp 3,710** | Rp 2,611 – Rp 3,037 | **68.3/100** | +0.0% | 57.2 | 2.8× (Mahal) | 🟢 8/9 | RSI Uptrend Kuat (57.2) | Volume Breakout | Fresh Breakout (+4.1% SMA20) [xlsx] |
+| 10 | **LSIP** | Konsumen Primer | Rp 1,690 | **Rp 1,555** | Rp 2,965 – Rp 3,449 | **67.9/100** | +92.6% | 63.2 | 0.8× (Murah) | 🟢 7/9 | RSI Uptrend Kuat (63.2) | Volume Normal [xlsx] |
 
 ---
+> ⚠️ = Mendekati ex-date dividen. F-Score: 🟢 ≥7 / 🟡 4–6 / 🔴 <4
 
-> ⚠️ = Mendekati ex-date dividen, waspadai dividend gap risk.
+## 💡 Investment Thesis: SRTG (Rank #1)
 
-## ⚠️ Dividend Ex-Date Risk Details
+**SRTG** (Keuangan Non-Bank) adalah kandidat tertinggi berdasarkan multi-factor swing strategy.
 
-```
-=== DIVIDEND EX-DATE SCAN: ASII ===
-Risk Tier         : 🟠 WARNING  — Ex-date dalam 30 hari
-Ex-Dividend Date  : 2026-05-05 (9 hari lagi)
-Dividend/Share    : Rp 98
-Estimated Yield   : 1.55%
-Expected Price Drop on Ex-Date: ~Rp 98
-
-⚠️  CIO NOTE: Saham ini akan mengalami price drop sebesar ~~Rp 98 pada 2026-05-05. Jika swing trade horizon mencakup tanggal ini, target price harus di-adjust downward sebesar dividend amount, dan R/R ratio efektif lebih buruk dari yang terkalkulasi.
-```
-
-## 💡 Investment Thesis: GJTL (Rank #1)
-
-**GJTL** (Konsumen Non-Primer) muncul sebagai kandidat tertinggi berdasarkan multi-factor swing strategy.
-
-- **Valuation MoS**: Diskon **276.4%** terhadap Graham Fair Value (Rp 4,423). PBV saat ini 0.4× — dinilai **Murah** vs historis sektor Konsumen Non-Primer.
-- **Momentum & Trend**: Harga Rp 1,175 di atas SMA-20 (Rp 1,142). RSI Uptrend Kuat (58.4) | Volume Breakout | Fresh Breakout (+2.9% SMA20).
-- **Profitabilitas**: ROE 11.9% dengan DER 0.50× — fundamental solid.
-- **Risk Management**: Stop loss di **Rp 1,105** (ATR-based, max drawdown ~6.0%).
-
-**Action Plan**: Kandidat ini cocok untuk swing 1–3 bulan dengan target menutup valuation gap, dilindungi oleh fundamental yang kuat.
+- **Valuation MoS**: Diskon **272.0%** terhadap Graham Fair Value. PBV saat ini 0.4× — **Murah** vs sektor.
+- **Quality**: Piotroski F-Score **7/9** | Altman Z **26.8**
+- **Momentum**: Harga Rp 1,830 di atas SMA-20 (Rp 1,765). RSI Uptrend Kuat (61.8) | Volume Breakout | Fresh Breakout (+3.7% SMA20).
+- **Profitabilitas**: ROE 12.4% | DER 0.00×
+- **Risk Management**: Stop loss di **Rp 1,710** (ATR-based, max drawdown ~6.6%)
