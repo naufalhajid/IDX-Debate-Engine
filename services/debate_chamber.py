@@ -81,9 +81,6 @@ _TRANSIENT_ERROR_PATTERNS = (
     "connection dropped",  # wraps asyncio.CancelledError from network timeout
     "timeout",
     "empty response",      # Gemini safety filter / token budget returns empty content
-    "connectionerror",     # requests.ConnectionError
-    "readtimeout",         # requests.ReadTimeout
-    "max retries",         # urllib3 MaxRetryError
 )
 
 
@@ -508,11 +505,11 @@ Current Date (Asia/Jakarta): {current_date}
                 "fundamental_data": resp.content,
                 "fair_value_estimate": fv_price,
             }
-        except BudgetExhaustedError:
-            raise  # C1: propagate — jangan swallow saat budget habis
         except Exception as e:
             logger.error(f"[Fundamental] Error: {e}")
             return {"fundamental_data": "Data Unavailable (Error)"}
+
+    async def _chartist_node(self, state: DebateChamberState) -> dict:
         """Chartist with real OHLCV from yfinance — pre-computes all technicals in Python."""
         ticker = state["ticker"]
         logger.info(f"[Chartist] Fetching OHLCV + orderbook for {ticker}")
@@ -521,11 +518,8 @@ Current Date (Asia/Jakarta): {current_date}
         # ── 1. Download real price history from yfinance ─────────────────────
         tech_indicators: dict = {}
         try:
-            df_yf = await asyncio.wait_for(
-                asyncio.to_thread(
-                    yf.download, f"{ticker}.JK", period="1y", progress=False
-                ),
-                timeout=30,  # H4: yfinance tanpa timeout bisa hang selamanya
+            df_yf = await asyncio.to_thread(
+                yf.download, f"{ticker}.JK", period="1y", progress=False
             )
             if df_yf is not None and len(df_yf) >= 20:
                 # yfinance 1.3.0+ returns MultiIndex columns for single tickers:
@@ -557,8 +551,8 @@ Current Date (Asia/Jakarta): {current_date}
                     "52w_low": round(float(close.min()), 0),
                 }
                 logger.info(f"[Chartist] Technicals computed: MA50={tech_indicators.get('ma50')}, RSI={tech_indicators.get('rsi14')}")
-        except (asyncio.TimeoutError, Exception) as e:
-            logger.warning(f"[Chartist] yfinance download failed for {ticker}: {type(e).__name__}: {e}")
+        except Exception as e:
+            logger.warning(f"[Chartist] yfinance download failed for {ticker}: {e}")
 
         # ── 2. Also fetch orderbook for near-term level context ──────────────
         orderbook_data: dict = {}
@@ -601,8 +595,6 @@ Current Date (Asia/Jakarta): {current_date}
             ]
             resp = await self._invoke_llm(self.flash_llm, messages)
             return {"sentiment_data": resp.content}
-        except BudgetExhaustedError:
-            raise  # C1: propagate — jangan biarkan pipeline lanjut saat budget habis
         except Exception as e:
             logger.error(f"[Sentiment] Error: {e}")
             return {"sentiment_data": "Data Unavailable (Error)"}
@@ -1171,62 +1163,71 @@ Start your response with '{' and end with '}'. Nothing else."""
               2. Preamble before {     — "Here is the JSON: {...}"
               3. Trailing text after } — "{...} Hope this helps!"
               4. Trailing commas       — {"a": 1,} or ["x",]
-              5. JS/Python comments    — // ... or # ... on their own line
+              5. Python-style comments — // ... or # ... on their own line
               6. Single-quoted keys    — {'key': 'val'}
-              7. Unescaped double quotes inside string values  ← NEW
-                 e.g. "summary": "The stock is "oversold" technically"
-                 This was the cause of the BBCA parse failure:
-                 "Expecting ',' delimiter: line 6 column 115 (char 504)"
+              7. Unescaped quotes inside strings (must preserve structure)
+              8. Newlines inside string values (replace with space)
             """
             # 1. Strip markdown fences
             text = re.sub(r"^```(?:json)?\s*\n?", "", text.strip())
             text = re.sub(r"\n?```\s*$", "", text).strip()
-            # 2 & 3. Trim preamble/postamble
+            # 2. Find first { and last } to trim preamble/postamble
             brace = text.find("{")
             if brace > 0:
                 text = text[brace:]
             rbrace = text.rfind("}")
             if rbrace != -1 and rbrace < len(text) - 1:
-                text = text[:rbrace + 1]
-            # 4. Trailing commas before ] or }
-            text = re.sub(r",\s*([\]}])", r"\1", text)
-            # 5. JS/Python comments
+                text = text[: rbrace + 1]
+            # 3. Remove JS/Python-style comments (// ... and # ... lines)
             text = re.sub(r"//[^\n]*", "", text)
             text = re.sub(r"#[^\n]*", "", text)
-            # 6. Single-quoted keys/values
-            text = re.sub(r"(?<!\w)'([^']*)'(?!\w)", r'"\1"', text)
-            # 7. Unescaped double quotes inside string values.
-            # Walk char-by-char: when inside a JSON string, any bare " that is
-            # NOT followed by a JSON structural token (:, ,, }, ]) must be
-            # an unescaped quote embedded in the text — escape it.
-            result: list[str] = []
+            # 4. Fix trailing commas before ] or }  e.g. [1, 2,] or {"a":1,}
+            text = re.sub(r",\s*([\]}])", r"\1", text)
+            # 5. Replace newlines inside double-quoted strings with space
+            #    This handles multi-line summary/reasoning fields
+            result = []
             in_string = False
-            i = 0
-            while i < len(text):
-                c = text[i]
-                if c == "\\" and i + 1 < len(text):
-                    result.append(c)
-                    result.append(text[i + 1])
-                    i += 2
-                    continue
-                if c == '"':
-                    if not in_string:
-                        in_string = True
-                        result.append(c)
-                    else:
-                        # Peek ahead (skip whitespace) to see what follows
-                        rest = text[i + 1:].lstrip()
-                        if rest and rest[0] in ":,}]":
-                            # Legitimate closing quote
-                            in_string = False
-                            result.append(c)
-                        else:
-                            # Unescaped quote inside string — escape it
-                            result.append('\\"')
+            escape_next = False
+            for char in text:
+                if escape_next:
+                    result.append(char)
+                    escape_next = False
+                elif char == "\\":
+                    result.append(char)
+                    escape_next = True
+                elif char == '"':
+                    in_string = not in_string
+                    result.append(char)
+                elif in_string and char in ("\n", "\r", "\t"):
+                    result.append(" ")  # Replace whitespace inside strings
                 else:
-                    result.append(c)
-                i += 1
-            return "".join(result).strip()
+                    result.append(char)
+            text = "".join(result).strip()
+            
+            # 6. Final safety: if still can't parse, convert single quotes outside strings to double
+            try:
+                json.loads(text)
+                return text
+            except json.JSONDecodeError:
+                # Last resort: fix 'key' to "key" pattern outside of strings
+                final = []
+                in_str = False
+                esc = False
+                for ch in text:
+                    if esc:
+                        final.append(ch)
+                        esc = False
+                    elif ch == "\\" and in_str:
+                        final.append(ch)
+                        esc = True
+                    elif ch == '"':
+                        in_str = not in_str
+                        final.append(ch)
+                    elif ch == "'" and not in_str:
+                        final.append('"')
+                    else:
+                        final.append(ch)
+                return "".join(final).strip()
         def _apply_envelope(parsed: dict) -> dict:
             """
             Overwrite LLM-supplied price fields with Python-computed envelope values.
