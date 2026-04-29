@@ -1,0 +1,57 @@
+{
+  "ticker": "BBCA",
+  "verdict": {
+    "ticker": "BBCA",
+    "rating": "HOLD",
+    "confidence": 0.0,
+    "fair_value": 10474.0,
+    "entry_price_range": "5800 - 5975",
+    "target_price": 6500.0,
+    "stop_loss": 5575.0,
+    "current_price": 5975.0,
+    "timeframe": "1-3 Months",
+    "weighted_reasoning": "",
+    "critical_risk_factor": "",
+    "key_catalysts": [],
+    "key_risks": [],
+    "summary": "CIO parse error — raw response stored. Error: Expecting ',' delimiter: line 6 column 115 (char 504)",
+    "expected_return": "+10.4%",
+    "risk_reward_ratio": 1.96,
+    "is_overvalued": false,
+    "wait_and_see": true
+  },
+  "debate_rounds": 2,
+  "debate_history": [
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 5,975, Rp 10,474",
+      "round": 0
+    },
+    {
+      "role": "bull",
+      "content": "BBCA presents a compelling fundamental undervaluation, trading at Rp 5,975, which is a substantial 75.3% discount to its estimated fair value of Rp 10,474. This significant gap provides a strong fundamental floor for a potential swing trade. The company's robust profitability, evidenced by a TTM ROE of 22.4",
+      "round": 1
+    },
+    {
+      "role": "bear",
+      "content": "As a Forensic Financial Auditor, the proposed swing trade for BBCA presents significant risks, warranting an AVOID verdict. The Bull's argument for a \"strong fundamental floor\" is severely undermined by the prevailing technical weakness and absence of a forward-looking catalyst.\n\n1.  **OVERVALUATION CHECK (Not Applicable):** The premise of an overvaluation check is not met",
+      "round": 1
+    },
+    {
+      "role": "bull",
+      "content": "The Bear's assertion that technical weakness undermines the fundamental floor overlooks the sheer magnitude of the current market valuation's divergence from its estimated intrinsic worth. While the stock exhibits technical weakness, trading below key moving averages, this merely reflects a market sentiment that has yet to recognize the underlying value. The current price, which also marks the 52-week low, suggests that much of the technical downside has already been absorbed. Any",
+      "round": 2
+    },
+    {
+      "role": "bear",
+      "content": "The Bull's assertion that the 52-week low of Rp 5,975 represents an absorbed downside, underpinned by a theoretical fundamental floor, is a dangerous misinterpretation for a swing trade. The \"fair value\" of Rp 10,474, while suggesting significant undervaluation, is a long-term metric. Its reliability as a short-term",
+      "round": 2
+    },
+    {
+      "role": "devils_advocate",
+      "content": "Here are two specific challenges to the BBCA swing trade setup:\n\n1.  Given BBCA is at its 52-week low of Rp 5,975, could sustained foreign fund outflows from Indonesian banking, exacerbated by a broader IHSG downturn, break this critical support, potentially triggering a deeper fall towards Rp 5,500 within 1-3 months",
+      "round": 3
+    }
+  ],
+  "raw_data_summary": "=== FUNDAMENTALS ===\nFAIR VALUE: Rp 10,474\n\nVALUATION VERDICT: BBCA is UNDERVALUED by 75.3% compared to its fair value of Rp 10,474, with a current market price of Rp 5,975. This indicates a strong fundamental cushion for a potential swing trade.\n\nSUPPORT METRICS:\n*   ROE (TTM): 22.41% (Note: 3-year trend data not available in provided information. The summary table's 0.0% ROE is inconsistent with raw API data.)\n*   Net Margin (Quarter): 49.52% (Note: 3-year trend data not available in provided information. The summary table's 0.0% Net Margin is inconsistent with raw API data.)\n*   Debt/Equity: null (Data not available in raw API.)\n*   Dividend Yield: 5.62% (The summary table's DPS of Rp 0 is inconsistent with raw API data.)\n\nGROWTH CATALYST: The latest dividend ex-date was 30 Mar 26, which is a PAST_EVENT_NOT_CATALYST. There is INSUFFICIENT_DATA for a specific upcoming growth catalyst (e.g., earnings release, new contract) within the 1-3 month swing trade horizon.\n\n=== TECHNICALS ===\nIHSG is currently in a strong downtrend, with the current price of Rp 5,975 trading significantly below both the MA50 (Rp 6,635) and MA200 (Rp 7,474). This indicates a bearish long-term and intermediate-term trend. The price is also below the SMA20 (Rp \n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 5975.0,\n  \"sma20\": 6434.0,\n  \"ma50\": 6635.0,\n  \"ma200\": 7474.0,\n  \"rsi14\": 32.2,\n  \"atr14\": 159.0,\n  \"avg_volume_20d\": 141181065.0,\n  \"52w_high\": 9232.0,\n  \"52w_low\": 5975.0\n}\n\n=== SENTIMENT ===\n**PAST_EVENT_NOT_CATALYST**: The provided social stream data is dated April 8, 2026. As the current date is April 29, 2026, this event is in the past and cannot be used as a catalyst for a 1-3 month forward-looking swing trade thesis. This analysis reflects the sentiment prevalent on April 8, 2026.\n\nOn April 8, 2026, the overall market mood was **BULLISH (90% confidence)**, as explicitly stated by the Stockbit Investment Analyst Team: \"sentimen pasar hari ini berpotensi sangat positif dengan dua katalis yang saling memperkuat.\" The dominant discussion theme revolved around two key positive catalysts: a temporary US-Iran ceasefire leading to a significant drop in oil prices (Brent -16%, WTI -19%), and FTSE Russell's confirmation of Indonesia's Secondary Emerging Market status in its Interim Review. These events were expected to reduce Indonesia's risk premium, attract foreign inflow into big caps and banking, and benefit conglomerate and metals sectors, while potentially pressuring the energy sector.\n\nRegarding volume anomaly, the provided data indicates 78 replies and 505 likes. However, without historical baseline data for comparison, it is **INSUFFICIENT_DATA** to determine if this discussion volume was abnormally high or low at the time. The swing-trade timing signal, based on this analyst commentary, was **trending with price**, as the analysts anticipated a very positive market opening and subsequent rally. This was a directional forecast rather than an indication of extreme contrarian sentiment from the broader crowd.\n\nNo significant red flags were identified. The post originates from a verified \"Stockbit\" admin and Investment Analyst Team, suggesting a professional and well-researched perspective. The commentary provides a balanced view, acknowledging both positive and negative sectoral impacts, and includes important caveats about the temporary nature of the ceasefire and factors to monitor (e.g., further negotiations, MSCI review, future FTSE updates). There is no language indicative of coordinated pump signals, insider leaks, or panic patterns.\n\n=== DIVIDEND EX-DATE SCAN: BBCA ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n"
+}

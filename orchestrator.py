@@ -249,8 +249,16 @@ def compute_conviction_score(verdict: dict) -> tuple[float, str | None]:
     rr_ratio = float(verdict.get("risk_reward_ratio", 0.0) or 0.0)
 
     warning: str | None = None
-    if rr_ratio > 3.5:
-        warning = "⚠️ R/R suspiciously high — verify stop is not inside noise band"
+    if rr_ratio > 5.0:
+        # M3: R/R > 5× hampir selalu berarti stop loss terlalu sempit atau
+        # target terlalu agresif — bukan trade yang realistis di IHSG
+        warning = (
+            f"⚠️ R/R {rr_ratio:.1f}× suspiciously high — "
+            "verifikasi trade envelope: stop loss mungkin terlalu sempit "
+            "atau target melebihi resistance kuat"
+        )
+    elif rr_ratio > 3.5:
+        warning = f"⚠️ R/R {rr_ratio:.1f}× — verify stop is not inside noise band"
 
     rr_score = min(max(rr_ratio / RR_NORM_CAP, 0.0), 1.0)
     score = (W_CONFIDENCE * confidence) + (W_RR_RATIO * rr_score)

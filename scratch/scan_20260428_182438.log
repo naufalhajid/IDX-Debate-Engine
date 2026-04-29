@@ -1,0 +1,34 @@
+2026-04-28 18:24:38,226 [INFO] ============================================================
+2026-04-28 18:24:38,227 [INFO] IHSG Quantitative Swing-Trade Scouting Engine v3.0
+2026-04-28 18:24:38,227 [INFO] ============================================================
+2026-04-28 18:24:38,228 [INFO] Input file: output\IDX Fundamental Analysis 2026-04-24.xlsx
+2026-04-28 18:24:38,229 [INFO] [XlsxAdapter] Initialized dengan: output\IDX Fundamental Analysis 2026-04-24.xlsx
+2026-04-28 18:24:38,230 [INFO] [Adapter] XlsxDataAdapter aktif → output\IDX Fundamental Analysis 2026-04-24.xlsx
+2026-04-28 18:24:38,230 [INFO] Membaca: output\IDX Fundamental Analysis 2026-04-24.xlsx
+2026-04-28 18:24:39,156 [INFO] Total ticker universe: 957
+2026-04-28 18:24:39,162 [INFO] Exclude PEMANTAUAN KHUSUS: 957 → 803
+2026-04-28 18:24:39,165 [INFO] [Sector] Cache loaded: 957 ticker dari output\sector_cache.json
+2026-04-28 18:24:39,165 [INFO] [Sector] Resolve selesai: cache=803, hardcode=0, keyword=0, default=0
+2026-04-28 18:24:39,178 [INFO] Lolos static filter: 150 ticker
+2026-04-28 18:24:39,180 [INFO] Distribusi sektor:
+Sector
+consumer_staples    37
+consumer_disc       20
+industrials         17
+tech                14
+basic_materials     12
+transport           12
+energy              10
+property            10
+healthcare           8
+finance_nonbank      7
+infrastructure       2
+bank                 1
+2026-04-28 18:24:39,185 [INFO] yfinance download attempt 1/3 (150 ticker)...
+2026-04-28 18:24:41,954 [INFO] Download berhasil. Shape: (60, 750)
+2026-04-28 18:24:42,341 [INFO] [XlsxAdapter] Loaded key-statistics: 957 tickers
+2026-04-28 18:24:42,554 [INFO] [RDTX] Excluded: suspek suspended/FCA (volume anomali)
+2026-04-28 18:24:42,822 [INFO] Top 10 kandidat berhasil disaring.
+2026-04-28 18:24:42,827 [INFO] JSON diekspor → output\top10_candidates.json
+2026-04-28 18:24:42,832 [INFO] Report → scratch\report.md
+2026-04-28 18:24:42,832 [INFO] PIPELINE SELESAI.

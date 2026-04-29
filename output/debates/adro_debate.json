@@ -4,56 +4,54 @@
     "ticker": "ADRO",
     "rating": "HOLD",
     "confidence": 0.0,
-    "fair_value": null,
-    "entry_price_range": "2410 - 2460",
-    "target_price": 2680.0,
-    "stop_loss": 2310.0,
-    "current_price": 2530.0,
+    "fair_value": 2615.0,
+    "entry_price_range": "2370 - 2440",
+    "target_price": 2640.0,
+    "stop_loss": 2280.0,
+    "current_price": 2440.0,
     "timeframe": "1-3 Months",
     "weighted_reasoning": "",
     "critical_risk_factor": "",
     "key_catalysts": [],
-    "key_risks": [
-      "Fair value tidak tersedia — validasi fundamental secara manual sebelum entry."
-    ],
-    "summary": "CIO parse error — raw response stored. Error: Expecting property name enclosed in double quotes: line 6 column 30 (char 140)",
-    "expected_return": "+10.1%",
-    "risk_reward_ratio": 1.96,
-    "is_overvalued": null,
+    "key_risks": [],
+    "summary": "CIO parse error — raw response stored. Error: Expecting ',' delimiter: line 20 column 18 (char 1784)",
+    "expected_return": "+9.8%",
+    "risk_reward_ratio": 1.88,
+    "is_overvalued": false,
     "wait_and_see": true
   },
   "debate_rounds": 2,
   "debate_history": [
     {
       "role": "system",
-      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 2,530",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 2,440, Rp 2,615",
       "round": 0
     },
     {
       "role": "bull",
-      "content": "**ADRO: Strong Buy Thesis (1-3 Month Horizon)**\n\n**1. Fundamental Floor:**\nA traditional fair value estimate for ADRO cannot be calculated due to insufficient core data (EPS, BVPS, DDM methods invalid). Therefore, a fundamental floor based on intrinsic valuation cannot be established. However, the stock offers a compelling income proposition, with the recent announcement of a",
+      "content": "**Swing Trade BUY Case: ADRO (1-3 Month Horizon)**\n\n**1. FUNDAMENTAL FLOOR:**\nADRO presents a fundamental floor for a swing trade, currently trading at Rp 2,440, which is at a +7.2% discount to its fair value estimate of Rp 2,615. This undervaluation is supported by a",
       "round": 1
     },
     {
       "role": "bear",
-      "content": "The Bull's \"Strong Buy Thesis\" for ADRO within a 1-3 month horizon faces significant challenges, making it an AVOID/SELL candidate.\n\n1.  **OVERVALUATION CHECK:** A traditional fair value cannot be calculated due to \"INSUFFICIENT_DATA\". However, the current price of Rp 2,530 is trading at a mere",
+      "content": "As a Forensic Financial Auditor, I find the proposed ADRO swing trade BUY case highly questionable, presenting significant risks that warrant an AVOID or SELL recommendation.\n\n1.  **INSUFFICIENT MARGIN OF SAFETY DESPITE SLIGHT UNDERVALUATION**: While ADRO is technically undervalued by +7.2% at Rp 2,440 compared to its fair value",
       "round": 1
     },
     {
       "role": "bull",
-      "content": "The Bear's assertion of implied overvaluation, despite acknowledging \"INSUFFICIENT_DATA\" for a traditional fair value, overlooks the market's current valuation drivers. While a standard intrinsic value cannot be computed, the substantial dividend yield acts as a robust income-based valuation floor, attracting a significant segment of the market. The prevailing bullish sentiment, explicitly tied to the magnitude of the recently approved dividend and its payout ratio, provides strong corroborating evidence that this income stream is the primary catalyst currently underpinning the stock's market perception and demand. This market-driven valuation, anchored by a generous shareholder return, effectively counters the Bear's vague overvaluation concerns.\n\nRegarding downside risk, the current price maintains a healthy buffer above key technical supports. Should the immediate support at the 20-day Simple Moving Average (SMA20) fail to hold, the 50-day Moving Average (MA50) stands as a robust primary defense. Furthermore, for a more severe downturn scenario, the 200-day Moving Average (MA200) offers a significant secondary support level, providing a substantial downside limit well below the current trading range. This layered technical support structure mitigates the Bear's implied downside risk, suggesting that any potential retracement would encounter strong buying interest at these established levels.\n\nThe current market pricing, driven by the strong dividend catalyst, inherently incorporates a significant margin of safety against the Bear's implied risk scenario. The substantial gap between the current price and the long-term MA200, coupled with the attractive dividend yield, suggests that the stock offers considerable headroom before reaching levels that would fundamentally challenge its income proposition or long-term trend. This combination of strong technical backing and a compelling income-driven valuation provides ample absorption capacity for potential market volatility, making the current entry timing defensible for a swing trade.",
+      "content": "The Bear's critique on ADRO's entry timing misjudges both the inherent downside protection and the impending catalysts. The concern regarding an insufficient margin of safety overlooks the robust financial underpinnings; ADRO's Debt/Equity ratio of 0.19 provides a substantial fundamental buffer against market volatility, while the impressive Net Profit Margin of 27.81%",
       "round": 2
     },
     {
       "role": "bear",
-      "content": "The Bull's swing setup for ADRO is built on precarious assumptions regarding both its fundamental floor and technical support structure, rendering the entry highly speculative for a 1-3 month horizon.\n\nThe claim of a \"robust income-based valuation floor\" anchored by the dividend yield is fundamentally undermined by the company's reported financial health. With a current ROE and Net Margin of",
+      "content": "The Bull's swing setup for ADRO is built on a foundation of misjudged technical support and an overestimation of fundamental buffers for short-term price action.\n\nThe reliance on MA50 at Rp 2422 as robust support is highly questionable. The current price of Rp 2440 is barely above this level, indicating a precarious position rather than strong support.",
       "round": 2
     },
     {
       "role": "devils_advocate",
-      "content": "1.  **MACRO/COMPANY RISK & FOREIGN FLOW:** If foreign funds, having bought into the dividend news, initiate profit-taking, could the Rp 2,500 SMA20 support fail, triggering a deeper correction towards the Rp 2,409 MA50, invalidating the bullish thesis?\n\n2.  **EXECUTION RISK:** If the capital gain from Rp 2,530 only reaches the lower end of the 3% target (e.g., Rp 2,605), will the net return after ~0.40% transaction costs still exceed the minimum 2% threshold, or would it become insufficient?",
+      "content": "Here are two specific challenges to the ADRO swing trade setup:\n\n1.  **MACRO/COMPANY RISK & FOREIGN FLOW**: If global coal prices decline sharply or foreign funds accelerate selling pressure, could the MA50 support at Rp 2422 break, potentially leading to a retest of the MA200 at Rp 1922?\n2.",
       "round": 3
     }
   ],
-  "raw_data_summary": "=== FUNDAMENTALS ===\n**FAIR VALUE: Tidak dapat dikalkulasi (Data Kosong / None)**\n\n**VALUATION VERDICT:** INSUFFICIENT_DATA. Fair value cannot be calculated due to missing core data (EPS, BVPS, DDM methods invalid). Therefore, a valuation verdict (undervalued/overvalued) cannot be determined.\n\n**SUPPORT METRICS:**\n*   ROE trend (3yr): N/A (Current ROE: 0.0% as per Python report).\n*   Net Margin trend (3yr): N/A (Current Net Margin: 0.0% as per Python report).\n*   Debt/Equity: 0.19\n*   Dividend Yield: 10.40%\n\n**GROWTH CATALYST:** No specific upcoming growth catalysts (earnings, ex-dividend, contract) are identified within the 1-3 month swing trade horizon. The latest dividend ex-date\n\n=== TECHNICALS ===\nHere's a technical chart analysis for IHSG swing trade entry/exit timing:\n\n**TREND CONTEXT**: The current price of Rp 2,530 is trading significantly above both the MA50 (Rp 2,409) and the MA200 (Rp 1,914). This configuration indicates a strong bullish trend across both medium and long-\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 2530.0,\n  \"sma20\": 2500.0,\n  \"ma50\": 2409.0,\n  \"ma200\": 1914.0,\n  \"rsi14\": 56.0,\n  \"atr14\": 57.0,\n  \"avg_volume_20d\": 75379135.0,\n  \"52w_high\": 2630.0,\n  \"52w_low\": 1518.0\n}\n\n=== SENTIMENT ===\n**Sentiment Analysis for ADRO (2026-04-27)**\n\n**Overall Mood:** BULLISH (90% Confidence)\nThe sentiment is strongly bullish, driven by the announcement of ADRO's final dividend for the 2025 financial year. The approval of a ~US$447.5 million total dividend, representing a 100% dividend payout ratio (significantly higher than 36% in 2024) and an indicated final yield of 4.6% (based on the Rp2,530 price on April 17th), is a substantial positive catalyst for shareholders and income-seeking investors.\n\n**Dominant Discussion Theme:**\nThe primary discussion\n\n=== DIVIDEND EX-DATE SCAN: ADRO ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n"
+  "raw_data_summary": "=== FUNDAMENTALS ===\n**FAIR VALUE: Rp 2,615**\n\nADRO is currently SLIGHTLY_UNDERVALUED at a market price of Rp 2,440, representing a +7.2% upside to its calculated fair value of Rp 2,615. The fair value calculation confidence is MEDIUM, derived from two valid methods (P/E Band and P/B Band).\n\nKey support metrics include a TTM Return on Equity (ROE) of 9.84% and a Net Profit Margin (Quarter) of 27.81%. The 3-year trends for ROE and Net Margin are not available in the provided data. The company maintains a low Debt/Equity ratio of 0.19, indicating strong financial solvency.\n\nADRO offers a high Dividend Yield of 10.78%. However, the latest dividend ex-date was 28 April 2026, which is a PAST_EVENT_NOT_CATALYST relative to the current date (2026-04-29). No other specific upcoming growth catalysts (e.g., earnings reports, new contracts) within the 1-3 month swing trade horizon were identified from the provided data.\n\n=== TECHNICALS ===\nBased on the provided technicals for IHSG, here's a swing trade analysis:\n\n**TREND CONTEXT**: The stock is in a strong bullish trend. The current price of Rp 2440 is above both the MA50 at Rp 2422 and the MA200 at Rp 1922. Furthermore, the MA50 is well above\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 2440.0,\n  \"sma20\": 2482.0,\n  \"ma50\": 2422.0,\n  \"ma200\": 1922.0,\n  \"rsi14\": 47.1,\n  \"atr14\": 56.0,\n  \"avg_volume_20d\": 74754005.0,\n  \"52w_high\": 2630.0,\n  \"52w_low\": 1518.0\n}\n\n=== SENTIMENT ===\nThe provided Stockbit post, dated 2026-04-17, announces that ADRO will distribute a final dividend for fiscal year 2025, indicating a yield of 4.6% based on the price on the announcement date, and a 100% dividend payout ratio. The cum date and payment date are yet to be announced.\n\n=== DIVIDEND EX-DATE SCAN: ADRO ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n"
 }

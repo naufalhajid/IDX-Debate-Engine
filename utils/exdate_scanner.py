@@ -11,14 +11,13 @@ Pipeline integration:
                           FACTUAL BLOCK untuk CIO consideration
 """
 
-import logging
+from utils.logger_config import logger
 from datetime import datetime, timezone
 from typing import TypedDict
 
 import pandas as pd
 import yfinance as yf
 
-logger = logging.getLogger(__name__)
 
 # ── Constants ────────────────────────────────────────────────────────────────
 
@@ -123,12 +122,14 @@ def scan_exdate(ticker: str, current_price: float = 0.0) -> ExDateInfo:
 
         result: ExDateInfo = {
             "has_upcoming_exdate" : risk_tier != "CLEAR",
-            "ex_date"             : str(ex_date),
-            "days_until_exdate"   : days_until,
+            # M2 fix: jangan tampilkan tanggal ex-date jika sudah lewat atau CLEAR
+            # — trader bisa salah baca tanggal 2025 sebagai upcoming
+            "ex_date"             : str(ex_date) if risk_tier != "CLEAR" else None,
+            "days_until_exdate"   : days_until if risk_tier != "CLEAR" else None,
             "div_per_share"       : div_per_share,
             "div_yield_pct"       : div_yield_pct,
             "risk_tier"           : risk_tier,
-            "expected_drop_rp"    : div_per_share,  # IHSG drops ~= div amount
+            "expected_drop_rp"    : div_per_share if risk_tier != "CLEAR" else None,
             "source"              : "yfinance",
         }
 

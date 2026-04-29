@@ -21,6 +21,8 @@ import asyncio
 import json
 import re
 from typing import Literal
+from pathlib import Path
+from datetime import datetime
 
 import pandas as pd
 import yfinance as yf
@@ -1150,43 +1152,128 @@ no trailing text. The JSON must have exactly these keys:
 Start your response with '{' and end with '}'. Nothing else."""
 
         messages = [
-            SystemMessage(content=CIO_SYSTEM_PROMPT),
+            SystemMessage(content=CIO_SYSTEM_PROMPT + json_schema_hint),
             HumanMessage(content=user_content),
         ]
 
-        def _parse_llm_json(raw: str) -> dict:
-            """Strip markdown fences and extract the first JSON object found."""
-            text = raw.strip()
-            # Remove opening/closing code fences (```json or ```)
-            text = re.sub(r"^```(?:json)?\s*\n?", "", text)
+        def _sanitize_json(text: str) -> str:
+            """
+            Clean common LLM JSON mistakes before json.loads().
+
+            Handles (in order):
+              1. Markdown code fences  — ```json ... ```
+              2. Preamble before {     — "Here is the JSON: {...}"
+              3. Trailing text after } — "{...} Hope this helps!"
+              4. Trailing commas       — {"a": 1,} or ["x",]
+                 This is the most common Gemini mistake and the one that
+                 caused the "Expecting property name" error in the logs.
+              5. Python-style comments — // ... or # ... on their own line
+              6. Single-quoted keys    — {'key': 'val'}
+            """
+            # 1. Strip markdown fences
+            text = re.sub(r"^```(?:json)?\s*\n?", "", text.strip())
             text = re.sub(r"\n?```\s*$", "", text).strip()
-            # If there's still non-JSON preamble, find the first '{'
+            # 2. Find first { and last } to trim preamble/postamble
             brace = text.find("{")
             if brace > 0:
                 text = text[brace:]
-            # Trim any trailing text after the closing '}'
             rbrace = text.rfind("}")
             if rbrace != -1 and rbrace < len(text) - 1:
                 text = text[: rbrace + 1]
-            return json.loads(text)
-
-        def _apply_envelope(d: dict) -> dict:
-            """Overwrite LLM-generated price fields with Python-computed envelope."""
-            d["current_price"] = current_price
-            d["fair_value"] = envelope["fair_value"]
-            d["entry_price_range"] = f"{int(envelope['entry_low'])} - {int(envelope['entry_high'])}"
-            d["target_price"] = envelope["target_price"]
-            d["stop_loss"] = envelope["stop_loss"]
-            return d
+            # 3. Remove JS/Python-style comments (// ... and # ... lines)
+            text = re.sub(r"//[^\n]*", "", text)
+            text = re.sub(r"#[^\n]*", "", text)
+            # 4. Fix trailing commas before ] or }  e.g. [1, 2,] or {"a":1,}
+            text = re.sub(r",\s*([\]}])", r"\1", text)
+            # 5. Fix single-quoted keys/values (only when not inside a double-quoted string)
+            #    Simple heuristic: replace 'key' patterns at word boundaries
+            text = re.sub(r"(?<!\w)'([^']*)'(?!\w)", r'"\1"', text)
+            return text.strip()
+        def _apply_envelope(parsed: dict) -> dict:
+            """
+            Overwrite LLM-supplied price fields with Python-computed envelope values.
+            Ensures numeric types and a canonical 'entry_low - entry_high' range string.
+            """
+            p = dict(parsed) if isinstance(parsed, dict) else {}
+            p.setdefault("ticker", ticker)
+            try:
+                p["current_price"] = float(p.get("current_price") or current_price or 0.0)
+            except Exception:
+                p["current_price"] = float(current_price or 0.0)
+            try:
+                entry_low = int(envelope.get("entry_low") or envelope.get("entry_mid") or 0)
+                entry_high = int(envelope.get("entry_high") or envelope.get("entry_mid") or 0)
+                p["entry_price_range"] = f"{entry_low} - {entry_high}"
+            except Exception:
+                p["entry_price_range"] = p.get("entry_price_range") or ""
+            try:
+                p["target_price"] = int(envelope.get("target_price")) if envelope.get("target_price") is not None else p.get("target_price")
+            except Exception:
+                p["target_price"] = p.get("target_price")
+            try:
+                p["stop_loss"] = int(envelope.get("stop_loss")) if envelope.get("stop_loss") is not None else p.get("stop_loss")
+            except Exception:
+                p["stop_loss"] = p.get("stop_loss")
+            fv_env = envelope.get("fair_value")
+            if fv_env is not None and fv_env != 0:
+                try:
+                    p["fair_value"] = int(fv_env)
+                except Exception:
+                    p["fair_value"] = fv_env
+            else:
+                p["fair_value"] = p.get("fair_value") or None
+            return p
 
         try:
-            resp = await self._invoke_llm(self.flash_llm, messages, inject_rules=False)
-            parsed = _parse_llm_json(resp.content)
+            resp = await self._invoke_llm(self.pro_llm, messages, inject_rules=False)
+            parsed = json.loads(_sanitize_json(resp.content))
             parsed = _apply_envelope(parsed)
             verdict_json = CIOVerdict(**parsed).model_dump_json()
             logger.info(f"[CIO] JSON parsed successfully for {ticker}")
         except Exception as e:
             logger.warning(f"[CIO] Primary JSON parse failed ({e}); using safe fallback verdict")
+            # Persist raw/sanitized LLM output to debug "why JSON broke".
+            # This is critical for fixing the prompt/sanitizer rather than guessing.
+            try:
+                raw_text = ""
+                try:
+                    raw_text = str(getattr(resp, "content", "") or "")
+                except Exception:
+                    raw_text = ""
+
+                sanitized_text = ""
+                try:
+                    sanitized_text = _sanitize_json(raw_text) if raw_text else ""
+                except Exception:
+                    sanitized_text = ""
+
+                debug_dir = Path("output") / "debug" / "cio_json_parse"
+                debug_dir.mkdir(parents=True, exist_ok=True)
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+                dump_path = debug_dir / f"{ticker}_cio_parse_{ts}.json"
+                payload = {
+                    "ticker": ticker,
+                    "error": str(e),
+                    "raw_content_len": len(raw_text),
+                    "raw_content_preview": raw_text[:12000],
+                    "sanitized_content_preview": sanitized_text[:12000],
+                    "envelope": {
+                        "fair_value": envelope.get("fair_value"),
+                        "entry_low": envelope.get("entry_low"),
+                        "entry_high": envelope.get("entry_high"),
+                        "target_price": envelope.get("target_price"),
+                        "stop_loss": envelope.get("stop_loss"),
+                        "risk_reward_ratio": envelope.get("risk_reward_ratio"),
+                    },
+                }
+                dump_path.write_text(
+                    json.dumps(payload, indent=2, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+                logger.info(f"[CIO] Debug dump written → {dump_path}")
+            except Exception as dump_e:
+                logger.warning(f"[CIO] Failed to write debug dump: {dump_e}")
             verdict_json = CIOVerdict(
                 ticker=ticker,
                 rating="HOLD",

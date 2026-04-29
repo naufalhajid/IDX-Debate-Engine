@@ -15,6 +15,7 @@ SOLUSI:
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -67,162 +68,261 @@ class KeyStats:
 # Extractor — parse response JSON dari Stockbit keystats API
 # ---------------------------------------------------------------------------
 
+def _parse_stockbit_flat(api_response: dict) -> dict[str, str]:
+    """
+    Flatten the Stockbit /keystats/ratio/v1/{ticker} response into a simple
+    {field_name: raw_value_string} dict.
+
+    Actual API structure (confirmed from live response):
+        data.closure_fin_items_results[i]
+            .fin_name_results[j]
+                .fitem.name   → human-readable field name  (e.g. "Current EPS (TTM)")
+                .fitem.value  → raw string value            (e.g. "312.50" or "9.96%")
+
+    This flat dict is then consumed by extract_keystats via _lookup().
+    Logging which fields were found makes it easy to add new mappings later.
+    """
+    import logging as _logging
+    _log = _logging.getLogger(__name__)
+
+    flat: dict[str, str] = {}
+    try:
+        groups = (
+            api_response.get("data", {})
+                        .get("closure_fin_items_results", [])
+        )
+        for group in groups:
+            for item in group.get("fin_name_results", []):
+                fitem = item.get("fitem", {})
+                name  = fitem.get("name", "").strip()
+                value = fitem.get("value", "")
+                if name and value not in (None, "", "-", "N/A"):
+                    flat[name] = str(value)
+    except Exception as e:
+        _log.warning(f"[FairValue] _parse_stockbit_flat failed: {e}")
+
+    _log.debug(f"[FairValue] Stockbit flat fields found: {list(flat.keys())}")
+    return flat
+
+
+def _clean_numeric(raw: str) -> float:
+    """
+    Convert a raw Stockbit value string to float.
+    Handles: "312.50", "9.96%", "Rp 2.530", "1,234.56", "-21.35"
+    Returns 0.0 on failure.
+    """
+    if not raw:
+        return 0.0
+    # Strip currency prefix and whitespace
+    s = re.sub(r"[Rr][Pp]\.?\s*", "", raw).strip()
+    # Remove thousand-separators (dot or comma before 3 digits)
+    s = re.sub(r"[,.](?=\d{3}(?!\d))", "", s)
+    # Remove trailing % sign (caller decides whether to divide by 100)
+    s = s.replace("%", "").strip()
+    try:
+        return float(s)
+    except (ValueError, TypeError):
+        return 0.0
+
+
 def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
     """
     Ekstrak field yang relevan dari response raw Stockbit keystats API.
-    
-    Fungsi ini defensive — setiap field di-try/except agar satu field
-    yang hilang tidak crash seluruh kalkulasi.
 
-    Key-name coverage: Stockbit API v1 /keystats/ratio/ mengembalikan struktur
-    yang berbeda tergantung endpoint dan versi. Semua pola yang diketahui
-    tercakup di bawah; debug log menunjukkan field mana yang berhasil di-parse
-    sehingga mudah menambah pola baru jika API berubah.
-    
-    Args:
-        api_response : dict mentah dari Stockbit /keystats/ratio/v1/{ticker}
-        ticker       : kode saham (untuk logging)
-    
-    Returns:
-        KeyStats yang sudah diisi, siap untuk FairValueCalculator
+    Mendukung DUA struktur API:
+      A) closure_fin_items_results (confirmed live format, 2025-2026)
+         data.closure_fin_items_results[].fin_name_results[].fitem.{name, value}
+      B) Legacy flat key-value (kept as fallback)
+
+    Debug log menampilkan field mana yang berhasil di-parse sehingga mudah
+    menambah mapping baru jika Stockbit mengubah nama field.
     """
     import logging as _logging
     _log = _logging.getLogger(__name__)
 
     stats = KeyStats(ticker=ticker)
 
-    def _get(keys: list[str], default: float = 0.0) -> float:
-        """Cari nilai dari daftar possible key names, return default jika tidak ada.
+    # ── Strategy A: parse by field name (live Stockbit format) ────────────────
+    flat = _parse_stockbit_flat(api_response)
 
-        Mendukung dot-notation untuk nested keys (e.g. "data.Current.EPS")
-        dan juga pencarian rekursif satu level ke dalam semua sub-dict
-        dari api_response untuk menangkap struktur yang tidak terduga.
+    def _lookup(name_patterns: list[str], pct: bool = False) -> float:
         """
-        for key in keys:
-            try:
-                val = api_response
-                for part in key.split("."):
-                    val = val[part]
-                if val is not None:
-                    return float(val)
-            except (KeyError, TypeError, ValueError):
-                continue
+        Find the first matching name from flat dict.
 
-        # Fallback: cari key sederhana (tanpa dot) di semua sub-dict satu level
-        simple_keys = {k.split(".")[-1].lower() for k in keys}
-        for top_val in api_response.values():
-            if not isinstance(top_val, dict):
-                continue
-            for k, v in top_val.items():
-                if k.lower() in simple_keys and v is not None:
-                    try:
-                        return float(v)
-                    except (ValueError, TypeError):
-                        continue
+        Matching order:
+          1. Exact match (original key as Stockbit returns it)
+          2. Case-insensitive exact match
+          3. Case-insensitive partial match (pattern contained in key)
+        Robust terhadap variasi nama field antar versi API dan sektor
+        (bank vs mining). ROE BBCA pakai "Return on Equity (TTM)"
+        (lowercase 'on') — exact match miss, partial match berhasil.
 
-        return default
+        pct=True: divide by 100 if value > 1 (normalise percent to decimal).
+        """
+        flat_lower = {k.lower(): v for k, v in flat.items()}
 
-    # ── Coba berbagai kemungkinan key name dari API Stockbit ────────────────
-    # (Key name bisa bervariasi tergantung versi API — list ini defensive)
+        for pattern in name_patterns:
+            # 1. Exact
+            val_str = flat.get(pattern)
+            if val_str is None:
+                # 2. Case-insensitive exact
+                val_str = flat_lower.get(pattern.lower())
+            if val_str is None:
+                # 3. Case-insensitive partial — pattern is substring of a key
+                pl = pattern.lower()
+                for k, v in flat_lower.items():
+                    if pl in k:
+                        val_str = v
+                        break
+            if val_str is not None:
+                v = _clean_numeric(val_str)
+                if pct and v > 1.0:
+                    v = v / 100.0
+                return v
+        return 0.0
 
-    stats.eps_ttm = _get([
-        "eps", "eps_ttm", "earningPerShare", "earning_per_share",
-        "ratios.eps", "keystats.eps", "data.Current.EPS",
-        # Stockbit v2 patterns
-        "EPS", "EPSTtm", "eps_per_share", "earningsPerShare",
-        "data.eps", "summary.eps",
-    ])
+    if flat:
+        # ── Per-share data ───────────────────────────────────────────────────
+        stats.eps_ttm = _lookup([
+            "Current EPS (TTM)", "EPS (TTM)", "EPS TTM",
+            "Earnings Per Share (TTM)",
+        ])
 
-    stats.eps_forward = _get([
-        "eps_forward", "epsForward", "forward_eps",
-        "ratios.eps_forward", "EpsForward", "forwardEps",
-    ], default=stats.eps_ttm)  # fallback ke TTM jika forward tidak ada
+        # If EPS is missing but PE and price are available, back-calculate:
+        #   EPS = price / PE
+        if stats.eps_ttm == 0.0:
+            pe_ttm = _lookup(["Current PE Ratio (TTM)", "PE Ratio (TTM)", "Current PE Ratio (Annualised)"])
+            if pe_ttm > 0 and api_response.get("current_price", 0.0) == 0.0:
+                # We'll inject current_price after keystats is built (in build_fair_value_report)
+                # Store raw PE for now; EPS back-calc happens in build_fair_value_report
+                stats.raw_pe_current = pe_ttm
+            elif pe_ttm > 0:
+                # current_price not in api_response for this endpoint; skip back-calc here
+                stats.raw_pe_current = pe_ttm
 
-    stats.book_value_per_share = _get([
-        "bookValuePerShare", "book_value_per_share", "bvps",
-        "ratios.bvps", "keystats.bvps", "data.Current.BVPS",
-        # Stockbit v2 patterns
-        "BVPS", "BookValuePerShare", "book_value", "bookValue",
-        "data.bvps", "summary.bvps", "nav_per_share",
-    ])
+        stats.eps_forward = _lookup([
+            "Forward EPS", "EPS (Forward)", "Estimated EPS",
+        ]) or stats.eps_ttm  # fallback to TTM
 
-    stats.dps = _get([
-        "dps", "dividendPerShare", "dividend_per_share",
-        "ratios.dps", "data.Current.DPS",
-        # Stockbit v2 patterns
-        "DPS", "DividendPerShare", "dividen_per_share",
-        "data.dps", "summary.dps", "dividend",
-    ])
+        stats.book_value_per_share = _lookup([
+            "Book Value Per Share", "BVPS", "Book Value/Share",
+            "Current Book Value Per Share",
+        ])
 
-    stats.roe = _get([
-        "roe", "returnOnEquity", "return_on_equity",
-        "ratios.roe", "data.Current.ROE",
-        # Stockbit v2 patterns
-        "ROE", "ReturnOnEquity", "return_equity",
-        "data.roe", "summary.roe",
-    ])
-    # Normalise: jika ROE dalam persen (misal 22.5), convert ke desimal
-    if stats.roe > 1.0:
-        stats.roe = stats.roe / 100.0
+        stats.dps = _lookup([
+            "Dividend Per Share (TTM)", "DPS (TTM)", "Dividend Per Share",
+            "DPS", "Annual Dividend Per Share", "Cash Dividend Per Share",
+            "Total Dividend Per Share", "Dividen Per Saham",
+        ])
 
-    stats.net_margin = _get([
-        "netMargin", "net_margin", "netProfitMargin",
-        "ratios.net_margin", "data.Current.NetProfitMargin",
-        # Stockbit v2 patterns
-        "NetMargin", "NetProfitMargin", "profit_margin",
-        "data.net_margin", "summary.net_margin",
-    ])
-    if stats.net_margin > 1.0:
-        stats.net_margin = stats.net_margin / 100.0
+        # ── Profitability ratios ─────────────────────────────────────────────
+        stats.roe = _lookup([
+            "Return On Equity (TTM)", "ROE (TTM)", "ROE", "Return on Equity",
+            "Return On Equity", "Return on Equity (TTM)",
+            "Imbal Hasil Ekuitas",  # Bahasa Indonesia variant
+        ], pct=True)
 
-    stats.roa = _get([
-        "roa", "returnOnAssets", "return_on_assets",
-        "ratios.roa", "data.Current.ROA",
-        "ROA", "ReturnOnAssets",
-    ])
-    if stats.roa > 1.0:
-        stats.roa = stats.roa / 100.0
+        stats.net_margin = _lookup([
+            "Net Profit Margin (TTM)", "Net Margin (TTM)", "Net Margin",
+            "Net Profit Margin", "Profit Margin",
+        ], pct=True)
 
-    stats.current_price = _get([
-        "price", "lastPrice", "last_price", "close",
-        "priceData.last", "Close", "last", "harga",
-    ])
+        stats.roa = _lookup([
+            "Return On Assets (TTM)", "ROA (TTM)", "ROA", "Return on Assets",
+        ], pct=True)
 
-    stats.shares_outstanding = _get([
-        "sharesOutstanding", "shares_outstanding", "totalShares",
-        "outstanding_shares", "SharesOutstanding", "total_shares",
-    ])
+        # ── Valuation multiples ──────────────────────────────────────────────
+        stats.raw_pe_current = stats.raw_pe_current or _lookup([
+            "Current PE Ratio (TTM)", "PE Ratio (TTM)",
+            "Current PE Ratio (Annualised)", "P/E Ratio",
+        ])
 
-    stats.raw_pe_current = _get([
-        "pe", "priceEarnings", "price_earnings", "per",
-        "ratios.pe", "data.Current.PE",
-        "PE", "PER", "price_to_earnings",
-    ])
+        stats.raw_pb_current = _lookup([
+            "Current Price to Book Value", "Price to Book Value",
+            "P/B Ratio", "Price/Book",
+        ])
 
-    stats.raw_pb_current = _get([
-        "pb", "priceBook", "price_book", "pbv",
-        "ratios.pb", "data.Current.PBV",
-        "PBV", "PB", "price_to_book",
-    ])
+    # ── Strategy B: legacy flat key-value fallback ────────────────────────────
+    # Only runs if Strategy A found nothing useful (flat dict empty or all zeros)
+    if not flat or (stats.eps_ttm == 0 and stats.book_value_per_share == 0 and stats.dps == 0):
+        _log.info(f"[FairValue] {ticker}: closure_fin_items structure empty, trying legacy key-value")
 
-    # ── Debug log: report what was actually parsed ──────────────────────────
+        def _get_legacy(keys: list[str], default: float = 0.0) -> float:
+            for key in keys:
+                try:
+                    val = api_response
+                    for part in key.split("."):
+                        val = val[part]
+                    if val is not None:
+                        return float(val)
+                except (KeyError, TypeError, ValueError):
+                    continue
+            # Recursive search in sub-dicts
+            simple_keys = {k.split(".")[-1].lower() for k in keys}
+            for top_val in api_response.values():
+                if not isinstance(top_val, dict):
+                    continue
+                for k, v in top_val.items():
+                    if k.lower() in simple_keys and v is not None:
+                        try:
+                            return float(v)
+                        except (ValueError, TypeError):
+                            continue
+            return default
+
+        stats.eps_ttm            = _get_legacy(["eps", "eps_ttm", "earningPerShare", "data.Current.EPS", "EPS"])
+        stats.book_value_per_share = _get_legacy(["bookValuePerShare", "bvps", "data.Current.BVPS", "BVPS"])
+        stats.dps                = _get_legacy(["dps", "dividendPerShare", "data.Current.DPS", "DPS"])
+        stats.roe                = _get_legacy(["roe", "returnOnEquity", "data.Current.ROE", "ROE"])
+        stats.net_margin         = _get_legacy(["netMargin", "net_margin", "data.Current.NetProfitMargin"])
+        stats.roa                = _get_legacy(["roa", "returnOnAssets", "data.Current.ROA"])
+        stats.raw_pe_current     = _get_legacy(["pe", "priceEarnings", "data.Current.PE", "PE"])
+        stats.raw_pb_current     = _get_legacy(["pb", "priceBook", "data.Current.PBV", "PBV"])
+
+        if stats.roe > 1.0:    stats.roe = stats.roe / 100.0
+        if stats.net_margin > 1.0: stats.net_margin = stats.net_margin / 100.0
+        if stats.roa > 1.0:    stats.roa = stats.roa / 100.0
+
+    # ── Derive DPS from dividend yield × price if DPS still missing ──────────
+    # BBCA dan bank besar lain kadang tidak expose DPS langsung di keystats
+    # tapi selalu expose Dividend Yield (%). DPS = yield × current_price / 100
+    if stats.dps == 0.0 and flat:
+        div_yield_pct = _lookup([
+            "Dividend Yield (TTM)", "Dividend Yield", "Yield",
+            "Trailing Dividend Yield", "Dividend Yield (Annual)",
+        ])
+        if div_yield_pct > 0:
+            price_for_dps = stats.current_price or _lookup([
+                "Last Price", "Current Price", "Close Price"
+            ])
+            if price_for_dps > 0:
+                # yield dari Stockbit dalam % (e.g. "5.62") → bagi 100
+                stats.dps = round((div_yield_pct / 100.0) * price_for_dps, 2) \
+                    if div_yield_pct > 1.0 \
+                    else round(div_yield_pct * price_for_dps, 2)
+                _log.info(
+                    f"[FairValue] {ticker}: DPS derived from yield "
+                    f"({div_yield_pct:.2f}%) × price ({price_for_dps:,.0f}) "
+                    f"= {stats.dps:.2f}"
+                )
+
+    # ── Debug summary ─────────────────────────────────────────────────────────
     parsed = {
         "eps_ttm": stats.eps_ttm,
-        "bvps": stats.book_value_per_share,
-        "dps": stats.dps,
-        "roe": f"{stats.roe * 100:.1f}%",
-        "pe_current": stats.raw_pe_current,
-        "pb_current": stats.raw_pb_current,
+        "bvps":    stats.book_value_per_share,
+        "dps":     stats.dps,
+        "roe":     f"{stats.roe * 100:.1f}%",
+        "pe":      stats.raw_pe_current,
+        "pb":      stats.raw_pb_current,
     }
-    zeros = [k for k, v in parsed.items() if v == 0 or v == "0.0%"]
+    zeros = [k for k, v in parsed.items() if str(v) in ("0", "0.0", "0.0%")]
     if zeros:
         _log.warning(
-            f"[FairValue] {ticker}: fields parsed as 0 (likely missing from API): {zeros}. "
-            "Fair value may fall back to DDM only or return null. "
-            "Check Stockbit API response structure if this is unexpected."
+            f"[FairValue] {ticker}: fields still 0 after parse: {zeros}. "
+            "Add the missing Stockbit field name to the mapping list in extract_keystats()."
         )
     else:
-        _log.info(f"[FairValue] {ticker}: all key stats parsed successfully: {parsed}")
+        _log.info(f"[FairValue] {ticker}: all key stats parsed OK: {parsed}")
 
     return stats
 
@@ -616,6 +716,9 @@ def build_fair_value_report(
     ticker: str,
     current_price: float,
 ) -> tuple[str, float]:
+    import logging as _logging
+    _log = _logging.getLogger(__name__)
+
     multiples = extract_historical_multiples(api_response, ticker)
     stats = extract_keystats(api_response, ticker=ticker)
 
@@ -625,6 +728,17 @@ def build_fair_value_report(
     if multiples.get("growth_rate"): stats.growth_rate = multiples["growth_rate"]
 
     stats.current_price = current_price
+
+    # ── EPS back-calculation from PE × price ──────────────────────────────
+    # The Stockbit closure_fin_items endpoint often includes PE but not EPS
+    # directly in the visible section.  If EPS is still 0 but we have PE
+    # and the live price, we can back-calculate a reasonable EPS estimate.
+    if stats.eps_ttm == 0.0 and stats.raw_pe_current > 0 and current_price > 0:
+        stats.eps_ttm = round(current_price / stats.raw_pe_current, 2)
+        _log.info(
+            f"[FairValue] {ticker}: EPS back-calculated from PE "
+            f"({current_price} / {stats.raw_pe_current} = {stats.eps_ttm})"
+        )
 
     calc   = FairValueCalculator(stats)
     report = calc.build_report(current_price=current_price)
