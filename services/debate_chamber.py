@@ -21,8 +21,6 @@ import asyncio
 import json
 import re
 from typing import Literal
-from pathlib import Path
-from datetime import datetime
 
 import pandas as pd
 import yfinance as yf
@@ -83,6 +81,9 @@ _TRANSIENT_ERROR_PATTERNS = (
     "connection dropped",  # wraps asyncio.CancelledError from network timeout
     "timeout",
     "empty response",      # Gemini safety filter / token budget returns empty content
+    "connectionerror",     # requests.ConnectionError
+    "readtimeout",         # requests.ReadTimeout
+    "max retries",         # urllib3 MaxRetryError
 )
 
 
@@ -507,11 +508,11 @@ Current Date (Asia/Jakarta): {current_date}
                 "fundamental_data": resp.content,
                 "fair_value_estimate": fv_price,
             }
+        except BudgetExhaustedError:
+            raise  # C1: propagate — jangan swallow saat budget habis
         except Exception as e:
             logger.error(f"[Fundamental] Error: {e}")
             return {"fundamental_data": "Data Unavailable (Error)"}
-
-    async def _chartist_node(self, state: DebateChamberState) -> dict:
         """Chartist with real OHLCV from yfinance — pre-computes all technicals in Python."""
         ticker = state["ticker"]
         logger.info(f"[Chartist] Fetching OHLCV + orderbook for {ticker}")
@@ -520,8 +521,11 @@ Current Date (Asia/Jakarta): {current_date}
         # ── 1. Download real price history from yfinance ─────────────────────
         tech_indicators: dict = {}
         try:
-            df_yf = await asyncio.to_thread(
-                yf.download, f"{ticker}.JK", period="1y", progress=False
+            df_yf = await asyncio.wait_for(
+                asyncio.to_thread(
+                    yf.download, f"{ticker}.JK", period="1y", progress=False
+                ),
+                timeout=30,  # H4: yfinance tanpa timeout bisa hang selamanya
             )
             if df_yf is not None and len(df_yf) >= 20:
                 # yfinance 1.3.0+ returns MultiIndex columns for single tickers:
@@ -553,8 +557,8 @@ Current Date (Asia/Jakarta): {current_date}
                     "52w_low": round(float(close.min()), 0),
                 }
                 logger.info(f"[Chartist] Technicals computed: MA50={tech_indicators.get('ma50')}, RSI={tech_indicators.get('rsi14')}")
-        except Exception as e:
-            logger.warning(f"[Chartist] yfinance download failed for {ticker}: {e}")
+        except (asyncio.TimeoutError, Exception) as e:
+            logger.warning(f"[Chartist] yfinance download failed for {ticker}: {type(e).__name__}: {e}")
 
         # ── 2. Also fetch orderbook for near-term level context ──────────────
         orderbook_data: dict = {}
@@ -597,6 +601,8 @@ Current Date (Asia/Jakarta): {current_date}
             ]
             resp = await self._invoke_llm(self.flash_llm, messages)
             return {"sentiment_data": resp.content}
+        except BudgetExhaustedError:
+            raise  # C1: propagate — jangan biarkan pipeline lanjut saat budget habis
         except Exception as e:
             logger.error(f"[Sentiment] Error: {e}")
             return {"sentiment_data": "Data Unavailable (Error)"}
@@ -1165,30 +1171,62 @@ Start your response with '{' and end with '}'. Nothing else."""
               2. Preamble before {     — "Here is the JSON: {...}"
               3. Trailing text after } — "{...} Hope this helps!"
               4. Trailing commas       — {"a": 1,} or ["x",]
-                 This is the most common Gemini mistake and the one that
-                 caused the "Expecting property name" error in the logs.
-              5. Python-style comments — // ... or # ... on their own line
+              5. JS/Python comments    — // ... or # ... on their own line
               6. Single-quoted keys    — {'key': 'val'}
+              7. Unescaped double quotes inside string values  ← NEW
+                 e.g. "summary": "The stock is "oversold" technically"
+                 This was the cause of the BBCA parse failure:
+                 "Expecting ',' delimiter: line 6 column 115 (char 504)"
             """
             # 1. Strip markdown fences
             text = re.sub(r"^```(?:json)?\s*\n?", "", text.strip())
             text = re.sub(r"\n?```\s*$", "", text).strip()
-            # 2. Find first { and last } to trim preamble/postamble
+            # 2 & 3. Trim preamble/postamble
             brace = text.find("{")
             if brace > 0:
                 text = text[brace:]
             rbrace = text.rfind("}")
             if rbrace != -1 and rbrace < len(text) - 1:
-                text = text[: rbrace + 1]
-            # 3. Remove JS/Python-style comments (// ... and # ... lines)
+                text = text[:rbrace + 1]
+            # 4. Trailing commas before ] or }
+            text = re.sub(r",\s*([\]}])", r"\1", text)
+            # 5. JS/Python comments
             text = re.sub(r"//[^\n]*", "", text)
             text = re.sub(r"#[^\n]*", "", text)
-            # 4. Fix trailing commas before ] or }  e.g. [1, 2,] or {"a":1,}
-            text = re.sub(r",\s*([\]}])", r"\1", text)
-            # 5. Fix single-quoted keys/values (only when not inside a double-quoted string)
-            #    Simple heuristic: replace 'key' patterns at word boundaries
+            # 6. Single-quoted keys/values
             text = re.sub(r"(?<!\w)'([^']*)'(?!\w)", r'"\1"', text)
-            return text.strip()
+            # 7. Unescaped double quotes inside string values.
+            # Walk char-by-char: when inside a JSON string, any bare " that is
+            # NOT followed by a JSON structural token (:, ,, }, ]) must be
+            # an unescaped quote embedded in the text — escape it.
+            result: list[str] = []
+            in_string = False
+            i = 0
+            while i < len(text):
+                c = text[i]
+                if c == "\\" and i + 1 < len(text):
+                    result.append(c)
+                    result.append(text[i + 1])
+                    i += 2
+                    continue
+                if c == '"':
+                    if not in_string:
+                        in_string = True
+                        result.append(c)
+                    else:
+                        # Peek ahead (skip whitespace) to see what follows
+                        rest = text[i + 1:].lstrip()
+                        if rest and rest[0] in ":,}]":
+                            # Legitimate closing quote
+                            in_string = False
+                            result.append(c)
+                        else:
+                            # Unescaped quote inside string — escape it
+                            result.append('\\"')
+                else:
+                    result.append(c)
+                i += 1
+            return "".join(result).strip()
         def _apply_envelope(parsed: dict) -> dict:
             """
             Overwrite LLM-supplied price fields with Python-computed envelope values.
@@ -1232,48 +1270,6 @@ Start your response with '{' and end with '}'. Nothing else."""
             logger.info(f"[CIO] JSON parsed successfully for {ticker}")
         except Exception as e:
             logger.warning(f"[CIO] Primary JSON parse failed ({e}); using safe fallback verdict")
-            # Persist raw/sanitized LLM output to debug "why JSON broke".
-            # This is critical for fixing the prompt/sanitizer rather than guessing.
-            try:
-                raw_text = ""
-                try:
-                    raw_text = str(getattr(resp, "content", "") or "")
-                except Exception:
-                    raw_text = ""
-
-                sanitized_text = ""
-                try:
-                    sanitized_text = _sanitize_json(raw_text) if raw_text else ""
-                except Exception:
-                    sanitized_text = ""
-
-                debug_dir = Path("output") / "debug" / "cio_json_parse"
-                debug_dir.mkdir(parents=True, exist_ok=True)
-                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-                dump_path = debug_dir / f"{ticker}_cio_parse_{ts}.json"
-                payload = {
-                    "ticker": ticker,
-                    "error": str(e),
-                    "raw_content_len": len(raw_text),
-                    "raw_content_preview": raw_text[:12000],
-                    "sanitized_content_preview": sanitized_text[:12000],
-                    "envelope": {
-                        "fair_value": envelope.get("fair_value"),
-                        "entry_low": envelope.get("entry_low"),
-                        "entry_high": envelope.get("entry_high"),
-                        "target_price": envelope.get("target_price"),
-                        "stop_loss": envelope.get("stop_loss"),
-                        "risk_reward_ratio": envelope.get("risk_reward_ratio"),
-                    },
-                }
-                dump_path.write_text(
-                    json.dumps(payload, indent=2, ensure_ascii=False),
-                    encoding="utf-8",
-                )
-                logger.info(f"[CIO] Debug dump written → {dump_path}")
-            except Exception as dump_e:
-                logger.warning(f"[CIO] Failed to write debug dump: {dump_e}")
             verdict_json = CIOVerdict(
                 ticker=ticker,
                 rating="HOLD",
