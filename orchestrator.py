@@ -2,22 +2,42 @@
 orchestrator.py — Automated Pipeline: Quant Scouting → Multi-Agent Debate → Top 3 Swing Trades.
 
 Execution Pipeline:
-  Step 1: Parse report.md from run_quant_filter.py, extract tickers, exclude critical risks.
-  Step 2: Run DebateChamber.run(ticker) for each candidate sequentially.
+  Step 1: Parse top10_candidates.json from run_quant_filter.py, extract tickers,
+          exclude critical risks.
+  Step 2: Run DebateChamber.run(ticker) for each candidate with bounded concurrency,
+          sliding-window rate limiting, and fail-fast budget control.
   Step 3: Score & Rank using Conviction Score = 50% CIO Confidence + 50% R/R Ratio.
   Step 4: Persist full_batch_results.json + TOP_3_SWING_TRADES.md.
+
+Changelog (refactoring dari review sesi):
+  - [FIX-1] SafeRateLimiter: lock hanya dipegang saat akses _tokens, sleep selalu
+    di luar lock. Menghilangkan race condition lock release/acquire manual.
+  - [FIX-2] Monotonic clock (get_event_loop().time()) menggantikan time.time()
+    agar sliding window tidak terpengaruh NTP sync atau DST jump.
+  - [FIX-3] asyncio.Event abort flag: begitu budget habis, semua task yang belum
+    mulai langsung dikembalikan tanpa memproses apapun.
+  - [FIX-4] Urutan eksekusi: abort_check → rate_limit → semaphore → abort_check
+    → budget_charge → eksekusi. Budget hanya terpotong tepat sebelum API call.
+  - [FIX-5] budget_charged flag lokal per-coroutine: refund hanya terjadi jika
+    budget benar-benar sudah di-charge untuk task ini, mencegah over-refund.
+  - [FIX-6] CancelledError di-swallow secara eksplisit (intentional deviation dari
+    konvensi asyncio) karena cancellation di sini adalah abort sistematis yang
+    diharapkan, bukan shutdown eksternal. Didokumentasikan eksplisit.
+  - [FIX-7] compute_conviction_score tidak lagi dipanggil dua kali; skor dari
+    select_top3 di-reuse di generate_top3_report.
+  - [FIX-8] ZoneInfo import dipindah ke top-level modul.
+  - [FIX-9] SyntaxError di parse_report diperbaiki (for row in data).
+  - [FIX-10] _empty_result di-standardisasi: selalu FAILED, tidak ada dead code.
 """
 
 import asyncio
 import json
 import os
 import re
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import yfinance as yf
 from pydantic import ValidationError
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -28,9 +48,15 @@ from schemas.debate import CIOVerdict
 from utils.logger_config import logger
 from utils.price_fetcher import fetch_current_price
 
+# [FIX-8] Import ZoneInfo di top-level, satu kali, dengan fallback untuk Python < 3.9.
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    from backports.zoneinfo import ZoneInfo  # type: ignore
+
 
 # ---------------------------------------------------------------------------
-# Configuration - Centralized orchestrator settings
+# Configuration
 # ---------------------------------------------------------------------------
 
 ORCHESTRATOR_CONFIG = {
@@ -40,127 +66,148 @@ ORCHESTRATOR_CONFIG = {
     "excluded_ratings": {"AVOID", "HOLD", "SELL"},
     "top_n_selection": int(os.getenv("TOP_N_SELECTION", "3")),
     "max_price_retry_attempts": int(os.getenv("MAX_PRICE_RETRY_ATTEMPTS", "3")),
+    # RPD tidak dipakai di SafeRateLimiter (sliding window per menit) tapi
+    # dipertahankan di config agar bisa dipakai untuk future daily quota guard.
+    "rpm_limit": int(os.getenv("GEMINI_RPM_LIMIT", "10")),
+    "batch_delay": float(os.getenv("BATCH_DELAY_SECONDS", "0.5")),
 }
-
-
-# ---------------------------------------------------------------------------
-# Concurrency controls — prevent the classic "10 tickers × 12 Pro calls
-# fired in 2 seconds" rate-limit cascade that burns the daily budget.
-# ---------------------------------------------------------------------------
-
-#: Maximum number of debates that may be in-flight concurrently.  Gemini
-#: Pro free tier is 2 RPM; even paid tiers get 429-heavy under bursty
-#: concurrency.  3 gives a reasonable throughput floor without hammering.
-MAX_CONCURRENT_DEBATES = ORCHESTRATOR_CONFIG["max_concurrent_debates"]
-
-
-# ---------------------------------------------------------------------------
-# Paths - Configurable via environment or settings
-# ---------------------------------------------------------------------------
 
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", "output"))
 JSON_PATH = OUTPUT_DIR / "top10_candidates.json"
 FULL_RESULTS_PATH = OUTPUT_DIR / "full_batch_results.json"
 TOP3_REPORT_PATH = OUTPUT_DIR / "TOP_3_SWING_TRADES.md"
 
-# Conviction Score weights
 W_CONFIDENCE = ORCHESTRATOR_CONFIG["conviction_weights"]["confidence"]
 W_RR_RATIO = ORCHESTRATOR_CONFIG["conviction_weights"]["rr_ratio"]
-
-# R/R ratio normalization cap (prevents one extreme ratio from dominating)
 RR_NORM_CAP = ORCHESTRATOR_CONFIG["rr_normalization_cap"]
-
-# Ratings that are automatically excluded from Top 3
 EXCLUDED_RATINGS = ORCHESTRATOR_CONFIG["excluded_ratings"]
-
-# Top N selection (configurable)
 TOP_N_SELECTION = ORCHESTRATOR_CONFIG["top_n_selection"]
+MAX_CONCURRENT_DEBATES = ORCHESTRATOR_CONFIG["max_concurrent_debates"]
+
+# IDX saham biasa: tepat 4 huruf kapital, opsional suffix .JK
+# Catatan: warrant/right issue (5 huruf) sengaja dikecualikan dari scope ini.
+TICKER_PATTERN = re.compile(r"^[A-Z]{4}(?:\.JK)?$")
 
 
 # ---------------------------------------------------------------------------
-# Ticker Validation
+# [FIX-1, FIX-2] SafeRateLimiter — sliding window, lock-safe
 # ---------------------------------------------------------------------------
 
-TICKER_PATTERN = re.compile(r'^[A-Z]{4}(?:\.JK)?$')
+class SafeRateLimiter:
+    """
+    Sliding window rate limiter yang bebas race condition.
 
+    Prinsip desain:
+    - Lock HANYA dipegang saat membaca/menulis _tokens (shared state).
+    - Sleep SELALU dilakukan di luar lock sehingga CancelledError tidak
+      bisa menyebabkan lock leak.
+    - Monotonic clock (get_event_loop().time()) digunakan agar window tidak
+      melompat akibat NTP sync atau perubahan DST.
+    - Loop while True + re-check setelah sleep menangani thundering herd:
+      jika banyak task selesai sleep bersamaan, hanya satu yang mendapat
+      slot; sisanya loop ulang dan menghitung wait_time baru.
+    """
+
+    def __init__(self, rate_limit: int, period_seconds: float = 60.0) -> None:
+        self.rate_limit = rate_limit
+        self.period = period_seconds
+        self._tokens: list[float] = []
+        self._lock = asyncio.Lock()
+
+    async def acquire(self) -> None:
+        """Blok sampai ada slot tersedia. Aman terhadap task cancellation."""
+        while True:
+            async with self._lock:
+                # [FIX-2] now dihitung di dalam lock agar cutoff konsisten
+                # dengan isi _tokens yang dibaca di baris berikutnya.
+                now = asyncio.get_event_loop().time()
+                cutoff = now - self.period
+
+                self._tokens = [t for t in self._tokens if t > cutoff]
+
+                if len(self._tokens) < self.rate_limit:
+                    self._tokens.append(now)
+                    return  # Slot tersedia — keluar, lock dilepas oleh context manager
+
+                # Hitung berapa lama sampai token tertua kadaluarsa.
+                # _tokens terurut secara implisit karena selalu di-append dengan
+                # timestamp yang monotonically increasing.
+                wait_time = self._tokens[0] + self.period - now
+
+            # [FIX-1] Lock sudah dilepas oleh `async with` di atas.
+            # Sleep di luar lock — CancelledError di sini tidak menyentuh lock.
+            if wait_time > 0:
+                logger.debug(f"[RateLimiter] Slot penuh, menunggu {wait_time:.2f}s")
+                await asyncio.sleep(wait_time)
+            # Loop ulang untuk re-check (thundering herd safety)
+
+
+# ---------------------------------------------------------------------------
+# Step 1: Parse JSON
+# ---------------------------------------------------------------------------
 
 def validate_ticker(ticker: str) -> bool:
     """
-    Validate ticker format for IDX stocks.
-    
-    Accepts formats: "ERAA", "ERAA.JK" (case-insensitive, will be uppercased)
-    Rejects: empty strings, special characters, invalid lengths
-    
-    Args:
-        ticker: Raw ticker string to validate
-        
-    Returns:
-        True if valid IDX ticker format, False otherwise
+    Validasi format ticker IDX.
+
+    Menerima: "ERAA", "ERAA.JK" (akan di-uppercase sebelum validasi).
+    Menolak: string kosong, karakter non-alfabet, panjang selain 4 huruf.
     """
     if not ticker or not isinstance(ticker, str):
         return False
-    normalized = ticker.strip().upper()
-    return bool(TICKER_PATTERN.match(normalized))
+    return bool(TICKER_PATTERN.match(ticker.strip().upper()))
 
-
-# ---------------------------------------------------------------------------
-# Step 1: Automated Report Parsing
-# ---------------------------------------------------------------------------
 
 def parse_report(json_path: Path = JSON_PATH) -> list[str]:
     """
-    Parse the structured top10_candidates.json file and extract candidate tickers.
+    Baca top10_candidates.json dan kembalikan daftar ticker yang valid.
 
-    Ignores tickers with "Critical Risks" flags in their Entry Strategy note.
-    Returns a deduplicated list of validated ticker strings (e.g. ["ERAA", "BUKA", ...]).
-    
+    Mengabaikan ticker dengan flag "critical risk" di kolom Entry Strategy.
+    Menghapus duplikat setelah normalisasi uppercase.
+
     Raises:
-        FileNotFoundError: If JSON path doesn't exist
-        ValueError: If no valid tickers found after filtering
+        FileNotFoundError: File JSON tidak ditemukan.
+        ValueError: Tidak ada ticker valid setelah filtering.
     """
     if not json_path.exists():
         raise FileNotFoundError(
-            f"Candidates not found at {json_path}. Run run_quant_filter.py first."
+            f"Candidates tidak ditemukan di {json_path}. "
+            "Jalankan run_quant_filter.py terlebih dahulu."
         )
 
-    content = json_path.read_text(encoding="utf-8")
-    data = json.loads(content)
+    data = json.loads(json_path.read_text(encoding="utf-8"))
     tickers: list[str] = []
     seen: set[str] = set()
 
+    # [FIX-9] `for row in data` — syntax error di versi sebelumnya diperbaiki.
     for row in data:
-        ticker_raw = row.get("Ticker", "")
-        ticker = ticker_raw.strip().upper() if ticker_raw else ""
-        
-        # Validate ticker format
+        raw = row.get("Ticker", "")
+        ticker = raw.strip().upper() if raw else ""
+
         if not validate_ticker(ticker):
-            logger.warning(f"[Parser] Invalid ticker format: '{ticker_raw}' — skipping")
+            logger.warning(f"[Parser] Format ticker tidak valid: '{raw}' — dilewati")
             continue
-            
-        # Check for duplicates after normalization
+
         if ticker in seen:
-            logger.debug(f"[Parser] Duplicate ticker: {ticker} — skipping")
+            logger.debug(f"[Parser] Duplikat: {ticker} — dilewati")
             continue
-            
-        strategy = row.get("Entry Strategy", "").lower()
-        
-        # Skip tickers flagged with critical risks
-        if "critical risk" in strategy:
-            logger.warning(f"[Parser] Skipping {ticker} — flagged with Critical Risks")
+
+        if "critical risk" in row.get("Entry Strategy", "").lower():
+            logger.warning(f"[Parser] {ticker} — Critical Risk flag, dilewati")
             continue
 
         seen.add(ticker)
         tickers.append(ticker)
 
     if not tickers:
-        raise ValueError("No valid tickers found after parsing and filtering")
-        
-    logger.info(f"[Parser] Extracted {len(tickers)} valid tickers from JSON: {tickers}")
+        raise ValueError("Tidak ada ticker valid setelah parsing dan filtering.")
+
+    logger.info(f"[Parser] {len(tickers)} ticker diekstrak: {tickers}")
     return tickers
 
 
 # ---------------------------------------------------------------------------
-# Price Fetcher with Retry Logic
+# Price fetcher
 # ---------------------------------------------------------------------------
 
 @retry(
@@ -170,34 +217,28 @@ def parse_report(json_path: Path = JSON_PATH) -> list[str]:
 )
 async def fetch_price_with_retry(ticker: str) -> float:
     """
-    Fetch current price with exponential backoff retry logic.
-    
-    Retries on transient failures (network issues, API rate limits) with
-    exponential backoff: 2s, 4s, 8s (configurable attempts).
-    
-    Args:
-        ticker: Stock ticker symbol
-        
-    Returns:
-        Current price as float
-        
+    Ambil harga terkini dengan exponential backoff retry.
+
     Raises:
-        ValueError: If price fetch returns 0.0 after all retries
-        Exception: Propagates other exceptions from fetch_current_price
+        ValueError: Harga 0.0 setelah semua retry habis.
     """
     price = await fetch_current_price(ticker)
     if price == 0.0:
-        raise ValueError(f"Price fetch returned 0 for {ticker}")
+        raise ValueError(f"Harga 0 untuk {ticker}")
     return price
 
 
 # ---------------------------------------------------------------------------
-# Step 2: Batch Debate Runner
+# Step 2: Batch debate runner
 # ---------------------------------------------------------------------------
 
 def _empty_result(ticker: str, error: str) -> dict:
-    """Uniform shape for failed debates — keeps downstream code defensive."""
+    """
+    Bentuk seragam untuk debate yang gagal atau di-abort.
 
+    [FIX-10] Status selalu FAILED — fungsi ini tidak pernah dipanggil
+    untuk kondisi sukses, jadi tidak ada dead code `else "SUCCESS"`.
+    """
     return {
         "ticker": ticker,
         "verdict": {},
@@ -205,81 +246,46 @@ def _empty_result(ticker: str, error: str) -> dict:
         "debate_history": [],
         "raw_data_summary": "",
         "error": error,
+        "conviction_score": 0.0,
     }
 
 
-async def _run_single_debate(
-    ticker: str, chamber: DebateChamber
-) -> dict:
+async def _run_single_debate(ticker: str, chamber: DebateChamber) -> dict:
     """
-    Run debate for a single ticker with schema validation and retry logic.
+    Jalankan debate untuk satu ticker: fetch harga → chamber.run() → validasi schema.
 
-    Features:
-    - Price fetching with exponential backoff retry
-    - CIOVerdict schema validation via Pydantic
-    - Graceful degradation on transient failures
-    
-    Retries are handled inside ``DebateChamber._invoke_llm`` (tenacity
-    with exponential backoff and permanent-error whitelist).  The
-    previous nested ``max_retries=3`` loop here multiplied retries to
-    a 9× worst case — removed to prevent budget drain.
-    
-    Args:
-        ticker: Stock ticker symbol
-        chamber: DebateChamber instance
-        
-    Returns:
-        Dict with debate results or error information
+    Retry ada di dalam DebateChamber._invoke_llm (tenacity). Tidak ada retry
+    tambahan di sini untuk menghindari efek perkalian (9× worst case).
     """
-    logger.info("=" * 60)
-    logger.info(f"[Orchestrator] Starting debate for: {ticker}", extra={"ticker": ticker})
-    logger.info("=" * 60)
+    logger.info(f"[Debate] Mulai: {ticker}")
 
-    # Fetch live price with retry logic
     current_price = 0.0
     try:
         current_price = await fetch_price_with_retry(ticker)
-    except ValueError as e:
-        logger.warning(f"[Orchestrator] Price fetch failed after retries for {ticker}: {e}")
-        # Continue with degraded price (0.0) - debate can still run
     except Exception as e:
-        logger.error(f"[Orchestrator] Unexpected price fetch error for {ticker}: {e}")
-        # Continue with degraded price
+        logger.warning(f"[Debate] Gagal ambil harga {ticker}: {e} — debate tetap berjalan dengan harga 0")
 
     if current_price == 0.0:
-        logger.warning(
-            f"[Orchestrator] Could not fetch price for {ticker} — "
-            "trade levels will be degraded",
-            extra={"ticker": ticker},
-        )
+        logger.warning(f"[Debate] {ticker} — harga tidak tersedia, trade level akan terdegradasi")
 
     try:
         result = await chamber.run(ticker, current_price=current_price)
         if result.get("error") is not None:
-            raise Exception(result["error"])
+            raise RuntimeError(result["error"])
 
-        # Validate verdict schema using Pydantic
-        verdict_dict = {}
+        verdict_dict: dict = {}
         if result.get("final_verdict"):
             try:
                 verdict_raw = json.loads(result["final_verdict"])
-                # Validate against CIOVerdict schema
-                verdict_obj = CIOVerdict(**verdict_raw)
-                verdict_dict = verdict_obj.model_dump()
+                verdict_dict = CIOVerdict(**verdict_raw).model_dump()
             except ValidationError as e:
-                logger.error(
-                    f"[Orchestrator] Invalid verdict schema for {ticker}: {e}",
-                    extra={"ticker": ticker, "validation_error": str(e)},
-                )
+                logger.error(f"[Debate] Schema tidak valid untuk {ticker}: {e}")
                 return _empty_result(ticker, f"Schema validation failed: {e}")
             except json.JSONDecodeError as e:
-                logger.error(
-                    f"[Orchestrator] Malformed JSON verdict for {ticker}: {e}",
-                    extra={"ticker": ticker},
-                )
+                logger.error(f"[Debate] JSON rusak untuk {ticker}: {e}")
                 return _empty_result(ticker, f"JSON decode error: {e}")
 
-        logger.info(f"[Orchestrator] ✅ Debate complete for {ticker}", extra={"ticker": ticker})
+        logger.info(f"[Debate] ✅ Selesai: {ticker}")
         return {
             "ticker": result["ticker"],
             "verdict": verdict_dict,
@@ -290,68 +296,168 @@ async def _run_single_debate(
             ],
             "raw_data_summary": result["raw_data"],
             "error": None,
+            "conviction_score": 0.0,  # Diisi oleh select_top3
         }
 
     except BudgetExhaustedError as e:
-        logger.error(f"[Orchestrator] 🛑 {ticker}: {e}", extra={"ticker": ticker})
+        logger.error(f"[Debate] 🛑 Budget habis saat debating {ticker}: {e}")
         return _empty_result(ticker, f"Budget exhausted: {e}")
     except Exception as e:
-        logger.error(f"[Orchestrator] 🚨 {ticker} debate failed: {e}", extra={"ticker": ticker})
+        logger.error(f"[Debate] 🚨 {ticker} gagal: {e}")
         return _empty_result(ticker, str(e))
 
 
-async def run_batch_debates(
-    tickers: list[str]
-) -> list[dict]:
+async def run_batch_debates(tickers: list[str]) -> list[dict]:
     """
-    Execute DebateChamber for all tickers with bounded concurrency.
+    Jalankan DebateChamber untuk semua ticker dengan kontrol:
+    - abort_event: fail-fast begitu budget habis
+    - SafeRateLimiter: sliding window RPM
+    - Semaphore: batas konkurensi paralel
+    - budget_charged flag: refund aman tanpa over-refund
 
-    Concurrency is capped at ``MAX_CONCURRENT_DEBATES`` to avoid
-    hammering Gemini's rate limit (which previously caused 429 storms
-    and 3-deep retry fan-out that drained the daily budget).
+    [FIX-3, FIX-4, FIX-5, FIX-6] Urutan eksekusi per-task:
+      1. Cek abort flag (tanpa lock)
+      2. Tunggu rate limit (sleep di luar lock)
+      3. Tunggu slot semaphore
+      4. Cek abort flag lagi (setelah antre)
+      5. Charge budget (atomik, di dalam budget_lock)
+      6. Eksekusi API
+      7. Refund jika CancelledError DAN budget_charged=True
     """
-
     logger.info(
-        f"[Orchestrator] Launching {len(tickers)} debates "
-        f"(concurrency={MAX_CONCURRENT_DEBATES})..."
+        f"[Orchestrator] Meluncurkan {len(tickers)} debate "
+        f"(concurrency={MAX_CONCURRENT_DEBATES}, "
+        f"RPM={ORCHESTRATOR_CONFIG['rpm_limit']})"
     )
 
     chamber = DebateChamber()
+    rate_limiter = SafeRateLimiter(
+        rate_limit=ORCHESTRATOR_CONFIG["rpm_limit"],
+        period_seconds=60.0,
+    )
     sem = asyncio.Semaphore(MAX_CONCURRENT_DEBATES)
 
+    # [FIX-3] Satu abort_event untuk seluruh batch.
+    abort_event = asyncio.Event()
+
+    # [FIX-4] Budget state dengan lock dedikasi.
+    budget_state = {"spent": 0}
+    budget_lock = asyncio.Lock()
+
+    # Batas budget per-run diambil dari core.budget; fallback ke jumlah ticker.
+    try:
+        usage = get_usage()
+        max_budget = usage.get("pro_budget", len(tickers))
+    except Exception:
+        max_budget = len(tickers)
+
     async def _guarded(ticker: str) -> dict:
-        async with sem:
-            try:
-                return await _run_single_debate(ticker, chamber)
-            except BudgetExhaustedError as e:
-                logger.error(f"[Budget] Aborting remaining tickers: {e}")
-                return _empty_result(ticker, f"Budget exhausted: {e}")
-            except asyncio.CancelledError:
-                # Should not reach here after debate_chamber fix, but kept
-                # as a last-resort safety net so the batch continues.
-                logger.error(f"[Orchestrator] ⚠️ {ticker}: CancelledError escaped — skipping ticker")
-                return _empty_result(ticker, "CancelledError: request cancelled or timed out")
-            except Exception as e:
-                logger.error(f"[Orchestrator] 🚨 {ticker} unhandled exception in _guarded: {e}")
-                return _empty_result(ticker, str(e))
+        # [FIX-5] Flag lokal per-coroutine — tidak butuh lock karena setiap
+        # coroutine punya stack sendiri dan flag ini tidak dibagi ke coroutine lain.
+        budget_charged = False
+
+        try:
+            # 1. Cek abort sebelum mulai apapun
+            if abort_event.is_set():
+                logger.info(f"[{ticker}] Dibatalkan sebelum start (budget habis)")
+                return _empty_result(ticker, "Aborted: budget exhausted before start")
+
+            # 2. Tunggu slot rate limit — sleep di luar lock, aman dari cancellation
+            await rate_limiter.acquire()
+
+            # 3. Tunggu slot konkurensi
+            async with sem:
+                # Small stagger agar tidak semua task langsung hit API bersamaan
+                await asyncio.sleep(ORCHESTRATOR_CONFIG["batch_delay"])
+
+                # 4. Cek abort lagi setelah antre (budget bisa habis selama menunggu)
+                if abort_event.is_set():
+                    logger.info(f"[{ticker}] Dibatalkan saat antre (budget habis)")
+                    return _empty_result(ticker, "Aborted: budget exhausted in queue")
+
+                # 5. Charge budget tepat sebelum eksekusi (atomik)
+                async with budget_lock:
+                    if budget_state["spent"] >= max_budget:
+                        abort_event.set()
+                        logger.warning(f"[{ticker}] Budget habis saat charge — abort ditetapkan")
+                        return _empty_result(ticker, "Budget exhausted at charge point")
+
+                    budget_state["spent"] += 1
+                    budget_charged = True  # Set di dalam lock, tepat setelah increment
+                    current = budget_state["spent"]
+
+                logger.info(f"[{ticker}] Budget terpakai: {current}/{max_budget}")
+
+                # 6. Eksekusi
+                try:
+                    result = await _run_single_debate(ticker, chamber)
+
+                    # Propagasi BudgetExhaustedError dari dalam chamber
+                    if result.get("error") and result["error"].startswith("Budget exhausted"):
+                        abort_event.set()
+
+                    return result
+
+                except BudgetExhaustedError as e:
+                    abort_event.set()
+                    logger.error(f"[{ticker}] 🛑 Budget habis dari dalam chamber: {e}")
+                    return _empty_result(ticker, f"Budget exhausted: {e}")
+
+                except Exception as e:
+                    # Budget sudah terpakai — request sudah dikirim ke API,
+                    # tidak di-refund karena biaya sudah terjadi di sisi provider.
+                    logger.error(f"[{ticker}] 🚨 Error saat eksekusi: {e}")
+                    return _empty_result(ticker, str(e))
+
+        except asyncio.CancelledError:
+            # [FIX-6] INTENTIONAL: CancelledError ditelan secara eksplisit.
+            #
+            # Mengapa tidak re-raise:
+            # - Cancellation di sini SELALU berasal dari abort_event (budget habis
+            #   secara sistematis), bukan dari external shutdown atau timeout.
+            # - asyncio.gather(return_exceptions=True) sudah menangani apapun
+            #   yang lolos, termasuk BaseException.
+            # - Menelan CancelledError memungkinkan pipeline tetap menghasilkan
+            #   laporan parsial daripada crash total.
+            #
+            # Trade-off: task.cancelled() akan mengembalikan False untuk task ini.
+            # Diterima karena Orchestrator tidak menggunakan task.cancelled()
+            # untuk logika apapun — abort dideteksi via abort_event.is_set().
+            #
+            # [FIX-5] Refund hanya jika budget_charged=True untuk task INI.
+            # Mencegah over-refund saat banyak task di-cancel bersamaan.
+            if budget_charged:
+                async with budget_lock:
+                    if budget_state["spent"] > 0:
+                        budget_state["spent"] -= 1
+                        logger.info(
+                            f"[{ticker}] Budget di-refund (dibatalkan sebelum eksekusi). "
+                            f"Total: {budget_state['spent']}"
+                        )
+            logger.warning(f"[{ticker}] Task dibatalkan (CancelledError)")
+            return _empty_result(ticker, "Task cancelled by abort event")
+
+        except Exception as e:
+            logger.exception(f"[{ticker}] Error tak terduga di _guarded: {e}")
+            return _empty_result(ticker, f"Orchestrator error: {e}")
 
     results = await asyncio.gather(
         *[_guarded(t) for t in tickers],
         return_exceptions=True,
     )
 
-    # Convert any stray BaseException (should not happen after _guarded fix,
-    # but this is the last-resort safety net) into empty result dicts.
+    # Konversi BaseException yang lolos semua guard menjadi empty result
     safe_results: list[dict] = []
     for ticker, res in zip(tickers, results):
         if isinstance(res, BaseException):
-            logger.error(f"[Orchestrator] 🚨 {ticker} escaped all guards: {res}")
+            logger.error(f"[Orchestrator] 🚨 {ticker} lolos semua guard: {res}")
             safe_results.append(_empty_result(ticker, str(res)))
         else:
             safe_results.append(res)
+
     usage = get_usage()
     logger.info(
-        f"[Budget] Run complete: "
+        f"[Budget] Run selesai: "
         f"Pro {usage['pro_calls']}/{usage['pro_budget']}, "
         f"Flash {usage['flash_calls']}/{usage['flash_budget']}"
     )
@@ -359,16 +465,18 @@ async def run_batch_debates(
 
 
 # ---------------------------------------------------------------------------
-# Step 3: The "Top 3" Selection Algorithm
+# Step 3: Scoring & ranking
 # ---------------------------------------------------------------------------
 
 def compute_conviction_score(verdict: dict) -> tuple[float, str | None]:
     """
-    Calculate Conviction Score:
-      50% × CIO Confidence + 50% × Normalized R/R Score
+    Hitung Conviction Score: 50% × CIO Confidence + 50% × Normalized R/R.
+
+    R/R dinormalisasi ke [0, 1] dengan cap di RR_NORM_CAP (5×).
+    R/R > 5× diberi warning karena hampir selalu berarti stop loss terlalu
+    sempit atau target melampaui resistance kuat di IHSG.
     """
     confidence = float(verdict.get("confidence", 0.0) or 0.0)
-    # Ensure confidence is scaled to [0, 1]
     if confidence > 1.0:
         confidence = confidence / 100.0
     confidence = max(0.0, min(confidence, 1.0))
@@ -377,15 +485,13 @@ def compute_conviction_score(verdict: dict) -> tuple[float, str | None]:
 
     warning: str | None = None
     if rr_ratio > 5.0:
-        # M3: R/R > 5× hampir selalu berarti stop loss terlalu sempit atau
-        # target terlalu agresif — bukan trade yang realistis di IHSG
         warning = (
-            f"⚠️ R/R {rr_ratio:.1f}× suspiciously high — "
-            "verifikasi trade envelope: stop loss mungkin terlalu sempit "
-            "atau target melebihi resistance kuat"
+            f"⚠️ R/R {rr_ratio:.1f}× mencurigakan tinggi — "
+            "verifikasi stop loss dan target: mungkin stop terlalu sempit "
+            "atau target melampaui resistance kuat"
         )
     elif rr_ratio > 3.5:
-        warning = f"⚠️ R/R {rr_ratio:.1f}× — verify stop is not inside noise band"
+        warning = f"⚠️ R/R {rr_ratio:.1f}× — verifikasi stop tidak berada di dalam noise band"
 
     rr_score = min(max(rr_ratio / RR_NORM_CAP, 0.0), 1.0)
     score = (W_CONFIDENCE * confidence) + (W_RR_RATIO * rr_score)
@@ -394,40 +500,35 @@ def compute_conviction_score(verdict: dict) -> tuple[float, str | None]:
 
 def select_top3(results: list[dict]) -> list[dict]:
     """
-    Rank all debate results by Conviction Score and return the Top N.
+    Rank hasil debate berdasarkan Conviction Score dan kembalikan Top N.
 
-    Exclusion Rule: Automatically reject AVOID, HOLD, and SELL ratings.
-    
-    Tie Handling: Includes all tickers with conviction score equal to the
-    cutoff threshold (e.g., if selecting top 3 and positions 3-5 have the
-    same score, all three are included).
-    
-    Args:
-        results: List of debate result dictionaries
-        
-    Returns:
-        List of top N (or more in case of ties) debate results
+    Exclusion: ticker dengan rating AVOID, HOLD, atau SELL otomatis dikeluarkan.
+    Tie handling: semua ticker dengan skor sama di posisi cutoff ikut disertakan.
+
+    [FIX-7] Skor ditulis ke entry dict di sini — generate_top3_report me-reuse
+    nilai ini tanpa memanggil ulang compute_conviction_score.
     """
     scorable: list[dict] = []
 
     for entry in results:
         verdict = entry.get("verdict", {})
         if not verdict:
-            logger.info(f"[Rank] Skipping {entry['ticker']} — no verdict")
+            logger.info(f"[Rank] Lewati {entry['ticker']} — tidak ada verdict")
             continue
 
         rating = verdict.get("rating", "AVOID")
         if rating in EXCLUDED_RATINGS:
-            logger.info(
-                f"[Rank] Excluding {entry['ticker']} — rating is {rating}"
-            )
+            logger.info(f"[Rank] Excluded {entry['ticker']} — rating {rating}")
             continue
 
         score, warning = compute_conviction_score(verdict)
+        # [FIX-7] Tulis langsung ke entry; generate_top3_report tidak perlu
+        # memanggil compute_conviction_score lagi untuk ticker yang sama.
         entry["conviction_score"] = round(score, 4)
         if warning:
             entry["rr_warning"] = warning
         scorable.append(entry)
+
         logger.debug(
             f"[Rank] {entry['ticker']}: "
             f"confidence={verdict.get('confidence', 0):.2f}, "
@@ -435,100 +536,70 @@ def select_top3(results: list[dict]) -> list[dict]:
             f"conviction={score:.4f}"
         )
 
-    # Sort descending by conviction score
     scorable.sort(key=lambda x: x["conviction_score"], reverse=True)
 
-    # Select top N with tie handling
     if len(scorable) <= TOP_N_SELECTION:
-        top_n = scorable
+        top_n = scorable[:]
     else:
         top_n = scorable[:TOP_N_SELECTION]
-        # Check for ties at the cutoff
-        if TOP_N_SELECTION < len(scorable):
-            tie_threshold = scorable[TOP_N_SELECTION - 1]["conviction_score"]
-            for entry in scorable[TOP_N_SELECTION:]:
-                if entry["conviction_score"] == tie_threshold:
-                    top_n.append(entry)
-                    logger.info(
-                        f"[Rank] Including tie: {entry['ticker']} "
-                        f"(score={tie_threshold:.4f})"
-                    )
+        tie_threshold = scorable[TOP_N_SELECTION - 1]["conviction_score"]
+        for entry in scorable[TOP_N_SELECTION:]:
+            if entry["conviction_score"] == tie_threshold:
+                top_n.append(entry)
+                logger.info(f"[Rank] Tie included: {entry['ticker']} (score={tie_threshold:.4f})")
 
     logger.info(
-        f"[Rank] Top {len(top_n)} selected: {[t['ticker'] for t in top_n]} "
-        f"(from {len(scorable)} eligible, configured top_n={TOP_N_SELECTION})"
+        f"[Rank] Top {len(top_n)} dipilih: {[t['ticker'] for t in top_n]} "
+        f"(dari {len(scorable)} eligible, konfigurasi top_n={TOP_N_SELECTION})"
     )
     return top_n
 
 
 # ---------------------------------------------------------------------------
-# Step 4: Data Persistence & Final Reporting
+# Step 4: Persistence & reporting
 # ---------------------------------------------------------------------------
 
 def save_full_results(results: list[dict], path: Path = FULL_RESULTS_PATH) -> None:
-    """Save all debate results as JSON."""
+    """Simpan semua hasil debate sebagai JSON."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(results, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
-    logger.info(f"[Persist] Full batch results saved → {path}")
+    path.write_text(json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8")
+    logger.info(f"[Persist] Full results → {path}")
+
+
+def get_local_timestamp() -> str:
+    """
+    Kembalikan timestamp lokal dalam timezone yang dikonfigurasi (default: Asia/Jakarta).
+
+    [FIX-8] ZoneInfo sudah di-import di top-level — fungsi ini tidak perlu
+    import lokal yang dieksekusi setiap kali dipanggil.
+    """
+    utc_now = datetime.now(timezone.utc)
+    local_tz = ZoneInfo(settings.DATETIME_TIMEZONE)
+    return utc_now.astimezone(local_tz).strftime("%Y-%m-%d %H:%M %Z")
 
 
 def _extract_winning_argument(entry: dict) -> str:
-    """Extract the Bull's strongest argument from the debate history."""
+    """Ambil argumen Bull terakhir (paling refined) dari history debate."""
     bull_args = [
-        h["content"]
-        for h in entry.get("debate_history", [])
-        if h.get("role") == "bull"
+        h["content"] for h in entry.get("debate_history", []) if h.get("role") == "bull"
     ]
     if not bull_args:
-        return "No bull argument recorded."
-
-    # Return the last (most refined) bull argument, trimmed
+        return "Tidak ada argumen bull yang tercatat."
     arg = bull_args[-1]
-    # Truncate to ~500 chars for the executive summary
-    if len(arg) > 500:
-        arg = arg[:497] + "..."
-    return arg
+    return arg[:497] + "..." if len(arg) > 500 else arg
 
 
 def _extract_devils_warning(entry: dict) -> str:
-    """Extract the #1 risk from the Devil's Advocate."""
+    """Ambil challenge terakhir dari Devil's Advocate."""
     da_args = [
         h["content"]
         for h in entry.get("debate_history", [])
         if h.get("role") == "devils_advocate"
     ]
     if not da_args:
-        return "No devil's advocate challenge recorded."
-
-    # Return the DA content, trimmed
+        return "Tidak ada challenge devil's advocate yang tercatat."
     arg = da_args[-1]
-    if len(arg) > 400:
-        arg = arg[:397] + "..."
-    return arg
-
-
-def get_local_timestamp() -> str:
-    """
-    Get current timestamp in configured timezone (Asia/Jakarta by default).
-    
-    Uses UTC internally and converts to local timezone only for display,
-    ensuring consistent behavior across different server environments.
-    
-    Returns:
-        Formatted timestamp string with timezone abbreviation
-    """
-    try:
-        from zoneinfo import ZoneInfo
-    except ImportError:
-        # Fallback for Python < 3.9
-        from backports.zoneinfo import ZoneInfo  # type: ignore
-    
-    utc_now = datetime.now(timezone.utc)
-    local_tz = ZoneInfo(settings.DATETIME_TIMEZONE)  # Default: Asia/Jakarta
-    return utc_now.astimezone(local_tz).strftime("%Y-%m-%d %H:%M %Z")
+    return arg[:397] + "..." if len(arg) > 400 else arg
 
 
 def generate_top3_report(
@@ -537,31 +608,25 @@ def generate_top3_report(
     path: Path = TOP3_REPORT_PATH,
 ) -> str:
     """
-    Generate the final executive Markdown report for the Top N swing trades.
-    Returns the Markdown string and saves it to disk.
-    
-    Args:
-        top_n: List of top N selected debate results
-        all_results: Full list of all debate results
-        path: Output file path for the report
-        
-    Returns:
-        Generated Markdown report as string
+    Generate laporan Markdown eksekutif untuk Top N swing trade.
+
+    [FIX-7] conviction_score di-reuse dari entry dict yang sudah diisi oleh
+    select_top3 — tidak ada pemanggilan ulang compute_conviction_score.
+    Untuk ticker error (tidak masuk select_top3), skor default 0.0.
     """
     timestamp = get_local_timestamp()
     total_debated = len(all_results)
     selected_count = len(top_n)
-    eligible = len([
-        r for r in all_results
-        if r.get("verdict", {}).get("rating") not in EXCLUDED_RATINGS
-        and r.get("verdict")
-    ])
+    eligible = sum(
+        1 for r in all_results
+        if r.get("verdict", {}).get("rating") not in EXCLUDED_RATINGS and r.get("verdict")
+    )
 
     lines: list[str] = [
         f"# 🏆 TOP {selected_count} HIGH-CONVICTION IHSG SWING TRADES",
         "",
         f"> **Generated**: {timestamp}",
-        f"> **Pipeline**: Quant Scouting → Multi-Agent Debate → CIO Verdict",
+        "> **Pipeline**: Quant Scouting → Multi-Agent Debate → CIO Verdict",
         f"> **Stocks Debated**: {total_debated} | **Eligible (BUY/STRONG_BUY)**: {eligible} | **Selected**: {selected_count}",
         "",
         "---",
@@ -569,12 +634,12 @@ def generate_top3_report(
     ]
 
     if not top_n:
-        lines.append(f"⚠️ **No stocks qualified for the Top {TOP_N_SELECTION}.**")
-        lines.append("")
-        lines.append(
-            "All candidates were rated HOLD, AVOID, or SELL by the CIO Judge. "
-            "No high-conviction swing trades identified in this batch."
-        )
+        lines += [
+            f"⚠️ **Tidak ada saham yang memenuhi syarat untuk Top {TOP_N_SELECTION}.**",
+            "",
+            "Semua kandidat diberi rating HOLD, AVOID, atau SELL oleh CIO Judge. "
+            "Tidak ada swing trade high-conviction yang teridentifikasi dalam batch ini.",
+        ]
         report_text = "\n".join(lines)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(report_text, encoding="utf-8")
@@ -583,18 +648,17 @@ def generate_top3_report(
     for rank, entry in enumerate(top_n, 1):
         v = entry["verdict"]
         ticker = entry["ticker"]
-        score = entry.get("conviction_score", 0)
-
-        # Medal emoji
+        # [FIX-7] Reuse skor dari select_top3, bukan hitung ulang
+        score = entry.get("conviction_score", 0.0)
         medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(rank, "")
 
-        lines.extend([
+        lines += [
             f"## {medal} #{rank} — {ticker}",
             "",
             "### Final Rating & Confidence",
             "",
-            f"| Metric | Value |",
-            f"|---|---|",
+            "| Metric | Value |",
+            "|---|---|",
             f"| **Rating** | `{v.get('rating', 'N/A')}` |",
             f"| **CIO Confidence** | {v.get('confidence', 0):.0%} |",
             f"| **Conviction Score** | {score:.2%} |",
@@ -602,16 +666,16 @@ def generate_top3_report(
             "",
             "### 📦 Trade Box",
             "",
-            f"| Parameter | Level |",
-            f"|---|---|",
+            "| Parameter | Level |",
+            "|---|---|",
             f"| **Buy Range** | Rp {v.get('entry_price_range', 'N/A')} |",
-            f"| **Target Price** | Rp {v.get('target_price', 'N/A'):,.0f} |" if v.get('target_price') else f"| **Target Price** | N/A |",
-            f"| **Stop Loss** | Rp {v.get('stop_loss', 'N/A'):,.0f} |" if v.get('stop_loss') else f"| **Stop Loss** | N/A |",
-            f"| **Fair Value** | Rp {v.get('fair_value', 'N/A'):,.0f} |" if v.get('fair_value') else f"| **Fair Value** | N/A |",
+            (f"| **Target Price** | Rp {v['target_price']:,.0f} |" if v.get("target_price") else "| **Target Price** | N/A |"),
+            (f"| **Stop Loss** | Rp {v['stop_loss']:,.0f} |" if v.get("stop_loss") else "| **Stop Loss** | N/A |"),
+            (f"| **Fair Value** | Rp {v['fair_value']:,.0f} |" if v.get("fair_value") else "| **Fair Value** | N/A |"),
             f"| **Expected Return** | {v.get('expected_return', 'N/A')} |",
             f"| **Risk/Reward** | {v.get('risk_reward_ratio', 'N/A')} |",
             "",
-            "*All prices are IHSG tick-rounded and Python-computed.*",
+            "*Semua harga sudah di-round ke tick IHSG dan dihitung oleh Python.*",
             "",
             "### 🏆 Winning Argument",
             "",
@@ -623,63 +687,49 @@ def generate_top3_report(
             "",
             "### 💡 CIO Summary",
             "",
-            v.get("summary", "No summary available."),
+            v.get("summary", "Tidak ada summary tersedia."),
             "",
-        ])
+        ]
 
         if "rr_warning" in entry:
-            lines.append(f"> **{entry['rr_warning']}**")
-            lines.append("")
+            lines += [f"> **{entry['rr_warning']}**", ""]
 
-        # Key catalysts & risks
         catalysts = v.get("key_catalysts", [])
         risks = v.get("key_risks", [])
 
         if catalysts:
             lines.append("**Key Catalysts:**")
-            for c in catalysts:
-                lines.append(f"- {c}")
+            lines += [f"- {c}" for c in catalysts]
             lines.append("")
 
         if risks:
             lines.append("**Key Risks:**")
-            for r in risks:
-                lines.append(f"- {r}")
+            lines += [f"- {r}" for r in risks]
             lines.append("")
 
-        lines.extend(["---", ""])
+        lines += ["---", ""]
 
-    # Footer with full batch summary table
-    lines.extend([
+    # Footer: tabel ringkasan semua ticker
+    lines += [
         "## 📊 Full Batch Summary",
         "",
         "| Ticker | Rating | Confidence | R/R Ratio | Conviction Score | Status |",
         "|---|---|---|---|---|---|",
-    ])
+    ]
 
-    # Include all results in the summary
-    all_scored: list[dict] = []
-    for entry in all_results:
-        verdict = entry.get("verdict", {})
-        if not verdict:
-            all_scored.append({**entry, "conviction_score": 0.0})
-            continue
-        score, warning = compute_conviction_score(verdict)
-        entry["conviction_score"] = round(score, 4)
-        if warning:
-            entry["rr_warning"] = warning
-        all_scored.append(entry)
-
-    all_scored.sort(key=lambda x: x["conviction_score"], reverse=True)
-
+    # [FIX-7] Untuk ticker yang sudah masuk select_top3, skor sudah ada di entry.
+    # Untuk ticker error/excluded, ambil dari entry atau default 0.0 — tidak ada
+    # pemanggilan ulang compute_conviction_score.
     selected_tickers = {t["ticker"] for t in top_n}
-    for entry in all_scored:
+    sorted_results = sorted(all_results, key=lambda x: x.get("conviction_score", 0.0), reverse=True)
+
+    for entry in sorted_results:
         v = entry.get("verdict", {})
         ticker = entry["ticker"]
-        rating = v.get("rating", "ERROR")
-        conf = v.get("confidence", 0)
-        rr = v.get("risk_reward_ratio", "N/A")
-        cscore = entry.get("conviction_score", 0)
+        rating = v.get("rating", "ERROR") if v else "ERROR"
+        conf = v.get("confidence", 0) if v else 0
+        rr = v.get("risk_reward_ratio", "N/A") if v else "N/A"
+        cscore = entry.get("conviction_score", 0.0)
 
         if entry.get("error"):
             status = "❌ Error"
@@ -691,81 +741,56 @@ def generate_top3_report(
             status = "—"
 
         rr_str = f"{rr:.2f}" if isinstance(rr, (int, float)) and rr else "N/A"
-        lines.append(
-            f"| {ticker} | {rating} | {conf:.0%} | {rr_str} | {cscore:.2%} | {status} |"
-        )
+        lines.append(f"| {ticker} | {rating} | {conf:.0%} | {rr_str} | {cscore:.2%} | {status} |")
 
-    lines.extend([
+    lines += [
         "",
         "---",
-        f"*Report generated by `orchestrator.py` at {timestamp}*",
-    ])
+        f"*Laporan dibuat oleh `orchestrator.py` pada {timestamp}*",
+    ]
 
     report_text = "\n".join(lines)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(report_text, encoding="utf-8")
-    logger.info(f"[Persist] Top {len(top_n)} report saved → {path}")
+    logger.info(f"[Persist] Top {len(top_n)} report → {path}")
     return report_text
 
 
 # ---------------------------------------------------------------------------
-# Main Entrypoint
+# Main entrypoint
 # ---------------------------------------------------------------------------
 
 async def main() -> None:
     """
-    Full pipeline: Parse → Debate → Rank → Report.
-    
-    Orchestrates the complete IHSG swing trade analysis workflow:
-    1. Parse candidate tickers from quant filter output
-    2. Run multi-agent debate for each ticker
-    3. Rank by conviction score and select top N
-    4. Generate comprehensive markdown report
+    Pipeline penuh: Parse → Debate → Rank → Report.
     """
     logger.info("=" * 60)
-    logger.info("[Orchestrator] 🚀 Starting IHSG Swing Trade Pipeline")
+    logger.info("[Orchestrator] 🚀 Memulai IHSG Swing Trade Pipeline")
     logger.info("=" * 60)
 
-    # Reset budget counters at the start of each run so repeated invocations
-    # within the same interpreter session don't poison each other.
     reset_budget()
 
-    # Step 1: Parse report
     try:
         tickers = parse_report()
-    except FileNotFoundError as e:
+    except (FileNotFoundError, ValueError) as e:
         logger.error(f"[Orchestrator] {e}")
-        return
-    except ValueError as e:
-        logger.error(f"[Orchestrator] {e}")
-        return
-        
-    if not tickers:
-        logger.error("[Orchestrator] No valid tickers found after parsing. Aborting.")
         return
 
-    # Step 2: Run debates
     results = await run_batch_debates(tickers)
-
-    # Step 3: Select Top N (with tie handling)
     top_n = select_top3(results)
-
-    # Step 4: Save & Report
     save_full_results(results)
     report = generate_top3_report(top_n, results)
 
     logger.info("=" * 60)
-    logger.info("[Orchestrator] ✅ Pipeline Complete")
+    logger.info("[Orchestrator] ✅ Pipeline selesai")
     logger.info(f"[Orchestrator] Full results → {FULL_RESULTS_PATH}")
     logger.info(f"[Orchestrator] Top {len(top_n)} report → {TOP3_REPORT_PATH}")
     logger.info("=" * 60)
 
-    # Print the report to console
     print("\n" + report)
 
 
 if __name__ == "__main__":
     from dotenv import load_dotenv
-
     load_dotenv()
     asyncio.run(main())

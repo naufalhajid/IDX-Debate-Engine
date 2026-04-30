@@ -1,62 +1,64 @@
 # 🏆 TOP 3 HIGH-CONVICTION IHSG SWING TRADES
 
-> **Generated**: 2026-04-30 01:51 WIB
+> **Generated**: 2026-04-30 15:41 WIB
 > **Pipeline**: Quant Scouting → Multi-Agent Debate → CIO Verdict
-> **Stocks Debated**: 10 | **Eligible (BUY/STRONG_BUY)**: 4 | **Selected**: 3
+> **Stocks Debated**: 10 | **Eligible (BUY/STRONG_BUY)**: 7 | **Selected**: 3
 
 ---
 
-## 🥇 #1 — AUTO
+## 🥇 #1 — WIIM
 
 ### Final Rating & Confidence
 
 | Metric | Value |
 |---|---|
-| **Rating** | `BUY` |
-| **CIO Confidence** | 75% |
-| **Conviction Score** | 67.50% |
+| **Rating** | `STRONG_BUY` |
+| **CIO Confidence** | 80% |
+| **Conviction Score** | 60.20% |
 | **Timeframe** | 1-3 Months |
 
 ### 📦 Trade Box
 
 | Parameter | Level |
 |---|---|
-| **Buy Range** | Rp 2520 - 2570 |
-| **Target Price** | Rp 2,650 |
-| **Stop Loss** | Rp 2,510 |
-| **Fair Value** | Rp 6,896 |
-| **Expected Return** | +4.1% |
-| **Risk/Reward** | 3.0 |
+| **Buy Range** | Rp 1845 - 1900 |
+| **Target Price** | Rp 2,120 |
+| **Stop Loss** | Rp 1,750 |
+| **Fair Value** | Rp 2,968 |
+| **Expected Return** | +13.2% |
+| **Risk/Reward** | 2.02 |
 
-*All prices are IHSG tick-rounded and Python-computed.*
+*Semua harga sudah di-round ke tick IHSG dan dihitung oleh Python.*
 
 ### 🏆 Winning Argument
 
-> The Bear's assessment of AUTO's valuation is self-contradictory; the stock is profoundly undervalued, not overvalued. This substantial discount to its intrinsic worth provides an exceptional margin of safety, making the current trading level highly attractive. This wide gap between market price and fair value inherently absorbs the Bear's perceived short-term technical risks, as any minor pullback represents an even deeper value proposition rather than a fundamental deterioration. The market'...
+> The Bear's dismissal of fundamental undervaluation as a short-term catalyst overlooks the immediate technical opportunity. The current price action represents a healthy pullback within a robust, confirmed long-term uptrend, providing a tactical entry point for accumulation. This technical setup, combined with the stock's strong underlying fundamentals—evidenced by impressive return on equity and minimal leverage—serves as a compelling short-term catalyst. These fundamentals attract sustained ...
 
 ### ⚠️ Devil's Advocate Warning
 
-> 1.  **MACRO/COMPANY RISK & FOREIGN FLOW:** If foreign funds accelerate selling pressure on AUTO, or a broader IHSG correction hits, could the Rp 2,430 stop-loss fail, pushing the price towards the MA200 at Rp 2,334, or even the 52-week low of Rp 1,799?
+> Here are two specific challenges to the WIIM trade setup:
 
-2.  **EXECUTION RISK:** If AUTO only achieves the lower end of the 3% projected gain (around Rp 2,597 from Rp 2,521 entry), will the net return...
+1.  **MACRO/COMPANY RISK & FOREIGN FLOW:** If broader market weakness intensifies or foreign funds accelerate selling, could the Rp 1689 stop loss break, triggering a deeper fall towards the MA200 at Rp 1435, invalidating the 'healthy pullback' thesis?
+
+2.  **EXECUTION RISK:** Given the gross 5.4% target return from Rp 1841 to Rp 1940, ...
 
 ### 💡 CIO Summary
 
-The trade plan for AUTO is approved with a BUY rating. The stock is profoundly undervalued, providing a significant margin of safety, and the technical setup is constructive. The trade offers an excellent risk/reward ratio of 3.0, targeting a +4.1% gain with a tight, well-defined stop-loss, contingent on a price pullback into the specified entry zone.
+This trade plan is approved with a STRONG_BUY rating. The stock is significantly undervalued with a 56% margin of safety to its fair value, supported by robust fundamentals. The provided trade envelope offers an excellent risk/reward ratio of 2.02, targeting a move towards the 52-week high resistance zone.
 
 **Key Catalysts:**
-- Significant undervaluation attracting value investors and creating a strong fundamental floor.
-- Continuation of the confirmed technical uptrend, with price holding above key moving averages.
-- Excellent risk/reward profile (3.0) making the trade mathematically attractive for a short-term swing.
+- Significant undervaluation (56% margin of safety) attracting value investors and creating potential for mean reversion.
+- Favorable technical setup with price consolidating near support (MA50/SMA20) within a confirmed long-term uptrend.
+- Strong fundamentals, including high ROE (20.95%) and very low debt, providing a solid financial foundation.
 
 **Key Risks:**
-- Price is currently above the ideal entry zone (Rp 2,520 – Rp 2,570), requiring a pullback that may not materialize.
-- Absence of a specific, near-term event-driven catalyst could lead to slow price action.
-- A broader market correction could trigger the tight stop-loss, even if company-specific fundamentals remain strong.
+- Lack of a specific, time-bound catalyst could lead to prolonged consolidation or sideways movement.
+- A breach of the Rp 1,750 stop-loss level could indicate a more severe short-term downtrend, potentially targeting the MA200.
+- General market weakness or negative sector sentiment could override the stock's positive fundamentals in the short term.
 
 ---
 
-## 🥈 #2 — WIIM
+## 🥈 #2 — MARK
 
 ### Final Rating & Confidence
 
@@ -71,88 +73,90 @@ The trade plan for AUTO is approved with a BUY rating. The stock is profoundly u
 
 | Parameter | Level |
 |---|---|
-| **Buy Range** | Rp 1870 - 1930 |
-| **Target Price** | Rp 2,130 |
-| **Stop Loss** | Rp 1,785 |
-| **Fair Value** | Rp 2,968 |
-| **Expected Return** | +12.1% |
+| **Buy Range** | Rp 790 - 810 |
+| **Target Price** | Rp 880 |
+| **Stop Loss** | Rp 760 |
+| **Fair Value** | Rp 887 |
+| **Expected Return** | +10.0% |
 | **Risk/Reward** | 2.0 |
 
-*All prices are IHSG tick-rounded and Python-computed.*
+*Semua harga sudah di-round ke tick IHSG dan dihitung oleh Python.*
 
 ### 🏆 Winning Argument
 
-> The Bear's critique of the risk-reward ratio, while numerically precise, overlooks the substantial fundamental cushion inherent in this setup. The significant undervaluation of the equity relative to its intrinsic worth provides a much wider margin of safety than what a purely technical stop-loss calculation might suggest. This deep discount implies that even if the initial technical stop is triggered, the asset remains profoundly undervalued, limiting the true economic downside and presentin...
+> The Bear's assertion of "no immediate margin of safety" at the current price overlooks the broader fundamental undervaluation. While the current trading level is indeed above the initial technical entry band, the stock remains at a significant discount to its calculated intrinsic value. This fundamental gap provides a substantial buffer, absorbing short-term price fluctuations and mitigating the perceived "technical fragility." The robust alignment of the short, mid, and long-term moving aver...
 
 ### ⚠️ Devil's Advocate Warning
 
-> 1.  **MACRO/COMPANY RISK & FOREIGN FLOW:** If a broader IHSG correction or accelerated foreign selling pressure materializes, could the SMA20 support at Rp 1806 fail, potentially driving WIIM down to the MA200 at Rp 1429, negating the established bullish trend?
+> 1.  **MACRO/COMPANY RISK & FOREIGN FLOW**: If foreign funds initiate a significant net sell-off in the broader market, could MARK's MA50 support at Rp 796 break, potentially triggering stops down to Rp 777, despite its strong fundamentals?
 
-2.  **EXECUTION RISK:** While the 9.91% target return yields 9.49% net after costs, does the unfavorable 1.14:1 R/R ratio make this tr...
+2.  **EXECUTION RISK**: While the projected 8.3% gross return from Rp 803 to Rp 870 comfortably covers 0.4% commissions, what if execution slippage or early...
 
 ### 💡 CIO Summary
 
-This trade plan is approved based on a compelling combination of deep fundamental undervaluation and a confirmed bullish technical structure. The current price offers a significant margin of safety relative to its fair value. The Python-calculated trade envelope presents an excellent 2.0 risk/reward ratio, making it an attractive entry for a potential re-rating.
+The trade plan for MARK is approved with a BUY rating. The stock is fundamentally undervalued with strong profitability and minimal debt. The technical setup confirms a robust uptrend, and the provided trade envelope offers an excellent 2.0 risk/reward ratio. While the current price is slightly above the ideal entry zone, a minor pullback would present a compelling entry opportunity.
 
 **Key Catalysts:**
-- Significant undervaluation (53.8% discount to fair value) creating potential for a market re-rating.
-- Confirmed bullish technical trend with price trading above both the MA50 and MA200.
-- Attractive risk/reward ratio of 2.00 as per the validated trade envelope.
-- Healthy fundamentals including a strong ROE (20.95%) and a low Debt/Equity ratio (0.15).
+- Price realization towards fair value of Rp 887, driven by strong fundamentals (ROE 30%, low debt).
+- Continuation of the confirmed technical uptrend with price holding above key moving averages (MA20/MA50).
+- High dividend yield (8.59%) may attract income-oriented investors, providing price support.
 
 **Key Risks:**
-- Absence of a specific, near-term corporate catalyst to ensure price appreciation within the 1-3 month swing timeframe.
-- General market risk or a broad IHSG correction could trigger the stop-loss despite positive company-specifics.
-- The fair value calculation has 'MEDIUM' confidence, which implies a degree of uncertainty in the long-term valuation target.
+- A broader market sell-off could break technical support levels, triggering the stop-loss.
+- The current price of Rp 815 is slightly above the optimal entry zone (790-810), requiring price to dip for the best entry.
+- Lack of a near-term corporate action or earnings catalyst could lead to a period of sideways consolidation before an upward move.
 
 ---
 
-## 🥉 #3 — STAA
+## 🥉 #3 — ELSA
 
 ### Final Rating & Confidence
 
 | Metric | Value |
 |---|---|
 | **Rating** | `BUY` |
-| **CIO Confidence** | 75% |
-| **Conviction Score** | 57.10% |
+| **CIO Confidence** | 80% |
+| **Conviction Score** | 60.00% |
 | **Timeframe** | 1-3 Months |
 
 ### 📦 Trade Box
 
 | Parameter | Level |
 |---|---|
-| **Buy Range** | Rp 1235 - 1260 |
-| **Target Price** | Rp 1,370 |
-| **Stop Loss** | Rp 1,185 |
-| **Fair Value** | Rp 1,825 |
-| **Expected Return** | +9.8% |
-| **Risk/Reward** | 1.96 |
+| **Buy Range** | Rp 765 - 785 |
+| **Target Price** | Rp 875 |
+| **Stop Loss** | Rp 725 |
+| **Fair Value** | Rp 1,493 |
+| **Expected Return** | +12.9% |
+| **Risk/Reward** | 2.0 |
 
-*All prices are IHSG tick-rounded and Python-computed.*
+*Semua harga sudah di-round ke tick IHSG dan dihitung oleh Python.*
 
 ### 🏆 Winning Argument
 
-> The Bear's assertion regarding the absence of a specific event catalyst overlooks the most potent driver for this swing: the profound fundamental undervaluation. Trading at a substantial discount to its calculated intrinsic value, STAA possesses an inherent gravitational pull towards fair value. This significant price-to-value gap, corroborated by robust profitability metrics like a strong Return on Equity and healthy Net Profit Margin, acts as its own powerful, albeit non-event-driven, catal...
+> The Bear's critique of the risk-reward ratio, derived from specific technical levels, overlooks the robust underlying support structure and the profound fundamental undervaluation. While a defined technical stop is a prudent measure, the stock's long-term moving average, positioned significantly below the initial risk threshold, provides a formidable secondary support. This deeper structural floor substantially limits true downside exposure beyond short-term fluctuations, making any dip towar...
 
 ### ⚠️ Devil's Advocate Warning
 
-> 1.  Given the absence of a specific catalyst and no foreign flow data, if the broader IHSG experiences a correction, could the Rp 1,214 stop-loss (near MA200) be easily breached, potentially leading to a deeper fall towards the 52-week low of Rp 742?
-2.  With a projected gross return of 5.47% from Rp 1,261 to Rp 1,330, can this trade sufficiently clear total transaction costs (approx. 0.40% for...
+> Here are two specific questions challenging the ELSA swing trade setup:
+
+1.  **MACRO/COMPANY RISK & FOREIGN FLOW:** If foreign funds accelerate net selling in the broader market, or global oil prices unexpectedly drop, could ELSA's MA50 support at Rp 771 break, triggering stops and pushing the price towards the MA200 at Rp 580, far below the Rp 683 stop loss?
+
+2.  **EXECUTION RISK:** Given the ...
 
 ### 💡 CIO Summary
 
-This trade plan for STAA is rated BUY. The stock is significantly undervalued relative to its fair value, providing a strong fundamental cushion. The technical setup offers an attractive risk/reward ratio of 1.96, justifying a position upon a pullback into the specified entry zone.
+This trade is approved based on a compelling combination of deep fundamental undervaluation and a strong, Python-calculated 2.0 risk/reward ratio. The stock's bullish technical posture above key moving averages provides a solid foundation for the trade. While a specific near-term catalyst is absent, the significant margin of safety offers a substantial buffer against downside risk, making the proposed entry attractive.
 
 **Key Catalysts:**
-- Significant undervaluation, with current price trading at a 40.4% discount to the calculated fair value of Rp 1,825.
-- Favorable technical setup with price above key moving averages (SMA20, MA50, MA200), indicating a bullish trend.
-- Attractive risk/reward ratio of 1.96 for the proposed swing trade.
+- Market re-rating towards its significant fundamental undervaluation (Fair Value Rp 1,493).
+- Continuation of the established bullish technical trend, with price holding above the MA50 support.
+- Potential for positive sector sentiment or unexpected contract announcements, which are not currently priced in.
 
 **Key Risks:**
-- Absence of a specific, event-driven catalyst within the 1-3 month timeframe could lead to range-bound trading.
-- A broad market (IHSG) correction could breach the technical stop-loss, as highlighted by the Devil's Advocate.
-- The current price is above the target entry zone, meaning the trade requires a price pullback that may not materialize.
+- The absence of a specific, identifiable company catalyst within the 1-3 month timeframe could lead to price stagnation.
+- Execution risk: The stop-loss at Rp 725 is within a 2x ATR range from the entry point, making it susceptible to being triggered by normal market volatility.
+- A broader market correction or a sudden drop in global oil prices could break the current technical support levels, invalidating the trade setup.
 
 ---
 
@@ -160,16 +164,16 @@ This trade plan for STAA is rated BUY. The stock is significantly undervalued re
 
 | Ticker | Rating | Confidence | R/R Ratio | Conviction Score | Status |
 |---|---|---|---|---|---|
-| AUTO | BUY | 75% | 3.00 | 67.50% | 🏆 Selected |
-| WIIM | BUY | 80% | 2.00 | 60.00% | 🏆 Selected |
-| GJTL | HOLD | 75% | 2.00 | 57.50% | ⛔ Excluded |
-| STAA | BUY | 75% | 1.96 | 57.10% | 🏆 Selected |
-| MARK | BUY | 75% | 1.94 | 56.90% | — |
-| DSNG | HOLD | 55% | 2.03 | 47.80% | ⛔ Excluded |
-| AKRA | HOLD | 55% | 2.00 | 47.50% | ⛔ Excluded |
-| SRTG | HOLD | 50% | 2.23 | 47.30% | ⛔ Excluded |
-| MIDI | HOLD | 55% | 1.93 | 46.80% | ⛔ Excluded |
-| AVIA | AVOID | 25% | 1.00 | 22.50% | ⛔ Excluded |
+| WIIM | STRONG_BUY | 80% | 2.02 | 60.20% | 🏆 Selected |
+| MARK | BUY | 80% | 2.00 | 60.00% | 🏆 Selected |
+| ELSA | BUY | 80% | 2.00 | 60.00% | 🏆 Selected |
+| DMAS | BUY | 75% | 2.08 | 58.30% | — |
+| AUTO | BUY | 75% | 2.00 | 57.50% | — |
+| INDF | BUY | 75% | 2.00 | 57.50% | — |
+| GJTL | BUY | 60% | 2.00 | 50.00% | — |
+| HMSP | AVOID | 90% | 0.50 | 0.00% | ⛔ Excluded |
+| AVIA | AVOID | 20% | 1.11 | 0.00% | ⛔ Excluded |
+| DSNG | HOLD | 60% | 2.00 | 0.00% | ⛔ Excluded |
 
 ---
-*Report generated by `orchestrator.py` at 2026-04-30 01:51 WIB*
+*Laporan dibuat oleh `orchestrator.py` pada 2026-04-30 15:41 WIB*

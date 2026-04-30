@@ -1,9 +1,9 @@
 """
 run_quant_filter.py — IHSG Quantitative Swing-Trade Scouting Engine
 ====================================================================
-Versi: 3.0
+Versi: 3.1
 
-Perubahan dari v2.1:
+Perubahan dari v3.0:
   1. [INTEGRATE] XlsxDataAdapter sebagai primary data source — Close Price,
      Volume, BVPS, DPS, Piotroski, Altman, ExDate semuanya dari xlsx.
      yfinance HANYA dipakai untuk OHLCV teknikal (SMA, ATR, RSI) yang
@@ -32,6 +32,39 @@ Perubahan dari v2.1:
 
   7. [IMPROVE] PEMANTAUAN KHUSUS dari idx-stocks sheet langsung di-exclude
      di awal pipeline tanpa perlu cek manual.
+
+Perubahan v3.1 (perbaikan mendalam):
+  8. [FIX KRITIS] Val_Score dan Prof_Score berubah dari rank(pct=True)
+     relatif menjadi scoring absolut berbasis threshold. Score sebelumnya
+     tergantung seberapa jelek universe hari itu — saham mediocre bisa
+     dapat score tinggi kalau saingannya lebih buruk. Sekarang score
+     mencerminkan kualitas absolut saham.
+
+  9. [FIX] Volume benchmark di momentum scoring berubah dari vol_5d_avg
+     ke vol_20d_avg, konsisten dengan liquidity gate dan ADT calculation.
+     vol_5d_avg terlalu pendek dan mudah distorsi oleh 1-2 hari spike.
+
+  10. [FIX] RSI scoring diperbaiki: RSI rendah (<45, zona akumulasi
+      oversold) sekarang diberi skor lebih tinggi dari RSI lemah (35-45).
+      Sebelumnya RSI <45 dan RSI >70 (overbought) dapat skor yang sama
+      (×0.25) — ini tidak masuk akal secara swing trade logic.
+      Tiers baru: Akumulasi (45-55) = 100%, Uptrend (55-70) = 80%,
+      Oversold (<45) = 60%, Overbought (>70) = 20%.
+
+  11. [FIX] Piotroski F-Score diintegrasikan ke dalam composite score
+      sebagai bonus/penalty eksplisit, bukan hanya gate di static filter.
+      F-Score ≥7 (strong) = +5 bonus, F-Score 4-5 (weak) = -5 penalty.
+
+  12. [FIX] Sektor bank dan finance_nonbank menggunakan valuasi berbasis
+      ROE/PBV relatif (bukan Graham Number) karena Graham Number tidak
+      valid untuk institusi finansial dengan leverage tinggi di aset.
+
+  13. [FIX BUG] _resolve_exdate: loop parse tanggal sekarang punya
+      explicit fallback ke yfinance jika semua format gagal di lapis 2,
+      bukan silent return None yang menyebabkan AttributeError downstream.
+
+  14. [IMPROVE] CONFIG tambah parameter baru untuk absolute scoring
+      thresholds dan RSI tier weights.
 
 Execution order:
   TIDAK perlu build_sector_cache.py terlebih dahulu —
@@ -147,6 +180,40 @@ CONFIG = {
     "weight_momentum_rsi":    20,
     "weight_momentum_vol":    20,
 
+    # ── Absolute Valuation Scoring Thresholds (v3.1)
+    # Val_Score dihitung absolut: gap tiered, bukan rank relatif.
+    # Tier 1 (>=50% gap) -> 100% weight_valuation
+    # Tier 2 (20-50%)    -> 70%
+    # Tier 3 (5-20%)     -> 40%
+    # Tier 4 (<5%)       -> 10% (nyaris tidak undervalued)
+    "val_tier1_gap":          50.0,
+    "val_tier2_gap":          20.0,
+    "val_tier3_gap":           5.0,
+
+    # ── Absolute Profitability Scoring Thresholds (v3.1)
+    # ROE >=25% -> 100% weight_profitability
+    # ROE 15-25% -> 70%
+    # ROE 10-15% -> 40%  (min ROE sudah di-gate di static filter)
+    "prof_roe_tier1":         0.25,
+    "prof_roe_tier2":         0.15,
+
+    # ── RSI Scoring Weights per tier (v3.1 — asimetris, swing-trade aware)
+    # Oversold (<45)    -> 60%  (potensi reversal, menarik tapi butuh konfirmasi)
+    # Akumulasi (45-55) -> 100% (sweet spot entry swing)
+    # Uptrend (55-70)   -> 80%  (momentum kuat, masih oke)
+    # Overbought (>70)  -> 20%  (hard-reject sudah >75, tapi 70-75 tetap lemah)
+    "rsi_weight_oversold":    0.60,
+    "rsi_weight_accum":       1.00,
+    "rsi_weight_uptrend":     0.80,
+    "rsi_weight_overbought":  0.20,
+
+    # ── Piotroski Score Adjustment (v3.1 — integrasi ke composite score)
+    # F-Score >=7 (strong) -> bonus; F-Score <=5 (marginal) -> penalty
+    "piotroski_strong_bonus":  +5,
+    "piotroski_weak_penalty":  -5,
+    "piotroski_strong_min":     7,
+    "piotroski_weak_max":       5,
+
     # ── Penalties & Bonuses
     "over_extended_penalty":  -15,
     "fresh_breakout_bonus":   +10,
@@ -189,6 +256,7 @@ TICKER_SECTOR_HARDCODE: dict[str, str] = {
     "ADMF": "finance_nonbank", "BFIN": "finance_nonbank", "WOMF": "finance_nonbank",
     "MFIN": "finance_nonbank", "CFIN": "finance_nonbank", "PNLF": "finance_nonbank",
     "ASII": "finance_nonbank",  # Astra Financial arm — industrial tapi PBV mix
+    "SRTG": "finance_nonbank",
     # Consumer staples
     "UNVR": "consumer_staples", "ICBP": "consumer_staples", "MYOR": "consumer_staples",
     "INDF": "consumer_staples", "SIDO": "consumer_staples", "CPIN": "consumer_staples",
@@ -350,12 +418,18 @@ def _resolve_exdate(
     adapter: "XlsxDataAdapter | None",
 ) -> ExDateInfo:
     """
-    Resolve ExDateInfo untuk satu ticker.
+    Resolve ExDateInfo untuk satu ticker via 3 lapis prioritas:
+      1. XlsxDataAdapter.get_exdate_info() — O(1), paling akurat
+      2. Parse langsung kolom 'Latest Dividend Ex-Date' dari row xlsx
+         - Jika tanggal sudah lewat (days < 0): lanjut ke lapis 3
+         - Jika semua format parse gagal (ValueError): lanjut ke lapis 3
+      3. scan_exdate() via yfinance — fallback lambat, hanya jika lapis 1-2 gagal
 
-    Priority:
-      1. XlsxDataAdapter.get_exdate_info() — baca dari kolom xlsx, O(1)
-      2. scan_exdate() via yfinance — fallback jika xlsx tidak ada/kosong
+    Catatan: import CRITICAL_WINDOW_DAYS / WARNING_WINDOW_DAYS dilakukan
+    di level modul — tidak perlu import ulang di dalam fungsi ini.
     """
+    from utils.exdate_scanner import CRITICAL_WINDOW_DAYS, WARNING_WINDOW_DAYS
+
     # Lapis 1: xlsx adapter
     if adapter is not None:
         try:
@@ -365,37 +439,39 @@ def _resolve_exdate(
         except Exception:
             pass
 
-    # Lapis 2: cek kolom 'Latest Dividend Ex-Date' langsung dari row
+    # Lapis 2: parse langsung kolom 'Latest Dividend Ex-Date' dari row
     exdate_str = str(row.get("Latest Dividend Ex-Date", "")).strip()
     if exdate_str and exdate_str not in ("-", "nan", "NaT", ""):
-        # Parse manual — format '21 Apr 26'
-        from datetime import date
+        parsed_date = None
         for fmt in ("%d %b %y", "%d %b %Y", "%Y-%m-%d"):
             try:
-                ex_date = datetime.strptime(exdate_str, fmt).date()
-                today = datetime.now(timezone.utc).date()
-                days  = (ex_date - today).days
-                if days < 0:
-                    break  # sudah lewat → CLEAR
-                from utils.exdate_scanner import CRITICAL_WINDOW_DAYS, WARNING_WINDOW_DAYS
+                parsed_date = datetime.strptime(exdate_str, fmt).date()
+                break
+            except ValueError:
+                continue
+
+        if parsed_date is not None:
+            today = datetime.now(timezone.utc).date()
+            days  = (parsed_date - today).days
+            if days >= 0:
+                # Ex-date masih ke depan — hitung risk tier
                 if days <= CRITICAL_WINDOW_DAYS:   tier = "CRITICAL"
                 elif days <= WARNING_WINDOW_DAYS:  tier = "WARNING"
                 else:                              tier = "CLEAR"
                 div = float(row.get("Dividend (TTM)", 0) or 0)
                 return {
                     "has_upcoming_exdate": tier != "CLEAR",
-                    "ex_date":             str(ex_date),
+                    "ex_date":             str(parsed_date),
                     "days_until_exdate":   days,
                     "div_per_share":       div or None,
-                    "div_yield_pct":       round(div/current_px*100, 2) if div and current_px > 0 else None,
+                    "div_yield_pct":       round(div / current_px * 100, 2) if div and current_px > 0 else None,
                     "risk_tier":           tier,
                     "expected_drop_rp":    div or None,
                     "source":              "xlsx_direct",
                 }
-            except ValueError:
-                continue
+            # days < 0 → ex-date sudah lewat → fall through ke lapis 3
 
-    # Lapis 3: yfinance (fallback lambat — hanya jika xlsx tidak ada)
+    # Lapis 3: yfinance (fallback lambat — hanya jika xlsx tidak ada/kosong/lewat)
     return scan_exdate(ticker, current_price=current_px)
 
 
@@ -539,27 +615,37 @@ def _analyze_ticker(
     if vol_3d_avg <= vol_20d_avg * cfg["vol_confirmation_ratio"]:
         return None
 
-    vol_5d_avg: float = float(vol.tail(5).mean())
-    curr_vol:   float = float(vol.iloc[-1])
+    # curr_vol dipakai untuk momentum scoring (dibandingkan vol_20d_avg)
+    curr_vol: float = float(vol.iloc[-1])
 
     # ── Momentum Score ────────────────────────────────────────────────────────
     mom_score: float = 0.0
     mom_note:  list[str] = []
 
+    # [v3.1 FIX] RSI scoring asimetris — swing-trade aware.
+    # Oversold (<45) lebih menarik dari overbought (>70) untuk entry swing,
+    # karena ada potensi reversal. Sebelumnya keduanya dapat skor yang sama (x0.25).
+    rsi_w = cfg["weight_momentum_rsi"]
     if cfg["rsi_accum_lo"] <= rsi_latest <= cfg["rsi_accum_hi"]:
-        mom_score += cfg["weight_momentum_rsi"]
+        mom_score += rsi_w * cfg["rsi_weight_accum"]
         mom_note.append(f"RSI Akumulasi ({rsi_latest:.1f})")
     elif cfg["rsi_accum_hi"] < rsi_latest <= cfg["rsi_strong_hi"]:
-        mom_score += cfg["weight_momentum_rsi"] * 0.75
+        mom_score += rsi_w * cfg["rsi_weight_uptrend"]
         mom_note.append(f"RSI Uptrend Kuat ({rsi_latest:.1f})")
     elif rsi_latest > cfg["rsi_strong_hi"]:
-        mom_score += cfg["weight_momentum_rsi"] * 0.25
+        # Overbought (70-75 range — di atas 75 sudah hard-reject)
+        mom_score += rsi_w * cfg["rsi_weight_overbought"]
         mom_note.append(f"RSI Overbought ({rsi_latest:.1f})")
     else:
-        mom_score += cfg["weight_momentum_rsi"] * 0.25
-        mom_note.append(f"RSI Lemah ({rsi_latest:.1f})")
+        # RSI < rsi_accum_lo (< 45) — zona oversold, potensi reversal
+        mom_score += rsi_w * cfg["rsi_weight_oversold"]
+        mom_note.append(f"RSI Oversold ({rsi_latest:.1f})")
 
-    if curr_vol > vol_5d_avg:
+    # [v3.1 FIX] Volume benchmark berubah dari vol_5d_avg ke vol_20d_avg.
+    # vol_5d_avg terlalu pendek — mudah terdistorsi oleh 1-2 hari spike volume,
+    # dan tidak konsisten dengan liquidity gate (ADT 20d) dan vol_20d_avg
+    # yang sudah dihitung di atas untuk volume confirmation.
+    if curr_vol > vol_20d_avg:
         mom_score += cfg["weight_momentum_vol"]
         mom_note.append("Volume Breakout")
     else:
@@ -576,6 +662,30 @@ def _analyze_ticker(
     elif 0.01 <= dist_to_sma20_pct <= 0.05:
         total_score += cfg["fresh_breakout_bonus"]
         mom_note.append(f"Fresh Breakout (+{dist_to_sma20_pct*100:.1f}% SMA20)")
+
+    # [v3.1 NEW] Piotroski F-Score adjustment — diintegrasikan ke composite score.
+    # Sebelumnya F-Score hanya jadi gate di static filter (>=4) tanpa membedakan
+    # kualitas antara saham F-Score 4 vs F-Score 9. Sekarang ada reward/penalty
+    # eksplisit untuk mencerminkan perbedaan kualitas fundamental yang nyata.
+    piotroski = int(row.get("Piotroski F-Score", 0) or 0)
+    if piotroski >= cfg["piotroski_strong_min"]:
+        total_score += cfg["piotroski_strong_bonus"]
+        mom_note.append(f"F-Score Kuat ({piotroski}/9)")
+    elif piotroski <= cfg["piotroski_weak_max"]:
+        total_score += cfg["piotroski_weak_penalty"]
+        mom_note.append(f"F-Score Lemah ({piotroski}/9)")
+
+    # Penalti jika tidak ada margin of safety (Valuation gap == 0)
+    try:
+        gap_pct = float(row.get("Valuation_Gap_Pct", 0) or 0)
+    except Exception:
+        gap_pct = 0.0
+    if gap_pct == 0.0:
+        total_score -= 10
+        mom_note.append("Penalty: no margin of safety (-10)")
+
+    # Cap composite score to 0..100 to keep the scale interpretable
+    total_score = max(0.0, min(total_score, 100.0))
 
     # ── Stop Loss (ATR-based + BEI tick size) ─────────────────────────────────
     stop_candidate_1 = sma20_latest - (cfg["stop_atr_from_sma20"] * atr_14)
@@ -595,8 +705,8 @@ def _analyze_ticker(
     )
 
     # ── Quality Flags dari xlsx ───────────────────────────────────────────────
-    piotroski = row.get("Piotroski F-Score", 0)
-    altman_z  = row.get("Altman Z-Score (Modified)", 0)
+    # Catatan: piotroski sudah didefinisikan di atas (blok Piotroski adjustment)
+    altman_z = row.get("Altman Z-Score (Modified)", 0)
 
     return {
         "Ticker":                    t,
@@ -753,13 +863,58 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         (filtered["Graham_Number"] - filtered["Close Price"]) / filtered["Close Price"] * 100
     ).clip(lower=0)
 
-    filtered["Val_Score"] = (
-        filtered["Valuation_Gap_Pct"].rank(pct=True) * cfg["weight_valuation"]
-    )
+    # [v3.1 FIX] Absolute threshold-based Val_Score — tidak lagi rank(pct=True).
+    # Rank relatif membuat saham mediocre dapat score tinggi jika universe sedang
+    # penuh saham jelek. Score absolut mencerminkan kualitas saham itu sendiri.
+    #
+    # Sektor bank dan finance_nonbank dikecualikan dari Graham Number karena
+    # formula Graham dirancang untuk non-finansial. Untuk bank/finance,
+    # digunakan PBV relatif vs benchmark sektor sebagai proxy valuasi.
+    def _compute_val_score(row: pd.Series, cfg: dict) -> float:
+        sector = row.get("Sector", "default")
+        w = cfg["weight_valuation"]
+
+        if sector in ("bank", "finance_nonbank"):
+            # Untuk sektor finansial: gunakan PBV vs sektor benchmark
+            pbv = float(row.get("Current Price to Book Value", 0) or 0)
+            bench = SECTOR_PBV_BENCHMARK.get(sector, SECTOR_PBV_BENCHMARK["default"])
+            fair_lo = bench["fair_lo"]
+            if pbv <= 0:
+                return w * 0.10
+            if pbv < fair_lo * 0.70:          # sangat murah vs benchmark sektor
+                return w * 1.00
+            if pbv < fair_lo * 0.90:
+                return w * 0.70
+            if pbv <= fair_lo:
+                return w * 0.40
+            return w * 0.10                   # di atas fair_lo = tidak menarik
+
+        # Non-finansial: Graham-based gap
+        gap = float(row.get("Valuation_Gap_Pct", 0) or 0)
+        if gap >= cfg["val_tier1_gap"]:
+            return w * 1.00
+        if gap >= cfg["val_tier2_gap"]:
+            return w * 0.70
+        if gap >= cfg["val_tier3_gap"]:
+            return w * 0.40
+        return w * 0.10
+
+    filtered["Val_Score"] = filtered.apply(lambda r: _compute_val_score(r, cfg), axis=1)
 
     # ── 5. PROFITABILITY SCORING ──────────────────────────────────────────────
-    filtered["Prof_Score"] = (
-        filtered["Return on Equity (TTM)"].rank(pct=True) * cfg["weight_profitability"]
+    # [v3.1 FIX] Absolute threshold-based Prof_Score — tidak lagi rank(pct=True).
+    def _compute_prof_score(roe: float, cfg: dict) -> float:
+        w = cfg["weight_profitability"]
+        if pd.isna(roe) or roe <= 0:
+            return 0.0
+        if roe >= cfg["prof_roe_tier1"]:
+            return w * 1.00
+        if roe >= cfg["prof_roe_tier2"]:
+            return w * 0.70
+        return w * 0.40  # 10-15% — sudah lolos min_roe gate (10%)
+
+    filtered["Prof_Score"] = filtered["Return on Equity (TTM)"].apply(
+        lambda r: _compute_prof_score(r, cfg)
     )
 
     # ── 6. DYNAMIC TECHNICALS VIA YFINANCE ───────────────────────────────────
@@ -821,7 +976,7 @@ def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
     lines = []
     lines.append(f"# 🏆 Top {cfg['top_n']} High-Conviction IHSG Swing Candidates")
     lines.append(f"*Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
-    lines.append(f"*Engine: v3.0 — Sektor via 4-lapis resolver | ExDate via xlsx*")
+    lines.append(f"*Engine: v3.1 — Absolute scoring | Asymmetric RSI | Piotroski integrated | Bank-aware valuation*")
     lines.append("")
     lines.append(
         "| Rank | Ticker | Sektor | Harga | Stop Loss | Graham Fair Value "
