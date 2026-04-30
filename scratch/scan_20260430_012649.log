@@ -1,0 +1,29 @@
+2026-04-30 01:26:49,438 [INFO] ============================================================
+2026-04-30 01:26:49,439 [INFO] IHSG Quantitative Swing-Trade Scouting Engine v3.0
+2026-04-30 01:26:49,440 [INFO] ============================================================
+2026-04-30 01:26:49,441 [INFO] Input file: output\IDX Fundamental Analysis 2026-04-29.xlsx
+2026-04-30 01:26:49,441 [INFO] [XlsxAdapter] Initialized dengan: output\IDX Fundamental Analysis 2026-04-29.xlsx
+2026-04-30 01:26:49,441 [INFO] [Adapter] XlsxDataAdapter aktif → output\IDX Fundamental Analysis 2026-04-29.xlsx
+2026-04-30 01:26:49,442 [INFO] Membaca: output\IDX Fundamental Analysis 2026-04-29.xlsx
+2026-04-30 01:26:50,483 [INFO] Total ticker universe: 957
+2026-04-30 01:26:50,490 [INFO] Exclude PEMANTAUAN KHUSUS: 957 → 803
+2026-04-30 01:26:50,493 [INFO] [Sector] Cache loaded: 957 ticker dari output\sector_cache.json
+2026-04-30 01:26:50,493 [INFO] [Sector] Resolve selesai: cache=803, hardcode=0, keyword=0, default=0
+2026-04-30 01:26:50,505 [INFO] Lolos static filter: 151 ticker
+2026-04-30 01:26:50,508 [INFO] Distribusi sektor:
+Sector
+consumer_staples    37
+consumer_disc       20
+industrials         16
+basic_materials     14
+tech                14
+transport           12
+energy              10
+property            10
+healthcare           9
+finance_nonbank      5
+infrastructure       3
+bank                 1
+2026-04-30 01:26:50,513 [INFO] yfinance download attempt 1/3 (151 ticker)...
+2026-04-30 01:26:53,686 [INFO] Download berhasil. Shape: (60, 755)
+2026-04-30 01:26:54,165 [INFO] [XlsxAdapter] Loaded key-statistics: 957 tickers
