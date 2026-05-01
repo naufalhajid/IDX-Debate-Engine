@@ -1,7 +1,10 @@
 import time
+import concurrent.futures
+import threading
 
 from datetime import datetime
 from dotenv import load_dotenv
+from core.settings import get_settings
 
 from schemas.fundamental import (
     Fundamental,
@@ -73,28 +76,38 @@ class StockBit:
 
     def with_fundamental(self):
         """
-        Get fundamentals for a list of stocks.
+        Get fundamentals for a list of stocks concurrently.
 
         Returns:
             Self
         """
-        processed = 1
-        for stock in self.stocks:
-            logger.info(
-                f"Processing key statistic for: {stock.ticker} ({processed}/{len(self.stocks)})"
-            )
-            self.key_statistic = self._safe_fetch_key_statistic(stock)
+        settings = get_settings()
+        max_workers = getattr(settings, "STOCKBIT_MAX_WORKERS", 10)
+        
+        processed_count = 0
+        processed_lock = threading.Lock()
 
-            if self.key_statistic:
-                stock.fundamental = self._fundamental(stock)
+        def safe_fetch(stock):
+            nonlocal processed_count
+            try:
+                key_statistic = self._safe_fetch_key_statistic(stock)
+                if key_statistic:
+                    stock.fundamental = self._fundamental(stock, key_statistic)
+                
+                with processed_lock:
+                    processed_count += 1
+                    logger.info(
+                        f"Processing key statistic for: {stock.ticker} ({processed_count}/{len(self.stocks)})"
+                    )
+            except Exception as e:
+                logger.warning(f"Failed fundamental for {stock.ticker}: {e}")
 
-            time.sleep(0.1)
-            logger.debug(stock)
-            processed += 1
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            list(executor.map(safe_fetch, self.stocks))
 
         return self
 
-    def _fundamental(self, stock: Stock) -> Fundamental | None:
+    def _fundamental(self, stock: Stock, key_statistic: dict) -> Fundamental | None:
         """
         Parses the API response data and returns a Fundamental object.
 
@@ -105,13 +118,15 @@ class StockBit:
             Fundamental: An object containing parsed fundamental data.
         """
 
-        if self.key_statistic == {}:
+        if not key_statistic:
             return None
 
         fundamental = Fundamental()
         fundamental.stock = stock
 
-        data = self.key_statistic["data"]
+        data = key_statistic.get("data")
+        if not data:
+            return None
 
         # Stats
         #
@@ -439,51 +454,56 @@ class StockBit:
 
     def with_stock_price(self):
         """
-        Updates each stock in the stocks list with detailed price data.
-
-        This method iterates over each stock in the `stocks` list, fetching the latest stock price data.
-        It updates various attributes of the stock with the retrieved data, such as last price, change, volume, etc.
-        The method pauses briefly between processing each stock to avoid overwhelming the server with requests.
-
-        Returns:
-        - self: The instance of the class, allowing for method chaining.
+        Updates each stock in the stocks list with detailed price data concurrently.
         """
-        processed = 1
-        for stock in self.stocks:
-            logger.info(
-                f"Processing stock price for: {stock.ticker} ({processed}/{len(self.stocks)})"
-            )
-            response = self._safe_fetch_stock_price(stock)
+        settings = get_settings()
+        max_workers = getattr(settings, "STOCKBIT_MAX_WORKERS", 10)
+        
+        processed_count = 0
+        processed_lock = threading.Lock()
 
-            if response == {}:
-                logger.warning(
-                    f"Skipped to fetch stock price for {stock.ticker} because empty response!"
+        def safe_fetch(stock):
+            nonlocal processed_count
+            try:
+                response = self._safe_fetch_stock_price(stock)
+
+                if response == {}:
+                    logger.warning(
+                        f"Skipped to fetch stock price for {stock.ticker} because empty response!"
+                    )
+                    return
+
+                data = response.get("data")
+                if not data:
+                    return
+
+                stock.stock_price = StockPrice(
+                    price=data["lastprice"],
+                    change=data["change"],
+                    fbuy=data["fbuy"],
+                    fsell=data["fsell"],
+                    volume=data["volume"],
+                    percentage_change=data["percentage_change"],
+                    average=data["average"],
+                    close=data["close"],
+                    high=data["high"],
+                    low=data["low"],
+                    open=data["open"],
+                    ara=float(data["ara"]["value"].replace(",", "")),
+                    arb=float(data["arb"]["value"].replace(",", "")),
+                    frequency=data["frequency"],
                 )
-                continue
 
-            data = response["data"]
+                with processed_lock:
+                    processed_count += 1
+                    logger.info(
+                        f"Processing stock price for: {stock.ticker} ({processed_count}/{len(self.stocks)})"
+                    )
+            except Exception as e:
+                logger.warning(f"Failed stock price for {stock.ticker}: {e}")
 
-            stock.stock_price = StockPrice(
-                price=data["lastprice"],
-                change=data["change"],
-                fbuy=data["fbuy"],
-                fsell=data["fsell"],
-                volume=data["volume"],
-                percentage_change=data["percentage_change"],
-                average=data["average"],
-                close=data["close"],
-                high=data["high"],
-                low=data["low"],
-                open=data["open"],
-                ara=float(data["ara"]["value"].replace(",", "")),
-                arb=float(data["arb"]["value"].replace(",", "")),
-                frequency=data["frequency"],
-            )
-
-            time.sleep(0.1)
-
-            logger.debug(stock)
-            processed += 1
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            list(executor.map(safe_fetch, self.stocks))
 
         return self
 
@@ -557,52 +577,53 @@ class StockBit:
 
     def with_stream_data(self):
         """
-        Updates each stock in the stocks list with sentiment data from stream and pinned stream sources.
-
-        This method iterates over each stock in the `stocks` list, fetching both pinned and regular stream data.
-        It processes the response to extract sentiment information, which is then added to the stock's sentiment attribute.
-        The method pauses briefly between processing each stock to avoid overwhelming the server with requests.
-
-        Returns:
-        - self: The instance of the class, allowing for method chaining.
+        Updates each stock in the stocks list with sentiment data from stream and pinned stream sources concurrently.
         """
-        processed = 1
-        for stock in self.stocks:
-            logger.info(
-                f"Processing stream data for: {stock.ticker} ({processed}/{len(self.stocks)})"
-            )
-            response_stream_pinned, response_stream = self._safe_fetch_stream_data(stock)
+        settings = get_settings()
+        max_workers = getattr(settings, "STOCKBIT_MAX_WORKERS", 10)
+        
+        processed_count = 0
+        processed_lock = threading.Lock()
 
-            if response_stream_pinned != {}:
-                pinned_data = response_stream_pinned["data"]
+        def safe_fetch(stock):
+            nonlocal processed_count
+            try:
+                response_stream_pinned, response_stream = self._safe_fetch_stream_data(stock)
 
-                if pinned_data is not None:
-                    posted_at = datetime.fromisoformat(pinned_data["created_at"])
-                    sentiment = Sentiment(
-                        content=pinned_data["content"], posted_at=posted_at
-                    )
-
-                    stock.sentiment = [sentiment]
-
-            if response_stream != {}:
-                stream_data = response_stream["data"]["stream"]
-
-                if stream_data is not None:
-                    for stream in stream_data:
-                        posted_at = datetime.fromisoformat(stream["created_at"])
-
+                if response_stream_pinned != {}:
+                    pinned_data = response_stream_pinned.get("data")
+                    if pinned_data is not None:
+                        posted_at = datetime.fromisoformat(pinned_data["created_at"])
                         sentiment = Sentiment(
-                            content=stream["content"], posted_at=posted_at
+                            content=pinned_data["content"], posted_at=posted_at
                         )
+                        stock.sentiment = [sentiment]
 
-                        if stock.sentiment is None:
-                            stock.sentiment = [sentiment]
-                        else:
-                            stock.sentiment.append(sentiment)
+                if response_stream != {}:
+                    stream_outer = response_stream.get("data")
+                    if stream_outer:
+                        stream_data = stream_outer.get("stream")
+                        if stream_data is not None:
+                            for stream in stream_data:
+                                posted_at = datetime.fromisoformat(stream["created_at"])
+                                sentiment = Sentiment(
+                                    content=stream["content"], posted_at=posted_at
+                                )
+                                if stock.sentiment is None:
+                                    stock.sentiment = [sentiment]
+                                else:
+                                    stock.sentiment.append(sentiment)
 
-            time.sleep(0.1)
-            processed += 1
-            logger.debug(stock)
+                with processed_lock:
+                    processed_count += 1
+                    logger.info(
+                        f"Processing stream data for: {stock.ticker} ({processed_count}/{len(self.stocks)})"
+                    )
+            except Exception as e:
+                logger.warning(f"Failed stream data for {stock.ticker}: {e}")
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            list(executor.map(safe_fetch, self.stocks))
 
         return self
 

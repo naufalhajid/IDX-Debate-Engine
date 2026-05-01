@@ -1,0 +1,68 @@
+{
+  "ticker": "WIIM",
+  "verdict": {
+    "ticker": "WIIM",
+    "rating": "BUY",
+    "confidence": 0.8,
+    "fair_value": 2968.0,
+    "entry_price_range": "1850 - 1905",
+    "target_price": 2120.0,
+    "stop_loss": 1755.0,
+    "current_price": 1905.0,
+    "timeframe": "1-3 Months",
+    "weighted_reasoning": "The BUY rating is heavily weighted on the substantial margin of safety provided by the fundamental undervaluation (Price Rp 1,905 vs. Fair Value Rp 2,968). This aligns with the 'Fundamental ✅ + Technical ✅' conflict resolution signal. The excellent risk/reward ratio of 1.98 further solidifies the decision. The Devil's Advocate's concern about the precarious MA50 support is a valid risk, managed by the stop-loss. However, the DA's second concern regarding low returns is dismissed, as it was based on an incorrect target from the debate transcript; the official trade plan's +12.9% target is robust and well within the swing trade objective.",
+    "critical_risk_factor": "",
+    "key_catalysts": [
+      "Significant undervaluation (55.8% discount to Fair Value) acting as a magnet for price correction towards Rp 2,120.",
+      "Technical support at the 50-day moving average (Rp 1,904), providing a potential launchpad for upward momentum.",
+      "Strong financial health, including a high ROE (20.95%) and very low debt-to-equity (0.09), which can attract value-oriented investors."
+    ],
+    "key_risks": [
+      "Lack of a specific, near-term corporate catalyst (e.g., earnings surprise, new contract) to guarantee a rapid price re-rating within the 1-3 month timeframe.",
+      "The MA50 support is very close to the current price, making it vulnerable to a breakdown from broad market selling pressure or negative sentiment.",
+      "The stock could remain in a consolidation phase if the market continues to overlook its fundamental value, potentially delaying the realization of the target price."
+    ],
+    "summary": "This trade plan is approved. WIIM presents a compelling swing trade opportunity based on a significant fundamental undervaluation and a constructive technical setup. The stock is trading at a 55% discount to its fair value, and the price is currently consolidating above its 50-day moving average, offering a solid entry point with a favorable risk/reward ratio of nearly 2:1.",
+    "expected_return": "+12.9%",
+    "risk_reward_ratio": 1.98,
+    "is_overvalued": false,
+    "wait_and_see": false
+  },
+  "debate_rounds": 2,
+  "debate_history": [
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 1,905, Rp 2,968, Rp 1,435, Rp 1,812, Rp 2,100, Rp 1,689, Rp 1,905.0, Rp 1,904.0, Rp 1,812.0, Rp 2,100.0",
+      "round": 0
+    },
+    {
+      "role": "bull",
+      "content": "…st for price movement towards more realistic valuations.\n\n**4. RISK/REWARD:**\nBased on the technical analysis and fundamental undervaluation, the recommended swing trade setup is:\n*   **Entry:** Rp 1,812 (targeting a retest of SMA20 support)\n*   **Target:** Rp 2,100 (52-week high, representing an initial re-rating towards fair value)\n*   **Stop Loss:** Rp 1,689 (1.5x ATR below SMA20)\n*   **R/R ratio:** (2100 - 1812) / (1812 - 1689) = 288 / 123 = **2.34:1**\n\nThis setup offers a favorable risk/reward profile, capitalizing on the significant fundamental discount and established technical support.",
+      "round": 1
+    },
+    {
+      "role": "bear",
+      "content": "…d timeline, making it unsuitable for a short-term swing trade. Such a re-rating could take significantly longer than 1-3 months, or be suppressed by broader market sentiment or company-specific non-events, failing to materialize within the trade's timeframe. Relying on a passive catalyst for a swing trade introduces substantial uncertainty.\n\n4.  **UNFAVOURABLE R/R:** The Bull's R/R calculation of 2.34:1 is based on an entry at Rp 1,812.0, which is *below* the current market price of Rp 1,905.0. Initiating a trade at the current price of Rp 1,905.0, with the Bull's target of Rp 2,100.0 (52-week",
+      "round": 1
+    },
+    {
+      "role": "bull",
+      "content": "The Bear's challenge to the risk/reward at the current market price overlooks the immediate technical setup and the underlying fundamental strength. The stock is currently consolidating directly above its 50-day moving average, a robust short-term support level, indicating a potential entry point for momentum continuation. While a lower entry was previously identified, the current price offers a valid entry with the 50-day average acting as a dynamic floor. The substantial fundamental undervaluation, exceeding fifty percent relative to intrinsic value, provides a significant buffer, ensuring that even a modest re-rating within the swing timeframe offers a compelling return profile that absorbs minor entry timing variations.\n\nRegarding downside risk, should the immediate technical supports fail, the long-term 200-day moving average stands as a formidable secondary floor, significantly below the initial risk management threshold. This deep-seated support underscores the stock's robust long-term trend, limiting extreme downside scenarios. Furthermore, the Bear's dismissal of fundamental undervaluation as a \"passive\" catalyst ignores the company's strong operational performance, evidenced by its high trailing twelve-month Return on Equity and healthy Net Margin, coupled with exceptionally low leverage. These are active indicators of financial health that continuously attract investor attention and can trigger a re-rating, especially when combined with favorable technical consolidation.\n\nThe sheer magnitude of the price-to-fair-value disparity is a critical factor in absorbing potential short-term volatility. With the market price trading at a substantial discount to its calculated intrinsic worth, the upside potential is not merely a speculative target but a fundamental gravitational pull. This wide valuation gap means that even if the stock experiences a temporary dip or fails to reach the full fair value within the 1-3 month window, there remains considerable room for appreciation that far outweighs the defined technical stop-loss. The inherent value proposition acts as a powerful counter-argument to the Bear's risk scenario, suggesting that the market has ample room to correct upwards, providing a generous margin of safety for a swing trade.",
+      "round": 2
+    },
+    {
+      "role": "bear",
+      "content": "The Bull's swing setup for WIIM is critically flawed, relying on fragile technicals and misinterpreting fundamental valuation as an active short-term catalyst. The assertion that the MA50 at Rp 1904 is a \"robust short-term support\" is highly precarious; with the current price at Rp 1905, the stock is barely above this level. A single tick down would breach this supposed floor, invalidating the immediate entry premise without historical evidence of its reliability for *this specific stock*. Furthermore, the Bull's target of Rp 1940 offers a mere Rp 35 upside from the current price, which is less than half of the daily ATR(14) of Rp 82.0, indicating an extremely poor risk-reward profile for a swing trade.\n\nThe claim that \"fundamental undervaluation\" acts as an \"active indicator\" for a 1-3 month swing trade is misleading. A fair value of Rp 2,968 represents a long-term intrinsic value, not a short-term price driver. Without a specific, time-bound catalyst (e.g., earnings, corporate action) within the May-July 2026 window, this undervaluation remains a passive factor, unlikely to trigger a rapid re-rating within the swing timeframe. If the Bull's stop loss at Rp 1689 fails, the next significant technical support is the MA200 at Rp 1435. This implies a potential maximum loss of Rp 470 from the current price of Rp 1905, significantly exceeding the Bull's implied maximum loss of Rp 169 from their entry midpoint to stop loss.\n\nThe Bull's \"significant buffer\" from fundamental undervaluation fails the margin of safety stress test for a swing trade. A maximum 1-week adverse move, calculated as 2 times the ATR(14), amounts to Rp 164.0. This single week's potential volatility is nearly five times the Bull's claimed upside target of Rp 35 from the current price to Rp 1940. Moreover, this Rp 164.0 adverse move is almost equivalent to the Bull's entire stop-loss buffer (Rp 169 from entry midpoint to stop loss). This demonstrates that typical short-term volatility can easily wipe out the entire projected gain and challenge the assumed risk tolerance, rendering the trade unviable for swing execution based on the proposed entry and target.",
+      "round": 2
+    },
+    {
+      "role": "devils_advocate",
+      "content": "Here are two specific challenges to the WIIM swing trade setup:\n\n1.  **MACRO/COMPANY RISK & FOREIGN FLOW:** If foreign funds accelerate net selling across the IHSG, could the precarious Rp 1904 MA50 support break, driving WIIM towards the Rp 1812 SMA20 or even the Rp 1689 stop-loss within 1-3 months?\n\n2.  **EXECUTION RISK:** With a current price of Rp 1905 and a target of Rp 1940, the gross return is only 1.84%. After typical IHSG transaction costs (0.15% buy, 0.25% sell), will the net return of approximately 1.43% be sufficient, falling below the 2% threshold for a viable swing trade?",
+      "round": 3
+    }
+  ],
+  "raw_data_summary": "=== FUNDAMENTALS ===\nFAIR VALUE: Rp 2,968\n\nWIIM is currently **UNDERVALUED** by 55.8% relative to its calculated fair value of Rp 2,968, with a market price of Rp 1,905. This indicates a significant upside potential based on fundamental valuation.\n\n**SUPPORT METRICS:**\n*   **ROE Trend (3yr):** Not available in provided data; current TTM ROE is 20.95%.\n*   **Net Margin Trend (3yr):** Not available in provided data; current TTM Net Margin is 9.19%.\n*   **Debt/Equity:** 0.09 (indicating very low leverage).\n*   **Dividend Yield:** 3.40%.\n\n**GROWTH CATALYST:**\nNo specific upcoming growth catalyst (e.g., earnings release, new contract, ex-dividend date) within the next 1-3 months (May-July 2026) has been identified. The latest dividend ex-date (2025-06-10) is a past event.\n\n=== TECHNICALS ===\n**Technical Chart Analysis for IHSG Swing Trade (1-3 Month Frame)**\n\nThe IHSG is currently in a strong long-term uptrend, with the current price of Rp 1905.0 significantly above the MA200 at Rp 1435.0. The MA50 (Rp 1904.0) is also well above the MA200, confirming the bullish long-term outlook. In the short term, the price is consolidating just above the MA50, indicating a potential retest of this key support level or a continuation of the upward momentum.\n\nFor a swing trade entry, the nearest confirmed support levels are the SMA20 at Rp 1812.0 and the MA50 at Rp 1904.0. Therefore, a suitable **ENTRY ZONE** is identified between **Rp 1812 – Rp 1904**. The nearest strong resistance, based on orderbook data, is observed around Rp 1940.0. This level would yield an approximate 4.4% gain from the entry midpoint (Rp 1858.0), falling within the desired 3-10% target range. Thus, the **TARGET** is set at **Rp 1940 (approx. 4.4% from entry mid)**.\n\nTo manage risk, a stop-loss order should be placed 1.5 times the ATR(14) below the SMA20. With an ATR(14) of 82.0 and SMA20 at Rp 1812.0, the calculated **STOP LOSS** is **Rp 1689 (1.5× ATR below SMA20)**. The RSI(14) is currently at 55.7, indicating that momentum is bullish but not yet in overbought territory, suggesting room for further upward movement. Current day's traded volume data is not provided, therefore, a definitive assessment of whether volume is confirming or denying the recent price move cannot be made.\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 1905.0,\n  \"sma20\": 1812.0,\n  \"ma50\": 1904.0,\n  \"ma200\": 1435.0,\n  \"rsi14\": 55.7,\n  \"atr14\": 82.0,\n  \"avg_volume_20d\": 4461190.0,\n  \"52w_high\": 2100.0,\n  \"52w_low\": 728.0\n}\n\n=== SENTIMENT ===\n**Sentiment Analysis Report: Stockbit Social Signal**\n\n**Input Data Status:** The provided JSON indicates \"Successfully retrieved pinned post\" but the `data` field is `null`. This means no social signal data was actually retrieved or provided for analysis.\n\n**Analysis:**\nDue to the absence of any social signal data, it is impossible to perform an analysis of overall mood, dominant discussion themes, volume anomalies, swing-trade timing signals, or identify any red flags. All metrics requiring social data are **INSUFFICIENT_DATA**.\n\n**Conclusion:**\nNo actionable insights can be derived from the current input. Please provide valid social signal data to proceed with the analysis.\n\n*   **Overall Mood:** INSUFFICIENT_DATA (Confidence: 0%)\n*   **Dominant Discussion Theme:** INSUFFICIENT_DATA\n*   **Volume Anomaly:** INSUFFICIENT_DATA\n*   **Swing-trade Timing Signal:** INSUFFICIENT_DATA\n*   **Red Flags:** INSUFFICIENT_DATA\n\n=== DIVIDEND EX-DATE SCAN: WIIM ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
+  "error": null,
+  "conviction_score": 0.598,
+  "sector_key": "consumer_staples"
+}

@@ -68,14 +68,52 @@ class Settings(BaseSettings):
     GEMINI_FLASH_MODEL: str = "gemini-2.5-flash"
     GEMINI_PRO_MODEL: str = "gemini-2.5-pro"
 
+    # ── Conviction Scoring Weights (must sum to 1.0) ─────────────────────────
+    # Override via: CONVICTION_WEIGHT_CONFIDENCE=0.6 CONVICTION_WEIGHT_RR_RATIO=0.4
+    CONVICTION_WEIGHT_CONFIDENCE: float = 0.50
+    CONVICTION_WEIGHT_RR_RATIO: float = 0.50
+    CONVICTION_RR_NORMALIZATION_CAP: float = 5.0
+
+    # Stockbit API
+    STOCKBIT_MAX_WORKERS: int = 10
+
+    # ── Orchestrator Configuration ────────────────────────────────────────────────
+    # CANDIDATES_MAX_AGE_HOURS: max umur top10_candidates.json sebelum dianggap stale
+    # CANDIDATES_AUTO_RERUN: jika True, jalankan run_quant_filter.py otomatis
+    CANDIDATES_MAX_AGE_HOURS: float = 72.0
+    CANDIDATES_AUTO_RERUN: bool = True
+
+    # ── Market Regime (IHSG ^JKSE realized volatility proxy) ─────────────────
+    REGIME_VOLATILITY_HIGH_THRESHOLD: float = 0.02   # daily std >= 2% → HIGH
+    REGIME_VOLATILITY_LOW_THRESHOLD: float = 0.01    # daily std < 1%  → LOW
+    REGIME_VOLATILITY_LOOKBACK_DAYS: int = 20
+
+    # ── Portfolio Diversification ────────────────────────────────────────────
+    # PORTFOLIO_MAX_PER_SECTOR: max saham per sektor dalam top N
+    # PORTFOLIO_MIN_CONVICTION: minimum conviction score agar eligible masuk top N
+    PORTFOLIO_MAX_PER_SECTOR: int = 2
+    PORTFOLIO_MIN_CONVICTION: float = 0.30
+
     @model_validator(mode="before")
     @classmethod
     def check_env(cls, values: Any) -> Any:
         if values.get("ENVIRONMENT") == "prod":
             values["FASTAPI_OPENAPI_URL"] = None
             values["FASTAPI_STATIC_FILES"] = False
-
         return values
+
+    @model_validator(mode="after")
+    def validate_conviction_weights(self) -> "Settings":
+        """Pastikan conviction weights selalu sum = 1.0 untuk mencegah silent score corruption."""
+        total = self.CONVICTION_WEIGHT_CONFIDENCE + self.CONVICTION_WEIGHT_RR_RATIO
+        if abs(total - 1.0) > 1e-6:
+            raise ValueError(
+                f"CONVICTION_WEIGHT_CONFIDENCE ({self.CONVICTION_WEIGHT_CONFIDENCE}) + "
+                f"CONVICTION_WEIGHT_RR_RATIO ({self.CONVICTION_WEIGHT_RR_RATIO}) "
+                f"harus sum = 1.0, got {total:.6f}. "
+                "Periksa environment variables."
+            )
+        return self
 
 
 @lru_cache

@@ -1,6 +1,7 @@
 import os
 import tempfile
 import time
+import threading
 
 import requests
 
@@ -39,7 +40,17 @@ class StockbitApiClient:
 
         self.ua_temp_file_path = os.path.join(tempfile.gettempdir(), "stockbit_ua.tmp")
 
+        self._auth_lock = threading.Lock()
+        self._thread_local = threading.local()
+        self._last_auth_time = 0
+
         self._initialize_token_file()
+
+    def _get_session(self):
+        """Mendapatkan requests.Session yang spesifik untuk thread saat ini."""
+        if not hasattr(self._thread_local, "session"):
+            self._thread_local.session = requests.Session()
+        return self._thread_local.session
 
     def _request(self, url: str, method: str, payload: dict = None):
         """
@@ -54,12 +65,14 @@ class StockbitApiClient:
         """
         retry = 0
         last_status_code = None
+        session = self._get_session()
+        
         while retry <= 3:
             try:
                 if method == "GET":
-                    response = requests.get(url, headers=self.headers)
+                    response = session.get(url, headers=self.headers, timeout=15)
                 elif method == "POST":
-                    response = requests.post(url, headers=self.headers, json=payload)
+                    response = session.post(url, headers=self.headers, json=payload, timeout=15)
                 else:
                     raise ValueError("Unsupported HTTP method")
 
@@ -118,14 +131,21 @@ class StockbitApiClient:
     def _authenticate_stockbit(self):
         """
         Authenticates with the Stockbit API and updates the authorization header.
-        Get refresh token if the token is expired
-        Login if needed
+        Get refresh token if the token is expired.
+        Login if needed. (Protected by Lock for multithreading).
         """
+        with self._auth_lock:
+            # Double-checked locking: skip jika thread lain baru saja refresh < 10 detik lalu
+            if time.time() - self._last_auth_time < 10:
+                logger.info("Authentication recently performed by another thread. Skipping.")
+                return
 
-        if self.is_authorise and not self._is_refresh_token_empty():
-            self._refresh_token()
-        else:
-            self._login()
+            if self.is_authorise and not self._is_refresh_token_empty():
+                self._refresh_token()
+            else:
+                self._login()
+            
+            self._last_auth_time = time.time()
 
     def reauthenticate(self):
         """
