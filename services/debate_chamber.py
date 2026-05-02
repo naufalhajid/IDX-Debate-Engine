@@ -164,7 +164,7 @@ Analyze the raw stream/social JSON and extract:
 
 RULES: Max 1200 tokens. Write 3-4 compact technical paragraphs. Be specific — note if sentiment is diverging from price action."""
 
-# ── Phase 2 Debate Agents (run on Pro — only when reasoning needed) ──────────
+# ── Phase 2 Debate Agents (Bull/Bear on Flash; Pro reserved for final CIO reasoning) ──────────
 
 BULL_SYSTEM_PROMPT_R1 = """\
 You are a Senior Equity Analyst building the strongest possible swing trade BUY case (1-3 month horizon).
@@ -670,7 +670,7 @@ Current Date (Asia/Jakarta): {current_date}
             "fair_value_estimate": fair_value_estimate,
         }
 
-    # ── Phase 2 — Debate Nodes (on Pro) ─────────────────────────────────────
+    # ── Phase 2 — Debate Nodes (Bull/Bear on Flash; Pro reserved for CIO) ─────────────────────────────────
 
     async def _bullish_node(self, state: DebateChamberState) -> dict:
         ticker = state["ticker"]
@@ -730,7 +730,7 @@ Current Date (Asia/Jakarta): {current_date}
             SystemMessage(content=prompt),
             HumanMessage(content="\n".join(content_parts)),
         ]
-        resp = await self._invoke_llm(self.flash_llm, messages)  # Temporarily using flash_llm
+        resp = await self._invoke_llm(self.flash_llm, messages)  # Use Flash for Bear opening/rebuttal rounds
         new_rc = rc + 1
         content = str(resp.content).strip()
         if len(content) < 50:
@@ -747,7 +747,7 @@ Current Date (Asia/Jakarta): {current_date}
         """
         Short-circuit check: if Bull & Bear essentially agree after Round 1,
         skip Round 2 and proceed directly to Devil's Advocate → CIO.
-        Uses Flash (cheap) — no Pro tokens wasted here.
+        Uses Pro — this reasoning step should not be downgraded to Flash.
         """
         logger.info("[Consensus] Evaluating agreement")
         # Only inspect the two most recent messages (latest round)
@@ -763,8 +763,8 @@ Current Date (Asia/Jakarta): {current_date}
         ]
         
         try:
-            # FIX: Use regular LLM instead of structured for consensus
-            resp = await self._invoke_llm(self.flash_llm, messages, inject_rules=False)
+            # Consensus evaluation is a reasoning step; use Pro to preserve judgment quality.
+            resp = await self._invoke_llm(self.pro_llm, messages, inject_rules=False)
             content = str(resp.content).strip().lower()
             agreed = "true" in content or "yes" in content
         except Exception as e:
