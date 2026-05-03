@@ -1,5 +1,4 @@
 """Tests untuk core/portfolio_optimizer.py."""
-import pytest
 
 from core.portfolio_optimizer import diversify_portfolio
 

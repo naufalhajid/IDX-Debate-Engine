@@ -1,5 +1,0 @@
-2026-04-28 15:57:10,064 [INFO] ============================================================
-2026-04-28 15:57:10,065 [INFO] IHSG Quantitative Swing-Trade Scouting Engine v3.0
-2026-04-28 15:57:10,065 [INFO] ============================================================
-2026-04-28 15:57:10,066 [WARNING] [Adapter] Gagal init XlsxDataAdapter: Xlsx tidak ditemukan: output\IDX_Fundamental_Analysis_2026-04-24.xlsx
-2026-04-28 15:57:10,066 [INFO] Membaca: output/IDX_Fundamental_Analysis_2026-04-24.xlsx

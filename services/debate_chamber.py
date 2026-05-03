@@ -42,7 +42,6 @@ from core.budget import (
     check_and_increment_pro_budget,
 )
 from providers.gemini import get_flash_llm, get_pro_llm
-from core.settings import settings
 from schemas.debate import CIOVerdict, DebateChamberState, DebateMessage, validate_swing_targets
 from services.stockbit_api_client import StockbitApiClient
 from services.fair_value_calculator import build_fair_value_report
@@ -227,11 +226,16 @@ RULES: No repeated data. Every counter-argument must cite a specific price. Max 
 
 CONSENSUS_PROMPT = """\
 You are a Consensus Evaluator. Read the Bull and Bear arguments below.
-Answer ONLY: do both agents overwhelmingly agree on the same investment direction
+Determine: do both agents overwhelmingly agree on the same investment direction
 (e.g., both conclude HOLD or both conclude BUY) with NO major unresolved objections?
 
 Return true only if consensus is genuine and unambiguous. Return false if there is
-meaningful disagreement or if one side raised a critical unaddressed risk."""
+meaningful disagreement or if one side raised a critical unaddressed risk.
+
+Respond ONLY with valid JSON:
+{"consensus_reached": true}
+or
+{"consensus_reached": false}"""
 
 STATE_CLEANER_PROMPT = """\
 You are a Context Pruner for a swing trade debate. Compress the history below into:
@@ -281,7 +285,7 @@ STEP 2 — TRADE ENVELOPE VALIDATION:
 
 STEP 3 — CONFLICT RESOLUTION (MANDATORY):
   Read the CONFLICT RESOLUTION signal provided. Apply this strict matrix:
-  • Fundamental ✅ + Technical ✅  → BUY (confidence ≥ 0.70)
+  • Fundamental ✅ + Technical ✅  → BUY; choose final confidence using the calibration rubric, caps, and Devil's Advocate penalty.
   • Fundamental ✅ + Technical ❌  → HOLD ("Wait for technical confirmation")
   • Fundamental ❌ + Technical ✅  → If strongly positive Foreign Flow / Momentum with Volume breakout, Lean BUY (Momentum Play, size 50%). Otherwise, HOLD.
   • Fundamental ❌ + Technical ❌  → AVOID
@@ -293,8 +297,40 @@ STEP 4 — FINAL RATING RULES:
   • HOLD        : Price near Fair Value OR R/R < 1.5 OR target < 3%.
   • AVOID       : Price > Fair Value (overvalued) OR R/R < 1.0 OR no clear catalyst.
 
+CONFIDENCE CALIBRATION:
+  Derive confidence from the evidence, not from a default midpoint.
+  • 0.90-0.95: Exceptional setup; clear catalyst, supportive sentiment/volume,
+    R/R >= 2.5, strong support confirmed, and Devil's Advocate risk fully answered.
+  • 0.80-0.89: Strong BUY; fundamental and technical evidence are solid,
+    R/R >= 2.0, and the main risks are controlled.
+  • 0.70-0.79: Normal BUY; positive setup but with weaknesses such as unclear
+    catalyst, missing sentiment, nearby resistance, or valid Devil's Advocate risk.
+  • 0.60-0.69: Weak/speculative BUY; R/R is acceptable but timing, support,
+    or catalyst remains questionable.
+  • <0.60: HOLD/AVOID territory unless momentum evidence is unusually strong.
+
+  Anti-anchor rule:
+  Confidence must be derived from the rubric bands above; select a value that
+  reflects ticker-specific evidence. Avoid round/default numbers such as 0.70,
+  0.75, or 0.80 unless the evidence precisely fits that threshold.
+
+  Ordered confidence caps for BUY ratings:
+  1. If sentiment is INSUFFICIENT_DATA, BUY confidence max is 0.82.
+  2. If there is no clear 1-3 month catalyst, BUY confidence max is 0.78.
+  3. If both conditions apply, use the lower cap: 0.78.
+  4. If an OVEREXTENDED FLAG is present, choose the lower end of the applicable
+     band instead of the upper half; this is the overextended-risk cap.
+  Caps are not additive.
+
+  Devil's Advocate handling:
+  • If the DA risk cannot be answered with specific evidence, subtract exactly
+    0.10 from the initial confidence.
+  • If the DA risk is only partially answered, use the lower end of the
+    selected band.
+  • Lower end means the minimum area of that band; for 0.80-0.89, use 0.80-0.82.
+
 STEP 5 — ADDRESS the Devil's Advocate scenario in your weighted_reasoning.
-         If you cannot dismiss the DA scenario, lower your confidence score accordingly.
+         Apply the confidence calibration rules above when deciding the final score.
 
 STEP 6 — Use the exact entry_price_range, target_price, stop_loss, and fair_value
          from the Trade Envelope. Do NOT change them.
@@ -364,22 +400,21 @@ class DebateChamber:
         Determine whether this LLM instance is Pro or Flash so we can charge
         the right budget counter.
 
-        `with_structured_output(...)` returns a wrapped Runnable that does
-        not expose the `.model` attribute directly, so we fall back to
-        introspecting the underlying bound LLM when possible.
+        Unknown tiers fail fast because budget accounting must be conservative.
         """
         model_name = getattr(llm, "model", None)
         if model_name is None:
-            # `with_structured_output` wraps in a RunnableSequence; dig one
-            # level deeper for best-effort detection.
             bound = getattr(llm, "bound", None) or getattr(llm, "first", None)
             model_name = getattr(bound, "model", None)
         if model_name is None:
-            return "flash"  # safe default — under-count rather than over-count
+            raise RuntimeError("Unable to classify LLM tier for budget accounting")
+
         m = str(model_name).lower()
         if "pro" in m:
             return "pro"
-        return "flash"
+        if "flash" in m:
+            return "flash"
+        raise RuntimeError("Unable to classify LLM tier for budget accounting")
 
     async def _invoke_llm(self, llm, messages, inject_rules: bool = True):
         """
@@ -388,12 +423,6 @@ class DebateChamber:
         Parameter inject_rules dihidupkan/dimatikan untuk memastikan
         structured output (CIO & Consensus) tidak berbenturan instruksi.
         """
-        tier = self._classify_llm_tier(llm)
-        if tier == "pro":
-            await check_and_increment_pro_budget()
-        else:
-            await check_and_increment_flash_budget()
-
         msgs = list(messages)
         
         # FIX: Hanya suntikkan global rules jika inject_rules = True
@@ -429,7 +458,8 @@ Current Date (Asia/Jakarta): {current_date}
                     msgs[i] = SystemMessage(content=f"{global_rules}\n\n{msg.content}")
                     break
 
-        resp = await self._invoke_llm_with_retry(llm, msgs)
+        tier = self._classify_llm_tier(llm)
+        resp = await self._invoke_llm_with_retry(llm, msgs, tier)
         return resp
 
     @retry(
@@ -437,16 +467,16 @@ Current Date (Asia/Jakarta): {current_date}
         stop=stop_after_attempt(3),
         retry=retry_if_exception(_is_transient_error),
     )
-    async def _invoke_llm_with_retry(self, llm, messages):
+    async def _invoke_llm_with_retry(self, llm, messages, tier: str):
+        if tier == "pro":
+            await check_and_increment_pro_budget()
+        else:
+            await check_and_increment_flash_budget()
+
         try:
             resp = await llm.ainvoke(messages)
         except asyncio.CancelledError:
-            # CancelledError arises when the underlying HTTP connection is
-            # dropped or timed-out by the network layer.  Wrap it in a
-            # regular RuntimeError so tenacity treats it as a transient
-            # failure and retries instead of propagating it to the event loop
-            # (which would abort the entire pipeline run).
-            raise RuntimeError("LLM request cancelled (connection dropped / timeout)")
+            raise
 
         # ── Guard: detect empty or safety-filtered responses ─────────────────
         # Gemini sometimes returns an AIMessage with empty content when it
@@ -461,7 +491,7 @@ Current Date (Asia/Jakarta): {current_date}
                 "Retrying..."
             )
             raise RuntimeError(
-                "LLM returned an empty response (possible safety filter or "
+                "LLM returned an empty response (possible provider issue or "
                 "token budget issue)"
             )
         return resp
@@ -765,8 +795,8 @@ Current Date (Asia/Jakarta): {current_date}
         try:
             # Consensus evaluation is a reasoning step; use Pro to preserve judgment quality.
             resp = await self._invoke_llm(self.pro_llm, messages, inject_rules=False)
-            content = str(resp.content).strip().lower()
-            agreed = "true" in content or "yes" in content
+            parsed = json.loads(self._sanitize_json(str(resp.content)))
+            agreed = ConsensusSchema(**parsed).consensus_reached
         except Exception as e:
             logger.warning(f"[Consensus] Failed ({e}); defaulting to False")
             agreed = False
@@ -1045,6 +1075,68 @@ Current Date (Asia/Jakarta): {current_date}
             f"   CIO must use these VERBATIM — do NOT override."
         )
 
+    @staticmethod
+    def _sanitize_json(text: str) -> str:
+        """
+        Clean common LLM JSON mistakes before json.loads().
+
+        This keeps cleanup conservative: it trims wrapper text/fences and fixes
+        trailing commas, but does not remove // or # inside valid JSON strings.
+        """
+        text = re.sub(r"^```(?:json)?\s*\n?", "", text.strip())
+        text = re.sub(r"\n?```\s*$", "", text).strip()
+
+        brace = text.find("{")
+        if brace > 0:
+            text = text[brace:]
+        rbrace = text.rfind("}")
+        if rbrace != -1 and rbrace < len(text) - 1:
+            text = text[: rbrace + 1]
+
+        text = re.sub(r",\s*([\]}])", r"\1", text)
+
+        result = []
+        in_string = False
+        escape_next = False
+        for char in text:
+            if escape_next:
+                result.append(char)
+                escape_next = False
+            elif char == "\\":
+                result.append(char)
+                escape_next = True
+            elif char == '"':
+                in_string = not in_string
+                result.append(char)
+            elif in_string and char in ("\n", "\r", "\t"):
+                result.append(" ")
+            else:
+                result.append(char)
+        text = "".join(result).strip()
+
+        try:
+            json.loads(text)
+            return text
+        except json.JSONDecodeError:
+            final = []
+            in_str = False
+            esc = False
+            for ch in text:
+                if esc:
+                    final.append(ch)
+                    esc = False
+                elif ch == "\\" and in_str:
+                    final.append(ch)
+                    esc = True
+                elif ch == '"':
+                    in_str = not in_str
+                    final.append(ch)
+                elif ch == "'" and not in_str:
+                    final.append('"')
+                else:
+                    final.append(ch)
+            return "".join(final).strip()
+
     # ── Phase 4 — CIO Judge ──────────────────────────────────────────────────
 
     async def _cio_judge_node(self, state: DebateChamberState) -> dict:
@@ -1062,6 +1154,21 @@ Current Date (Asia/Jakarta): {current_date}
         fair_value = state.get("fair_value_estimate", 0.0)
         logger.info(f"[CIO] Deliberating on {ticker} (current price: {current_price:,.0f})")
 
+        if current_price <= 0:
+            logger.warning(f"[CIO] Invalid current price for {ticker}; returning HOLD fallback")
+            verdict_json = CIOVerdict(
+                ticker=ticker,
+                rating="HOLD",
+                confidence=0.0,
+                summary="Harga pasar tidak valid; trade envelope tidak dibuat.",
+                current_price=current_price,
+                fair_value=fair_value if fair_value and fair_value > 0 else None,
+                entry_price_range=None,
+                target_price=None,
+                stop_loss=None,
+            ).model_dump_json()
+            return {"final_verdict": verdict_json}
+
         # ── Compute Trade Envelope (deterministic, Python-only) ──────────────
         envelope = self._compute_trade_envelope(current_price, fair_value, tech)
         envelope_text = self._format_trade_envelope(envelope)
@@ -1074,7 +1181,8 @@ Current Date (Asia/Jakarta): {current_date}
 
         if fundamental_ok and technical_ok:
             conflict_signal = (
-                "SIGNAL: Fundamental ✅ + Technical ✅ → Lean BUY (confidence ≥ 0.70). "
+                "SIGNAL: Fundamental ✅ + Technical ✅ → Lean BUY; choose final confidence "
+                "using the calibration rubric, caps, and Devil's Advocate penalty. "
                 f"Rationale: {signal_reason}."
             )
         elif fundamental_ok and not technical_ok:
@@ -1097,7 +1205,8 @@ Current Date (Asia/Jakarta): {current_date}
         if overextended_flag:
             conflict_signal += (
                 "\n⚠️ OVEREXTENDED FLAG: Price is 8–10% above MA50 — swing entry is "
-                "risky; confidence should be reduced by at least 0.10 even if other signals agree."
+                "risky; apply the overextended-risk cap and choose the lower end of "
+                "the applicable confidence band."
             )
 
         # ── Build CIO prompt ─────────────────────────────────────────────────
@@ -1154,80 +1263,6 @@ Start your response with '{' and end with '}'. Nothing else."""
             HumanMessage(content=user_content),
         ]
 
-        def _sanitize_json(text: str) -> str:
-            """
-            Clean common LLM JSON mistakes before json.loads().
-
-            Handles (in order):
-              1. Markdown code fences  — ```json ... ```
-              2. Preamble before {     — "Here is the JSON: {...}"
-              3. Trailing text after } — "{...} Hope this helps!"
-              4. Trailing commas       — {"a": 1,} or ["x",]
-              5. Python-style comments — // ... or # ... on their own line
-              6. Single-quoted keys    — {'key': 'val'}
-              7. Unescaped quotes inside strings (must preserve structure)
-              8. Newlines inside string values (replace with space)
-            """
-            # 1. Strip markdown fences
-            text = re.sub(r"^```(?:json)?\s*\n?", "", text.strip())
-            text = re.sub(r"\n?```\s*$", "", text).strip()
-            # 2. Find first { and last } to trim preamble/postamble
-            brace = text.find("{")
-            if brace > 0:
-                text = text[brace:]
-            rbrace = text.rfind("}")
-            if rbrace != -1 and rbrace < len(text) - 1:
-                text = text[: rbrace + 1]
-            # 3. Remove JS/Python-style comments (// ... and # ... lines)
-            text = re.sub(r"//[^\n]*", "", text)
-            text = re.sub(r"#[^\n]*", "", text)
-            # 4. Fix trailing commas before ] or }  e.g. [1, 2,] or {"a":1,}
-            text = re.sub(r",\s*([\]}])", r"\1", text)
-            # 5. Replace newlines inside double-quoted strings with space
-            #    This handles multi-line summary/reasoning fields
-            result = []
-            in_string = False
-            escape_next = False
-            for char in text:
-                if escape_next:
-                    result.append(char)
-                    escape_next = False
-                elif char == "\\":
-                    result.append(char)
-                    escape_next = True
-                elif char == '"':
-                    in_string = not in_string
-                    result.append(char)
-                elif in_string and char in ("\n", "\r", "\t"):
-                    result.append(" ")  # Replace whitespace inside strings
-                else:
-                    result.append(char)
-            text = "".join(result).strip()
-            
-            # 6. Final safety: if still can't parse, convert single quotes outside strings to double
-            try:
-                json.loads(text)
-                return text
-            except json.JSONDecodeError:
-                # Last resort: fix 'key' to "key" pattern outside of strings
-                final = []
-                in_str = False
-                esc = False
-                for ch in text:
-                    if esc:
-                        final.append(ch)
-                        esc = False
-                    elif ch == "\\" and in_str:
-                        final.append(ch)
-                        esc = True
-                    elif ch == '"':
-                        in_str = not in_str
-                        final.append(ch)
-                    elif ch == "'" and not in_str:
-                        final.append('"')
-                    else:
-                        final.append(ch)
-                return "".join(final).strip()
         def _apply_envelope(parsed: dict) -> dict:
             """
             Overwrite LLM-supplied price fields with Python-computed envelope values.
@@ -1265,7 +1300,7 @@ Start your response with '{' and end with '}'. Nothing else."""
 
         try:
             resp = await self._invoke_llm(self.pro_llm, messages, inject_rules=False)
-            parsed = json.loads(_sanitize_json(resp.content))
+            parsed = json.loads(self._sanitize_json(resp.content))
             parsed = _apply_envelope(parsed)
             verdict_json = CIOVerdict(**parsed).model_dump_json()
             logger.info(f"[CIO] JSON parsed successfully for {ticker}")

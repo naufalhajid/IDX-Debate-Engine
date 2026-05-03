@@ -31,6 +31,7 @@ _WIN_RATE_HIGH_THRESHOLD: float = 0.70
 _WIN_RATE_LOW_THRESHOLD: float = 0.30
 _BONUS: float = 0.05
 _PENALTY: float = -0.05
+_MAX_HISTORY_RECORDS_PER_TICKER: int = 20
 
 
 # \u2500\u2500 Public API \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -49,7 +50,27 @@ def load_debate_history(output_dir: Path) -> list[dict]:
         logger.debug(f"[HistScorer] Direktori {debates_dir} tidak ada — tidak ada history.")
         return records
 
-    for f in debates_dir.glob("*_debate.json"):
+    versioned_by_ticker: dict[str, list[Path]] = {}
+    for f in debates_dir.glob("*/v*/*_debate.json"):
+        ticker = f.name.removesuffix("_debate.json")
+        versioned_by_ticker.setdefault(ticker, []).append(f)
+
+    files: list[Path] = []
+    for ticker_files in versioned_by_ticker.values():
+        files.extend(
+            sorted(ticker_files, key=lambda p: p.parent.name, reverse=True)[
+                :_MAX_HISTORY_RECORDS_PER_TICKER
+            ]
+        )
+
+    versioned_tickers = set(versioned_by_ticker)
+    files.extend(
+        f
+        for f in debates_dir.glob("*_debate.json")
+        if f.name.removesuffix("_debate.json") not in versioned_tickers
+    )
+
+    for f in files:
         try:
             data = json.loads(f.read_text(encoding="utf-8"))
             if isinstance(data, dict) and "ticker" in data:

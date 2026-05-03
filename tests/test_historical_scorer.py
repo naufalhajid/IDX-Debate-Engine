@@ -8,7 +8,6 @@ from core.historical_scorer import (
     apply_historical_adjustment,
     compute_historical_win_rate,
     load_debate_history,
-    _MIN_RECORDS_FOR_ADJUSTMENT,
     _WIN_RATE_HIGH_THRESHOLD,
     _WIN_RATE_LOW_THRESHOLD,
     _BONUS,

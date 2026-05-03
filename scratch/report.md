@@ -1,5 +1,5 @@
 # 🏆 Top 10 High-Conviction IHSG Swing Candidates
-*Generated: 2026-05-01 20:43:04*
+*Generated: 2026-05-03 05:12:52*
 *Engine: v3.1 — Absolute scoring | Asymmetric RSI | Piotroski integrated | Bank-aware valuation*
 
 | Rank | Ticker | Sektor | Harga | Stop Loss | Graham Fair Value | Score | Gap | RSI | PBV | F-Score | Entry Note |

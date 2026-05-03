@@ -1,5 +1,4 @@
 """Tests untuk core/regime.py."""
-import pytest
 
 from core.regime import classify_regime, get_regime_params
 

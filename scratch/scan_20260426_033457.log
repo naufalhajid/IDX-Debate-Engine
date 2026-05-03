@@ -1,6 +1,0 @@
-2026-04-26 03:34:57,268 [INFO] ============================================================
-2026-04-26 03:34:57,269 [INFO] IHSG Quantitative Swing-Trade Scouting Engine v2.1
-2026-04-26 03:34:57,269 [INFO] ============================================================
-2026-04-26 03:34:57,269 [INFO] Membaca: output/IDX Fundamental Analysis 2026-04-24.xlsx
-2026-04-26 03:34:58,406 [INFO] Total ticker universe: 957
-2026-04-26 03:34:58,415 [WARNING] SECTOR_MAP miss → 46 ticker fallback ke 'default': ['BTEL', 'COWL', 'ETWA', 'GAMA', 'GOLL', 'HOME', 'HOTL', 'IIKP', 'KBRI', 'LAPD', 'LCGP', 'LMAS', 'MAGP', 'META', 'OCAP', 'PLAS', 'RIMO', 'SCPI', 'SIMA', 'SKYB', 'SMRU', 'SRIL', 'SUGI', 'TRAM', 'TRIL', 'TRIO', 'UNIT', 'WSKT', 'MTRA', 'ARMY']...
