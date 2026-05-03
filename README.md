@@ -8,10 +8,45 @@ This repository combines:
 - ETL and database persistence
 - quantitative filtering for swing candidates
 - multi-agent debate and CIO verdict generation
-- rank aggregation, historical scoring, and markdown reporting
+- rank aggregation, historical scoring, and markdown reporting through the flagship orchestrator
 - FastAPI endpoints and a minimal SvelteKit UI
 
 The project is research tooling, not financial advice.
+
+## Orchestrator
+
+`orchestrator.py` is the flagship execution path of the repository. It turns the
+latest quant screen into ranked swing-trade recommendations in a single,
+reproducible pipeline run.
+
+### What it does
+
+- validates dependencies and candidate freshness before consuming API budget
+- applies regime-aware thresholds before debate execution begins
+- runs debates with bounded concurrency and rate limiting
+- protects the Gemini budget and aborts cleanly when limits are hit
+- applies historical scoring adjustments before final ranking
+- writes both machine-readable JSON and human-readable markdown reports
+- preserves versioned debate snapshots for auditability and replay
+- exposes a Rich-powered terminal experience for interactive runs
+- supports headless execution for automation, CI, or scheduled runs
+
+### Output artifacts
+
+- `output/full_batch_results.json`
+- `output/TOP_3_SWING_TRADES.md`
+- `output/debates/<TICKER>/vYYYYMMDD_HHMMSS/`
+- `output/debates/<TICKER>/latest_debate.json`
+
+### Recommended usage
+
+```bash
+uv run python orchestrator.py
+```
+
+Use `--no-interactive` for unattended runs, `--skip-scraping` when
+`top10_candidates.json` is already available, `--dry-run` to validate the
+pipeline without live LLM calls, and `--output-dir` to isolate artifacts.
 
 ## Architecture
 
@@ -41,7 +76,7 @@ High level responsibilities:
 | `uv run python build_sector_cache.py` | Build or refresh `output/sector_cache.json` |
 | `uv run python run_quant_filter.py` | Run the quantitative swing filter and write `output/top10_candidates.json` plus `scratch/report.md` |
 | `uv run python run_debate.py --tickers BBRI BBCA TLKM` | Run the debate chamber for selected tickers and save per-ticker debate JSON |
-| `uv run python orchestrator.py` | Run quant -> debate -> rank -> report as one pipeline |
+| `uv run python orchestrator.py` | Flagship end-to-end pipeline: quant screening, debate orchestration, historical scoring, and final swing-trade reporting |
 | `uv run python run_api.py` | Start the FastAPI backend on `http://127.0.0.1:8000` |
 | `cd app/ui && bun install && bun run dev --open` | Start the local SvelteKit UI |
 
