@@ -1,129 +1,264 @@
 # IDX Fundamental Analysis
 
-## Description
+Python tooling for Indonesian stock research, swing-trade screening, and multi-agent debate.
 
-IDX Fundamental Analysis project aims to retrieve and analyse fundamental stock data of companies listed on the
-Indonesian
-Stock Exchange (IDX). It fetches stock data and key statistics using Selenium, requests, and various provider APIs, and
-stores the resultant data in Google Sheets or local Excel file for easy access and analysis.
+This repository combines:
 
-https://github.com/user-attachments/assets/13395cf7-1e3e-4153-8d20-40d4755a4c6d
+- data acquisition from IDX, Stockbit, yfinance, and Google Drive
+- ETL and database persistence
+- quantitative filtering for swing candidates
+- multi-agent debate and CIO verdict generation
+- rank aggregation, historical scoring, and markdown reporting
+- FastAPI endpoints and a minimal SvelteKit UI
 
-## Features
+The project is research tooling, not financial advice.
 
-- **Fetch Stock Data from IDX**: Use Selenium web driver to scrape stock data from IDX.
-- **Retrieve Fundamental Data**: Obtain key statistics and fundamental data using StockBit and YFinance API.
-- **Google Sheets Integration**: Create and update Google Sheets with stock data using Google Drive API. Required
-  Google Service Account environment variable.
-- **Save as Excel**: Stored the fundamental analysis data in your local file.
-- **Store to SQLite**: Stored all data to persistent storage.
-- **Logging**: Robust logging using Loguru for debugging and tracking purposes.
+## Architecture
 
-## Installation
+The repo is organized as a pipeline:
 
-### Prerequisites
+`providers/` -> `builders/` -> `db/` and `repositories/` -> `services/` and `core/` -> `output/`
 
-- [Python 3.14](https://docs.python.org/3.14/whatsnew/3.14.html)
-- [UV](https://docs.astral.sh/uv/getting-started/installation/)
+High level responsibilities:
 
-### Steps
+| Layer | Main modules | Responsibility |
+| --- | --- | --- |
+| Data sources | `providers/` | IDX scraping, Stockbit API, yfinance, Gemini |
+| ETL | `builders/` | Build datasets, enrich rows, persist structured outputs |
+| Persistence | `db/`, `repositories/` | SQLAlchemy models and query layer |
+| Domain services | `services/` | Debate chamber, fair value, API clients, token handling |
+| System logic | `core/` | Settings, budget, regime detection, historical scoring, quant filter |
+| API | `app/api/` | FastAPI routers and dependency injection |
+| UI | `app/ui/` | Minimal SvelteKit client for local web access |
+| Artifacts | `output/`, `scratch/` | Generated reports, candidate lists, debate snapshots, temp files |
 
-1. Clone the repository:
+## Entry Points
 
-   ```bash
-   git clone https://github.com/noczero/idx-fundamental.git
-   cd idx-fundamental
-   ```
+| Command | Purpose |
+| --- | --- |
+| `uv run python main.py -f -o excel` | Run the core IDX ETL, fetch fundamentals, and export to Excel |
+| `uv run python main.py -f -o spreadsheet` | Same pipeline, but export to Google Sheets |
+| `uv run python build_sector_cache.py` | Build or refresh `output/sector_cache.json` |
+| `uv run python run_quant_filter.py` | Run the quantitative swing filter and write `output/top10_candidates.json` plus `scratch/report.md` |
+| `uv run python run_debate.py --tickers BBRI BBCA TLKM` | Run the debate chamber for selected tickers and save per-ticker debate JSON |
+| `uv run python orchestrator.py` | Run quant -> debate -> rank -> report as one pipeline |
+| `uv run python run_api.py` | Start the FastAPI backend on `http://127.0.0.1:8000` |
+| `cd app/ui && bun install && bun run dev --open` | Start the local SvelteKit UI |
 
-2. Install dependencies:
+The orchestrator has a Rich-based terminal UI. It supports:
 
-   ```bash
-   uv sync
-   ```
+- `--no-interactive`
+- `--skip-scraping`
+- `--dry-run`
+- `--output-dir`
 
-3. Set up environment variables:
+## Quick Start
 
-   Create a `.env` file in the project root directory and add the following environment variables:
+### 1. Install prerequisites
 
-   ```env
-   GOOGLE_SERVICE_ACCOUNT='{
-     "type": "service_account",
-     "project_id": "...",
-     "private_key_id": "...",
-     "private_key": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n",
-     "client_email": "...",
-     "client_id": "...",
-     "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-     "token_uri": "https://oauth2.googleapis.com/token",
-     "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-     "client_x509_cert_url": "..."
-   }'
+- Python 3.12 or newer
+- UV package manager
+- Chrome or Chromium for IDX scraping
+- Bun if you want to run the SvelteKit UI
 
-   GOOGLE_DRIVE_EMAILS='["email1@gmail.com", "email2@gmail.com"]'
-   ```
+### 2. Install dependencies
 
-## Usage
+```bash
+uv sync
+```
 
-1. Run the main script:
+### 3. Configure environment variables
 
-   ```bash
-   python main.py -f -o excel
-   ```
+Copy `.env.example` to `.env` and fill in the values that apply to your setup.
 
-   - The `-f` or `--full-retrieve` argument is optional. If included, the script will retrieve full stock data from
-     IDX.
-     If not set, it only retrieve first page which is only 10 stocks.
+Key settings live in `core/settings.py` and `orchestrator.py`.
 
-   - The `-o` or `--output-format` argument with two choices: `spreadsheet` and `excel`. Output will be saved into
-     Google
-     Sheet or Excel local file inside `output` folder.
-   - This will start the process of fetching stock data from IDX, retrieving key statistics from StockBit, and
-     inserting them into a Google Sheet.
+### 4. Prepare optional sector cache
 
-## Configuration
+```bash
+uv run python build_sector_cache.py
+```
 
-The primary configuration options include environment variables set in the `.env` file. Ensure you have authenticated
-and authorized access to Google Drive and possessed a valid username and password for StockBit API access.
+This improves sector resolution for the quantitative filter. It is optional, but recommended.
 
-## Contribution Guidelines
+## Environment Variables
 
-Contributions are welcome! Feel free to open issues or submit pull requests. Please follow these guidelines:
+The most important variables are:
 
-1. Fork the repository.
-2. Create a new branch for your feature/bug fix.
-3. Make your changes, ensuring tests pass.
-4. Open a pull request with a detailed description of your changes.
+| Variable | Purpose |
+| --- | --- |
+| `GEMINI_API_KEY` | Required for real debate runs |
+| `GEMINI_FLASH_MODEL` | Model used for lighter debate steps |
+| `GEMINI_PRO_MODEL` | Model used for final CIO reasoning |
+| `GOOGLE_SERVICE_ACCOUNT` | JSON credential for Google Sheets / Drive integration |
+| `GOOGLE_DRIVE_EMAILS` | Email list used when sharing spreadsheet output |
+| `DATABASE_TYPE` | `sqlite` or `postgresql` |
+| `DATABASE_HOST` / `DATABASE_PORT` / `DATABASE_USER` / `DATABASE_PASSWORD` | Database connection settings |
+| `LOG_LEVEL` | Console log level |
+| `LOG_APP_FILENAME` | Main application log file |
+| `OUTPUT_DIR` | Root output directory used by the orchestrator |
+| `MAX_CONCURRENT_DEBATES` | Parallel debate limit |
+| `GEMINI_RPM_LIMIT` | Gemini requests-per-minute cap |
+| `BATCH_DELAY_SECONDS` | Delay between debate tasks |
+| `TOP_N_SELECTION` | Number of top candidates to keep |
+| `MAX_PRICE_RETRY_ATTEMPTS` | Price fetch retry limit |
+| `CANDIDATES_MAX_AGE_HOURS` | How long `top10_candidates.json` stays valid |
+| `CANDIDATES_AUTO_RERUN` | Auto-run quant filter if candidates are stale |
+| `CONVICTION_WEIGHT_CONFIDENCE` | Weight for CIO confidence in conviction scoring |
+| `CONVICTION_WEIGHT_RR_RATIO` | Weight for risk/reward in conviction scoring |
+| `CONVICTION_RR_NORMALIZATION_CAP` | Cap used when normalizing R/R |
+| `PORTFOLIO_MAX_PER_SECTOR` | Sector diversification limit |
+| `PORTFOLIO_MIN_CONVICTION` | Minimum score required for selection |
+
+If you only need the default local setup, start with the values in `.env.example` and add Gemini, Google, and database settings as needed.
+
+## Common Workflows
+
+### 1. Build the base dataset
+
+```bash
+uv run python main.py -f -o excel
+```
+
+Use `-o spreadsheet` if you want Google Sheets output instead of a local Excel file.
+
+### 2. Run the quant filter
+
+```bash
+uv run python run_quant_filter.py
+```
+
+Outputs:
+
+- `output/top10_candidates.json`
+- `scratch/report.md`
+
+The filter reads the latest Excel workbook in `output/` by default.
+
+### 3. Run a standalone debate batch
+
+```bash
+uv run python run_debate.py --tickers BBRI BBCA TLKM
+```
+
+Outputs:
+
+- `output/debates/<TICKER>_debate.json`
+
+The standalone debate wrapper keeps the classic flat file layout. The versioned
+per-ticker snapshot layout is produced by `orchestrator.py` for auditability and
+historical scoring.
+
+### 4. Run the full orchestrator
+
+```bash
+uv run python orchestrator.py
+```
+
+What it does:
+
+1. validates dependencies
+2. checks the candidate file freshness
+3. detects market regime
+4. runs debates with bounded concurrency
+5. ranks candidates with historical adjustments
+6. writes `output/full_batch_results.json`
+7. writes `output/TOP_3_SWING_TRADES.md`
+8. writes versioned debate snapshots under `output/debates/<TICKER>/`
+
+If you omit `--no-interactive`, the orchestrator shows a Rich terminal flow with progress and summary panels.
+
+### 5. Start the API
+
+```bash
+uv run python run_api.py
+```
+
+Useful URLs:
+
+- `http://127.0.0.1:8000/docs`
+- `http://127.0.0.1:8000/redoc`
+- `http://127.0.0.1:8000/api/v1/health`
+
+API routers currently cover:
+
+- health
+- stocks
+- fundamentals
+- sentiments
+- key analysis
+- stock prices
+
+### 6. Start the UI
+
+```bash
+cd app/ui
+bun install
+bun run dev --open
+```
+
+`run_ui.sh` is a convenience wrapper for Unix-like shells. It assumes `nvm` and Bun are available.
+
+## Output Directory
+
+The main generated artifacts are:
+
+- `output/top10_candidates.json`
+- `scratch/report.md`
+- `output/full_batch_results.json`
+- `output/TOP_3_SWING_TRADES.md`
+- `output/debates/`
+- `output/sector_cache.json`
+
+Treat files in `output/` as generated artifacts. They can be regenerated from the pipeline.
+
+## Project Layout
+
+- `providers/` - external data adapters
+- `builders/` - ETL and persistence builders
+- `repositories/` - SQLAlchemy repository layer
+- `services/` - debate, valuation, Google Drive, and API helpers
+- `core/` - settings, quant filter, regime, budget, and historical scoring
+- `db/` - models and session management
+- `schemas/` - Pydantic models and debate schemas
+- `app/api/` - FastAPI app and routers
+- `app/ui/` - SvelteKit frontend
+- `tests/` - pytest suite
+- `output/` - generated reports and snapshots
+- `scratch/` - temporary analysis and experimental files
 
 ## Testing
 
-Currently, the project does not include unit tests. However, testing can be done by running the `main.py` script and
-verifying the output in the Google Sheet if argument `-o spreadsheet` is used. If argument `-o excel` is used, the output
-will be saved in the `./output` folder.
+Run the full test and lint pass with:
 
-## Result
+```bash
+uv run python -m py_compile orchestrator.py run_quant_filter.py services/debate_chamber.py
+uv run ruff check .
+uv run pytest -q
+```
 
-### File [Limited only 10 stocks]
+The current test suite focuses on:
 
-- [IDX Fundamental Analysis 05-10-2024](https://drive.zeroinside.id/s/GpcEYfc2MAbCS4N)
+- debate chamber reliability
+- dependency validation
+- historical scoring
+- regime detection
+- portfolio optimization
 
-### Screencast
+## Troubleshooting
 
-![demo-idx-fundamental](https://github.com/user-attachments/assets/c365cd75-fed7-41c9-8719-17bf36dc97cb)
+- If debate runs fail immediately, check `GEMINI_API_KEY` and the configured Gemini model names.
+- If the orchestrator says candidates are stale, rerun `run_quant_filter.py` or let auto-rerun handle it.
+- If IDX scraping fails, make sure Chrome or Chromium is installed.
+- If the UI does not start, install Bun and run `bun install` inside `app/ui`.
 
-## TODO
+## Notes
 
-1. Dashboard support using Streamlit.
-2. Sentiment Analysis using LLMs, will use OpenAI and Ollama.
-3. Time Series Forecasting using ETS, ARIMA, and Prophet.
+- The historical scorer reads debate snapshots from `output/debates/`.
+- The debate pipeline now stores versioned per-ticker snapshots plus a latest file for compatibility.
+- `core/quant_filter/` is the canonical implementation of the swing candidate filter; `run_quant_filter.py` is only a wrapper.
+- `orchestrator.py` is the main end-to-end swing-trade pipeline entry point.
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
-## Acknowledgements
-
-- [Stockbit](https://stockbit.com) for IDX composite key statistics and stock prices data.
-- [Selenium](https://www.selenium.dev/) for web scraping capabilities.
-- [Loguru](https://github.com/Delgan/loguru) for logging.
-- [yfinance](https://github.com/ranaroussi/yfinance) for financial data.
-- [Google APIs](https://developers.google.com/api-client-library/python/) for integration with Google Sheets.
+MIT License. See `LICENSE` if present in your checkout.
