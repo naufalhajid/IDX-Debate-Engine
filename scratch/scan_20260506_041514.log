@@ -1,0 +1,38 @@
+2026-05-06 04:15:14,036 [INFO] ============================================================
+2026-05-06 04:15:14,036 [INFO] IHSG Quantitative Swing-Trade Scouting Engine v3.2
+2026-05-06 04:15:14,036 [INFO] ============================================================
+2026-05-06 04:15:14,037 [INFO] Input file: output\IDX Fundamental Analysis 2026-05-06.xlsx
+2026-05-06 04:15:14,038 [INFO] [XlsxAdapter] Initialized dengan: output\IDX Fundamental Analysis 2026-05-06.xlsx
+2026-05-06 04:15:14,039 [INFO] [Adapter] XlsxDataAdapter aktif → output\IDX Fundamental Analysis 2026-05-06.xlsx
+2026-05-06 04:15:14,039 [INFO] Membaca: output\IDX Fundamental Analysis 2026-05-06.xlsx
+2026-05-06 04:15:14,957 [INFO] Total ticker universe: 957
+2026-05-06 04:15:14,960 [INFO] Exclude PEMANTAUAN KHUSUS: 957 → 796
+2026-05-06 04:15:14,963 [INFO] [Sector] Cache loaded: 957 ticker dari output\sector_cache.json
+2026-05-06 04:15:14,964 [INFO] [Sector] Resolve selesai: cache=796, hardcode=0, keyword=0, default=0
+2026-05-06 04:15:14,978 [INFO] Lolos static filter: 147 ticker
+2026-05-06 04:15:14,984 [INFO] Distribusi sektor:
+Sector
+consumer_staples    36
+consumer_disc       22
+industrials         17
+basic_materials     16
+tech                12
+property            10
+energy               9
+transport            9
+healthcare           7
+finance_nonbank      5
+infrastructure       3
+bank                 1
+2026-05-06 04:15:14,991 [INFO] yfinance download attempt 1/3 (147 ticker)...
+2026-05-06 04:15:18,158 [INFO] Download berhasil. Shape: (120, 735)
+2026-05-06 04:15:18,278 [INFO] IHSG return 1 bulan: -1.08%
+2026-05-06 04:15:18,722 [INFO] [XlsxAdapter] Loaded key-statistics: 957 tickers
+2026-05-06 04:15:18,912 [INFO] [RDTX] Excluded: suspek suspended/FCA (volume anomali)
+2026-05-06 04:15:18,950 [INFO] [STTP] Excluded: suspek suspended/FCA (volume anomali)
+2026-05-06 04:15:18,967 [INFO] [TRIS] Excluded: ex-date CRITICAL (dalam 0 hari — source=xlsx)
+2026-05-06 04:15:19,029 [INFO] [GOOD] Excluded: ex-date CRITICAL (dalam 0 hari — source=xlsx)
+2026-05-06 04:15:19,168 [INFO] Top 10 kandidat berhasil disaring.
+2026-05-06 04:15:19,174 [INFO] JSON diekspor → output\top10_candidates.json
+2026-05-06 04:15:19,181 [INFO] Report → scratch\report.md
+2026-05-06 04:15:19,181 [INFO] PIPELINE SELESAI.

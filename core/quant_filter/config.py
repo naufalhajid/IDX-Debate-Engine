@@ -42,7 +42,22 @@ CONFIG = {
 
     # ── Static Filter
     "min_close_price":        100,        # Rp — buang penny stocks
-    "max_der":                1.5,        # Debt to Equity Ratio maksimum
+    # ── DER Cap per Sektor (menggantikan max_der flat)
+    "max_der_by_sector": {
+        "bank":             8.0,   # Bank: DER tinggi adalah norma (leverage perbankan)
+        "finance_nonbank":  5.0,   # Multifinance: leverage bisnis
+        "infrastructure":   3.0,   # Infrastruktur & BUMN: project financing
+        "property":         2.5,   # Properti: development financing
+        "industrials":      2.0,   # Industri: capex heavy
+        "transport":        2.0,   # Transportasi: fleet financing
+        "consumer_staples": 1.5,   # Konsumer primer: moderat
+        "consumer_disc":    1.5,   # Konsumer non-primer: moderat
+        "energy":           1.5,   # Energi & mining: moderat
+        "basic_materials":  1.5,   # Bahan baku: moderat
+        "healthcare":       1.0,   # Healthcare: seharusnya rendah
+        "tech":             1.0,   # Tech: seharusnya asset-light
+        "default":          1.5,   # Fallback untuk sektor tidak dikenal
+    },
     "max_pbv_hard":           6.0,        # PBV ceiling absolut
     "pbv_sector_pctile":      0.80,       # Buang top 20% PBV per sektor
     "min_roe":                0.10,       # ROE minimum TTM (10%)

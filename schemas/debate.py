@@ -448,6 +448,7 @@ class DebateChamberState(TypedDict):
     debate_history: Annotated[list[DebateMessage], history_updater]
     round_count: int
     consensus_reached: bool
+    disagreement_type: str | None
 
     # Adaptive nodes
     devils_advocate_question: str

@@ -280,6 +280,18 @@ def _analyze_ticker(
         return None
 
     current_px: float = float(close.iloc[-1])
+    sector_key = str(row.get("sektor_key", row.get("Sector", "default")) or "default")
+    max_der_map = cfg["max_der_by_sector"]
+    max_der = float(max_der_map.get(sector_key, max_der_map["default"]))
+    der_raw = row.get("Debt to Equity Ratio (Quarter)")
+    try:
+        der = None if der_raw is None or pd.isna(der_raw) else float(der_raw)
+    except (TypeError, ValueError):
+        der = None
+    if der is not None and der > max_der:
+        logger.debug(f"[{t}] DER {der:.2f} > sector cap {max_der:.2f} ({sector_key}), skip")
+        return None
+
     price_mom_period = int(cfg.get("price_mom_period_days", 22))
 
     # Trend Filter: EMA20 is more responsive for swing entries than SMA50.
@@ -287,6 +299,25 @@ def _analyze_ticker(
     if pd.isna(ema20.iloc[-1]):
         return None
     ema20_latest: float = float(ema20.iloc[-1])
+
+    ma200 = close.rolling(window=200, min_periods=50).mean()
+    ma200_value: float | None = None
+    if len(close) >= 50 and not pd.isna(ma200.iloc[-1]):
+        ma200_value = float(ma200.iloc[-1])
+
+    if ma200_value is None:
+        ma200_context = "INSUFFICIENT_DATA"
+    elif current_px > ma200_value * 1.02:
+        ma200_context = "ABOVE"
+    elif current_px < ma200_value * 0.98:
+        ma200_context = "BELOW"
+    else:
+        prev5 = close.iloc[-6:-1]
+        if len(prev5) == 5 and float(prev5.mean()) < ma200_value and current_px > ma200_value:
+            ma200_context = "CROSSOVER_RECENT"
+        else:
+            ma200_context = "ABOVE" if current_px >= ma200_value else "BELOW"
+
     min_price_vs_ema20 = cfg.get("min_price_vs_ema20", cfg.get("min_price_vs_sma50", 1.0))
     if current_px < ema20_latest * min_price_vs_ema20:
         logger.debug(f"[{t}] Price below EMA20 trend filter, skip")
@@ -411,6 +442,13 @@ def _analyze_ticker(
         total_score += cfg["fresh_breakout_bonus"]
         mom_note.append(f"Fresh Breakout (+{dist_to_sma20_pct*100:.1f}% SMA20)")
 
+    if ma200_context == "CROSSOVER_RECENT":
+        total_score += 7
+        mom_note.append("MA200 Crossover Recent (+7)")
+    elif ma200_context == "BELOW":
+        total_score -= 7
+        mom_note.append("Below MA200 (-7)")
+
     # [v3.1 NEW] Piotroski F-Score adjustment — diintegrasikan ke composite score.
     # Sebelumnya F-Score hanya jadi gate di static filter (>=4) tanpa membedakan
     # kualitas antara saham F-Score 4 vs F-Score 9. Sekarang ada reward/penalty
@@ -443,7 +481,6 @@ def _analyze_ticker(
     stop_loss = snap_to_tick(stop_loss)
 
     # ── Sector PBV Context ────────────────────────────────────────────────────
-    sector_key   = row["Sector"]
     sector_bench = SECTOR_PBV_BENCHMARK.get(sector_key, SECTOR_PBV_BENCHMARK["default"])
     pbv_current: float = float(row.get("Current Price to Book Value", 0))
     pbv_label = (
@@ -470,9 +507,12 @@ def _analyze_ticker(
         "RSI (14)":                  rsi_latest,
         "SMA 20":                    sma20_latest,
         "ema20":                     round(ema20_latest, 2),
+        "ma200":                     round(ma200_value, 2) if ma200_value else None,
+        "ma200_context":             ma200_context,
         "ATR (14)":                  atr_14,
         "ROE (TTM)":                 row["Return on Equity (TTM)"],
         "DER (Quarter)":             row["Debt to Equity Ratio (Quarter)"],
+        "max_der_allowed":           max_der,
         "PBV":                       pbv_current,
         "PBV vs Sektor":             pbv_label,
         "PBV Sektor Percentile":     round(row["PBV_Sector_Pctile"] * 100, 1),
@@ -579,13 +619,15 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
     df["Sector_Label"] = df["Sector"].map(
         {k: v["label"] for k, v in SECTOR_PBV_BENCHMARK.items()}
     ).fillna("Lain-lain")
+    max_der_map = cfg["max_der_by_sector"]
+    df["Max_DER_Allowed"] = df["Sector"].map(max_der_map).fillna(max_der_map["default"])
 
     # ── 3. STATIC FILTERING ───────────────────────────────────────────────────
     alt_col = "Altman Z-Score (Modified)"
 
     filtered = df[
         (df["Close Price"] > cfg["min_close_price"]) &
-        (df["Debt to Equity Ratio (Quarter)"] < cfg["max_der"]) &
+        (df["Debt to Equity Ratio (Quarter)"] <= df["Max_DER_Allowed"]) &
         (df["PBV_Sector_Pctile"] < cfg["pbv_sector_pctile"]) &
         (df["Current Price to Book Value"] < cfg["max_pbv_hard"]) &
         (df["Return on Equity (TTM)"] > cfg["min_roe"]) &

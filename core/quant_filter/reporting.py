@@ -198,8 +198,75 @@ def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
     return "\n".join(lines)
 
 
+def _build_position_summary(sizing_result: dict | None) -> str:
+    """Build a markdown position-sizing section for the final orchestrator report."""
+    if not sizing_result:
+        return ""
+
+    positions = sizing_result.get("positions") or []
+    summary = sizing_result.get("summary") or {}
+    if not positions:
+        return ""
+
+    def _rupiah(value: float | int | None) -> str:
+        try:
+            return "Rp " + f"{float(value):,.0f}".replace(",", ".")
+        except (TypeError, ValueError):
+            return "Rp 0"
+
+    def _int_id(value: float | int | None) -> str:
+        try:
+            return f"{int(value):,}".replace(",", ".")
+        except (TypeError, ValueError):
+            return "0"
+
+    def _pct(value: float | int | None) -> str:
+        try:
+            return f"{float(value) * 100:.1f}%"
+        except (TypeError, ValueError):
+            return "0.0%"
+
+    lines = [
+        "## 💼 Rekomendasi Posisi",
+        "",
+        "| # | Ticker | Rating | Lot | Saham | Nilai Posisi | Alokasi | Max Loss | Est. Biaya |",
+        "|---|--------|--------|-----|-------|-------------|---------|----------|------------|",
+    ]
+
+    for i, position in enumerate(positions, 1):
+        lines.append(
+            f"| {i} "
+            f"| {position.get('ticker', 'N/A')} "
+            f"| {position.get('rating', 'N/A')} "
+            f"| {_int_id(position.get('lot'))} "
+            f"| {_int_id(position.get('shares'))} "
+            f"| {_rupiah(position.get('position_value'))} "
+            f"| {_pct(position.get('allocation_pct'))} "
+            f"| {_rupiah(position.get('max_loss_rp'))} "
+            f"| {_rupiah(position.get('total_cost_est'))} |"
+        )
+
+    lines += [
+        "",
+        "---",
+        "",
+        "### 📊 Portfolio Summary",
+        "",
+        "| Item | Nilai |",
+        "|------|-------|",
+        f"| Total Modal | {_rupiah(summary.get('total_capital'))} |",
+        f"| Total Deployed | {_rupiah(summary.get('total_deployed'))} |",
+        f"| Sisa Cash | {_rupiah(summary.get('remaining_cash'))} |",
+        f"| % Deployed | {_pct(summary.get('deployed_pct'))} |",
+        f"| Jumlah Posisi | {_int_id(summary.get('total_positions'))} |",
+        f"| Est. Total Biaya Transaksi | {_rupiah(summary.get('total_cost_est'))} |",
+    ]
+
+    return "\n".join(lines)
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # ── ENTRY POINT ───────────────────────────────────────────────────────────────
 # ══════════════════════════════════════════════════════════════════════════════
 
-__all__ = ["_build_markdown_report"]
+__all__ = ["_build_markdown_report", "_build_position_summary"]

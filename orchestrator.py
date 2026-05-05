@@ -88,6 +88,8 @@ from core.historical_scorer import (
     compute_historical_win_rate,
     load_debate_history,
 )
+from core.quant_filter.position_sizer import calculate_positions
+from core.quant_filter.reporting import _build_position_summary
 from core.portfolio_optimizer import diversify_portfolio
 from core.regime import RegimeType, classify_regime, fetch_ihsg_volatility, get_regime_params
 from core.settings import settings
@@ -199,6 +201,57 @@ def configure_output_dir(output_dir: Path) -> None:
     JSON_PATH = OUTPUT_DIR / "top10_candidates.json"
     FULL_RESULTS_PATH = OUTPUT_DIR / "full_batch_results.json"
     TOP3_REPORT_PATH = OUTPUT_DIR / "TOP_3_SWING_TRADES.md"
+
+
+def _prompt_user_config() -> dict:
+    """Tanya input modal, max loss, max posisi ke user via terminal."""
+    try:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
+    print("\n" + "═" * 50)
+    print("  IHSG Swing Trade — Position Sizing Setup")
+    print("═" * 50)
+
+    while True:
+        try:
+            capital = float(input("\nModal total (Rp): ").replace(",", "").replace(".", ""))
+            if capital > 0:
+                break
+            print("  ⚠️  Modal harus lebih dari 0.")
+        except ValueError:
+            print("  ⚠️  Masukkan angka tanpa huruf.")
+
+    while True:
+        try:
+            raw = input("Max loss per trade (%, default 2): ").strip()
+            max_loss = float(raw) / 100 if raw else 0.02
+            if 0 < max_loss <= 0.10:
+                break
+            print("  ⚠️  Max loss harus antara 0.1% - 10%.")
+        except ValueError:
+            print("  ⚠️  Masukkan angka, contoh: 2")
+
+    while True:
+        try:
+            raw = input("Max jumlah posisi (default 5): ").strip()
+            max_pos = int(raw) if raw else 5
+            if 1 <= max_pos <= 20:
+                break
+            print("  ⚠️  Max posisi harus antara 1 - 20.")
+        except ValueError:
+            print("  ⚠️  Masukkan angka bulat, contoh: 5")
+
+    print(f"\n  ✅ Modal: Rp {capital:,.0f} | Max loss: {max_loss*100:.1f}% | Max posisi: {max_pos}")
+    print("═" * 50 + "\n")
+
+    return {
+        "total_capital": capital,
+        "max_loss_pct": max_loss,
+        "max_positions": max_pos,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -379,6 +432,8 @@ def _empty_result(ticker: str, error: str, sector_key: str = "unknown") -> dict:
         "ticker": ticker,
         "verdict": {},
         "debate_rounds": 0,
+        "consensus_reached": False,
+        "disagreement_type": None,
         "debate_history": [],
         "raw_data_summary": "",
         "error": error,
@@ -425,10 +480,15 @@ async def _run_single_debate(ticker: str, chamber: Any) -> dict:
                 return _empty_result(ticker, f"JSON decode error: {e}")
 
         logger.info(f"[Debate] ✅ Selesai: {ticker}")
+        disagreement_type = result.get("disagreement_type")
+        if disagreement_type:
+            logger.info(f"[Debate] {ticker} disagreement_type={disagreement_type}")
         return {
             "ticker": result["ticker"],
             "verdict": verdict_dict,
             "debate_rounds": result["round_count"],
+            "consensus_reached": result.get("consensus_reached", False),
+            "disagreement_type": disagreement_type,
             "debate_history": [
                 {"role": m.role, "content": m.content, "round": m.round_num}
                 for m in result["debate_history"]
@@ -949,6 +1009,22 @@ def save_individual_debates_versioned(
         )
 
 
+def _build_sizing_candidates(top_n: list[dict]) -> list[dict]:
+    """Flatten selected orchestrator entries into position-sizer input records."""
+    candidates: list[dict] = []
+    for entry in top_n:
+        verdict = entry.get("verdict") or {}
+        candidates.append({
+            "ticker": entry.get("ticker") or verdict.get("ticker"),
+            "current_price": verdict.get("current_price"),
+            "stop_loss": verdict.get("stop_loss"),
+            "rating": verdict.get("rating"),
+            "confidence": verdict.get("confidence"),
+            "rr_ratio": verdict.get("risk_reward_ratio"),
+        })
+    return candidates
+
+
 def _dry_run_profile(sector_key: str) -> dict[str, Any]:
     """Return a small sector-aware profile for dry-run mock generation."""
     sector = sector_key.lower()
@@ -1111,6 +1187,7 @@ def generate_top3_report(
     top_n: list[dict],
     all_results: list[dict],
     path: Path = TOP3_REPORT_PATH,
+    sizing_result: dict | None = None,
 ) -> str:
     """
     Generate laporan Markdown eksekutif untuk Top N swing trade.
@@ -1155,6 +1232,12 @@ def generate_top3_report(
         ticker = entry["ticker"]
         # [FIX-7] Reuse skor dari select_top3, bukan hitung ulang
         score = entry.get("conviction_score", 0.0)
+        disagreement = entry.get("disagreement_type")
+        consensus_label = (
+            "Reached"
+            if entry.get("consensus_reached")
+            else f"No ({disagreement or 'unknown'})"
+        )
 
         lines += [
             f"## #{rank} - {ticker}",
@@ -1166,6 +1249,7 @@ def generate_top3_report(
             f"| **Rating** | `{v.get('rating', 'N/A')}` |",
             f"| **CIO Confidence** | {v.get('confidence', 0):.0%} |",
             f"| **Conviction Score** | {score:.2%} |",
+            f"| **Debate Consensus** | {consensus_label} |",
             f"| **Timeframe** | {v.get('timeframe', '1-3 Months')} |",
             "",
             "### Trade Box",
@@ -1213,12 +1297,16 @@ def generate_top3_report(
 
         lines += ["---", ""]
 
+    position_summary = _build_position_summary(sizing_result)
+    if position_summary:
+        lines += [position_summary, "", "---", ""]
+
     # Footer: tabel ringkasan semua ticker
     lines += [
         "## Full Batch Summary",
         "",
-        "| Ticker | Rating | Confidence | R/R Ratio | Conviction Score | Status |",
-        "|---|---|---|---|---|---|",
+        "| Ticker | Rating | Confidence | R/R Ratio | Conviction Score | Consensus | Disagreement | Status |",
+        "|---|---|---|---|---|---|---|---|",
     ]
 
     # [FIX-7] Untuk ticker yang sudah masuk select_top3, skor sudah ada di entry.
@@ -1234,6 +1322,8 @@ def generate_top3_report(
         conf = v.get("confidence", 0) if v else 0
         rr = v.get("risk_reward_ratio", "N/A") if v else "N/A"
         cscore = entry.get("conviction_score", 0.0)
+        consensus = "YES" if entry.get("consensus_reached") else "NO"
+        disagreement = entry.get("disagreement_type") or "-"
 
         if entry.get("error"):
             status = "Error"
@@ -1245,7 +1335,10 @@ def generate_top3_report(
             status = "-"
 
         rr_str = f"{rr:.2f}" if isinstance(rr, (int, float)) and rr else "N/A"
-        lines.append(f"| {ticker} | {rating} | {conf:.0%} | {rr_str} | {cscore:.2%} | {status} |")
+        lines.append(
+            f"| {ticker} | {rating} | {conf:.0%} | {rr_str} | {cscore:.2%} "
+            f"| {consensus} | {disagreement} | {status} |"
+        )
 
     lines += [
         "",
@@ -1264,7 +1357,12 @@ def generate_top3_report(
 # Main entrypoint
 # ---------------------------------------------------------------------------
 
-async def main(*, dry_run: bool = False, output_dir: Path = OUTPUT_DIR) -> None:
+async def main(
+    *,
+    dry_run: bool = False,
+    output_dir: Path = OUTPUT_DIR,
+    user_config: dict | None = None,
+) -> None:
     """
     Pipeline penuh: Validate -> Regime -> Parse -> Debate -> Rank -> Report.
 
@@ -1280,6 +1378,8 @@ async def main(*, dry_run: bool = False, output_dir: Path = OUTPUT_DIR) -> None:
     logger.info("=" * 60)
 
     reset_budget()
+    if user_config is None:
+        user_config = _prompt_user_config()
 
     deps = check_all_dependencies(
         output_dir,
@@ -1346,12 +1446,14 @@ async def main(*, dry_run: bool = False, output_dir: Path = OUTPUT_DIR) -> None:
     # Step 3: Score + Rank + Diversify
     debate_records = load_debate_history(OUTPUT_DIR)
     top_n = select_top_n(results, debate_records=debate_records)
+    cio_candidates = _build_sizing_candidates(top_n)
+    sizing_result = calculate_positions(cio_candidates, user_config)
 
     # Step 4: Persist
     batch_timestamp = datetime.now(ZoneInfo(settings.DATETIME_TIMEZONE)).strftime("%Y%m%d_%H%M%S")
     save_full_results(results, FULL_RESULTS_PATH)
     save_individual_debates_versioned(results, timestamp=batch_timestamp, output_dir=OUTPUT_DIR)
-    generate_top3_report(top_n, results, TOP3_REPORT_PATH)
+    generate_top3_report(top_n, results, TOP3_REPORT_PATH, sizing_result=sizing_result)
 
     logger.info("=" * 60)
     logger.info("[Orchestrator] Pipeline selesai")

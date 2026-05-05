@@ -108,6 +108,10 @@ class ConsensusSchema(BaseModel):
         description="True only if BOTH agents overwhelmingly agree on the same direction "
                     "with no major unresolved fundamental objections."
     )
+    disagreement_type: Literal["direction", "timing", "valuation", "catalyst"] | None = Field(
+        default=None,
+        description="Primary disagreement type when consensus_reached is false.",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -127,8 +131,29 @@ PRIMARY MISSION — Calculate Fair Value:
      State the discount/premium as a percentage.
   3. SUPPORT METRICS: ROE trend (3yr), Net Margin trend (3yr), Debt/Equity, Dividend Yield.
   4. GROWTH CATALYST: One specific upcoming event (earnings, ex-dividend, contract) within 1-3 months.
+  5. QUALITY CHECK — Deteksi inkonsistensi laporan keuangan (wajib, bukan opsional):
+     Periksa kombinasi berikut yang sering terjadi di emiten Indonesia:
 
-RULES: Numbers ONLY. No vague statements. Rupiah prices must be explicit. Max 1200 tokens. Write 3-4 compact technical paragraphs — do NOT pad for length."""
+     • ROE tinggi (>15%) tapi Net Margin rendah (<5%):
+       → Kemungkinan ROE digelembungkan oleh leverage tinggi atau revaluasi aset.
+       → Flag: "⚠️ ROE-Margin Divergence — verifikasi kualitas laba"
+
+     • DER rendah (<0.3) tapi Interest Coverage Ratio juga rendah (<3x):
+       → Kemungkinan ada off-balance-sheet liability atau utang tersembunyi.
+       → Flag: "⚠️ Low DER tapi Interest Coverage lemah — cek catatan kaki laporan keuangan"
+
+     • Revenue growth positif tapi Operating Cash Flow negatif:
+       → Kemungkinan revenue recognition agresif atau piutang menumpuk.
+       → Flag: "⚠️ Revenue-CFO Divergence — laba mungkin tidak cash-backed"
+
+     • Altman Z-Score > 10 tapi DER > 1.0:
+       → Kemungkinan Z-Score inflated oleh market cap besar, bukan fundamental sehat.
+       → Flag: "⚠️ Z-Score vs DER Inconsistency — cross-check dengan interest coverage"
+
+     Jika tidak ada inkonsistensi ditemukan: tulis "✅ No red flags detected."
+     Jika data tidak tersedia untuk cek tertentu: skip cek tersebut, jangan fabrikasi.
+
+RULES: Numbers ONLY. No vague statements. Rupiah prices must be explicit. Max 2500 tokens. Write 3-4 compact technical paragraphs — do NOT pad for length."""
 
 CHARTIST_PROMPT = """\
 You are a Technical Chartist specializing in IHSG swing trade entry/exit timing (1-3 month frame).
@@ -137,9 +162,17 @@ CRITICAL: The PRE-COMPUTED TECHNICALS section below contains Python-calculated i
 These are GROUND TRUTH — reference them directly. Do NOT recalculate any indicator.
 
 PRIMARY MISSION — Interpret the Trade Setup using provided technical data:
-  1. TREND CONTEXT: Using the provided MA50 and MA200 values, describe the current trend.
-     State whether price is above/below these moving averages and what it means.
-  2. ENTRY ZONE: Using the provided SMA20 and MA50, identify the nearest confirmed support.
+  1. TREND CONTEXT:
+     Use the MA200 and ma200_context values available in PRE-COMPUTED TECHNICALS.
+     Your interpretation MUST follow this matrix — do not override it:
+     • ma200_context = "ABOVE"            → "Saham dalam uptrend struktural. Swing long searah tren."
+     • ma200_context = "BELOW"            → "Saham dalam downtrend struktural. Ini counter-trend bounce — target lebih konservatif, size 50%."
+     • ma200_context = "CROSSOVER_RECENT" → "Golden cross MA200 baru terjadi. Setup swing terkuat — konfirmasi dengan volume."
+     • ma200_context = "INSUFFICIENT_DATA"→ "Data MA200 tidak cukup. Gunakan EMA20 sebagai satu-satunya trend reference."
+     After the matrix interpretation, add one ticker-specific context sentence.
+  2. ENTRY ZONE: Use EMA20 (not SMA20) and MA50 from PRE-COMPUTED TECHNICALS as support boundaries.
+     If ma200_context = "BELOW", add this warning:
+     "⚠️ Counter-trend trade — kurangi ukuran posisi 50% dari normal."
      State as a range: "ENTRY ZONE: Rp X,XXX – Rp Y,YYY".
   3. TARGET PRICE: The nearest strong resistance level that would yield 3-10% gain from entry midpoint.
      State as: "TARGET: Rp Z,ZZZ (approx. X% from entry mid)".
@@ -149,10 +182,34 @@ PRIMARY MISSION — Interpret the Trade Setup using provided technical data:
   6. VOLUME SIGNAL: Is current volume confirming or denying the price move?
 
 RULES: All prices in Rupiah. Use the pre-computed numbers as your foundation — do not
-fabricate MA/RSI values. Max 1200 tokens. Write 3-4 compact technical paragraphs — do NOT pad for length."""
+fabricate MA/RSI values. Max 2500 tokens. Write 3-4 compact technical paragraphs — do NOT pad for length.
+Additional rules:
+- MA200 and ma200_context are Python GROUND TRUTH — do not recalculate or override them.
+- If ma200_context = "BELOW", the maximum target price is MA200 itself as first resistance.
+- Do not describe MA200 as support when ma200_context = "BELOW"."""
 
 SENTIMENT_PROMPT = """\
 You are a Sentiment Specialist monitoring Stockbit social signal data for IHSG swing trade timing.
+
+PRE-CHECK — Lakukan ini SEBELUM analisis apapun:
+
+Hitung jumlah post/entry dalam data sentiment yang diterima.
+
+Jika jumlah post < 5 ATAU data sentiment kosong/null:
+  Kembalikan HANYA JSON berikut dan BERHENTI — jangan lanjutkan analisis:
+  {
+    "sentiment": "INSUFFICIENT_DATA",
+    "confidence": 0,
+    "dominant_theme": null,
+    "volume_anomaly": null,
+    "swing_signal": null,
+    "red_flags": [],
+    "reason": "Data sosial tidak mencukupi (< 5 post)"
+  }
+  JANGAN fabrikasi sentiment. JANGAN lanjut ke analisis di bawah.
+
+Jika jumlah post >= 5, lanjutkan analisis normal di bawah ini.
+Kembalikan hasil dalam format JSON yang sama dengan field di atas.
 
 Analyze the raw stream/social JSON and extract:
   • Overall mood: BULLISH / NEUTRAL / BEARISH with a % confidence estimate
@@ -161,7 +218,7 @@ Analyze the raw stream/social JSON and extract:
   • Swing-trade timing signal: Is sentiment at EXTREME (contrarian opportunity) or trending with price?
   • Red flags: Any coordinated pump signals, insider-leak language, or panic patterns?
 
-RULES: Max 1200 tokens. Write 3-4 compact technical paragraphs. Be specific — note if sentiment is diverging from price action."""
+RULES: Max 2500 tokens. Write 3-4 compact technical paragraphs. Be specific — note if sentiment is diverging from price action."""
 
 # ── Phase 2 Debate Agents (Bull/Bear on Flash; Pro reserved for final CIO reasoning) ──────────
 
@@ -176,7 +233,7 @@ ROUND 1 OBJECTIVE — Build the Trade Thesis:
   3. CATALYST: Name ONE specific event within 1-3 months that will drive the price to target.
   4. RISK/REWARD: State explicitly: "Entry Rp X → Target Rp Y → Stop Rp Z → R/R ratio: N:1"
 
-RULES: Swing trade frame ONLY (1-3 months). No long-term narratives. Cite exact prices. Max 1000 tokens. Write 3-4 compact technical paragraphs."""
+RULES: Swing trade frame ONLY (1-3 months). No long-term narratives. Cite exact prices. Max 2500 tokens. Write 3-4 compact technical paragraphs."""
 
 BULL_SYSTEM_PROMPT_R2 = """\
 You are a Senior Equity Analyst in Cross-Examination mode — swing trade frame.
@@ -188,7 +245,7 @@ ROUND 2 OBJECTIVE — Defend Entry Timing Against the Bear:
   ✅ If the Bear challenged the catalyst, provide corroborating evidence or a fallback catalyst.
   ✅ Address whether the current price-to-fair-value gap is wide enough to absorb the Bear's risk scenario.
 
-RULES: No repeated data. Attack specific Bear arguments. Max 1000 tokens. Write 3-4 compact technical paragraphs."""
+RULES: No repeated data. Attack specific Bear arguments. Max 2500 tokens. Write 3-4 compact technical paragraphs."""
 
 BEAR_SYSTEM_PROMPT_R1 = """\
 You are a Forensic Financial Auditor building the strongest possible swing trade AVOID/SELL case.
@@ -203,7 +260,7 @@ ROUND 1 OBJECTIVE — Challenge the Trade Setup:
   4. UNFAVOURABLE R/R: If the stop-loss is close to entry but resistance is far away, state the
      actual R/R ratio and explain why it makes the trade unattractive.
 
-RULES: Cite exact prices to counter every Bull price level. Max 1000 tokens. Write 3-4 compact technical paragraphs."""
+RULES: Cite exact prices to counter every Bull price level. Max 2500 tokens. Write 3-4 compact technical paragraphs."""
 
 BEAR_SYSTEM_PROMPT_R2 = """\
 You are a Forensic Financial Auditor in Cross-Examination mode — swing trade frame.
@@ -220,7 +277,7 @@ ROUND 2 OBJECTIVE — Destroy the Bull's Swing Setup:
      margin of safety. If 2×ATR wipes out the margin of safety, the trade is unviable
      for swing execution — state this explicitly.
 
-RULES: No repeated data. Every counter-argument must cite a specific price. Max 1000 tokens. Write 3-4 compact technical paragraphs."""
+RULES: No repeated data. Every counter-argument must cite a specific price. Max 2500 tokens. Write 3-4 compact technical paragraphs."""
 
 # ── Adaptive nodes ───────────────────────────────────────────────────────────
 
@@ -232,10 +289,25 @@ Determine: do both agents overwhelmingly agree on the same investment direction
 Return true only if consensus is genuine and unambiguous. Return false if there is
 meaningful disagreement or if one side raised a critical unaddressed risk.
 
-Respond ONLY with valid JSON:
-{"consensus_reached": true}
-or
-{"consensus_reached": false}"""
+Respond ONLY with valid JSON in one of these two formats:
+
+If consensus IS reached (both agents agree on direction with no major unresolved objection):
+{"consensus_reached": true, "disagreement_type": null}
+
+If consensus is NOT reached, identify the PRIMARY source of disagreement:
+{"consensus_reached": false, "disagreement_type": "<type>"}
+
+Where <type> must be exactly one of:
+- "direction"  → Bull says BUY, Bear says AVOID (fundamental disagreement)
+- "timing"     → Both agree on direction but disagree on WHEN to enter
+- "valuation"  → Disagree on whether current price has margin of safety
+- "catalyst"   → Disagree on whether the catalyst will materialise in 1-3 months
+
+Rules:
+- If multiple disagreement types exist, pick the most dominant one.
+- "timing" is the most common in IHSG sideways market — use it when both agents
+  agree the stock is good but disagree on entry point or RSI readiness.
+- Do NOT return any text outside the JSON object."""
 
 STATE_CLEANER_PROMPT = """\
 You are a Context Pruner for a swing trade debate. Compress the history below into:
@@ -256,9 +328,26 @@ Challenge the trade setup with TWO specific questions:
    Example: "If this stock enters Ex-Date next month, or foreign funds accelerate dumping, 
    could the Rp 4,850 MA50 support break, triggering stops all the way to Rp 4,400?"
 
-2. EXECUTION RISK: Can the projected return (3-10%) survive IHSG transaction costs
-   (buy commission ~0.15%, sell commission ~0.25%, WHT on dividends 10%)?
-   If the net return after costs drops below 2%, flag it as insufficient.
+2. EXECUTION RISK — Transaction Cost Stress Test:
+   Hitung total biaya transaksi IHSG yang sebenarnya untuk posisi ini:
+
+   Komponen biaya (gunakan nilai entry price dari Trade Envelope):
+   • Beli  : 0.15% dari nilai posisi
+   • Jual  : 0.25% dari nilai posisi
+   • PPh final: 0.10% dari nilai jual (bukan dari profit)
+   • Slippage: estimasi 0.30% untuk saham dengan harga < Rp 500,
+               estimasi 0.15% untuk saham dengan harga >= Rp 500
+   • Total biaya round-trip: jumlahkan semua komponen di atas
+
+   Kemudian:
+   • Hitung net return setelah biaya: target_return% - total_biaya%
+   • Jika net return < 2.0%: flag sebagai "INSUFFICIENT NET RETURN — biaya transaksi
+     menggerus terlalu besar dari projected gain"
+   • Jika net return 2.0–3.0%: flag sebagai "MARGINAL — only proceed if conviction high"
+   • Jika net return > 3.0%: "VIABLE after transaction costs"
+
+   Format jawaban: satu paragraf dengan breakdown biaya eksplisit dan verdict akhir.
+   Sebutkan harga entry yang dipakai dalam kalkulasi.
 
 Format: Two direct questions, each under 60 words, each naming a specific price level."""
 
@@ -564,16 +653,40 @@ Current Date (Asia/Jakarta): {current_date}
 
                 # Pre-compute all technicals in Python (ground truth)
                 sma20_val = float(close.rolling(20).mean().iloc[-1])
+                ema20_val = float(close.ewm(span=20, adjust=False).mean().iloc[-1])
                 ma50_raw = close.rolling(50).mean().iloc[-1] if len(close) >= 50 else None
-                ma200_raw = close.rolling(200).mean().iloc[-1] if len(close) >= 200 else None
+                ma200_series = close.rolling(window=200, min_periods=50).mean()
+                ma200_raw = ma200_series.iloc[-1] if len(close) >= 50 else None
                 rsi_val = float(compute_rsi(close).iloc[-1])
                 atr_val = float(compute_atr(high, low, close).iloc[-1])
+                current_price = float(close.iloc[-1])
+
+                if ma200_raw is None or pd.isna(ma200_raw):
+                    ma200_context = "INSUFFICIENT_DATA"
+                else:
+                    ma200_value = float(ma200_raw)
+                    if current_price > ma200_value * 1.02:
+                        ma200_context = "ABOVE"
+                    elif current_price < ma200_value * 0.98:
+                        ma200_context = "BELOW"
+                    else:
+                        prev5 = close.iloc[-6:-1]
+                        if (
+                            len(prev5) == 5
+                            and float(prev5.mean()) < ma200_value
+                            and current_price > ma200_value
+                        ):
+                            ma200_context = "CROSSOVER_RECENT"
+                        else:
+                            ma200_context = "ABOVE" if current_price >= ma200_value else "BELOW"
 
                 tech_indicators = {
-                    "current_price": round(float(close.iloc[-1]), 0),
+                    "current_price": round(current_price, 0),
                     "sma20": round(sma20_val, 0),
+                    "ema20": round(ema20_val, 0),
                     "ma50": round(float(ma50_raw), 0) if ma50_raw is not None and not pd.isna(ma50_raw) else None,
                     "ma200": round(float(ma200_raw), 0) if ma200_raw is not None and not pd.isna(ma200_raw) else None,
+                    "ma200_context": ma200_context,
                     "rsi14": round(rsi_val, 1),
                     "atr14": round(atr_val, 0),
                     "avg_volume_20d": round(float(volume.tail(20).mean()), 0),
@@ -796,13 +909,23 @@ Current Date (Asia/Jakarta): {current_date}
             # Consensus evaluation is a reasoning step; use Pro to preserve judgment quality.
             resp = await self._invoke_llm(self.pro_llm, messages, inject_rules=False)
             parsed = json.loads(self._sanitize_json(str(resp.content)))
-            agreed = ConsensusSchema(**parsed).consensus_reached
+            consensus = ConsensusSchema(**parsed)
+            agreed = consensus.consensus_reached
+            disagreement_type = consensus.disagreement_type
         except Exception as e:
             logger.warning(f"[Consensus] Failed ({e}); defaulting to False")
             agreed = False
+            disagreement_type = "direction"
 
-        logger.info(f"[Consensus] Result: {agreed}")
-        return {"consensus_reached": agreed}
+        if agreed:
+            disagreement_type = None
+        elif disagreement_type is None:
+            disagreement_type = "direction"
+        logger.info(f"[Consensus] Result: {agreed} | disagreement_type={disagreement_type}")
+        return {
+            "consensus_reached": agreed,
+            "disagreement_type": disagreement_type,
+        }
 
     #: Regex matching IHSG price mentions in LLM output.  Handles Indonesian
     #: formatting (dot as thousand separator) and the occasional "Rp." with
@@ -1393,6 +1516,7 @@ Start your response with '{' and end with '}'. Nothing else."""
             "debate_history": [],
             "round_count": 0,
             "consensus_reached": False,
+            "disagreement_type": None,
             "devils_advocate_question": "",
             "final_verdict": "",
             "error": None,
