@@ -7,16 +7,85 @@ import pandas as pd
 from utils.exdate_scanner import ExDateInfo, format_exdate_block
 
 def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
+    def _float_or_none(row: pd.Series, key: str) -> float | None:
+        value = row.get(key)
+        if value is None or pd.isna(value):
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _format_signed_pct(row: pd.Series, key: str) -> str:
+        value = _float_or_none(row, key)
+        return "N/A" if value is None else f"{value:+.1f}%"
+
+    def _format_ema20(row: pd.Series) -> str:
+        ema20 = _float_or_none(row, "ema20")
+        price = _float_or_none(row, "Current Price")
+        if ema20 is None or price is None:
+            return "N/A"
+        icon = "✅" if price > ema20 else "⚠️"
+        return f"{icon} {ema20:,.2f}"
+
+    def _format_ema20_signal(row: pd.Series) -> str:
+        ema20 = _float_or_none(row, "ema20")
+        price = _float_or_none(row, "Current Price")
+        if ema20 is None or price is None:
+            return "N/A"
+        return "✅ Uptrend" if price > ema20 else "⚠️ Weak"
+
+    def _format_vol_surge(row: pd.Series) -> str:
+        ratio = _float_or_none(row, "vol_surge_ratio")
+        if ratio is None:
+            return "N/A"
+        if ratio >= 2.0:
+            icon = "🔥"
+        elif ratio >= 1.5:
+            icon = "📈"
+        elif ratio >= 1.1:
+            icon = "➡️"
+        else:
+            icon = "😴"
+        return f"{icon} {ratio:.2f}x"
+
+    def _format_price_mom(row: pd.Series) -> str:
+        value = _float_or_none(row, "price_return_1m")
+        if value is None:
+            return "N/A"
+        if value >= 10:
+            icon = "🚀"
+        elif value >= 5:
+            icon = "📈"
+        elif value >= 0:
+            icon = "➡️"
+        else:
+            icon = "🔻"
+        return f"{icon} {value:+.1f}%"
+
+    def _format_rs_vs_ihsg(row: pd.Series) -> str:
+        value = _float_or_none(row, "rs_vs_ihsg_1m")
+        if value is None:
+            return "N/A"
+        if value >= 5:
+            icon = "💪"
+        elif value >= 0:
+            icon = "✅"
+        else:
+            icon = "⚠️"
+        return f"{icon} {value:+.1f}%"
+
     lines = []
     lines.append(f"# 🏆 Top {cfg['top_n']} High-Conviction IHSG Swing Candidates")
     lines.append(f"*Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
     lines.append("*Engine: v3.1 — Absolute scoring | Asymmetric RSI | Piotroski integrated | Bank-aware valuation*")
+    lines.append(f"**Filter Version:** {cfg.get('version', 'v3.2')} — Swing Trade Optimized")
     lines.append("")
     lines.append(
         "| Rank | Ticker | Sektor | Harga | Stop Loss | Graham Fair Value "
-        "| Score | Gap | RSI | PBV | F-Score | Entry Note |"
+        "| Score | Gap | RSI (14) | Price Mom 1M | RS vs IHSG | PBV | F-Score | Entry Note |"
     )
-    lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|")
+    lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
 
     for i, (_, r) in enumerate(final_df.iterrows(), 1):
         fv_str = (
@@ -39,12 +108,32 @@ def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
             f"| **{r['Composite Score']:.1f}/100** "
             f"| +{r['Valuation Gap (%)']:.1f}% "
             f"| {r['RSI (14)']:.1f} "
+            f"| {_format_signed_pct(r, 'price_return_1m')} "
+            f"| {_format_signed_pct(r, 'rs_vs_ihsg_1m')} "
             f"| {r['PBV']:.1f}× ({r['PBV vs Sektor']}) "
             f"| {piotroski_icon} {r.get('Piotroski F-Score', 'N/A')}/9 "
             f"| {r['Entry Strategy']}{ex_src} |"
         )
 
     lines.append("")
+    v32_cols = {"price_return_1m", "rs_vs_ihsg_1m", "vol_surge_ratio", "ema20"}
+    if not final_df.empty and v32_cols.issubset(final_df.columns):
+        lines.append("## 📊 Momentum Snapshot (Sort: Price Mom 1M)")
+        lines.append("")
+        lines.append("| # | Ticker | Price Mom 1M | RS vs IHSG | Vol Surge | EMA20 Signal |")
+        lines.append("|---|--------|-------------|------------|-----------|--------------|")
+        momentum_df = final_df.sort_values("price_return_1m", ascending=False)
+        for i, (_, mr) in enumerate(momentum_df.iterrows(), 1):
+            lines.append(
+                f"| {i} "
+                f"| {mr['Ticker']} "
+                f"| {_format_signed_pct(mr, 'price_return_1m')} "
+                f"| {_format_signed_pct(mr, 'rs_vs_ihsg_1m')} "
+                f"| {_format_vol_surge(mr)} "
+                f"| {_format_ema20_signal(mr)} |"
+            )
+        lines.append("")
+
     lines.append("---")
     lines.append("> ⚠️ = Mendekati ex-date dividen. F-Score: 🟢 ≥7 / 🟡 4–6 / 🔴 <4")
     lines.append("")
@@ -85,6 +174,12 @@ def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
         lines.append(
             f"- **Momentum**: Harga Rp {top1['Current Price']:,.0f} di atas "
             f"SMA-20 (Rp {top1['SMA 20']:,.0f}). {top1['Entry Strategy']}."
+        )
+        lines.append(
+            f"- **Teknikal:** EMA20 `{_format_ema20(top1)}` | "
+            f"Vol Surge `{_format_vol_surge(top1)}` | "
+            f"Mom 1M `{_format_price_mom(top1)}` | "
+            f"RS vs IHSG `{_format_rs_vs_ihsg(top1)}`"
         )
         lines.append(
             f"- **Profitabilitas**: ROE {top1['ROE (TTM)']*100:.1f}% | "

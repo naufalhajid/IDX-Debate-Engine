@@ -80,7 +80,7 @@ class Settings(BaseSettings):
     # ── Orchestrator Configuration ────────────────────────────────────────────────
     # CANDIDATES_MAX_AGE_HOURS: max umur top10_candidates.json sebelum dianggap stale
     # CANDIDATES_AUTO_RERUN: jika True, jalankan run_quant_filter.py otomatis
-    CANDIDATES_MAX_AGE_HOURS: float = 72.0
+    CANDIDATES_MAX_AGE_HOURS: float = 48.0
     CANDIDATES_AUTO_RERUN: bool = True
 
     # ── Market Regime (IHSG ^JKSE realized volatility proxy) ─────────────────

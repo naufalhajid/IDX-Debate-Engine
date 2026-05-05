@@ -32,6 +32,7 @@ def _find_latest_xlsx(output_dir: str = "output") -> str:
 # ══════════════════════════════════════════════════════════════════════════════
 
 CONFIG = {
+    # v3.2 — swing trade optimized
     # ── Path
     # input_file = None → auto-detect xlsx terbaru di output_dir saat runtime
     "input_file":        None,
@@ -48,6 +49,10 @@ CONFIG = {
     "min_piotroski":          4,          # [NEW v3.0] Piotroski F-Score minimum
     "min_altman_z":           1.1,        # [NEW v3.0] Altman Z > 1.1 (bukan distress zone)
     "exclude_pemantauan":     True,       # [NEW v3.0] Exclude PEMANTAUAN KHUSUS
+    # Trend Filter — harga harus di atas EMA20 saat entry
+    "min_price_vs_ema20":     1.0,        # price >= EMA20 (1.0 = tepat di EMA20, boleh set 0.98 untuk toleransi)
+    # Relative Strength vs IHSG
+    "min_rs_vs_ihsg_1m":      0.0,        # return 1 bulan saham >= return IHSG 1 bulan (outperform atau minimal setara)
 
     # ── Graham Number (IHSG-calibrated)
     "graham_k":               18.2,
@@ -55,36 +60,41 @@ CONFIG = {
     "graham_bull_eps":        1.15,
 
     # ── yfinance (HANYA untuk teknikal OHLCV)
-    "yf_period":              "60d",
+    "yf_period":              "120d",
     "yf_retries":             3,
     "yf_retry_delay":         5,
 
     # ── Liquidity Gate
     "min_adt_20d":            5_000_000_000,
-    "min_bars":               20,
+      "min_bars":               60,
 
     # ── Volume Filter
-    "vol_confirmation_ratio": 0.80,
+    # Volume Surge Scoring Tiers (masuk ke scoring, bukan sekadar gate)
+    "vol_surge_tier1":        2.0,        # volume >= 2x rata-rata 20d -> 100% weight_momentum_vol
+    "vol_surge_tier2":        1.5,        # volume 1.5–2x          -> 70%
+    "vol_surge_tier3":        1.1,        # volume 1.1–1.5x        -> 40%
+                                             # volume <1.1x           -> 10%
 
     # ── Suspended/FCA Heuristic
     "max_zero_vol_days":      3,
 
     # ── RSI Scoring
-    "rsi_hard_reject":        75,
+    "rsi_hard_reject":        80,
     "rsi_accum_lo":           45,
     "rsi_accum_hi":           55,
     "rsi_strong_hi":          70,
 
     # ── Stop Loss
     "stop_atr_from_sma20":    1.0,
-    "stop_atr_from_price":    2.0,
-    "stop_hard_floor_pct":    0.92,
+    "stop_atr_from_price":    2.5,
+    "stop_hard_floor_pct":    0.88,
 
     # ── Score Weights (total = 100)
-    "weight_valuation":       40,
-    "weight_profitability":   20,
-    "weight_momentum_rsi":    20,
-    "weight_momentum_vol":    20,
+    "weight_valuation":       20,
+    "weight_profitability":   10,
+    "weight_momentum_rsi":    25,
+    "weight_momentum_vol":    25,
+    "weight_price_momentum":  20,
 
     # ── Absolute Valuation Scoring Thresholds (v3.1)
     # Val_Score dihitung absolut: gap tiered, bukan rank relatif.
@@ -108,10 +118,18 @@ CONFIG = {
     # Akumulasi (45-55) -> 100% (sweet spot entry swing)
     # Uptrend (55-70)   -> 80%  (momentum kuat, masih oke)
     # Overbought (>70)  -> 20%  (hard-reject sudah >75, tapi 70-75 tetap lemah)
-    "rsi_weight_oversold":    0.60,
+    "rsi_weight_oversold":    0.40,
     "rsi_weight_accum":       1.00,
     "rsi_weight_uptrend":     0.80,
-    "rsi_weight_overbought":  0.20,
+    "rsi_weight_overbought":  0.30,
+
+    # ── Price Momentum Scoring (v3.2 — swing trade alignment)
+    # Return 1 bulan saham vs IHSG sebagai proxy demand institusional
+    "price_mom_period_days":  22,         # ~1 bulan trading
+    "price_mom_tier1":        0.10,       # return >= +10% dalam 1 bulan -> 100% weight_price_momentum
+    "price_mom_tier2":        0.05,       # return +5% s/d +10%         -> 70%
+    "price_mom_tier3":        0.00,       # return flat s/d +5%         -> 40%
+                                             # return negatif              -> 0% (hard zero, bukan reject)
 
     # ── Piotroski Score Adjustment (v3.1 — integrasi ke composite score)
     # F-Score >=7 (strong) -> bonus; F-Score <=5 (marginal) -> penalty
@@ -122,7 +140,7 @@ CONFIG = {
 
     # ── Penalties & Bonuses
     "over_extended_penalty":  -15,
-    "fresh_breakout_bonus":   +10,
+    "fresh_breakout_bonus":   +15,
 
     # ── Output
     "top_n": 10,

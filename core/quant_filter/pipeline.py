@@ -255,6 +255,7 @@ def _analyze_ticker(
     df_t: pd.DataFrame,
     cfg: dict,
     logger: logging.Logger,
+    ihsg_return_1m: float = 0.0,
     adapter: "XlsxDataAdapter | None" = None,
 ) -> dict | None:
     """
@@ -279,6 +280,26 @@ def _analyze_ticker(
         return None
 
     current_px: float = float(close.iloc[-1])
+    price_mom_period = int(cfg.get("price_mom_period_days", 22))
+
+    # Trend Filter: EMA20 is more responsive for swing entries than SMA50.
+    ema20 = close.ewm(span=20, adjust=False).mean()
+    if pd.isna(ema20.iloc[-1]):
+        return None
+    ema20_latest: float = float(ema20.iloc[-1])
+    min_price_vs_ema20 = cfg.get("min_price_vs_ema20", cfg.get("min_price_vs_sma50", 1.0))
+    if current_px < ema20_latest * min_price_vs_ema20:
+        logger.debug(f"[{t}] Price below EMA20 trend filter, skip")
+        return None
+
+    # Relative Strength vs IHSG: reject candidates underperforming the index.
+    if len(close) <= price_mom_period:
+        return None
+    price_return_1m: float = float((current_px / float(close.iloc[-price_mom_period - 1])) - 1)
+    rs_vs_ihsg: float = price_return_1m - ihsg_return_1m
+    if rs_vs_ihsg < cfg["min_rs_vs_ihsg_1m"]:
+        logger.debug(f"[{t}] RS vs IHSG {rs_vs_ihsg:.2%} < threshold, skip")
+        return None
 
     # ── ExDate — xlsx primary, yfinance fallback ──────────────────────────────
     exdate_info: ExDateInfo = _resolve_exdate(t, row, current_px, adapter)
@@ -307,8 +328,6 @@ def _analyze_ticker(
         return None
     sma20_latest: float = float(sma20.iloc[-1])
 
-    if current_px <= sma20_latest:
-        return None  # Harga di bawah SMA20 = downtrend, skip
 
     # ── ATR (14) ──────────────────────────────────────────────────────────────
     atr_series = compute_atr(high, low, close)
@@ -324,15 +343,10 @@ def _analyze_ticker(
 
     # ── Volume Confirmation ───────────────────────────────────────────────────
     vol_20d_avg: float = float(vol.tail(20).mean())
-    vol_3d_avg:  float = float(vol.tail(3).mean())
-    if vol_3d_avg <= vol_20d_avg * cfg["vol_confirmation_ratio"]:
-        return None
-
-    # curr_vol dipakai untuk momentum scoring (dibandingkan vol_20d_avg)
     curr_vol: float = float(vol.iloc[-1])
+    vol_surge_ratio: float = curr_vol / vol_20d_avg if vol_20d_avg > 0 else 0.0
 
     # ── Momentum Score ────────────────────────────────────────────────────────
-    mom_score: float = 0.0
     mom_note:  list[str] = []
 
     # [v3.1 FIX] RSI scoring asimetris — swing-trade aware.
@@ -340,33 +354,54 @@ def _analyze_ticker(
     # karena ada potensi reversal. Sebelumnya keduanya dapat skor yang sama (x0.25).
     rsi_w = cfg["weight_momentum_rsi"]
     if cfg["rsi_accum_lo"] <= rsi_latest <= cfg["rsi_accum_hi"]:
-        mom_score += rsi_w * cfg["rsi_weight_accum"]
+        momentum_rsi_score = rsi_w * cfg["rsi_weight_accum"]
         mom_note.append(f"RSI Akumulasi ({rsi_latest:.1f})")
     elif cfg["rsi_accum_hi"] < rsi_latest <= cfg["rsi_strong_hi"]:
-        mom_score += rsi_w * cfg["rsi_weight_uptrend"]
+        momentum_rsi_score = rsi_w * cfg["rsi_weight_uptrend"]
         mom_note.append(f"RSI Uptrend Kuat ({rsi_latest:.1f})")
     elif rsi_latest > cfg["rsi_strong_hi"]:
         # Overbought (70-75 range — di atas 75 sudah hard-reject)
-        mom_score += rsi_w * cfg["rsi_weight_overbought"]
+        momentum_rsi_score = rsi_w * cfg["rsi_weight_overbought"]
         mom_note.append(f"RSI Overbought ({rsi_latest:.1f})")
     else:
         # RSI < rsi_accum_lo (< 45) — zona oversold, potensi reversal
-        mom_score += rsi_w * cfg["rsi_weight_oversold"]
+        momentum_rsi_score = rsi_w * cfg["rsi_weight_oversold"]
         mom_note.append(f"RSI Oversold ({rsi_latest:.1f})")
 
     # [v3.1 FIX] Volume benchmark berubah dari vol_5d_avg ke vol_20d_avg.
     # vol_5d_avg terlalu pendek — mudah terdistorsi oleh 1-2 hari spike volume,
     # dan tidak konsisten dengan liquidity gate (ADT 20d) dan vol_20d_avg
     # yang sudah dihitung di atas untuk volume confirmation.
-    if curr_vol > vol_20d_avg:
-        mom_score += cfg["weight_momentum_vol"]
-        mom_note.append("Volume Breakout")
+    if vol_surge_ratio >= cfg["vol_surge_tier1"]:
+        vol_score = 1.00
+    elif vol_surge_ratio >= cfg["vol_surge_tier2"]:
+        vol_score = 0.70
+    elif vol_surge_ratio >= cfg["vol_surge_tier3"]:
+        vol_score = 0.40
     else:
-        mom_score += cfg["weight_momentum_vol"] * 0.5
-        mom_note.append("Volume Normal")
+        vol_score = 0.10
+    momentum_vol_score: float = vol_score * cfg["weight_momentum_vol"]
+    mom_note.append(f"Volume Surge {vol_surge_ratio:.2f}x")
+
+    if price_return_1m >= cfg["price_mom_tier1"]:
+        price_mom_score = 1.00
+    elif price_return_1m >= cfg["price_mom_tier2"]:
+        price_mom_score = 0.70
+    elif price_return_1m >= cfg["price_mom_tier3"]:
+        price_mom_score = 0.40
+    else:
+        price_mom_score = 0.00
+    price_momentum_score: float = price_mom_score * cfg["weight_price_momentum"]
+    mom_note.append(f"Price Mom {price_return_1m*100:.1f}%")
 
     # ── Composite Score + SMA20 Distance Adjustments ─────────────────────────
-    total_score: float = row["Val_Score"] + row["Prof_Score"] + mom_score
+    total_score: float = (
+        row["Val_Score"] +
+        row["Prof_Score"] +
+        momentum_rsi_score +
+        momentum_vol_score +
+        price_momentum_score
+    )
     dist_to_sma20_pct: float = (current_px - sma20_latest) / sma20_latest
 
     if dist_to_sma20_pct > 0.10:
@@ -434,6 +469,7 @@ def _analyze_ticker(
         "Price to Equity Discount": row.get("Price to Equity Discount (%)", 0),
         "RSI (14)":                  rsi_latest,
         "SMA 20":                    sma20_latest,
+        "ema20":                     round(ema20_latest, 2),
         "ATR (14)":                  atr_14,
         "ROE (TTM)":                 row["Return on Equity (TTM)"],
         "DER (Quarter)":             row["Debt to Equity Ratio (Quarter)"],
@@ -442,6 +478,10 @@ def _analyze_ticker(
         "PBV Sektor Percentile":     round(row["PBV_Sector_Pctile"] * 100, 1),
         "ADT 20d (Rp)":              adt_20,
         "Composite Score":           total_score,
+        "price_return_1m":           round(price_return_1m * 100, 2),
+        "rs_vs_ihsg_1m":             round(rs_vs_ihsg * 100, 2),
+        "vol_surge_ratio":           round(vol_surge_ratio, 2),
+        "price_momentum_score":      round(price_momentum_score, 2),
         "Entry Strategy":            " | ".join(mom_note),
         "Piotroski F-Score":         int(piotroski) if piotroski else 0,
         "Altman Z-Score":            float(altman_z) if altman_z else 0.0,
@@ -462,7 +502,7 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
     os.makedirs(cfg["scratch_dir"], exist_ok=True)
 
     logger.info("=" * 60)
-    logger.info("IHSG Quantitative Swing-Trade Scouting Engine v3.0")
+    logger.info("IHSG Quantitative Swing-Trade Scouting Engine v3.2")
     logger.info("=" * 60)
 
     # ── Resolve input_file — auto-detect jika None ────────────────────────────
@@ -642,6 +682,40 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         logger=logger,
     )
 
+    ihsg_return_1m: float = 0.0
+    try:
+        ihsg_data = yf.download(
+            "^JKSE",
+            period=cfg["yf_period"],
+            progress=False,
+            auto_adjust=True,
+        )
+        if ihsg_data.empty:
+            raise ValueError("yfinance mengembalikan data IHSG kosong.")
+
+        if isinstance(ihsg_data.columns, pd.MultiIndex):
+            if "Close" in ihsg_data.columns.get_level_values(0):
+                ihsg_close = ihsg_data["Close"].squeeze()
+            elif "Close" in ihsg_data.columns.get_level_values(-1):
+                ihsg_close = ihsg_data.xs("Close", axis=1, level=-1).squeeze()
+            else:
+                raise KeyError("Kolom Close IHSG tidak ditemukan.")
+        else:
+            ihsg_close = ihsg_data["Close"].squeeze()
+
+        ihsg_close = ihsg_close.dropna()
+        price_mom_period = int(cfg.get("price_mom_period_days", 22))
+        if len(ihsg_close) <= price_mom_period:
+            raise ValueError("Data IHSG tidak cukup untuk return 1 bulan.")
+
+        ihsg_return_1m = float(
+            (float(ihsg_close.iloc[-1]) / float(ihsg_close.iloc[-price_mom_period - 1])) - 1
+        )
+        logger.info(f"IHSG return 1 bulan: {ihsg_return_1m:.2%}")
+    except Exception as e:
+        logger.warning(f"Gagal ambil return IHSG 1 bulan, fallback 0.0: {e}")
+        ihsg_return_1m = 0.0
+
     results = []
     for _, row in filtered.iterrows():
         t_yf = row["Ticker"] + ".JK"
@@ -650,7 +724,14 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         df_t = data[t_yf].dropna(how="all")
         if len(df_t) < cfg["min_bars"]:
             continue
-        result = _analyze_ticker(row, df_t, cfg, logger, adapter=adapter)
+        result = _analyze_ticker(
+            row,
+            df_t,
+            cfg,
+            logger,
+            ihsg_return_1m=ihsg_return_1m,
+            adapter=adapter,
+        )
         if result:
             results.append(result)
 
