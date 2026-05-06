@@ -1512,8 +1512,23 @@ async def main(
     # Step 3: Score + Rank + Diversify
     debate_records = load_debate_history(OUTPUT_DIR)
     top_n = select_top_n(results, debate_records=debate_records)
-    cio_candidates = _build_sizing_candidates(top_n)
-    sizing_result = calculate_positions(cio_candidates, user_config)
+    sizing_candidates = _build_sizing_candidates(top_n)
+    logger.debug(f"[Sizing DEBUG] user_config masuk: {user_config}")
+    logger.debug(f"[Sizing DEBUG] jumlah candidates: {len(sizing_candidates)}")
+    for c in sizing_candidates:
+        logger.debug(
+            f"[Sizing DEBUG] {c.get('ticker')} | "
+            f"price={c.get('current_price')} | "
+            f"stop={c.get('stop_loss')} | "
+            f"rating={c.get('rating')} | "
+            f"confidence={c.get('confidence')}"
+        )
+    sizing_result = calculate_positions(sizing_candidates, user_config)
+    logger.info(
+        f"[Sizing] {sizing_result['summary']['total_positions']} posisi | "
+        f"Deployed: Rp {sizing_result['summary']['total_deployed']:,.0f} "
+        f"({sizing_result['summary']['deployed_pct'] * 100:.1f}%)"
+    )
 
     # Step 4: Persist
     batch_timestamp = datetime.now(ZoneInfo(settings.DATETIME_TIMEZONE)).strftime("%Y%m%d_%H%M%S")

@@ -176,8 +176,8 @@ PRIMARY MISSION — Interpret the Trade Setup using provided technical data:
      State as a range: "ENTRY ZONE: Rp X,XXX – Rp Y,YYY".
   3. TARGET PRICE: The nearest strong resistance level that would yield 3-10% gain from entry midpoint.
      State as: "TARGET: Rp Z,ZZZ (approx. X% from entry mid)".
-  4. STOP-LOSS: Reference the ATR(14) value provided. A stop at 1.5× ATR below SMA20 is standard.
-     State as: "STOP LOSS: Rp W,WWW (1.5× ATR below SMA20)".
+  4. STOP-LOSS: Reference the ATR(14) value provided. A stop at 1.5× ATR below EMA20 is standard.
+     State as: "STOP LOSS: Rp W,WWW (1.5× ATR below EMA20)".
   5. RSI INTERPRETATION: Using the provided RSI(14) value, assess momentum state.
   6. VOLUME SIGNAL: Is current volume confirming or denying the price move?
 
@@ -209,7 +209,9 @@ Jika jumlah post < 5 ATAU data sentiment kosong/null:
   JANGAN fabrikasi sentiment. JANGAN lanjut ke analisis di bawah.
 
 Jika jumlah post >= 5, lanjutkan analisis normal di bawah ini.
-Kembalikan hasil dalam format JSON yang sama dengan field di atas.
+Kembalikan hasil dalam format JSON yang sama dengan field di atas —
+semua field harus terisi. JANGAN kembalikan paragraf prosa.
+Output harus selalu JSON, baik untuk path insufficient maupun sufficient.
 
 Analyze the raw stream/social JSON and extract:
   • Overall mood: BULLISH / NEUTRAL / BEARISH with a % confidence estimate
@@ -349,7 +351,11 @@ Challenge the trade setup with TWO specific questions:
    Format jawaban: satu paragraf dengan breakdown biaya eksplisit dan verdict akhir.
    Sebutkan harga entry yang dipakai dalam kalkulasi.
 
-Format: Two direct questions, each under 60 words, each naming a specific price level."""
+Format:
+- Question 1: satu pertanyaan singkat (<60 kata) dengan satu harga spesifik.
+- Question 2: satu paragraf kalkulasi biaya eksplisit dengan verdict akhir
+  (INSUFFICIENT NET RETURN / MARGINAL / VIABLE). Tidak ada batasan kata untuk question 2.
+  Setiap harga yang dipakai dalam kalkulasi harus disebutkan eksplisit."""
 
 # ── CIO Judge — Swing Trade Edition (Phase 4) ───────────────────────────────
 
@@ -401,6 +407,11 @@ STEP 2 — TRADE ENVELOPE VALIDATION:
 
 STEP 3 — CONFLICT RESOLUTION (MANDATORY):
   Read the CONFLICT RESOLUTION signal provided. Apply this strict matrix:
+  Catatan urutan: Selesaikan STEP 1-4 untuk menentukan rating terlebih dahulu.
+  Kalkulasi confidence (Step A, B, C) dilakukan setelah rating ditentukan,
+  di section CONFIDENCE CALIBRATION di bawah STEP 4.
+  Step 3 ini hanya menentukan adjustment yang akan diterapkan di Step B nanti.
+
   • Fundamental ✅ + Technical ✅  → BUY; choose final confidence using the calibration rubric, caps, and Devil's Advocate penalty.
   • Fundamental ✅ + Technical ❌  → HOLD ("Wait for technical confirmation")
   • Fundamental ❌ + Technical ✅  → If strongly positive Foreign Flow / Momentum with Volume breakout, Lean BUY (Momentum Play, size 50%). Otherwise, HOLD.
@@ -456,7 +467,6 @@ STEP B — Pilih angka spesifik dalam band menggunakan checklist ini.
   [+0.02] Volume surge >= 2x rata-rata mengkonfirmasi price action
   [+0.02] Sentiment BULLISH dengan confidence >= 0.7
   [+0.01] Piotroski F-Score >= 7
-  [-0.02] Consensus debate = NO (direction) — Bull Bear tidak sepakat arah
   [-0.02] Devil's Advocate risk tidak terjawab dengan evidence spesifik
   [-0.02] ma200_context = BELOW (counter-trend trade)
   [-0.01] Sentiment INSUFFICIENT_DATA

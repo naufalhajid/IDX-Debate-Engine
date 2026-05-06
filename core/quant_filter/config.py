@@ -75,6 +75,8 @@ CONFIG = {
     "graham_k":               18.2,
     "graham_bear_eps":        0.85,
     "graham_bull_eps":        1.15,
+    # ── Graham FV Sanity Cap
+    "graham_fv_cap_multiplier": 5.0,      # FV maksimal 5x current price
 
     # ── yfinance (HANYA untuk teknikal OHLCV)
     "yf_period":              "120d",

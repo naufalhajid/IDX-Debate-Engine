@@ -5,6 +5,8 @@ from __future__ import annotations
 from math import floor
 from typing import Any
 
+from utils.logger_config import logger
+
 
 LOT_SIZE = 100
 BUY_COMMISSION = 0.0015
@@ -66,6 +68,9 @@ def _recompute_position(position: dict, total_capital: float) -> None:
 
 def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
     """Calculate lot-sized IHSG positions from CIO verdict candidates."""
+    assert user_config["total_capital"] > 0, "total_capital tidak valid"
+    assert 0 < user_config["max_loss_pct"] <= 0.10, "max_loss_pct tidak valid"
+
     total_capital = _to_float(user_config.get("total_capital"))
     max_loss_pct = _to_float(user_config.get("max_loss_pct"))
     max_positions = _to_int(user_config.get("max_positions"))
@@ -141,17 +146,26 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
     total_deployed = sum(p["position_value"] for p in positions)
     total_cost_est = sum(p["total_cost_est"] for p in positions)
     remaining_cash = total_capital - total_deployed
+    summary = {
+        "total_capital": total_capital,
+        "total_deployed": total_deployed,
+        "remaining_cash": remaining_cash,
+        "deployed_pct": total_deployed / total_capital if total_capital > 0 else 0.0,
+        "total_positions": len(positions),
+        "total_cost_est": total_cost_est,
+    }
+
+    if summary["total_deployed"] > user_config["total_capital"]:
+        logger.error(
+            f"[Sizing] BUG: total_deployed {summary['total_deployed']:,.0f} "
+            f"> total_capital {user_config['total_capital']:,.0f}. "
+            f"Portfolio guard gagal."
+        )
+        raise ValueError("Position sizing menghasilkan deployed > capital. Cek lot calculation.")
 
     return {
         "positions": positions,
-        "summary": {
-            "total_capital": total_capital,
-            "total_deployed": total_deployed,
-            "remaining_cash": remaining_cash,
-            "deployed_pct": total_deployed / total_capital if total_capital > 0 else 0.0,
-            "total_positions": len(positions),
-            "total_cost_est": total_cost_est,
-        },
+        "summary": summary,
     }
 
 

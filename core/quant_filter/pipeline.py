@@ -502,6 +502,7 @@ def _analyze_ticker(
         "Est. Fair Value (Graham)":  row["Graham_Number"],
         "Graham_Bear":               row["Graham_Bear"],
         "Graham_Bull":               row["Graham_Bull"],
+        "graham_fv_capped":          bool(row.get("graham_fv_capped", False)),
         "Valuation Gap (%)":         row["Valuation_Gap_Pct"],
         "Price to Equity Discount": row.get("Price to Equity Discount (%)", 0),
         "RSI (14)":                  rsi_latest,
@@ -653,6 +654,28 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
     filtered["Graham_Number"] = np.where(valid_graham, np.sqrt(k * eps * bvps), 0)
     filtered["Graham_Bear"]   = np.where(valid_graham, np.sqrt(k * eps * cfg["graham_bear_eps"] * bvps), 0)
     filtered["Graham_Bull"]   = np.where(valid_graham, np.sqrt(k * eps * cfg["graham_bull_eps"] * bvps), 0)
+
+    # Graham FV Sanity Cap: prevent extreme EPS/BVPS outliers from dominating ranking.
+    fv_cap = filtered["Close Price"] * cfg["graham_fv_cap_multiplier"]
+    filtered["graham_fv_capped"] = filtered["Graham_Number"] > fv_cap
+    capped_rows = filtered[filtered["graham_fv_capped"]]
+    for _, capped_row in capped_rows.iterrows():
+        logger.warning(
+            f"[Graham] {capped_row['Ticker']}: FV={capped_row['Graham_Number']:,.0f} > "
+            f"{cfg['graham_fv_cap_multiplier']}x "
+            f"price={capped_row['Close Price']:,.0f}. Capped ke "
+            f"{capped_row['Close Price'] * cfg['graham_fv_cap_multiplier']:,.0f}."
+        )
+
+    filtered["Graham_Number"] = np.where(
+        filtered["graham_fv_capped"], fv_cap, filtered["Graham_Number"]
+    )
+    filtered["Graham_Bear"] = np.where(
+        filtered["graham_fv_capped"], fv_cap * cfg["graham_bear_eps"], filtered["Graham_Bear"]
+    )
+    filtered["Graham_Bull"] = np.where(
+        filtered["graham_fv_capped"], fv_cap * cfg["graham_bull_eps"], filtered["Graham_Bull"]
+    )
 
     filtered["Valuation_Gap_Pct"] = (
         (filtered["Graham_Number"] - filtered["Close Price"]) / filtered["Close Price"] * 100
