@@ -362,6 +362,33 @@ IMPORTANT: The TRADE ENVELOPE below was calculated by Python using real market d
 You MUST use the provided entry, target, and stop-loss prices VERBATIM.
 Do NOT invent or override these price levels. Your job is to APPROVE or REJECT the plan.
 
+STEP 0 — PRE-CHECK DISQUALIFIERS (jalankan SEBELUM semua step lain):
+
+Cek field "ExDate Risk" dan "ExDate Date" dari Trade Envelope.
+
+Hitung selisih hari antara tanggal analisis dan ExDate:
+
+• Jika ExDate <= 7 hari dari sekarang:
+  → WAJIB rating AVOID, confidence 0.10
+  → weighted_reasoning harus dimulai dengan:
+    "AUTO-DISQUALIFIED: Ex-dividend date dalam X hari (ExDate: [tanggal]).
+     Entry baru tidak disarankan — risiko price drop dividen langsung
+     mengancam stop loss sebelum trade sempat berkembang."
+  → STOP — jangan lanjutkan ke STEP 1 dst.
+
+• Jika ExDate 8-14 hari dari sekarang:
+  → Lanjutkan analisis normal, tapi:
+  → Tambahkan ke weighted_reasoning:
+    "⚠️ ExDate Warning: Ex-dividend dalam X hari.
+     Kurangi position size 50% dan set target lebih konservatif."
+  → Confidence di-cap maksimal 0.65 untuk rating BUY apapun.
+
+• Jika ExDate > 14 hari atau ExDate Risk = "CLEAR":
+  → Lanjutkan analisis normal, tidak ada adjustment.
+
+Catatan: Jika ExDate Date tidak tersedia atau null,
+asumsikan CLEAR dan lanjutkan normal.
+
 STEP 1 — FAIR VALUE:
   Read the fair value from the Trade Envelope. It is pre-calculated by Python.
   If current price is ABOVE fair value, you MUST flag this in weighted_reasoning and
@@ -380,43 +407,90 @@ STEP 3 — CONFLICT RESOLUTION (MANDATORY):
   • Fundamental ❌ + Technical ❌  → AVOID
   • Any ✅ + Sentiment EXTREME    → Lower confidence by 0.10 (contrarian caution)
 
+  CONSENSUS DISAGREEMENT ADJUSTMENT:
+  Baca field "disagreement_type" dari hasil debate.
+
+  • disagreement_type = "direction":
+    → Ini adalah disagreement terkuat — Bull dan Bear tidak sepakat arah.
+    → WAJIB turunkan confidence sebesar 0.05 dari hasil kalkulasi Step B.
+    → Jika rating BUY, pertimbangkan apakah R/R >= 2.0 cukup kuat untuk
+      override disagreement. Jika R/R < 2.0 DAN direction disagreement,
+      downgrade ke HOLD.
+
+  • disagreement_type = "valuation":
+    → Turunkan confidence 0.03.
+
+  • disagreement_type = "catalyst":
+    → Turunkan confidence 0.02. Terapkan cap "no catalyst" (max 0.78).
+
+  • disagreement_type = "timing":
+    → Tidak ada penalty confidence — timing disagreement adalah normal
+      di pasar IHSG sideways. Catat di weighted_reasoning sebagai
+      "timing-sensitive entry, tunggu konfirmasi teknikal."
+
+  • disagreement_type = null (consensus = YES):
+    → Bonus: +0.02 confidence (kedua agent sepakat).
+
 STEP 4 — FINAL RATING RULES:
   • STRONG_BUY  : Price < Fair Value, R/R ≥ 2.0, clear catalyst, strong support confirmed.
   • BUY         : Price ≤ Fair Value, R/R ≥ 1.5, support holds.
   • HOLD        : Price near Fair Value OR R/R < 1.5 OR target < 3%.
   • AVOID       : Price > Fair Value (overvalued) OR R/R < 1.0 OR no clear catalyst.
 
-CONFIDENCE CALIBRATION:
-  Derive confidence from the evidence, not from a default midpoint.
-  • 0.90-0.95: Exceptional setup; clear catalyst, supportive sentiment/volume,
-    R/R >= 2.5, strong support confirmed, and Devil's Advocate risk fully answered.
-  • 0.80-0.89: Strong BUY; fundamental and technical evidence are solid,
-    R/R >= 2.0, and the main risks are controlled.
-  • 0.70-0.79: Normal BUY; positive setup but with weaknesses such as unclear
-    catalyst, missing sentiment, nearby resistance, or valid Devil's Advocate risk.
-  • 0.60-0.69: Weak/speculative BUY; R/R is acceptable but timing, support,
-    or catalyst remains questionable.
-  • <0.60: HOLD/AVOID territory unless momentum evidence is unusually strong.
+CONFIDENCE CALIBRATION — MANDATORY DERIVATION PROCESS:
 
-  Anti-anchor rule:
-  Confidence must be derived from the rubric bands above; select a value that
-  reflects ticker-specific evidence. Avoid round/default numbers such as 0.70,
-  0.75, or 0.80 unless the evidence precisely fits that threshold.
+STEP A — Tentukan band dulu berdasarkan evidence:
+  • 0.90-0.95: Exceptional — catalyst jelas, sentiment/volume konfirmasi,
+    R/R >= 2.5, support kuat, Devil's Advocate terjawab penuh.
+  • 0.80-0.89: Strong BUY — fundamental + teknikal solid, R/R >= 2.0,
+    risiko terkontrol.
+  • 0.70-0.79: Normal BUY — setup positif tapi ada kelemahan: catalyst
+    kurang jelas, ada resistance dekat, atau DA risk tidak terjawab penuh.
+  • 0.60-0.69: Weak BUY — R/R acceptable tapi timing, support, atau
+    catalyst masih questionable.
+  • <0.60: HOLD/AVOID territory.
 
-  Ordered confidence caps for BUY ratings:
-  1. If sentiment is INSUFFICIENT_DATA, BUY confidence max is 0.82.
-  2. If there is no clear 1-3 month catalyst, BUY confidence max is 0.78.
-  3. If both conditions apply, use the lower cap: 0.78.
-  4. If an OVEREXTENDED FLAG is present, choose the lower end of the applicable
-     band instead of the upper half; this is the overextended-risk cap.
-  Caps are not additive.
+STEP B — Pilih angka spesifik dalam band menggunakan checklist ini.
+  Mulai dari midpoint band, lalu geser naik/turun berdasarkan:
+  [+0.02] Catalyst spesifik dalam 30 hari terkonfirmasi
+  [+0.02] Volume surge >= 2x rata-rata mengkonfirmasi price action
+  [+0.02] Sentiment BULLISH dengan confidence >= 0.7
+  [+0.01] Piotroski F-Score >= 7
+  [-0.02] Consensus debate = NO (direction) — Bull Bear tidak sepakat arah
+  [-0.02] Devil's Advocate risk tidak terjawab dengan evidence spesifik
+  [-0.02] ma200_context = BELOW (counter-trend trade)
+  [-0.01] Sentiment INSUFFICIENT_DATA
+  [-0.01] ExDate dalam 14-30 hari ke depan
 
-  Devil's Advocate handling:
-  • If the DA risk cannot be answered with specific evidence, subtract exactly
-    0.10 from the initial confidence.
-  • If the DA risk is only partially answered, use the lower end of the
-    selected band.
-  • Lower end means the minimum area of that band; for 0.80-0.89, use 0.80-0.82.
+  Jumlahkan semua adjustment. Clip ke batas band.
+
+STEP C — Verifikasi anti-anchor:
+  Sebelum finalize, cek: apakah angkamu adalah 0.60, 0.65, 0.68, 0.70,
+  0.72, 0.75, 0.78, 0.80, 0.85, 0.90?
+  Jika ya, WAJIB geser ±0.01 atau ±0.02 berdasarkan checklist Step B.
+  Angka bulat atau "nice" adalah tanda anchor, bukan derivasi.
+  Contoh valid: 0.63, 0.71, 0.76, 0.82, 0.87, 0.91
+  Contoh invalid: 0.65, 0.70, 0.75, 0.80, 0.85
+
+HOLD/AVOID CONFIDENCE RULES (hard cap, tidak bisa dioverride):
+  • Rating HOLD  → confidence MAX 0.55. Lebih dari ini adalah kontradiksi
+    logis — HOLD bukan setup high-conviction.
+  • Rating AVOID → confidence MAX 0.40.
+  • Rating BUY   → confidence MIN 0.60, MAX 0.89.
+  • Rating STRONG_BUY → confidence MIN 0.80, MAX 0.95.
+  Jika hasil kalkulasi Step B melewati cap ini, gunakan nilai cap.
+
+ORDERED CAPS (berlaku di atas band, bukan menggantikan):
+  1. Sentiment INSUFFICIENT_DATA → BUY max 0.82
+  2. Tidak ada catalyst 1-3 bulan → BUY max 0.78
+  3. Keduanya berlaku → gunakan cap terendah: 0.78
+  4. OVEREXTENDED FLAG → gunakan lower end band, bukan upper half
+  Caps tidak additive.
+
+DEVIL'S ADVOCATE PENALTY:
+  • DA risk tidak terjawab dengan evidence spesifik → kurangi 0.10
+    dari hasil Step B (sebelum cap)
+  • DA risk terjawab sebagian → gunakan lower end band
 
 STEP 5 — ADDRESS the Devil's Advocate scenario in your weighted_reasoning.
          Apply the confidence calibration rules above when deciding the final score.

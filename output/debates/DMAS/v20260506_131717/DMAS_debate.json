@@ -1,0 +1,66 @@
+{
+  "ticker": "DMAS",
+  "verdict": {
+    "ticker": "DMAS",
+    "rating": "HOLD",
+    "confidence": 0.0,
+    "fair_value": 288.0,
+    "entry_price_range": "135 - 138",
+    "target_price": 150.0,
+    "stop_loss": 130.0,
+    "current_price": 150.0,
+    "timeframe": "1-3 Months",
+    "weighted_reasoning": "",
+    "critical_risk_factor": "",
+    "key_catalysts": [],
+    "key_risks": [],
+    "summary": "CIO parse error — raw response stored. Error: RetryError[<Future at 0x1daeada5550 state=finished raised RuntimeError>]",
+    "expected_return": "+9.9%",
+    "risk_reward_ratio": 2.08,
+    "is_overvalued": false,
+    "wait_and_see": true
+  },
+  "debate_rounds": 2,
+  "consensus_reached": false,
+  "disagreement_type": "direction",
+  "debate_history": [
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 150",
+      "round": 0
+    },
+    {
+      "role": "bull",
+      "content": "**DMAS: Swing Trade BUY Case (1-3 Month Horizon)**\n\n**1. FUNDAMENTAL FLOOR:**\nDMAS is fundamentally undervalued, currently trading at Rp 150, which represents a significant 92.0% discount to its calculated fair value of",
+      "round": 1
+    },
+    {
+      "role": "bear",
+      "content": "As a Forensic Financial Auditor, I find the DMAS swing trade BUY case to be highly speculative and lacking a robust margin of safety, warranting an **AVOID** verdict. The Bull's argument relies on miscalculated fundamental data and ignores critical technical red flags.\n\n1.  **OVER",
+      "round": 1
+    },
+    {
+      "role": "bull",
+      "content": "The Bear's assessment of DMAS as overvalued and lacking a margin of safety misinterprets the current market dynamics and undervalues the company's intrinsic worth. While valuation models can differ, the substantial gap between the current market price and its calculated intrinsic value provides a robust buffer, far",
+      "round": 2
+    },
+    {
+      "role": "bear",
+      "content": "As a Forensic Financial Auditor, I find the Bull's swing setup for DMAS to be critically flawed, particularly regarding its entry zone and the assumed margin of safety. The reliance on a singular fair value figure as a \"robust buffer\" is misleading when juxtaposed with the stock's current",
+      "round": 2
+    },
+    {
+      "role": "devils_advocate",
+      "content": "**1. MACRO/COMPANY RISK & FOREIGN FLOW:**\nGiven DMAS's RSI at 78.",
+      "round": 3
+    }
+  ],
+  "raw_data_summary": "=== FUNDAMENTALS ===\nFAIR VALUE: Rp 288\n\nDMAS is currently trading at Rp 150, which is **UNDERVALUED** by 92.0% compared to its calculated fair value of Rp 288. This indicates a strong fundamental cushion for a\n\n=== TECHNICALS ===\nBerikut adalah analisis teknikal untuk swing trade (1-3 bulan):\n\n**TREND CONTEXT:**\nSaham dalam uptrend struktural. Swing long searah tren. Harga saat ini berada di atas semua moving average utama (EMA20, MA50, MA200) dan\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 150.0,\n  \"sma20\": 138.0,\n  \"ema20\": 139.0,\n  \"ma50\": 135.0,\n  \"ma200\": 136.0,\n  \"ma200_context\": \"ABOVE\",\n  \"rsi14\": 78.9,\n  \"atr14\": 4.0,\n  \"avg_volume_20d\": 76112000.0,\n  \"52w_high\": 150.0,\n  \"52w_low\": 128.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\n=== DIVIDEND EX-DATE SCAN: DMAS ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
+  "error": null,
+  "conviction_score": 0.0,
+  "sector_key": "property",
+  "metadata": {
+    "batch_timestamp": "20260506_131717",
+    "versioned_output": true
+  }
+}

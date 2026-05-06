@@ -64,6 +64,8 @@ CONFIG = {
     "min_piotroski":          4,          # [NEW v3.0] Piotroski F-Score minimum
     "min_altman_z":           1.1,        # [NEW v3.0] Altman Z > 1.1 (bukan distress zone)
     "exclude_pemantauan":     True,       # [NEW v3.0] Exclude PEMANTAUAN KHUSUS
+    # Trend Filter — harga harus di atas SMA50 saat entry
+    "min_price_vs_sma50":     1.0,        # price >= SMA50 (1.0 = tepat di SMA50, boleh set 0.98 untuk toleransi)
     # Trend Filter — harga harus di atas EMA20 saat entry
     "min_price_vs_ema20":     1.0,        # price >= EMA20 (1.0 = tepat di EMA20, boleh set 0.98 untuk toleransi)
     # Relative Strength vs IHSG
@@ -81,7 +83,7 @@ CONFIG = {
 
     # ── Liquidity Gate
     "min_adt_20d":            5_000_000_000,
-      "min_bars":               60,
+    "min_bars":               60,
 
     # ── Volume Filter
     # Volume Surge Scoring Tiers (masuk ke scoring, bukan sekadar gate)
@@ -158,7 +160,7 @@ CONFIG = {
     "fresh_breakout_bonus":   +15,
 
     # ── Output
-    "top_n": 10,
+    "top_n": 15,
 }
 
 

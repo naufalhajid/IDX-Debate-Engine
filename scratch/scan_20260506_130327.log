@@ -1,0 +1,37 @@
+2026-05-06 13:03:27,672 [INFO] ============================================================
+2026-05-06 13:03:27,672 [INFO] IHSG Quantitative Swing-Trade Scouting Engine v3.2
+2026-05-06 13:03:27,673 [INFO] ============================================================
+2026-05-06 13:03:27,673 [INFO] Input file: output\IDX Fundamental Analysis 2026-05-06.xlsx
+2026-05-06 13:03:27,675 [INFO] [XlsxAdapter] Initialized dengan: output\IDX Fundamental Analysis 2026-05-06.xlsx
+2026-05-06 13:03:27,675 [INFO] [Adapter] XlsxDataAdapter aktif → output\IDX Fundamental Analysis 2026-05-06.xlsx
+2026-05-06 13:03:27,675 [INFO] Membaca: output\IDX Fundamental Analysis 2026-05-06.xlsx
+2026-05-06 13:03:28,542 [INFO] Total ticker universe: 957
+2026-05-06 13:03:28,545 [INFO] Exclude PEMANTAUAN KHUSUS: 957 → 796
+2026-05-06 13:03:28,548 [INFO] [Sector] Cache loaded: 957 ticker dari output\sector_cache.json
+2026-05-06 13:03:28,549 [INFO] [Sector] Resolve selesai: cache=796, hardcode=0, keyword=0, default=0
+2026-05-06 13:03:28,561 [INFO] Lolos static filter: 147 ticker
+2026-05-06 13:03:28,564 [INFO] Distribusi sektor:
+Sector
+consumer_staples    36
+consumer_disc       22
+industrials         17
+basic_materials     16
+tech                12
+property            10
+energy               9
+transport            9
+healthcare           7
+finance_nonbank      5
+infrastructure       3
+bank                 1
+2026-05-06 13:03:28,569 [INFO] yfinance download attempt 1/3 (147 ticker)...
+2026-05-06 13:03:31,269 [INFO] Download berhasil. Shape: (120, 735)
+2026-05-06 13:03:31,377 [INFO] IHSG return 1 bulan: 1.08%
+2026-05-06 13:03:31,761 [INFO] [XlsxAdapter] Loaded key-statistics: 957 tickers
+2026-05-06 13:03:31,882 [WARNING] [Graham] LPLI: FV=4,528 > 5.0x price=294. Capped ke 1,470.
+2026-05-06 13:03:31,928 [INFO] [RDTX] Excluded: suspek suspended/FCA (volume anomali)
+2026-05-06 13:03:31,954 [INFO] [STTP] Excluded: suspek suspended/FCA (volume anomali)
+2026-05-06 13:03:32,127 [INFO] Top 10 kandidat berhasil disaring.
+2026-05-06 13:03:32,131 [INFO] JSON diekspor → output\top10_candidates.json
+2026-05-06 13:03:32,135 [INFO] Report → scratch\report.md
+2026-05-06 13:03:32,135 [INFO] PIPELINE SELESAI.

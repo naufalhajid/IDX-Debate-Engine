@@ -323,7 +323,74 @@ def validate_ticker(ticker: str) -> bool:
     return bool(TICKER_PATTERN.match(ticker.strip().upper()))
 
 
-def parse_report(json_path: Path = JSON_PATH) -> list[str]:
+def _load_quant_candidates(json_path: Path = JSON_PATH) -> list[dict]:
+    """
+    Baca kandidat hasil quant filter sebagai list dict mentah.
+    """
+    if not json_path.exists():
+        raise FileNotFoundError(
+            f"Candidates tidak ditemukan di {json_path}. "
+            "Jalankan run_quant_filter.py terlebih dahulu."
+        )
+
+    data = json.loads(json_path.read_text(encoding="utf-8"))
+    if not isinstance(data, list):
+        raise ValueError(f"Format candidates tidak valid di {json_path}: expected list.")
+    return [row for row in data if isinstance(row, dict)]
+
+
+def _candidate_ticker(candidate: dict) -> str:
+    raw = candidate.get("ticker") or candidate.get("Ticker") or ""
+    return raw.strip().upper() if isinstance(raw, str) else ""
+
+
+def _candidate_exdate_days(candidate: dict) -> int | None:
+    raw = (
+        candidate.get("exdate_days_remaining")
+        if candidate.get("exdate_days_remaining") is not None
+        else candidate.get("days_until_exdate")
+    )
+    if raw is None and isinstance(candidate.get("_exdate_info"), dict):
+        raw = candidate["_exdate_info"].get("days_until_exdate")
+    if raw is None:
+        return None
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _candidate_ma200_context(candidate: dict) -> str:
+    return str(candidate.get("ma200_context") or candidate.get("MA200 Context") or "").upper()
+
+
+def _apply_pre_cio_filters(candidates: list[dict], regime: str) -> list[dict]:
+    """
+    Hard filter sebelum masuk CIO — buang kandidat yang tidak layak
+    tanpa membuang LLM token untuk mereka.
+    """
+    filtered = []
+    for c in candidates:
+        ticker = _candidate_ticker(c) or str(c.get("ticker") or c.get("Ticker") or "UNKNOWN")
+
+        # ExDate hard disqualifier (redundant safety net di Python level)
+        exdate_days = _candidate_exdate_days(c)
+        if exdate_days is not None and exdate_days <= 7:
+            logger.info(f"[PreCIO] {ticker} SKIP — ExDate {exdate_days}d")
+            continue
+
+        # Counter-trend di HIGH regime → skip langsung
+        # Di NORMAL/LOW regime → biarkan masuk tapi CIO beri penalty
+        if regime == "HIGH" and _candidate_ma200_context(c) == "BELOW":
+            logger.info(f"[PreCIO] {ticker} SKIP — counter-trend di HIGH regime")
+            continue
+
+        filtered.append(c)
+
+    return filtered
+
+
+def parse_report(json_path: Path = JSON_PATH, candidates: list[dict] | None = None) -> list[str]:
     """
     Baca top10_candidates.json dan kembalikan daftar ticker yang valid.
 
@@ -334,19 +401,13 @@ def parse_report(json_path: Path = JSON_PATH) -> list[str]:
         FileNotFoundError: File JSON tidak ditemukan.
         ValueError: Tidak ada ticker valid setelah filtering.
     """
-    if not json_path.exists():
-        raise FileNotFoundError(
-            f"Candidates tidak ditemukan di {json_path}. "
-            "Jalankan run_quant_filter.py terlebih dahulu."
-        )
-
-    data = json.loads(json_path.read_text(encoding="utf-8"))
+    data = candidates if candidates is not None else _load_quant_candidates(json_path)
     tickers: list[str] = []
     seen: set[str] = set()
 
     # [FIX-9] `for row in data` — syntax error di versi sebelumnya diperbaiki.
     for row in data:
-        raw = row.get("Ticker", "")
+        raw = row.get("Ticker") or row.get("ticker") or ""
         ticker = raw.strip().upper() if raw else ""
 
         if not validate_ticker(ticker):
@@ -371,7 +432,10 @@ def parse_report(json_path: Path = JSON_PATH) -> list[str]:
     return tickers
 
 
-def parse_sector_map(json_path: Path = JSON_PATH) -> dict[str, str]:
+def parse_sector_map(
+    json_path: Path = JSON_PATH,
+    candidates: list[dict] | None = None,
+) -> dict[str, str]:
     """
     Baca sector_key dari top10_candidates.json.
 
@@ -379,14 +443,14 @@ def parse_sector_map(json_path: Path = JSON_PATH) -> dict[str, str]:
     Field "Sektor Key" adalah output dari run_quant_filter.py.
     Tidak raise — file hilang/corrupt hanya menghasilkan dict kosong.
     """
-    if not json_path.exists():
+    if candidates is None and not json_path.exists():
         logger.warning("[Parser] Sector map: file tidak ditemukan, sector_key 'unknown'.")
         return {}
 
     sector_map: dict[str, str] = {}
-    data = json.loads(json_path.read_text(encoding="utf-8"))
+    data = candidates if candidates is not None else _load_quant_candidates(json_path)
     for row in data:
-        raw = row.get("Ticker", "")
+        raw = row.get("Ticker") or row.get("ticker") or ""
         ticker = raw.strip().upper() if raw else ""
         if validate_ticker(ticker):
             sector_map[ticker] = str(row.get("Sektor Key", "unknown") or "unknown")
@@ -1427,8 +1491,10 @@ async def main(
 
     # Step 1: Parse
     try:
-        tickers = parse_report()
-        sector_map = parse_sector_map()
+        candidates = _load_quant_candidates(JSON_PATH)
+        candidates = _apply_pre_cio_filters(candidates, regime)
+        tickers = parse_report(candidates=candidates)
+        sector_map = parse_sector_map(candidates=candidates)
     except (FileNotFoundError, ValueError) as e:
         logger.error(f"[Orchestrator] {e}")
         return
