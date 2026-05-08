@@ -43,6 +43,8 @@ class DebateMessage(BaseDataClass):
     ] = "scout"
     content: str = ""
     round_num: int = 0
+    position: Literal["BUY", "HOLD", "AVOID", "UNKNOWN"] = "UNKNOWN"
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -156,6 +158,21 @@ class CIOVerdict(BaseDataClass):
             "Auto-flag: True when confidence < 0.60 OR risk_reward_ratio < 1.0. "
             "Svelte renders a yellow caution banner when this is True."
         ),
+    )
+
+    consensus_reached: bool = Field(
+        default=False,
+        description="Whether the debate agents reached consensus before the CIO formatter.",
+    )
+
+    consensus_method: Literal["voting", "confidence_winner", "soft_hold"] | None = Field(
+        default=None,
+        description="Consensus path used by the debate chamber.",
+    )
+
+    dissenting_agents: list[str] = Field(
+        default_factory=list,
+        description="Agents whose position differed from the consensus or winner position.",
     )
 
     @model_validator(mode="after")
@@ -448,6 +465,10 @@ class DebateChamberState(TypedDict):
     debate_history: Annotated[list[DebateMessage], history_updater]
     round_count: int
     consensus_reached: bool
+    consensus_method: Literal["voting", "confidence_winner", "soft_hold"] | None
+    dissenting_agents: list[str]
+    agent_votes: list[dict]
+    consensus_winner: dict | None
     disagreement_type: str | None
 
     # Adaptive nodes

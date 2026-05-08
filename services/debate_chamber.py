@@ -18,6 +18,7 @@ Refactored (audit fixes):
 """
 
 import asyncio
+from collections import Counter
 import json
 import re
 from typing import Literal
@@ -525,7 +526,11 @@ def post_evaluator_router(
     Short-circuit: if consensus reached OR 2 rounds complete → go to CIO path.
     Otherwise → prune state and run another debate round.
     """
-    if state.get("consensus_reached") or state["round_count"] >= 2:
+    if (
+        state.get("consensus_reached")
+        or state.get("consensus_method") == "confidence_winner"
+        or state["round_count"] >= MAX_DEBATE_ROUNDS
+    ):
         return "devils_advocate"
     return "state_cleaner"
 
@@ -535,6 +540,20 @@ def post_evaluator_router(
 # ---------------------------------------------------------------------------
 
 BASE_URL = "https://exodus.stockbit.com"
+CONSENSUS_THRESHOLD = 0.60
+CONSENSUS_AGENT_COUNT = 5
+MAX_DEBATE_ROUNDS = 3
+SOFT_HOLD_CONFIDENCE_DELTA = 0.15
+
+AGENT_SIGNAL_PROMPT = """\
+
+MANDATORY AGENT SIGNAL:
+End every argument with exactly these two lines:
+Position: BUY | HOLD | AVOID
+Agent Confidence: 0.xx
+
+The confidence score must be numeric from 0.00 to 1.00. Do not use percentages
+in the final Agent Confidence line."""
 
 
 class DebateChamber:
@@ -565,6 +584,266 @@ class DebateChamber:
         self.pro_llm = pro_llm or get_pro_llm()
         self.stockbit_client = stockbit_client or StockbitApiClient()
         self.app = self._build_graph()
+
+    # -- Agent signal helpers -------------------------------------------------
+
+    _CONFIDENCE_RE = re.compile(
+        r"(?:agent\s*)?confidence[^0-9]{0,24}"
+        r"([01](?:\.\d+)?|[1-9]\d(?:\.\d+)?|100(?:\.0+)?)\s*%?",
+        re.IGNORECASE,
+    )
+    _POSITION_RE = re.compile(
+        r"(?:position|rating|verdict|swing_signal)\s*[:=]\s*"
+        r"['\"]?(STRONG_BUY|BUY|HOLD|AVOID|SELL|NEUTRAL|BULLISH|BEARISH)",
+        re.IGNORECASE,
+    )
+
+    @staticmethod
+    def _normalise_position(value: str | None) -> str:
+        if not value:
+            return "UNKNOWN"
+        token = value.strip().upper().replace("-", "_").replace(" ", "_")
+        if token in {"STRONG_BUY", "BUY", "BULLISH", "ACCUMULATE"}:
+            return "BUY"
+        if token in {"SELL", "AVOID", "BEARISH", "DISTRIBUTE"}:
+            return "AVOID"
+        if token in {"HOLD", "NEUTRAL", "WAIT", "WAIT_AND_SEE"}:
+            return "HOLD"
+        return "UNKNOWN"
+
+    @classmethod
+    def _extract_confidence(cls, content: str, default: float | None = None) -> float | None:
+        text = str(content or "")
+        for match in cls._CONFIDENCE_RE.finditer(text):
+            try:
+                value = float(match.group(1))
+            except (TypeError, ValueError):
+                continue
+            if value > 1.0:
+                value = value / 100.0
+            return max(0.0, min(value, 1.0))
+        return default
+
+    @classmethod
+    def _infer_position_from_text(cls, content: str, role: str) -> str:
+        text = str(content or "")
+        if not text.strip() or "data unavailable" in text.lower() or "missing" == text.lower().strip():
+            return "UNKNOWN"
+
+        explicit = cls._POSITION_RE.search(text)
+        if explicit:
+            return cls._normalise_position(explicit.group(1))
+
+        lowered = text.lower()
+        if "insufficient_data" in lowered or "insufficient data" in lowered:
+            return "HOLD"
+
+        scores = {
+            "BUY": sum(
+                token in lowered
+                for token in (
+                    "strong_buy",
+                    " buy",
+                    "bullish",
+                    "undervalued",
+                    "discount",
+                    "support holds",
+                    "breakout",
+                    "viable",
+                    "accumulate",
+                )
+            ),
+            "HOLD": sum(
+                token in lowered
+                for token in (
+                    "hold",
+                    "wait",
+                    "neutral",
+                    "sideways",
+                    "confirmation",
+                    "marginal",
+                    "fairly valued",
+                )
+            ),
+            "AVOID": sum(
+                token in lowered
+                for token in (
+                    "avoid",
+                    "sell",
+                    "bearish",
+                    "overvalued",
+                    "breakdown",
+                    "no margin",
+                    "unviable",
+                    "high risk",
+                    "support breaks",
+                )
+            ),
+        }
+        best_position, best_score = max(scores.items(), key=lambda item: item[1])
+        if best_score > 0 and list(scores.values()).count(best_score) == 1:
+            return best_position
+
+        if role == "bull":
+            return "BUY"
+        if role == "bear":
+            return "AVOID"
+        return "UNKNOWN"
+
+    def _extract_agent_signal(self, content: str, role: str) -> dict[str, object]:
+        position = self._infer_position_from_text(content, role)
+        unavailable = position == "UNKNOWN"
+        default_confidence = None if unavailable else (0.60 if role in {"bull", "bear"} else 0.55)
+        confidence = self._extract_confidence(content, default=default_confidence)
+        return {
+            "position": position,
+            "confidence": None if confidence is None else round(confidence, 2),
+        }
+
+    def _ensure_signal_footer(self, content: str, role: str) -> tuple[str, dict[str, object]]:
+        signal = self._extract_agent_signal(content, role)
+        confidence = signal.get("confidence")
+        if confidence is None:
+            confidence = 0.0
+            signal["confidence"] = confidence
+        if signal.get("position") == "UNKNOWN":
+            signal["position"] = "HOLD" if confidence == 0.0 else "UNKNOWN"
+
+        text = str(content or "").strip()
+        if "agent confidence" not in text.lower() or "position:" not in text.lower():
+            text = (
+                f"{text}\n\n"
+                f"Position: {signal['position']}\n"
+                f"Agent Confidence: {float(confidence):.2f}"
+            ).strip()
+        return text, signal
+
+    @staticmethod
+    def _latest_message(state: DebateChamberState, role: str) -> DebateMessage | None:
+        messages = [m for m in state.get("debate_history", []) if m.role == role]
+        return messages[-1] if messages else None
+
+    def _collect_agent_votes(self, state: DebateChamberState) -> list[dict[str, object]]:
+        specs = [
+            ("fundamental_scout", state.get("fundamental_data", ""), "fundamental_scout", 0),
+            ("chartist", state.get("technical_data", ""), "chartist", 0),
+            ("sentiment_specialist", state.get("sentiment_data", ""), "sentiment_specialist", 0),
+        ]
+        for role in ("bull", "bear"):
+            msg = self._latest_message(state, role)
+            if msg is not None:
+                specs.append((role, msg.content, role, msg.round_num))
+            else:
+                specs.append((role, "", role, state.get("round_count", 0)))
+
+        votes: list[dict[str, object]] = []
+        for agent, content, role, round_num in specs:
+            signal = self._extract_agent_signal(str(content), role)
+            confidence = signal.get("confidence")
+            votes.append({
+                "agent": agent,
+                "position": signal.get("position", "UNKNOWN"),
+                "confidence": 0.0 if confidence is None else float(confidence),
+                "round": round_num,
+            })
+        return votes
+
+    @staticmethod
+    def _dissenters(votes: list[dict[str, object]], consensus_position: str) -> list[str]:
+        return [
+            str(v["agent"])
+            for v in votes
+            if v.get("position") not in {consensus_position, "UNKNOWN"}
+        ]
+
+    @staticmethod
+    def _infer_disagreement_type(votes: list[dict[str, object]]) -> str:
+        positions = {str(v.get("position")) for v in votes if v.get("position") != "UNKNOWN"}
+        if "BUY" in positions and "AVOID" in positions:
+            return "direction"
+        if "HOLD" in positions and len(positions) > 1:
+            return "timing"
+        return "direction"
+
+    def _evaluate_consensus_votes(
+        self,
+        votes: list[dict[str, object]],
+        round_count: int,
+    ) -> dict[str, object]:
+        bull_vote = next((v for v in votes if v["agent"] == "bull"), None)
+        bear_vote = next((v for v in votes if v["agent"] == "bear"), None)
+
+        if bull_vote and bear_vote:
+            bull_pos = str(bull_vote.get("position"))
+            bear_pos = str(bear_vote.get("position"))
+            bull_conf = float(bull_vote.get("confidence", 0.0) or 0.0)
+            bear_conf = float(bear_vote.get("confidence", 0.0) or 0.0)
+            if (
+                bull_pos != "UNKNOWN"
+                and bear_pos != "UNKNOWN"
+                and bull_pos != bear_pos
+                and abs(bull_conf - bear_conf) < SOFT_HOLD_CONFIDENCE_DELTA
+            ):
+                return {
+                    "consensus_reached": True,
+                    "consensus_method": "soft_hold",
+                    "disagreement_type": "timing",
+                    "dissenting_agents": self._dissenters(votes, "HOLD"),
+                    "consensus_winner": {
+                        "agent": "soft_hold_rule",
+                        "position": "HOLD",
+                        "confidence": round(max(bull_conf, bear_conf), 2),
+                    },
+                    "agent_votes": votes,
+                }
+
+        known_positions = [
+            str(v.get("position"))
+            for v in votes
+            if v.get("position") in {"BUY", "HOLD", "AVOID"}
+        ]
+        counts = Counter(known_positions)
+        if counts:
+            position, count = counts.most_common(1)[0]
+            if count / CONSENSUS_AGENT_COUNT >= CONSENSUS_THRESHOLD:
+                majority_votes = [v for v in votes if v.get("position") == position]
+                winner = max(majority_votes, key=lambda v: float(v.get("confidence", 0.0) or 0.0))
+                return {
+                    "consensus_reached": True,
+                    "consensus_method": "voting",
+                    "disagreement_type": None,
+                    "dissenting_agents": self._dissenters(votes, position),
+                    "consensus_winner": winner,
+                    "agent_votes": votes,
+                }
+
+        if round_count >= MAX_DEBATE_ROUNDS:
+            known_votes = [v for v in votes if v.get("position") in {"BUY", "HOLD", "AVOID"}]
+            winner = max(
+                known_votes or votes,
+                key=lambda v: float(v.get("confidence", 0.0) or 0.0),
+            )
+            winner_position = str(winner.get("position") or "HOLD")
+            if winner_position == "UNKNOWN":
+                winner_position = "HOLD"
+                winner = {**winner, "position": winner_position}
+            return {
+                "consensus_reached": False,
+                "consensus_method": "confidence_winner",
+                "disagreement_type": self._infer_disagreement_type(votes),
+                "dissenting_agents": self._dissenters(votes, winner_position),
+                "consensus_winner": winner,
+                "agent_votes": votes,
+            }
+
+        return {
+            "consensus_reached": False,
+            "consensus_method": None,
+            "disagreement_type": self._infer_disagreement_type(votes),
+            "dissenting_agents": [],
+            "consensus_winner": None,
+            "agent_votes": votes,
+        }
 
     # ── LLM & HTTP helpers ──────────────────────────────────────────────────
 
@@ -700,12 +979,13 @@ Current Date (Asia/Jakarta): {current_date}
                 logger.warning(f"[Fundamental] Raw API response for {ticker}: {json.dumps(raw)[:2000]}")
 
             messages = [
-                SystemMessage(content=FUNDAMENTAL_SCOUT_PROMPT),
+                SystemMessage(content=FUNDAMENTAL_SCOUT_PROMPT + AGENT_SIGNAL_PROMPT),
                 HumanMessage(content=f"{report_str}\n\n=== RAW API JSON ===\n{json.dumps(raw)[:10_000]}"),
             ]
             resp = await self._invoke_llm(self.flash_llm, messages)
+            content, _signal = self._ensure_signal_footer(resp.content, "fundamental_scout")
             return {
-                "fundamental_data": resp.content,
+                "fundamental_data": content,
                 "fair_value_estimate": fv_price,
             }
         except Exception as e:
@@ -793,7 +1073,7 @@ Current Date (Asia/Jakarta): {current_date}
         # ── 3. Build message with ground-truth technicals ────────────────────
         tech_summary = json.dumps(tech_indicators, indent=2) if tech_indicators else "{}"
         messages = [
-            SystemMessage(content=CHARTIST_PROMPT),
+            SystemMessage(content=CHARTIST_PROMPT + AGENT_SIGNAL_PROMPT),
             HumanMessage(content=(
                 f"=== PRE-COMPUTED TECHNICALS (Python — Ground Truth, do NOT recalculate) ===\n"
                 f"{tech_summary}\n\n"
@@ -801,8 +1081,9 @@ Current Date (Asia/Jakarta): {current_date}
             )),
         ]
         resp = await self._invoke_llm(self.flash_llm, messages)
+        content, _signal = self._ensure_signal_footer(resp.content, "chartist")
         return {
-            "technical_data": resp.content,
+            "technical_data": content,
             "technical_indicators": tech_indicators,
         }
 
@@ -817,11 +1098,12 @@ Current Date (Asia/Jakarta): {current_date}
             if not raw:
                 return {"sentiment_data": "Data Unavailable"}
             messages = [
-                SystemMessage(content=SENTIMENT_PROMPT),
+                SystemMessage(content=SENTIMENT_PROMPT + AGENT_SIGNAL_PROMPT),
                 HumanMessage(content=json.dumps(raw)[:10_000]),
             ]
             resp = await self._invoke_llm(self.flash_llm, messages)
-            return {"sentiment_data": resp.content}
+            content, _signal = self._ensure_signal_footer(resp.content, "sentiment_specialist")
+            return {"sentiment_data": content}
         except Exception as e:
             logger.error(f"[Sentiment] Error: {e}")
             return {"sentiment_data": "Data Unavailable (Error)"}
@@ -917,17 +1199,23 @@ Current Date (Asia/Jakarta): {current_date}
             content_parts.append(f"\n\nDebate History (may be pruned summary):\n{hist}")
 
         messages = [
-            SystemMessage(content=prompt),
+            SystemMessage(content=prompt + AGENT_SIGNAL_PROMPT),
             HumanMessage(content="\n".join(content_parts)),
         ]
         resp = await self._invoke_llm(self.flash_llm, messages)
-        content = str(resp.content).strip()
+        content, signal = self._ensure_signal_footer(str(resp.content), "bull")
         if len(content) < 50:
             logger.warning(
                 f"[Bull] Suspiciously short response for {ticker} R{rc+1} "
                 f"({len(content)} chars) — may indicate a safety filter hit"
             )
-        msg = DebateMessage(role="bull", content=content, round_num=rc + 1)
+        msg = DebateMessage(
+            role="bull",
+            content=content,
+            round_num=rc + 1,
+            position=str(signal.get("position", "UNKNOWN")),
+            confidence=signal.get("confidence"),
+        )
         return {"debate_history": [msg]}
 
     async def _bearish_node(self, state: DebateChamberState) -> dict:
@@ -954,18 +1242,24 @@ Current Date (Asia/Jakarta): {current_date}
                 )
 
         messages = [
-            SystemMessage(content=prompt),
+            SystemMessage(content=prompt + AGENT_SIGNAL_PROMPT),
             HumanMessage(content="\n".join(content_parts)),
         ]
         resp = await self._invoke_llm(self.flash_llm, messages)  # Use Flash for Bear opening/rebuttal rounds
         new_rc = rc + 1
-        content = str(resp.content).strip()
+        content, signal = self._ensure_signal_footer(str(resp.content), "bear")
         if len(content) < 50:
             logger.warning(
                 f"[Bear] Suspiciously short response for {ticker} R{new_rc} "
                 f"({len(content)} chars) — may indicate a safety filter hit"
             )
-        msg = DebateMessage(role="bear", content=content, round_num=new_rc)
+        msg = DebateMessage(
+            role="bear",
+            content=content,
+            round_num=new_rc,
+            position=str(signal.get("position", "UNKNOWN")),
+            confidence=signal.get("confidence"),
+        )
         return {"debate_history": [msg], "round_count": new_rc}
 
     # ── Phase 3 — Adaptive Logic ─────────────────────────────────────────────
@@ -976,40 +1270,17 @@ Current Date (Asia/Jakarta): {current_date}
         skip Round 2 and proceed directly to Devil's Advocate → CIO.
         Uses Pro — this reasoning step should not be downgraded to Flash.
         """
-        logger.info("[Consensus] Evaluating agreement")
-        # Only inspect the two most recent messages (latest round)
-        recent = [
-            m for m in state["debate_history"]
-            if m.round_num == state["round_count"]
-        ]
-        hist = "\n".join(f"[{m.role.upper()}]: {m.content}" for m in recent)
-
-        messages = [
-            SystemMessage(content=CONSENSUS_PROMPT),
-            HumanMessage(content=hist),
-        ]
-        
-        try:
-            # Consensus evaluation is a reasoning step; use Pro to preserve judgment quality.
-            resp = await self._invoke_llm(self.pro_llm, messages, inject_rules=False)
-            parsed = json.loads(self._sanitize_json(str(resp.content)))
-            consensus = ConsensusSchema(**parsed)
-            agreed = consensus.consensus_reached
-            disagreement_type = consensus.disagreement_type
-        except Exception as e:
-            logger.warning(f"[Consensus] Failed ({e}); defaulting to False")
-            agreed = False
-            disagreement_type = "direction"
-
-        if agreed:
-            disagreement_type = None
-        elif disagreement_type is None:
-            disagreement_type = "direction"
-        logger.info(f"[Consensus] Result: {agreed} | disagreement_type={disagreement_type}")
-        return {
-            "consensus_reached": agreed,
-            "disagreement_type": disagreement_type,
-        }
+        logger.info("[Consensus] Evaluating 5-agent votes")
+        votes = self._collect_agent_votes(state)
+        result = self._evaluate_consensus_votes(votes, state["round_count"])
+        logger.info(
+            "[Consensus] Result: "
+            f"reached={result['consensus_reached']} "
+            f"method={result['consensus_method']} "
+            f"winner={result.get('consensus_winner')} "
+            f"dissent={result['dissenting_agents']}"
+        )
+        return result
 
     #: Regex matching IHSG price mentions in LLM output.  Handles Indonesian
     #: formatting (dot as thousand separator) and the occasional "Rp." with
@@ -1055,7 +1326,13 @@ Current Date (Asia/Jakarta): {current_date}
             content = m.content
             truncated = content if len(content) <= TAIL_CHARS else "…" + content[-TAIL_CHARS:]
             compressed_msgs.append(
-                DebateMessage(role=m.role, content=truncated, round_num=m.round_num)
+                DebateMessage(
+                    role=m.role,
+                    content=truncated,
+                    round_num=m.round_num,
+                    position=m.position,
+                    confidence=m.confidence,
+                )
             )
 
         evidence_content = (
@@ -1084,14 +1361,17 @@ Current Date (Asia/Jakarta): {current_date}
             HumanMessage(content=f"Data:\n{state['raw_data']}\n\nDebate:\n{hist}"),
         ]
         resp = await self._invoke_llm(self.flash_llm, messages)
+        content, signal = self._ensure_signal_footer(str(resp.content), "devils_advocate")
         msg = DebateMessage(
             role="devils_advocate",
-            content=resp.content,
+            content=content,
             round_num=state["round_count"] + 1,
+            position=str(signal.get("position", "UNKNOWN")),
+            confidence=signal.get("confidence"),
         )
         return {
             "debate_history": [msg],
-            "devils_advocate_question": resp.content,
+            "devils_advocate_question": content,
         }
 
     # ── Signal Classifier (pure Python — deterministic) ─────────────────────
@@ -1344,6 +1624,75 @@ Current Date (Asia/Jakarta): {current_date}
                     final.append(ch)
             return "".join(final).strip()
 
+    @staticmethod
+    def _format_consensus_directive(state: DebateChamberState) -> str:
+        method = state.get("consensus_method") or "pending"
+        winner = state.get("consensus_winner") or {}
+        votes = state.get("agent_votes") or []
+        dissenters = state.get("dissenting_agents") or []
+        return (
+            f"consensus_reached: {state.get('consensus_reached', False)}\n"
+            f"consensus_method: {method}\n"
+            f"winner: {json.dumps(winner, ensure_ascii=False)}\n"
+            f"dissenting_agents: {json.dumps(dissenters, ensure_ascii=False)}\n"
+            f"agent_votes: {json.dumps(votes, ensure_ascii=False)}\n"
+            "Rules:\n"
+            "- If consensus_method=soft_hold, final rating must be HOLD.\n"
+            "- If consensus_method=confidence_winner, align final rating with the winner position.\n"
+            "- CIO may validate price levels and risks, but must not override those two consensus outcomes."
+        )
+
+    @staticmethod
+    def _append_reason(existing: str | None, addition: str) -> str:
+        existing_text = str(existing or "").strip()
+        if not existing_text:
+            return addition
+        return f"{existing_text} {addition}"
+
+    def _apply_consensus_override(self, parsed: dict, state: DebateChamberState) -> dict:
+        p = dict(parsed) if isinstance(parsed, dict) else {}
+        method = state.get("consensus_method")
+        winner = state.get("consensus_winner") or {}
+        dissenters = list(state.get("dissenting_agents") or [])
+
+        p["consensus_reached"] = bool(state.get("consensus_reached", False))
+        p["consensus_method"] = method
+        p["dissenting_agents"] = dissenters
+
+        if method == "soft_hold":
+            p["rating"] = "HOLD"
+            p["confidence"] = min(float(p.get("confidence") or 0.52), 0.55)
+            p["weighted_reasoning"] = self._append_reason(
+                p.get("weighted_reasoning"),
+                (
+                    "Consensus override: Bull/Bear confidence gap was below 0.15, "
+                    "so the chamber treats this as soft consensus HOLD instead of "
+                    "forcing an entry."
+                ),
+            )
+            return p
+
+        if method == "confidence_winner":
+            winner_position = self._normalise_position(str(winner.get("position", "HOLD")))
+            if winner_position == "UNKNOWN":
+                winner_position = "HOLD"
+            p["rating"] = "BUY" if winner_position == "BUY" else winner_position
+            try:
+                p["confidence"] = max(0.0, min(float(winner.get("confidence", p.get("confidence", 0.0))), 1.0))
+            except (TypeError, ValueError):
+                p["confidence"] = max(0.0, min(float(p.get("confidence") or 0.0), 1.0))
+            p["weighted_reasoning"] = self._append_reason(
+                p.get("weighted_reasoning"),
+                (
+                    "Consensus override: no 60% vote after 3 rounds, so "
+                    f"{winner.get('agent', 'highest-confidence agent')} wins by "
+                    "highest numeric confidence. CIO did not override the winner."
+                ),
+            )
+            return p
+
+        return p
+
     # ── Phase 4 — CIO Judge ──────────────────────────────────────────────────
 
     async def _cio_judge_node(self, state: DebateChamberState) -> dict:
@@ -1373,6 +1722,9 @@ Current Date (Asia/Jakarta): {current_date}
                 entry_price_range=None,
                 target_price=None,
                 stop_loss=None,
+                consensus_reached=bool(state.get("consensus_reached", False)),
+                consensus_method=state.get("consensus_method"),
+                dissenting_agents=list(state.get("dissenting_agents") or []),
             ).model_dump_json()
             return {"final_verdict": verdict_json}
 
@@ -1417,6 +1769,7 @@ Current Date (Asia/Jakarta): {current_date}
             )
 
         # ── Build CIO prompt ─────────────────────────────────────────────────
+        consensus_directive = self._format_consensus_directive(state)
         hist = "\n".join(
             f"[{m.role.upper()} R{m.round_num}]: {m.content}"
             for m in state["debate_history"]
@@ -1428,6 +1781,8 @@ Current Date (Asia/Jakarta): {current_date}
             f"{envelope_text}\n\n"
             f"=== CONFLICT RESOLUTION ===\n"
             f"{conflict_signal}\n\n"
+            f"=== CONSENSUS DIRECTIVE ===\n"
+            f"{consensus_directive}\n\n"
             f"Synthesized Market Data:\n{state['raw_data']}\n\n"
             f"Full Debate Transcript:\n{hist}\n\n"
             f"Devil's Advocate Challenge:\n{state.get('devils_advocate_question', 'N/A')}"
@@ -1460,7 +1815,10 @@ no trailing text. The JSON must have exactly these keys:
   "current_price": <number>,
   "fair_value": <number or null>,
   "expected_return": "<string e.g. '+6.2%'>",
-  "risk_reward_ratio": <float>
+  "risk_reward_ratio": <float>,
+  "consensus_reached": <true | false>,
+  "consensus_method": "<voting | confidence_winner | soft_hold>",
+  "dissenting_agents": ["<agent>", ...]
 }
 
 Start your response with '{' and end with '}'. Nothing else."""
@@ -1509,6 +1867,7 @@ Start your response with '{' and end with '}'. Nothing else."""
             resp = await self._invoke_llm(self.pro_llm, messages, inject_rules=False)
             parsed = json.loads(self._sanitize_json(resp.content))
             parsed = _apply_envelope(parsed)
+            parsed = self._apply_consensus_override(parsed, state)
             verdict_json = CIOVerdict(**parsed).model_dump_json()
             logger.info(f"[CIO] JSON parsed successfully for {ticker}")
         except Exception as e:
@@ -1523,6 +1882,9 @@ Start your response with '{' and end with '}'. Nothing else."""
                 entry_price_range=f"{int(envelope['entry_low'])} - {int(envelope['entry_high'])}",
                 target_price=envelope["target_price"],
                 stop_loss=envelope["stop_loss"],
+                consensus_reached=bool(state.get("consensus_reached", False)),
+                consensus_method=state.get("consensus_method"),
+                dissenting_agents=list(state.get("dissenting_agents") or []),
             ).model_dump_json()
 
         logger.info(f"[CIO] Verdict delivered for {ticker}")
@@ -1600,6 +1962,10 @@ Start your response with '{' and end with '}'. Nothing else."""
             "debate_history": [],
             "round_count": 0,
             "consensus_reached": False,
+            "consensus_method": None,
+            "dissenting_agents": [],
+            "agent_votes": [],
+            "consensus_winner": None,
             "disagreement_type": None,
             "devils_advocate_question": "",
             "final_verdict": "",

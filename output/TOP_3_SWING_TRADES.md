@@ -1,12 +1,12 @@
 # TOP 3 HIGH-CONVICTION IHSG SWING TRADES
 
-> **Generated**: 2026-05-06 21:29 WIB
+> **Generated**: 2026-05-07 03:50 WIB
 > **Pipeline**: Quant Scouting -> Multi-Agent Debate -> CIO Verdict
-> **Stocks Debated**: 10 | **Eligible (BUY/STRONG_BUY)**: 7 | **Selected**: 3
+> **Stocks Debated**: 10 | **Eligible (BUY/STRONG_BUY)**: 3 | **Selected**: 3
 
 ---
 
-## #1 - ELSA
+## #1 - GJTL
 
 ### Final Rating & Confidence
 
@@ -14,47 +14,51 @@
 |---|---|
 | **Rating** | `BUY` |
 | **CIO Confidence** | 74% |
-| **Conviction Score** | 57.60% |
-| **Debate Consensus** | No (direction) |
+| **Conviction Score** | 62.00% |
+| **Debate Consensus** | Reached (voting) |
+| **Dissenting Agents** | sentiment_specialist |
 | **Timeframe** | 1-3 Months |
 
 ### Trade Box
 
 | Parameter | Level |
 |---|---|
-| **Buy Range** | Rp 740 - 765 |
-| **Target Price** | Rp 840 |
-| **Stop Loss** | Rp 710 |
-| **Fair Value** | Rp 1,493 |
-| **Expected Return** | +11.6% |
-| **Risk/Reward** | 2.06 |
+| **Buy Range** | Rp 1115 - 1135 |
+| **Target Price** | Rp 1,235 |
+| **Stop Loss** | Rp 1,070 |
+| **Fair Value** | Rp 5,800 |
+| **Expected Return** | +9.8% |
+| **Risk/Reward** | 2.0 |
 
 *Semua harga sudah di-round ke tick IHSG dan dihitung oleh Python.*
 
 ### Winning Argument
 
-> The Bear's narrow focus on a specific technical risk/reward ratio overlooks the substantial fundamental undervaluation. The current market valuation is nearly half of its intrinsic worth, presenting a significant margin of safety. This fundamental gap suggests that even if short-term technical levels are breached, the downside is cushioned by the inherent value proposition. The potential for price appreciation towards its calculated fair value far exceeds the limited technical target proposed...
+> GJTL presents a compelling swing trade BUY opportunity (1-3 month horizon) driven by extreme undervaluation and a robust technical setup, despite the absence of an immediate fundamental news catalyst.
+
+**1. Fundamental Floor:**
+GJTL is significantly undervalued, trading at Rp 1,180 against a fair value estimate of Rp 5,800, representing a substantial +391.5% upside. This deep discount is supported by attractive valuation multiples, including a TTM P/E of 3.2x and P/B of 0.4x, both well below ...
 
 ### Devil's Advocate Warning
 
-> Berikut adalah tantangan Devil's Advocate untuk setup trade ELSA:
+> **1. MACRO/COMPANY RISK & FOREIGN FLOW:**
+Given the recent "net foreign selling yang signifikan" and the absence of an immediate fundamental catalyst, if foreign funds continue to accelerate their selling pressure on GJTL, could the MA50 support at Rp 1,115 break, potentially triggering a deeper correction towards the MA200 at Rp 1,065?
 
-1.  **MACRO/COMPANY RISK & FOREIGN FLOW:**
-    Mengingat ELSA menunjukkan penurunan pendapatan QoQ sebesar -2.98%, jika laporan keuangan berikutnya menunjukkan pelemahan lebih lanjut atau jika terjadi akselerasi net foreign sell di pasar saham Indonesia, mungkinkah tekanan jual ini mematahkan level stop-loss Rp 705, memicu korek...
+**2. EXECUTION RISK — Transaction Cost Stress Test:**
+Men...
 
 ### CIO Summary
 
-The trade plan for ELSA is approved with a BUY rating. The stock is significantly undervalued with a strong 2.06 R/R ratio, providing a substantial margin of safety. The entry is well-timed near dynamic support within a confirmed long-term uptrend. However, conviction is tempered by a lack of near-term catalysts and a recent decline in quarterly revenue, warranting a normal BUY rating rather than a high-conviction one.
+This is a BUY recommendation based on significant fundamental undervaluation and a confirmed technical uptrend. The trade offers an attractive 2.0 R/R ratio, targeting a retest of the 52-week high. However, the lack of a clear near-term catalyst and recent foreign selling pressure warrant a cautious entry within the specified zone and cap the confidence.
 
 **Key Catalysts:**
-- Significant undervaluation (95% below Fair Value) acting as a price floor and attracting value investors.
-- Technical setup with entry near dynamic support (EMA20) in a confirmed long-term uptrend (above MA200).
-- Favorable Risk/Reward ratio of 2.06 provides a well-defined and attractive trade structure.
+- Market re-rating due to extreme undervaluation (Price/Book 0.4x).
+- Continuation of the established technical uptrend, leading to a retest of the 52-week high resistance at Rp 1,230-1,235.
 
 **Key Risks:**
-- Lack of a specific, near-term catalyst could lead to prolonged consolidation or sideways movement, tying up capital.
-- Negative quarterly revenue growth (-2.98%) may signal underlying business weakness, potentially leading to downward revisions of fair value if the trend continues.
-- A broader market downturn or continued foreign selling could override the stock's individual technicals and trigger the stop-loss.
+- Sustained net foreign selling pressure could break the MA50 support at Rp 1,115, invalidating the setup.
+- Lack of a specific, near-term fundamental catalyst could lead to prolonged consolidation or sideways movement, failing to reach the target within the 1-3 month timeframe.
+- The current price of Rp 1,180 is above the ideal entry zone, requiring a pullback which may not occur.
 
 ---
 
@@ -65,9 +69,10 @@ The trade plan for ELSA is approved with a BUY rating. The stock is significantl
 | Metric | Value |
 |---|---|
 | **Rating** | `BUY` |
-| **CIO Confidence** | 71% |
-| **Conviction Score** | 56.90% |
-| **Debate Consensus** | No (direction) |
+| **CIO Confidence** | 74% |
+| **Conviction Score** | 58.40% |
+| **Debate Consensus** | Reached (voting) |
+| **Dissenting Agents** | sentiment_specialist |
 | **Timeframe** | 1-3 Months |
 
 ### Trade Box
@@ -85,80 +90,87 @@ The trade plan for ELSA is approved with a BUY rating. The stock is significantl
 
 ### Winning Argument
 
-> The Bear's challenge regarding the absence of a specific, immediate catalyst for a swing trade overlooks the inherent drivers present in BFIN's profile. While a singular news event is absent, the persistent fundamental undervaluation, currently trading at a substantial discount to its intrinsic worth, acts as a powerful, underlying catalyst. This significant gap between the market's current assessment and the calculated fair value creates a compelling incentive for market participants to re-r...
+> **BFIN: Swing Trade BUY Case (1-3 Month Horizon)**
+
+**1. FUNDAMENTAL FLOOR:**
+BFIN presents a compelling fundamental floor, currently trading at Rp 810, a significant 84.7% discount to its calculated fair value of Rp 1,496. This deep undervaluation provides a robust cushion and a strong long-term pull for the stock. Supporting this valuation are solid financial metrics, including a TTM Return on Equity (ROE) of 13.98%, a healthy TTM Net Margin of 20.76%, and an attractive Dividend Yield of 8....
 
 ### Devil's Advocate Warning
 
-> 1.  Given the lack of 3-year trend data for key fundamentals and the absence of an immediate catalyst, if a broader IHSG correction materializes, coupled with sustained net foreign selling pressure on financial stocks, could the MA50 support at Rp 753 break, potentially triggering a cascade towards the 52-week low of Rp 665?
+> **1. MACRO/COMPANY RISK & FOREIGN FLOW:**
+Given the missing Debt/Equity Ratio and Interest Coverage data, if foreign funds accelerate selling pressure on BFIN due to broader market concerns or if new regulations negatively impact the multi-finance sector, could the MA50 support at Rp 753 break, triggering stops down to Rp 690 within the next 1-3 months?
 
-2.  Menggunakan harga entry Rp 753 dan target Rp 845, total biaya tra...
+**2. EXECUTION RISK — Transaction Cost S...
 
 ### CIO Summary
 
-The trade plan for BFIN is rated BUY, contingent on a pullback to the Rp 755-770 entry zone. The setup is attractive due to a compelling fundamental undervaluation and a technically sound entry near major support. The Python-calculated trade envelope offers an excellent risk/reward ratio of 2.14, but confidence is tempered by the absence of a clear, near-term catalyst, making this a value-based swing that requires patience for the right entry.
+The trade plan for BFIN is rated BUY based on a significant undervaluation against its fair value and a strong risk/reward ratio of 2.14. The technical setup is favorable, targeting a pullback entry into an established uptrend. However, confidence is moderated by the lack of a clear near-term catalyst and unaddressed risks regarding missing debt metrics, making this a fundamentally-backed technical play rather than a catalyst-driven one.
 
 **Key Catalysts:**
-- Market recognition of significant undervaluation (Price vs. Fair Value of Rp 1,496).
-- Continuation of the existing structural uptrend, with price holding above key moving averages (MA50, MA200).
-- High dividend yield (8.27%) providing a potential demand floor.
+- Deep undervaluation (trading significantly below Fair Value of Rp 1,496) acting as a price anchor.
+- Favorable technical structure (price above MA50/MA200) supporting a pullback entry strategy.
 
 **Key Risks:**
-- Absence of a specific near-term catalyst could lead to price stagnation or failure to reach the target within the 1-3 month timeframe.
-- A broader IHSG correction could break the MA50 support, potentially triggering the stop loss, as highlighted by the Devil's Advocate.
-- The current price of Rp 810 is above the target of Rp 800; the trade is only viable after a significant pullback into the entry zone.
+- Absence of a specific near-term (1-3 month) catalyst could lead to price stagnation.
+- Devil's Advocate Risk: Missing Debt/Equity data combined with potential foreign selling pressure could break key technical support at Rp 753.
+- Execution risk: The trade requires a price pullback to the Rp 755-770 entry zone, which may not occur if momentum continues.
 
 ---
 
-## #3 - SRTG
+## #3 - ASGR
 
 ### Final Rating & Confidence
 
 | Metric | Value |
 |---|---|
 | **Rating** | `BUY` |
-| **CIO Confidence** | 73% |
-| **Conviction Score** | 56.50% |
-| **Debate Consensus** | No (direction) |
+| **CIO Confidence** | 76% |
+| **Conviction Score** | 58.00% |
+| **Debate Consensus** | Reached (voting) |
+| **Dissenting Agents** | sentiment_specialist |
 | **Timeframe** | 1-3 Months |
 
 ### Trade Box
 
 | Parameter | Level |
 |---|---|
-| **Buy Range** | Rp 1735 - 1775 |
-| **Target Price** | Rp 1,825 |
-| **Stop Loss** | Rp 1,720 |
-| **Fair Value** | Rp 8,351 |
-| **Expected Return** | +4.0% |
+| **Buy Range** | Rp 1495 - 1525 |
+| **Target Price** | Rp 1,660 |
+| **Stop Loss** | Rp 1,435 |
+| **Fair Value** | Rp 3,235 |
+| **Expected Return** | +9.9% |
 | **Risk/Reward** | 2.0 |
 
 *Semua harga sudah di-round ke tick IHSG dan dihitung oleh Python.*
 
 ### Winning Argument
 
-> The Bear's challenge regarding the stop-loss placement below major long-term averages misconstrues its tactical purpose. This initial risk management level is strategically set to accommodate normal market volatility and prevent premature exits during minor pullbacks within an established uptrend. The stock's consistent positioning above its 200-day moving average firmly establishes a structural bullish trend. Should the price experience an unusual breakdown below these intermediate supports,...
+> ASGR presents a compelling fundamental undervaluation, trading at Rp 1,595, a significant 102.8% discount to its fair value of Rp 3,235. This provides a robust fundamental floor, supported by strong solvency (Interest Coverage Ratio 69.06x, Total Liabilities/Equity 0.41) and decent profitability (TTM ROE 13.55%, TTM Net Profit Margin 9.14%). While the high dividend yield of 15.11% is attractive, its ex-date (24 Apr 26) is a past event and not a future catalyst for a 1-3 month swing trade.
+
+Te...
 
 ### Devil's Advocate Warning
 
-> Berikut adalah tantangan Devil's Advocate untuk setup trade SRTG:
+> 1.  **MACRO/COMPANY RISK & FOREIGN FLOW:** If foreign funds continue their net selling trend on the IHSG, coupled with a broader market correction, could ASGR's MA50 support at Rp 1,497 fail, leading to a deeper decline towards its MA200 at Rp 1,172?
 
-1.  **MACRO/COMPANY RISK & FOREIGN FLOW:**
-    Jika sentimen global memburuk dan memicu akselerasi net sell oleh investor asing di pasar ekuitas Indonesia, mampukah support MA50 di Rp 1,742 bertahan, ataukah SRTG berisiko tertekan hingga 52-week low di Rp 1,450, mengikis tesis uptrend strukturalnya?
-
-2.  **EXECUTION RISK — Trans...
+2.  **EXECUTION RISK — Transaction Cost Stress Test:**
+    Menghitung total biaya transaksi untuk posisi ini dengan asumsi harga entry Rp 1,595 d...
 
 ### CIO Summary
 
-The trade plan for SRTG is approved with a BUY rating. The stock is profoundly undervalued, trading at a significant discount to its fair value, and exhibits a solid technical uptrend with price above all key moving averages. While the lack of a specific near-term catalyst and exposure to macro risks like foreign outflows temper conviction, the excellent 2.0 R/R ratio and deep value provide a substantial margin of safety for a swing trade.
+This trade plan for ASGR is approved with a BUY rating. The stock is significantly undervalued, offering a substantial margin of safety, and the technical setup presents an excellent 2.0 Risk/Reward ratio for an entry on a pullback to the MA50 support. However, conviction is tempered by the absence of a clear short-term catalyst and potential macro headwinds, making a disciplined entry within the specified zone crucial.
 
 **Key Catalysts:**
-- Significant undervaluation (Price at Rp 1,790 vs. Fair Value at Rp 8,351) acting as a magnet for value investors.
-- Continuation of the technical uptrend, with price holding above key moving averages (MA50, MA200).
+- Significant undervaluation providing a 102.8% discount to Fair Value.
+- Favorable Risk/Reward ratio of 2.0.
+- Trade entry is aligned with strong technical support at the MA50 (Rp 1,497).
+- Stock is in a confirmed long-term uptrend (Price > MA200).
 
 **Key Risks:**
-- Absence of a specific near-term catalyst, which could lead to slow price appreciation or sideways movement.
-- Macroeconomic risk, specifically potential foreign investor outflows from the IHSG, which could break the technical support at MA50 (Rp 1,742) regardless of company fundamentals.
-- The target price offers a modest +4.0% return, which could be eroded by transaction costs if the exit is not timed well.
+- Lack of a specific, identifiable catalyst within the 1-3 month swing trading horizon.
+- The Devil's Advocate scenario of a broader market correction causing a break of the MA50 support is a key risk.
+- Current price (Rp 1,595) is above the target entry zone, requiring a pullback that may not materialize.
+- Sentiment data is insufficient, providing no insight into market perception.
 
 ---
 
@@ -166,8 +178,9 @@ The trade plan for SRTG is approved with a BUY rating. The stock is profoundly u
 
 | # | Ticker | Rating | Lot | Saham | Nilai Posisi | Alokasi | Max Loss | Est. Biaya |
 |---|--------|--------|-----|-------|-------------|---------|----------|------------|
-| 1 | ELSA | BUY | 1 | 100 | Rp 76.500 | 7.6% | Rp 5.500 | Rp 382 |
-| 2 | BFIN | BUY | 1 | 100 | Rp 81.000 | 8.1% | Rp 6.500 | Rp 405 |
+| 1 | ASGR | BUY | 1 | 100 | Rp 159.500 | 16.0% | Rp 16.000 | Rp 798 |
+| 2 | BFIN | BUY | 2 | 200 | Rp 162.000 | 16.2% | Rp 13.000 | Rp 810 |
+| 3 | GJTL | BUY | 1 | 100 | Rp 118.000 | 11.8% | Rp 11.000 | Rp 590 |
 
 ---
 
@@ -176,28 +189,51 @@ The trade plan for SRTG is approved with a BUY rating. The stock is profoundly u
 | Item | Nilai |
 |------|-------|
 | Total Modal | Rp 1.000.000 |
-| Total Deployed | Rp 157.500 |
-| Sisa Cash | Rp 842.500 |
-| % Deployed | 15.8% |
-| Jumlah Posisi | 2 |
-| Est. Total Biaya Transaksi | Rp 788 |
+| Total Deployed | Rp 439.500 |
+| Sisa Cash | Rp 560.500 |
+| % Deployed | 44.0% |
+| Jumlah Posisi | 3 |
+| Est. Total Biaya Transaksi | Rp 2.198 |
+
+### Allocation Reasoning
+
+| Item | Nilai |
+|------|-------|
+| Target Deployment | 65.0% |
+| Actual Deployment | 44.0% |
+| Market Condition Score | 0.74 |
+| Gap Explanation | Actual deployment 44.0% masih 21.1 percentage points di bawah target 65.0% karena sizing menghormati lot IHSG, cap per posisi, dan budget risiko stop-loss. |
+| Recommendation | Deployment sudah cukup aktif untuk swing trade moderat; tambah exposure hanya jika sinyal teknikal menguat tanpa memperbesar drawdown per posisi. |
+
+**Risk Factors Limiting Deployment:**
+- lot size 100 saham dan harga entry membatasi penambahan posisi tanpa oversizing
+- hanya 3 kandidat yang lolos rating dan risk/reward untuk sizing
+- cap per posisi 20.0% membuat feasible deployment maksimum sekitar 60.0%
+- max drawdown per posisi dibatasi 7.0% sehingga lot tidak dipaksa melewati stop-risk budget
+
+### Deploy 60% Now vs Wait
+
+| Scenario | Expected Return | Max Drawdown | Catatan |
+|---|---:|---:|---|
+| Deploy 60% sekarang | 4.82% (Rp 48.181) | 4.20% (Rp 42.000) | Return on deployed 8.03% |
+| Tunggu konfirmasi | 0.00% (Rp 0) | 0.00% (Rp 0) | Cash protects capital while waiting for cleaner entry, but gives up roughly Rp 48,181 if the current 60% deployment scenario works. |
 
 ---
 
 ## Full Batch Summary
 
-| Ticker | Rating | Confidence | R/R Ratio | Conviction Score | Consensus | Disagreement | Status |
-|---|---|---|---|---|---|---|---|
-| ELSA | BUY | 74% | 2.06 | 57.60% | NO | direction | Selected |
-| BFIN | BUY | 71% | 2.14 | 56.90% | NO | direction | Selected |
-| SRTG | BUY | 73% | 2.00 | 56.50% | NO | direction | Selected |
-| GJTL | BUY | 71% | 2.00 | 55.50% | NO | direction | - |
-| ULTJ | BUY | 71% | 2.00 | 55.50% | NO | direction | - |
-| ERAA | BUY | 64% | 2.00 | 52.00% | NO | direction | - |
-| INDF | BUY | 63% | 2.04 | 51.90% | NO | direction | - |
-| ASGR | HOLD | 55% | 2.00 | 0.00% | NO | direction | Excluded |
-| JPFA | AVOID | 10% | 1.96 | 0.00% | NO | catalyst | Excluded |
-| MIDI | HOLD | 37% | 2.00 | 0.00% | NO | direction | Excluded |
+| Ticker | Rating | Confidence | R/R Ratio | Conviction Score | Consensus | Method | Dissenting Agents | Disagreement | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| GJTL | BUY | 74% | 2.00 | 62.00% | YES | voting | sentiment_specialist | - | Selected |
+| BFIN | BUY | 74% | 2.14 | 58.40% | YES | voting | sentiment_specialist | - | Selected |
+| ASGR | BUY | 76% | 2.00 | 58.00% | YES | voting | sentiment_specialist | - | Selected |
+| ELSA | HOLD | 52% | 2.06 | 0.00% | YES | soft_hold | fundamental_scout, chartist, bull, bear | timing | Excluded |
+| SRTG | HOLD | 45% | 2.00 | 0.00% | YES | voting | fundamental_scout, bull | - | Excluded |
+| ERAA | HOLD | 0% | 2.00 | 0.00% | YES | soft_hold | fundamental_scout, bull, bear | timing | Excluded |
+| INDF | HOLD | 55% | 2.04 | 0.00% | YES | soft_hold | fundamental_scout, bull, bear | timing | Excluded |
+| JPFA | ERROR | 0% | N/A | 0.00% | NO | - | - | - | - |
+| MIDI | HOLD | 48% | 2.00 | 0.00% | YES | voting | bull, bear | - | Excluded |
+| ULTJ | ERROR | 0% | N/A | 0.00% | NO | - | - | - | Error |
 
 ---
-*Laporan dibuat oleh `orchestrator.py` pada 2026-05-06 21:29 WIB*
+*Laporan dibuat oleh `orchestrator.py` pada 2026-05-07 03:50 WIB*

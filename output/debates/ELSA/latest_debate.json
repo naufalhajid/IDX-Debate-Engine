@@ -2,73 +2,111 @@
   "ticker": "ELSA",
   "verdict": {
     "ticker": "ELSA",
-    "rating": "BUY",
-    "confidence": 0.74,
+    "rating": "HOLD",
+    "confidence": 0.52,
     "fair_value": 1493.0,
     "entry_price_range": "740 - 765",
     "target_price": 840.0,
     "stop_loss": 710.0,
     "current_price": 765.0,
     "timeframe": "1-3 Months",
-    "weighted_reasoning": "The decision is a BUY based on a confluence of strong valuation and a favorable technical setup. The primary driver is the massive undervaluation (Current Price Rp 765 vs. Fair Value Rp 1,493), which provides a significant safety buffer. The Python-calculated trade envelope offers an attractive Risk/Reward ratio of 2.06, meeting our swing trade criteria. The entry zone is strategically placed near the EMA20 support within a clear long-term uptrend (Price > MA200). Confidence is capped from a higher band due to two key factors: 1) The absence of a clear, identifiable catalyst within the 1-3 month timeframe, which imposes a hard cap per protocol, and 2) The Devil's Advocate's valid concern about declining YoY quarterly revenue (-2.98%), which introduces uncertainty about future fundamental performance. The 'INSUFFICIENT_DATA' for sentiment also contributes a minor penalty. The trade is approved as a value/technical play, but the position size should reflect the lack of a strong forward-looking catalyst.",
+    "weighted_reasoning": "The final rating is determined by the 'soft_hold' consensus rule, which overrides the otherwise positive fundamental and technical signals. The primary positive driver is the significant undervaluation, with the current price of Rp 765 at a 95% discount to the fair value of Rp 1,493, providing a substantial margin of safety. The trade setup itself is attractive, offering a Risk/Reward ratio of 2.06.\n\nHowever, these factors are outweighed by significant risks that justify a HOLD rating. The most critical issue, raised by both the Bear and Devil's Advocate, is the complete lack of an identifiable catalyst within the 1-3 month swing trading horizon. Without a driver, the stock is vulnerable to stagnation or broader market sentiment shifts. The technical picture is also ambiguous; while in a long-term uptrend (above MA200), the price is currently trading below its MA50 (Rp 771), indicating short-term weakness and potential overhead resistance. The Devil's Advocate's concern about a breakdown due to macro pressure is valid and unanswered. Given these uncertainties, a neutral stance is the most prudent course of action. Consensus override: Bull/Bear confidence gap was below 0.15, so the chamber treats this as soft consensus HOLD instead of forcing an entry.",
     "critical_risk_factor": "",
     "key_catalysts": [
-      "Significant undervaluation (95% below Fair Value) acting as a price floor and attracting value investors.",
-      "Technical setup with entry near dynamic support (EMA20) in a confirmed long-term uptrend (above MA200).",
-      "Favorable Risk/Reward ratio of 2.06 provides a well-defined and attractive trade structure."
+      "Significant undervaluation (Price Rp 765 vs. Fair Value Rp 1,493) could attract value investors.",
+      "A potential technical breakout above the MA50 resistance at Rp 771 could signal renewed momentum."
     ],
     "key_risks": [
-      "Lack of a specific, near-term catalyst could lead to prolonged consolidation or sideways movement, tying up capital.",
-      "Negative quarterly revenue growth (-2.98%) may signal underlying business weakness, potentially leading to downward revisions of fair value if the trend continues.",
-      "A broader market downturn or continued foreign selling could override the stock's individual technicals and trigger the stop-loss."
+      "Absence of a clear, near-term catalyst to unlock value, leading to price stagnation or drift.",
+      "Technical weakness with price below the MA50 (Rp 771), which may act as resistance.",
+      "Vulnerability to negative market sentiment or sector-wide selling pressure without a strong company-specific driver.",
+      "Sentiment data is unavailable (INSUFFICIENT_DATA), removing a layer of confirmation."
     ],
-    "summary": "The trade plan for ELSA is approved with a BUY rating. The stock is significantly undervalued with a strong 2.06 R/R ratio, providing a substantial margin of safety. The entry is well-timed near dynamic support within a confirmed long-term uptrend. However, conviction is tempered by a lack of near-term catalysts and a recent decline in quarterly revenue, warranting a normal BUY rating rather than a high-conviction one.",
+    "summary": "This trade plan is rated HOLD due to a mandatory 'soft_hold' consensus directive, reflecting significant unresolved debate among analysts. While ELSA is deeply undervalued with an excellent R/R of 2.06, the critical absence of a near-term catalyst and mixed technical signals (struggling below MA50) make an immediate entry premature. We will wait for a clearer technical breakout or an identifiable catalyst before committing capital.",
     "expected_return": "+11.6%",
     "risk_reward_ratio": 2.06,
     "is_overvalued": false,
-    "wait_and_see": false
+    "wait_and_see": true,
+    "consensus_reached": true,
+    "consensus_method": "soft_hold",
+    "dissenting_agents": [
+      "fundamental_scout",
+      "chartist",
+      "bull",
+      "bear"
+    ]
   },
-  "debate_rounds": 2,
-  "consensus_reached": false,
-  "disagreement_type": "direction",
-  "debate_history": [
+  "debate_rounds": 1,
+  "consensus_reached": true,
+  "consensus_method": "soft_hold",
+  "dissenting_agents": [
+    "fundamental_scout",
+    "chartist",
+    "bull",
+    "bear"
+  ],
+  "agent_votes": [
     {
-      "role": "system",
-      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 765, Rp 1,493, Rp 584, Rp 763, Rp 771, Rp 767, Rp 790, Rp 705, Rp 1000",
+      "agent": "fundamental_scout",
+      "position": "BUY",
+      "confidence": 0.85,
       "round": 0
     },
     {
-      "role": "bull",
-      "content": "…nt for future price action.\n\n4.  **RISK/REWARD:** Based on the provided technical analysis, the proposed swing trade setup is: Entry Rp 767 (midpoint of the entry zone) → Target Rp 790 → Stop Rp 705. This yields a potential Reward of Rp 23 (Rp 790 - Rp 767) and a potential Risk of Rp 62 (Rp 767 - Rp 705). The resulting Risk/Reward ratio is approximately **0.37:1**. This ratio is significantly below the generally accepted minimum for a favorable swing trade (typically 1.5:1 or 2:1), indicating that the potential reward does not adequately compensate for the inherent risk in this specific setup.",
+      "agent": "chartist",
+      "position": "BUY",
+      "confidence": 0.88,
+      "round": 0
+    },
+    {
+      "agent": "sentiment_specialist",
+      "position": "HOLD",
+      "confidence": 0.0,
+      "round": 0
+    },
+    {
+      "agent": "bull",
+      "position": "BUY",
+      "confidence": 0.6,
       "round": 1
     },
     {
-      "role": "bear",
-      "content": "…NFAVOURABLE RISK/REWARD:** The proposed swing trade setup, with an entry at Rp 767, a target of Rp 790, and a stop-loss at Rp 705, yields a potential reward of Rp 23 (Rp 790 - Rp 767) against a potential risk of Rp 62 (Rp 767 - Rp 705). This results in an abysmal Risk/Reward ratio of approximately **0.37:1**. This ratio is severely unfavorable and falls far short of the minimum acceptable standard (typically 1.5:1 or 2:1) for a viable swing trade. The potential reward does not adequately compensate for the inherent risk, making this trade highly unattractive from a risk management perspective.",
+      "agent": "bear",
+      "position": "AVOID",
+      "confidence": 0.6,
       "round": 1
-    },
+    }
+  ],
+  "disagreement_type": "timing",
+  "debate_history": [
     {
       "role": "bull",
-      "content": "The Bear's narrow focus on a specific technical risk/reward ratio overlooks the substantial fundamental undervaluation. The current market valuation is nearly half of its intrinsic worth, presenting a significant margin of safety. This fundamental gap suggests that even if short-term technical levels are breached, the downside is cushioned by the inherent value proposition. The potential for price appreciation towards its calculated fair value far exceeds the limited technical target proposed, fundamentally altering the risk-reward calculus when viewed through a broader lens.\n\nThe Bear's stop-loss, derived from a multiple of average true range below a dynamic average, is overly conservative given the stock's structural uptrend. Should the immediate dynamic supports fail, a more robust structural floor is provided by the long-term moving average, which sits considerably lower than the current trading range. This deeper support level offers a more significant psychological and technical barrier against sustained declines, limiting the true downside risk for a swing trade aligned with the prevailing trend.\n\nFurthermore, the proposed technical target, based on immediate orderbook resistance, is unduly restrictive and fails to account for the substantial upside potential. While short-term supply zones are relevant, the primary driver for a swing trade in an undervalued asset should be its convergence towards intrinsic value. The absence of an explicit near-term news catalyst does not negate the underlying fundamental strength and undervaluation. The company's robust balance sheet, evidenced by its low leverage and strong interest coverage, combined with a respectable return on equity, provides a compelling fundamental backdrop for institutional accumulation, acting as a latent catalyst for price discovery towards its fair value over the swing horizon.",
-      "round": 2
+      "content": "ELSA presents a compelling fundamental floor, trading at Rp 765, a significant 95.2% discount to its fair value of Rp 1,493. The company exhibits robust financial health, characterized by a TTM Return on Equity of 13.11%, a Net Profit Margin of 5.24%, a low Debt/Equity Ratio of 0.13, and strong Interest Coverage of 10.01x. Additionally, ELSA offers an attractive Dividend Yield of 5.11%. These metrics establish a strong fundamental cushion and long-term value proposition, suggesting the current price is deeply undervalued.\n\nTechnically, ELSA is situated within a strong structural uptrend, with the current price of Rp 7\n\nPosition: BUY\nAgent Confidence: 0.60",
+      "round": 1,
+      "position": "BUY",
+      "confidence": 0.6
     },
     {
       "role": "bear",
-      "content": "The Bull's swing setup for ELSA is fundamentally flawed, relying on fragile technical assumptions and an eroding fundamental premise that fails to account for current market dynamics and volatility.\n\nFirstly, the Bull's entry zone (Rp 763 – Rp 771) is predicated on EMA20 and MA50 acting as dynamic support. However, the current price of Rp 765 is already trading *below* the MA50 at Rp 771. This indicates that the MA50 has *failed* as immediate support and now acts as a resistance level, directly contradicting the Bull's premise. Relying on the EMA20 at Rp 763 as the sole remaining dynamic support is precarious, especially when a more significant moving average has already been breached. This immediate technical weakness undermines the entire entry strategy.\n\nSecondly, the Bull's assertion of a \"substantial fundamental undervaluation\" (Fair Value Rp 1,493) as a robust floor is undermined by the company's declining performance. The reported Quarter YoY Revenue growth of -2.98% is a critical red flag, indicating an erosion of the underlying business that could lead to a downward revision of this \"fair value.\" A fundamental floor based on historical metrics becomes increasingly unreliable when current operational trends are negative. Furthermore, the Bull's target of Rp 790, based on immediate orderbook resistance, represents a mere Rp 25 upside from the current price of Rp 765. This paltry target is inconsistent with the claim of \"substantial upside potential\" from a fundamentally undervalued asset, suggesting a disconnect between the long-term fundamental view and the short-term technical execution.\n\nFinally, the proposed stop-loss at Rp 705 is insufficient to withstand normal market volatility, rendering the trade unviable for swing execution. With an ATR(14) of 39.0, the maximum 1-week adverse move (2 × ATR) is Rp 78. This potential adverse movement of Rp 78 from the current price of Rp 765 would push the price down to Rp 687, easily breaching the Bull's stop-loss at Rp 705. This demonstrates that the Bull's technical risk assessment is severely underestimated. Should this immediate stop-loss fail, the Bull's \"more robust structural floor\" at the MA200 (Rp 584) implies a potential maximum loss of Rp 181 from the current price of Rp 765, a significantly greater risk than the Bull's assumed Rp 60. This exposes the true, unmitigated downside if the immediate technical levels do not hold.",
-      "round": 2
+      "content": "**OVERVALUATION CHECK:** The current price of Rp 765 is significantly *below* the stated fair value of Rp 1,493, representing a substantial discount rather than a premium. While this suggests fundamental undervaluation, for a 1-3 month swing trade, this discount does not inherently provide a margin of safety for *timely price appreciation*. Without an identifiable catalyst to unlock this value within the short swing trade horizon, the fundamental undervaluation is not actionable, meaning the entry lacks a *catalyst-driven* margin of safety for the intended trade duration.\n\n**TECHNICAL BREAKDOWN RISK:** The technical setup presents significant breakdown risks, contradicting the Bull's \"strong structural uptrend\" claim for a short-term swing. The current price of Rp 765 is *below* the MA50 (Rp 771), indicating short-term weakness and potential resistance at this level, not merely \"consolidation.\" A breakdown below the EMA20 (Rp 763), which is included in the Bull's entry zone (Rp 750 – Rp 763), would confirm further bearish momentum. The 52-week high of Rp 1000 suggests a significant pullback, and the inability to reclaim MA50 reinforces the risk of a continued downtrend or sideways consolidation rather than an immediate upward swing. The Bull's entry zone places the trade directly into a potential support breakdown area, with the MA50 acting as overhead resistance.\n\n**CATALYST RISK:** The Bull explicitly states, \"No clear upcoming growth catalyst (e.g., earnings, new contracts) has been identified within the 1-3 month swing trade horizon.\" This is a critical flaw for a swing trade. While ELSA may be fundamentally undervalued, the absence of a specific event or news flow to unlock this value within the short 1-3 month timeframe means the stock could languish or even decline further, making the fundamental undervaluation irrelevant for a swing trading strategy. The past dividend ex-date of 04 Jun 25 is a PAST_EVENT_NOT_CATALYST and offers no forward momentum.\n\n**UNFAVOURABLE R/R:** The proposed swing trade setup exhibits an extremely unfavorable Risk/Reward (R/R) ratio. Using the Bull's suggested entry midpoint of Rp 755, a target price of Rp 78\n\nPosition: AVOID\nAgent Confidence: 0.60",
+      "round": 1,
+      "position": "AVOID",
+      "confidence": 0.6
     },
     {
       "role": "devils_advocate",
-      "content": "Berikut adalah tantangan Devil's Advocate untuk setup trade ELSA:\n\n1.  **MACRO/COMPANY RISK & FOREIGN FLOW:**\n    Mengingat ELSA menunjukkan penurunan pendapatan QoQ sebesar -2.98%, jika laporan keuangan berikutnya menunjukkan pelemahan lebih lanjut atau jika terjadi akselerasi net foreign sell di pasar saham Indonesia, mungkinkah tekanan jual ini mematahkan level stop-loss Rp 705, memicu koreksi lebih dalam menuju MA200 di Rp 584 dalam 1-3 bulan ke depan?\n\n2.  **EXECUTION RISK — Transaction Cost Stress Test:**\n    Dengan harga entry Rp 767 dan target Rp 790, estimasi gross return adalah 2.99%. Namun, biaya transaksi round-trip perlu diperhitungkan. Biaya beli 0.15% dari Rp 767 adalah Rp 1.15, biaya jual 0.25% dari Rp 790 adalah Rp 1.98, PPh final 0.10% dari Rp 790 adalah Rp 0.79, dan slippage 0.15% dari Rp 767 (karena harga >= Rp 500) adalah Rp 1.15. Total biaya transaksi per saham adalah Rp 1.15 + Rp 1.98 + Rp 0.79 + Rp 1.15 = Rp 5.07. Jika dihitung sebagai persentase dari harga entry Rp 767, total biaya adalah (Rp 5.07 / Rp 767) * 100% = 0.66%. Dengan demikian, net return setelah biaya adalah 2.99% - 0.66% = 2.33%. Berdasarkan kriteria, net return 2.33% ini masuk kategori **MARGINAL — only proceed if conviction high**.",
-      "round": 3
+      "content": "**Question 1: MACRO/COMPANY RISK & FOREIGN FLOW**\nGiven the absence of a clear catalyst and ELSA's current price being below its MA50, if broader market foreign selling pressure intensifies or negative sentiment hits the energy sector, could ELSA break below the Rp 750 support level, potentially triggering further declines towards its stop loss at Rp 705?\n\n**Question 2: EXECUTION RISK — Transaction Cost Stress Test**\nMenggunakan harga entry tengah yang disarankan Rp 755 dan target harga Rp 785, potensi keuntungan kotor adalah 3.97%. Total biaya transaksi round-trip dihitung sebagai berikut: biaya beli 0.15%, biaya jual 0.25%, PPh final 0.10% dari nilai jual, dan estimasi slippage 0.15% (karena harga saham >= Rp 500). Jadi, total biaya transaksi adalah 0.15% + 0.25% + 0.10% + 0.15% = 0.65%. Setelah dikurangi biaya ini, net return yang diharapkan adalah 3.97% - 0.65% = 3.32%. Berdasarkan perhitungan ini, trade ini dianggap VIABLE after transaction costs.",
+      "round": 2,
+      "position": "UNKNOWN",
+      "confidence": null
     }
   ],
-  "raw_data_summary": "=== FUNDAMENTALS ===\n**FAIR VALUE: Rp 1,493**\n\nELSA is currently trading at Rp 765, indicating it is **UNDERVALUED** by 95.2% compared to its calculated fair value of Rp 1,493. This valuation is based on a weighted average of P/E Band (Rp 1,482) and P/B Band (Rp 1,508) methods, with a medium confidence level (2/3 methods valid).\n\nKey fundamental metrics include a TTM ROE of 13.11%, a TTM Net Margin of 5.24%, a low Debt/Equity Ratio of 0.13, and a Dividend Yield of 5.11%. Historical trends for ROE and Net Margin (3yr) are not available in the provided data.\n\nNo specific upcoming growth catalyst (e.g., earnings release, new contract) within the 1-3 month swing trade horizon is identified. The latest dividend ex-date (04 Jun 25) is a past event and not a future catalyst.\n\n**Quality Check:**\n*   ROE (13.11%) is not high (>15%) while Net Margin (5.24%) is not low (<5%), so no ROE-Margin Divergence.\n*   DER (0.13) is low (<0.3), but Interest Coverage Ratio (10.01x) is strong (>3x), so no hidden debt concern.\n*   Revenue growth (Quarter YoY: -2.98%) is not positive, so no Revenue-CFO Divergence.\n*   Altman Z-Score (4.37) is not high (>10), so no Z-Score vs DER inconsistency.\n✅ No red flags detected.\n\n=== TECHNICALS ===\nBerikut adalah analisis teknikal untuk swing trade (1-3 bulan):\n\n**TREND CONTEXT:**\nSaham dalam uptrend struktural. Swing long searah tren. Harga saat ini (Rp 765) diperdagangkan jauh di atas MA200 (Rp 584), mengkonfirmasi tren naik jangka panjang. Harga sedang berkonsolidasi di sekitar EMA20 dan MA50, menunjukkan potensi retest atau pantulan dari level support dinamis ini.\n\n**ENTRY ZONE:**\nENTRY ZONE: Rp 763 – Rp 771. Area ini mencakup EMA20 (Rp 763) dan MA50 (Rp 771), yang dapat berfungsi sebagai support dinamis untuk entri beli.\n\n**TARGET PRICE:**\nTARGET: Rp 790 (approx. 3.0% from entry mid). Level Rp 790 menunjukkan akumulasi volume offer yang signifikan pada orderbook, menjadikannya resistensi terdekat yang kuat.\n\n**STOP LOSS:**\nSTOP LOSS: Rp 705 (1.5× ATR below EMA20). Ini memberikan buffer yang cukup di bawah EMA20 untuk menahan volatilitas normal.\n\n**RSI INTERPRETATION:**\nRSI(14) berada di 51.3, menunjukkan momentum yang relatif netral. Harga tidak dalam kondisi overbought maupun oversold, memberikan ruang untuk pergerakan ke atas.\n\n**VOLUME SIGNAL:**\nData volume total harian saat ini tidak tersedia untuk dibandingkan dengan rata-rata volume 20 hari. Oleh karena itu, sulit untuk mengkonfirmasi apakah pergerakan harga terbaru didukung oleh volume yang signifikan. Namun, orderbook menunjukkan likuiditas yang baik pada level harga bid dan offer.\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 765.0,\n  \"sma20\": 749.0,\n  \"ema20\": 763.0,\n  \"ma50\": 771.0,\n  \"ma200\": 584.0,\n  \"ma200_context\": \"ABOVE\",\n  \"rsi14\": 51.3,\n  \"atr14\": 39.0,\n  \"avg_volume_20d\": 66625415.0,\n  \"52w_high\": 1000.0,\n  \"52w_low\": 429.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\n=== DIVIDEND EX-DATE SCAN: ELSA ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
+  "raw_data_summary": "=== FUNDAMENTALS ===\nFAIR VALUE: Rp 1,493\n\nThe current market price of Rp 765 for ELSA is significantly UNDERVALUED, presenting a 95.2% upside compared to the calculated fair value of Rp 1,493. This indicates a strong fundamental cushion for a potential swing trade.\n\nKey support metrics include a TTM Return on Equity (ROE) of 13.11% and a Net Profit Margin of 5.24%. The company maintains a very healthy balance sheet with a low Debt/Equity Ratio of 0.13 and robust Interest Coverage of 10.01x. Additionally, ELSA offers a Dividend Yield of 5.11% based on a TTM dividend per share of Rp 39.11. (Note: 3-year trend data for ROE and Net Margin was not provided in the source).\n\nThe latest dividend ex-date of 04 Jun 25 is a PAST_EVENT_NOT_CATALYST relative to the current date (2026-05-07). No clear upcoming growth catalyst (e.g., earnings, new contracts) has been identified within the 1-3 month swing trade horizon.\n\nQuality Check:\n• ROE (13.11%) is not >15%, so \"ROE-Margin Divergence\" is not triggered.\n• DER (0.13) is <0.3, but Interest Coverage (10.01x) is not <3x, so \"Low DER tapi Interest Coverage lemah\" is not triggered.\n• Revenue growth (-2.98%) is not positive, so \"Revenue-CFO Divergence\" is not triggered.\n• Altman Z-Score (4.37) is not >10, so \"Z-Score vs DER Inconsistency\" is not triggered.\n✅ No red flags detected.\n\nPosition: BUY\nAgent Confidence: 0.85\n\n=== TECHNICALS ===\nAnalisis teknikal menunjukkan saham berada dalam uptrend struktural yang kuat, dengan harga saat ini jauh di atas MA200. Ini mendukung strategi swing long searah tren. Harga saat ini (Rp 765) berada di atas EMA20 namun sedikit di bawah MA50, mengindikasikan konsolidasi singkat dalam tren naik.\n\nUntuk setup swing trade 1-3 bulan, zona entri yang ideal adalah pada retest support. Berdasarkan EMA20 (Rp 763) dan MA50 (Rp 771) sebagai batas support, ENTRY ZONE yang disarankan adalah Rp 750 – Rp 763. TARGET PRICE terdekat pada level resistensi kuat adalah Rp 785, yang menawarkan potensi keuntungan sekitar 3.97% dari titik tengah entri (Rp 755). STOP LOSS ditempatkan pada Rp 705, dihitung 1.5× ATR (39.0) di bawah EMA20 (Rp 763).\n\nIndikator RSI(14) berada di 51.3, menunjukkan momentum yang netral, tidak ada kondisi overbought atau oversold yang signifikan. Ini memberikan ruang bagi harga untuk bergerak naik. Informasi volume perdagangan harian saat ini tidak tersedia untuk dibandingkan dengan rata-rata volume 20 hari, sehingga tidak dapat digunakan untuk mengkonfirmasi atau menyangkal pergerakan harga.\n\nPosition: BUY\nAgent Confidence: 0.88\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 765.0,\n  \"sma20\": 749.0,\n  \"ema20\": 763.0,\n  \"ma50\": 771.0,\n  \"ma200\": 584.0,\n  \"ma200_context\": \"ABOVE\",\n  \"rsi14\": 51.3,\n  \"atr14\": 39.0,\n  \"avg_volume_20d\": 66625415.0,\n  \"52w_high\": 1000.0,\n  \"52w_low\": 429.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== DIVIDEND EX-DATE SCAN: ELSA ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
   "error": null,
-  "conviction_score": 0.576,
+  "conviction_score": 0.0,
   "sector_key": "energy",
   "metadata": {
-    "batch_timestamp": "20260506_212948",
+    "batch_timestamp": "20260507_035045",
     "versioned_output": true
   }
 }

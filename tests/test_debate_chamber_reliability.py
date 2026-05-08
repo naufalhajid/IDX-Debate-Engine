@@ -84,11 +84,11 @@ async def test_cancelled_error_is_not_wrapped_or_retried():
 
 
 @pytest.mark.asyncio
-async def test_consensus_json_false(monkeypatch):
+async def test_consensus_soft_hold_when_bull_bear_confidence_gap_is_small(monkeypatch):
     chamber = _chamber()
 
     async def fake_invoke(llm, messages, inject_rules=True):
-        return SimpleNamespace(content='{"consensus_reached": false}')
+        raise AssertionError("consensus evaluator should be deterministic")
 
     monkeypatch.setattr(chamber, "_invoke_llm", fake_invoke)
     chamber.pro_llm = FakeLLM(model="gemini-2.5-pro")
@@ -103,15 +103,17 @@ async def test_consensus_json_false(monkeypatch):
         }
     )
 
-    assert result == {"consensus_reached": False}
+    assert result["consensus_reached"] is True
+    assert result["consensus_method"] == "soft_hold"
+    assert result["dissenting_agents"] == ["bull", "bear"]
 
 
 @pytest.mark.asyncio
-async def test_consensus_text_not_true_defaults_false(monkeypatch):
+async def test_consensus_requires_three_of_five_votes(monkeypatch):
     chamber = _chamber()
 
     async def fake_invoke(llm, messages, inject_rules=True):
-        return SimpleNamespace(content="not true")
+        raise AssertionError("consensus evaluator should be deterministic")
 
     monkeypatch.setattr(chamber, "_invoke_llm", fake_invoke)
     chamber.pro_llm = FakeLLM(model="gemini-2.5-pro")
@@ -126,7 +128,62 @@ async def test_consensus_text_not_true_defaults_false(monkeypatch):
         }
     )
 
-    assert result == {"consensus_reached": False}
+    assert result["consensus_reached"] is False
+    assert result["consensus_method"] is None
+
+
+@pytest.mark.asyncio
+async def test_consensus_voting_three_of_five(monkeypatch):
+    chamber = _chamber()
+
+    async def fake_invoke(llm, messages, inject_rules=True):
+        raise AssertionError("consensus evaluator should be deterministic")
+
+    monkeypatch.setattr(chamber, "_invoke_llm", fake_invoke)
+
+    result = await chamber._consensus_evaluator_node(
+        {
+            "round_count": 1,
+            "fundamental_data": "Position: BUY\nAgent Confidence: 0.70",
+            "technical_data": "Position: BUY\nAgent Confidence: 0.66",
+            "sentiment_data": "Position: HOLD\nAgent Confidence: 0.52",
+            "debate_history": [
+                DebateMessage(role="bull", content="Position: BUY\nAgent Confidence: 0.72", round_num=1),
+                DebateMessage(role="bear", content="Position: AVOID\nAgent Confidence: 0.40", round_num=1),
+            ],
+        }
+    )
+
+    assert result["consensus_reached"] is True
+    assert result["consensus_method"] == "voting"
+    assert result["dissenting_agents"] == ["sentiment_specialist", "bear"]
+
+
+@pytest.mark.asyncio
+async def test_consensus_round_three_uses_confidence_winner(monkeypatch):
+    chamber = _chamber()
+
+    async def fake_invoke(llm, messages, inject_rules=True):
+        raise AssertionError("consensus evaluator should be deterministic")
+
+    monkeypatch.setattr(chamber, "_invoke_llm", fake_invoke)
+
+    result = await chamber._consensus_evaluator_node(
+        {
+            "round_count": 3,
+            "fundamental_data": "Position: BUY\nAgent Confidence: 0.61",
+            "technical_data": "Position: AVOID\nAgent Confidence: 0.62",
+            "sentiment_data": "Position: HOLD\nAgent Confidence: 0.63",
+            "debate_history": [
+                DebateMessage(role="bull", content="Position: BUY\nAgent Confidence: 0.64", round_num=3),
+                DebateMessage(role="bear", content="Position: AVOID\nAgent Confidence: 0.80", round_num=3),
+            ],
+        }
+    )
+
+    assert result["consensus_reached"] is False
+    assert result["consensus_method"] == "confidence_winner"
+    assert result["consensus_winner"]["agent"] == "bear"
 
 
 @pytest.mark.asyncio
@@ -176,11 +233,11 @@ def test_cio_prompt_contains_confidence_calibration_rubric():
     assert "CONFIDENCE CALIBRATION" in prompt
     assert "0.82" in prompt
     assert "0.78" in prompt
-    assert "Caps are not additive" in prompt
-    assert "0.80-0.82" in prompt
-    assert "Avoid round/default numbers" in prompt
+    assert "Caps tidak additive" in prompt
+    assert "0.80-0.89" in prompt
+    assert "Angka bulat" in prompt
     assert "0.70" in prompt
     assert "0.75" in prompt
     assert "0.80" in prompt
-    assert "subtract exactly" in prompt
+    assert "kurangi 0.10" in prompt
     assert "0.10" in prompt

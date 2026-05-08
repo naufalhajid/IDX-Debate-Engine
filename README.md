@@ -1,91 +1,172 @@
 # IDX Fundamental Analysis
 
-Python tooling for Indonesian stock research, swing-trade screening, and multi-agent debate.
+CLI-first research engine for Indonesian stock analysis, swing-trade screening, and AI-assisted investment reasoning.
 
-This repository combines:
+This project was built to answer one practical question:
 
-- data acquisition from IDX, Stockbit, yfinance, and Google Drive
-- ETL and database persistence
-- quantitative filtering for swing candidates
-- multi-agent debate and CIO verdict generation
-- rank aggregation, historical scoring, and markdown reporting through the flagship orchestrator
-- FastAPI endpoints and a minimal SvelteKit UI
+> From many IDX stocks, which names deserve deeper attention for a short-to-medium term swing trade, and why?
 
-The project is research tooling, not financial advice.
+The system combines market data collection, quantitative filtering, multi-agent AI debate, risk/reward scoring, portfolio diversification, and markdown reporting into one reproducible command-line pipeline.
 
-## Orchestrator
+This is research tooling, not financial advice.
 
-`orchestrator.py` is the flagship execution path of the repository. It turns the
-latest quant screen into ranked swing-trade recommendations in a single,
-reproducible pipeline run.
+## Why This Project Exists
 
-### What it does
+Retail investors often face too much scattered information: price movement, valuation metrics, technical levels, market sentiment, sector context, and news catalysts all compete for attention. This project turns that messy workflow into a structured pipeline.
 
-- validates dependencies and candidate freshness before consuming API budget
-- applies regime-aware thresholds before debate execution begins
-- runs debates with bounded concurrency and rate limiting
-- protects the Gemini budget and aborts cleanly when limits are hit
-- applies historical scoring adjustments before final ranking
-- writes both machine-readable JSON and human-readable markdown reports
-- preserves versioned debate snapshots for auditability and replay
-- exposes a Rich-powered terminal experience for interactive runs
-- supports headless execution for automation, CI, or scheduled runs
+Instead of manually checking every stock, the CLI:
 
-### Output artifacts
+- collects and prepares stock data from multiple sources
+- filters candidates using quantitative rules
+- sends selected tickers into a multi-agent debate process
+- scores each result using confidence, risk/reward, and historical behavior
+- produces a readable final report with trade levels, risks, and rationale
 
-- `output/full_batch_results.json`
-- `output/TOP_3_SWING_TRADES.md`
-- `output/debates/<TICKER>/vYYYYMMDD_HHMMSS/`
-- `output/debates/<TICKER>/latest_debate.json`
+The project is intentionally CLI-first. The priority is the analysis engine: correctness, reproducibility, automation, logs, and useful output artifacts.
 
-### Recommended usage
+## Core Showcase
+
+`orchestrator.py` is the main showcase file. It runs the end-to-end swing-trade pipeline:
+
+```text
+Quant Filter -> Pre-CIO Risk Filter -> Market Regime Detection
+             -> Multi-Agent Debate -> Conviction Scoring
+             -> Portfolio Diversification -> Position Sizing
+             -> Markdown + JSON Reports
+```
+
+Recommended command:
 
 ```bash
 uv run python orchestrator.py
 ```
 
-Use `--no-interactive` for unattended runs, `--skip-scraping` when
-`top10_candidates.json` is already available, `--dry-run` to validate the
-pipeline without live LLM calls, and `--output-dir` to isolate artifacts.
+For unattended runs:
+
+```bash
+uv run python orchestrator.py --no-interactive --skip-scraping
+```
+
+For validating the pipeline without live Gemini calls:
+
+```bash
+uv run python orchestrator.py --dry-run
+```
+
+## Orchestrator Analysis
+
+The orchestrator is designed as a production-style CLI pipeline rather than a simple script.
+
+| Area | What it does |
+| --- | --- |
+| Pre-flight validation | Checks required dependencies, output folders, candidate freshness, and Gemini availability before spending API budget |
+| Market regime awareness | Fetches IHSG volatility, classifies regime, and adjusts thresholds such as top-N selection and conviction limits |
+| Candidate parsing | Reads `output/top10_candidates.json`, validates IDX tickers, removes duplicates, and skips critical-risk entries |
+| Pre-CIO filtering | Skips candidates with near ExDate risk and avoids counter-trend setups in high-volatility regimes |
+| Rate limiting | Uses `SafeRateLimiter` with a monotonic clock and lock-safe sliding window logic |
+| Concurrency control | Runs multiple debates with `asyncio.Semaphore` while respecting Gemini request limits |
+| Budget protection | Uses abort flags and budget charging so expensive LLM calls stop cleanly when the budget is exhausted |
+| Debate execution | Calls `DebateChamber` for each ticker and normalizes the final verdict, debate history, and agent votes |
+| Scoring | Computes conviction score from CIO confidence and normalized risk/reward ratio |
+| Historical adjustment | Reads previous debate records and adjusts scoring based on historical win-rate behavior |
+| Portfolio diversification | Applies sector caps so the final picks are not concentrated in one sector |
+| Position sizing | Calculates suggested allocation using user capital, max loss per trade, and max positions |
+| Persistence | Writes full JSON results, versioned per-ticker debate snapshots, and a human-readable markdown report |
+| CLI experience | Uses Rich panels, tables, progress bars, and graceful Ctrl+C handling |
+
+This makes `orchestrator.py` the best file to explain in a portfolio interview because it shows system design, async programming, reliability thinking, AI integration, and product judgment in one place.
+
+## Example Output
+
+The main artifacts are generated under `output/`:
+
+```text
+output/
+  top10_candidates.json
+  full_batch_results.json
+  TOP_3_SWING_TRADES.md
+  debates/
+    <TICKER>/
+      latest_debate.json
+      vYYYYMMDD_HHMMSS/
+```
+
+The final markdown report includes:
+
+- final BUY/STRONG_BUY/HOLD/AVOID rating
+- CIO confidence
+- conviction score
+- entry range
+- target price
+- stop loss
+- risk/reward ratio
+- winning argument
+- devil's advocate warning
+- CIO summary
+- position sizing summary
+
+## Features
+
+- IDX stock data scraping and enrichment
+- Stockbit and yfinance integration
+- Google Drive / Google Sheets export support
+- Quantitative swing-trade candidate filtering
+- AI-powered multi-agent debate chamber
+- CIO-style final verdict generation
+- Market regime detection
+- Risk/reward and conviction scoring
+- Historical scoring adjustment from previous debate records
+- Sector-aware portfolio diversification
+- Position sizing based on capital and risk limit
+- Rich-powered interactive CLI
+- JSON and markdown report generation
+- Async execution with rate limiting and graceful abort behavior
+- Pytest coverage for core reliability modules
 
 ## Architecture
 
-The repo is organized as a pipeline:
+```text
+providers/      External data sources: IDX, Stockbit, yfinance, Gemini, Google Drive
+builders/       ETL and analysis builders
+db/             SQLAlchemy models and async session setup
+repositories/   Database query layer
+services/       Debate chamber, AI assistant, valuation, API clients
+core/           Settings, budget, regime detection, quant filter, scoring, optimizer
+schemas/        Pydantic models for validation and structured outputs
+utils/          Logging, price fetching, Excel helpers, serialization
+tests/          Pytest suite
+output/         Generated reports and debate snapshots
+scratch/        Temporary analysis files and experiments
+```
 
-`providers/` -> `builders/` -> `db/` and `repositories/` -> `services/` and `core/` -> `output/`
+High-level flow:
 
-High level responsibilities:
+```text
+Data Sources
+  -> ETL / Analysis
+  -> Quant Filter
+  -> Debate Chamber
+  -> Scoring + Portfolio Rules
+  -> CLI Summary + Output Reports
+```
 
-| Layer | Main modules | Responsibility |
-| --- | --- | --- |
-| Data sources | `providers/` | IDX scraping, Stockbit API, yfinance, Gemini |
-| ETL | `builders/` | Build datasets, enrich rows, persist structured outputs |
-| Persistence | `db/`, `repositories/` | SQLAlchemy models and query layer |
-| Domain services | `services/` | Debate chamber, fair value, API clients, token handling |
-| System logic | `core/` | Settings, budget, regime detection, historical scoring, quant filter |
-| API | `app/api/` | FastAPI routers and dependency injection |
-| UI | `app/ui/` | Minimal SvelteKit client for local web access |
-| Artifacts | `output/`, `scratch/` | Generated reports, candidate lists, debate snapshots, temp files |
+## Tech Stack
 
-## Entry Points
-
-| Command | Purpose |
+| Category | Tools |
 | --- | --- |
-| `uv run python main.py -f -o excel` | Run the core IDX ETL, fetch fundamentals, and export to Excel |
-| `uv run python main.py -f -o spreadsheet` | Same pipeline, but export to Google Sheets |
-| `uv run python build_sector_cache.py` | Build or refresh `output/sector_cache.json` |
-| `uv run python run_quant_filter.py` | Run the quantitative swing filter and write `output/top10_candidates.json` plus `scratch/report.md` |
-| `uv run python run_debate.py --tickers BBRI BBCA TLKM` | Run the debate chamber for selected tickers and save per-ticker debate JSON |
-| `uv run python orchestrator.py` | Flagship end-to-end pipeline: quant screening, debate orchestration, historical scoring, and final swing-trade reporting |
-| `uv run python run_api.py` | Start the FastAPI backend on `http://127.0.0.1:8000` |
-| `cd app/ui && bun install && bun run dev --open` | Start the local SvelteKit UI |
+| Language | Python 3.12+ |
+| Package manager | UV |
+| Data processing | pandas, numpy, openpyxl |
+| Scraping | undetected-chromedriver, BeautifulSoup, requests |
+| Database | SQLAlchemy async, SQLite via aiosqlite, optional PostgreSQL config |
+| API layer | FastAPI, Uvicorn |
+| AI / LLM | Gemini, LangGraph, LangChain |
+| Reliability | Tenacity, Loguru, Rich |
+| Validation | Pydantic v2 |
+| Testing | pytest, pytest-asyncio |
+| Code quality | Ruff, isort |
 
-The orchestrator has a Rich-based terminal UI. It supports:
-
-- `--no-interactive`
-- `--skip-scraping`
-- `--dry-run`
-- `--output-dir`
+Note: the repository contains API and UI folders, but the main product experience for this showcase is the CLI analysis pipeline.
 
 ## Quick Start
 
@@ -94,7 +175,7 @@ The orchestrator has a Rich-based terminal UI. It supports:
 - Python 3.12 or newer
 - UV package manager
 - Chrome or Chromium for IDX scraping
-- Bun if you want to run the SvelteKit UI
+- Gemini API key for real debate runs
 
 ### 2. Install dependencies
 
@@ -102,169 +183,94 @@ The orchestrator has a Rich-based terminal UI. It supports:
 uv sync
 ```
 
-### 3. Configure environment variables
+### 3. Configure environment
 
-Copy `.env.example` to `.env` and fill in the values that apply to your setup.
+Copy `.env.example` to `.env` and fill the values you need:
 
-Key settings live in `core/settings.py` and `orchestrator.py`.
+```bash
+GEMINI_API_KEY=your_key_here
+LOG_LEVEL=INFO
+```
 
-### 4. Prepare optional sector cache
+Most runtime settings live in `core/settings.py`.
+
+### 4. Build optional sector cache
 
 ```bash
 uv run python build_sector_cache.py
 ```
 
-This improves sector resolution for the quantitative filter. It is optional, but recommended.
-
-## Environment Variables
-
-The most important variables are:
-
-| Variable | Purpose |
-| --- | --- |
-| `GEMINI_API_KEY` | Required for real debate runs |
-| `GEMINI_FLASH_MODEL` | Model used for lighter debate steps |
-| `GEMINI_PRO_MODEL` | Model used for final CIO reasoning |
-| `GOOGLE_SERVICE_ACCOUNT` | JSON credential for Google Sheets / Drive integration |
-| `GOOGLE_DRIVE_EMAILS` | Email list used when sharing spreadsheet output |
-| `DATABASE_TYPE` | `sqlite` or `postgresql` |
-| `DATABASE_HOST` / `DATABASE_PORT` / `DATABASE_USER` / `DATABASE_PASSWORD` | Database connection settings |
-| `LOG_LEVEL` | Console log level |
-| `LOG_APP_FILENAME` | Main application log file |
-| `OUTPUT_DIR` | Root output directory used by the orchestrator |
-| `MAX_CONCURRENT_DEBATES` | Parallel debate limit |
-| `GEMINI_RPM_LIMIT` | Gemini requests-per-minute cap |
-| `BATCH_DELAY_SECONDS` | Delay between debate tasks |
-| `TOP_N_SELECTION` | Number of top candidates to keep |
-| `MAX_PRICE_RETRY_ATTEMPTS` | Price fetch retry limit |
-| `CANDIDATES_MAX_AGE_HOURS` | How long `top10_candidates.json` stays valid |
-| `CANDIDATES_AUTO_RERUN` | Auto-run quant filter if candidates are stale |
-| `CONVICTION_WEIGHT_CONFIDENCE` | Weight for CIO confidence in conviction scoring |
-| `CONVICTION_WEIGHT_RR_RATIO` | Weight for risk/reward in conviction scoring |
-| `CONVICTION_RR_NORMALIZATION_CAP` | Cap used when normalizing R/R |
-| `PORTFOLIO_MAX_PER_SECTOR` | Sector diversification limit |
-| `PORTFOLIO_MIN_CONVICTION` | Minimum score required for selection |
-
-If you only need the default local setup, start with the values in `.env.example` and add Gemini, Google, and database settings as needed.
-
-## Common Workflows
-
-### 1. Build the base dataset
-
-```bash
-uv run python main.py -f -o excel
-```
-
-Use `-o spreadsheet` if you want Google Sheets output instead of a local Excel file.
-
-### 2. Run the quant filter
-
-```bash
-uv run python run_quant_filter.py
-```
-
-Outputs:
-
-- `output/top10_candidates.json`
-- `scratch/report.md`
-
-The filter reads the latest Excel workbook in `output/` by default.
-
-### 3. Run a standalone debate batch
-
-```bash
-uv run python run_debate.py --tickers BBRI BBCA TLKM
-```
-
-Outputs:
-
-- `output/debates/<TICKER>_debate.json`
-
-The standalone debate wrapper keeps the classic flat file layout. The versioned
-per-ticker snapshot layout is produced by `orchestrator.py` for auditability and
-historical scoring.
-
-### 4. Run the full orchestrator
+### 5. Run the full pipeline
 
 ```bash
 uv run python orchestrator.py
 ```
 
-What it does:
+## Common CLI Workflows
 
-1. validates dependencies
-2. checks the candidate file freshness
-3. detects market regime
-4. runs debates with bounded concurrency
-5. ranks candidates with historical adjustments
-6. writes `output/full_batch_results.json`
-7. writes `output/TOP_3_SWING_TRADES.md`
-8. writes versioned debate snapshots under `output/debates/<TICKER>/`
-
-If you omit `--no-interactive`, the orchestrator shows a Rich terminal flow with progress and summary panels.
-
-### 5. Start the API
+Build the base dataset:
 
 ```bash
-uv run python run_api.py
+uv run python main.py -f -o excel
 ```
 
-Useful URLs:
-
-- `http://127.0.0.1:8000/docs`
-- `http://127.0.0.1:8000/redoc`
-- `http://127.0.0.1:8000/api/v1/health`
-
-API routers currently cover:
-
-- health
-- stocks
-- fundamentals
-- sentiments
-- key analysis
-- stock prices
-
-### 6. Start the UI
+Run the quantitative candidate filter:
 
 ```bash
-cd app/ui
-bun install
-bun run dev --open
+uv run python run_quant_filter.py
 ```
 
-`run_ui.sh` is a convenience wrapper for Unix-like shells. It assumes `nvm` and Bun are available.
+Run debate for selected tickers:
 
-## Output Directory
+```bash
+uv run python run_debate.py --tickers BBRI BBCA TLKM
+```
 
-The main generated artifacts are:
+Run the full orchestrator:
 
-- `output/top10_candidates.json`
-- `scratch/report.md`
-- `output/full_batch_results.json`
-- `output/TOP_3_SWING_TRADES.md`
-- `output/debates/`
-- `output/sector_cache.json`
+```bash
+uv run python orchestrator.py
+```
 
-Treat files in `output/` as generated artifacts. They can be regenerated from the pipeline.
+Run in headless mode:
 
-## Project Layout
+```bash
+uv run python orchestrator.py --no-interactive --skip-scraping
+```
 
-- `providers/` - external data adapters
-- `builders/` - ETL and persistence builders
-- `repositories/` - SQLAlchemy repository layer
-- `services/` - debate, valuation, Google Drive, and API helpers
-- `core/` - settings, quant filter, regime, budget, and historical scoring
-- `db/` - models and session management
-- `schemas/` - Pydantic models and debate schemas
-- `app/api/` - FastAPI app and routers
-- `app/ui/` - SvelteKit frontend
-- `tests/` - pytest suite
-- `output/` - generated reports and snapshots
-- `scratch/` - temporary analysis and experimental files
+## CLI Options
+
+| Option | Purpose |
+| --- | --- |
+| `--no-interactive` | Skips Rich banner and prompts for automation |
+| `--skip-scraping` | Assumes candidate data already exists |
+| `--scrape-cmd` | Uses a custom scraping command before the pipeline starts |
+| `--dry-run` | Uses mock debate results without Gemini calls |
+| `--output-dir` | Writes artifacts to a custom output directory |
+
+## Important Environment Variables
+
+| Variable | Purpose |
+| --- | --- |
+| `GEMINI_API_KEY` | Required for real AI debate runs |
+| `GEMINI_FLASH_MODEL` | Model for lighter AI tasks |
+| `GEMINI_PRO_MODEL` | Model for deeper debate and CIO reasoning |
+| `OUTPUT_DIR` | Root folder for generated artifacts |
+| `MAX_CONCURRENT_DEBATES` | Parallel debate limit |
+| `GEMINI_RPM_LIMIT` | Gemini request-per-minute cap |
+| `BATCH_DELAY_SECONDS` | Delay between debate tasks |
+| `TOP_N_SELECTION` | Number of selected final candidates |
+| `CANDIDATES_MAX_AGE_HOURS` | Freshness limit for candidate JSON |
+| `CANDIDATES_AUTO_RERUN` | Auto-run quant filter when candidates are stale |
+| `CONVICTION_WEIGHT_CONFIDENCE` | Weight for CIO confidence |
+| `CONVICTION_WEIGHT_RR_RATIO` | Weight for risk/reward |
+| `CONVICTION_RR_NORMALIZATION_CAP` | Cap used when normalizing R/R |
+| `PORTFOLIO_MAX_PER_SECTOR` | Maximum selected names per sector |
+| `PORTFOLIO_MIN_CONVICTION` | Minimum conviction score for final selection |
 
 ## Testing
 
-Run the full test and lint pass with:
+Run syntax checks, linting, and tests:
 
 ```bash
 uv run python -m py_compile orchestrator.py run_quant_filter.py services/debate_chamber.py
@@ -272,27 +278,47 @@ uv run ruff check .
 uv run pytest -q
 ```
 
-The current test suite focuses on:
+Current tests focus on:
 
 - debate chamber reliability
 - dependency validation
 - historical scoring
-- regime detection
+- market regime detection
 - portfolio optimization
+
+## Portfolio Angle
+
+This project is suitable as a technical portfolio project because it shows:
+
+- ability to turn a real-world problem into an automated system
+- async Python and concurrency control
+- API budget and rate-limit awareness
+- structured AI integration, not just a simple prompt call
+- data pipeline design
+- risk-based decision support
+- readable CLI product experience
+- generated artifacts that can be audited and replayed
+
+For Apple Developer Academy, the strongest story is not "I built a stock bot." The stronger story is:
+
+> I built a CLI decision-support engine that helps Indonesian retail investors process complex stock information more systematically, while keeping the reasoning, risks, and assumptions visible.
+
+## Future Improvements
+
+- Add a lightweight SwiftUI dashboard that reads generated JSON reports
+- Improve explainability for each scoring component
+- Add backtesting for historical recommendations
+- Add more robust data quality checks before debate execution
+- Create a portfolio summary report across multiple pipeline runs
+- Add CI workflows for tests and linting
 
 ## Troubleshooting
 
-- If debate runs fail immediately, check `GEMINI_API_KEY` and the configured Gemini model names.
-- If the orchestrator says candidates are stale, rerun `run_quant_filter.py` or let auto-rerun handle it.
+- If debate runs fail immediately, check `GEMINI_API_KEY` and model settings.
+- If candidates are stale, run `uv run python run_quant_filter.py`.
 - If IDX scraping fails, make sure Chrome or Chromium is installed.
-- If the UI does not start, install Bun and run `bun install` inside `app/ui`.
-
-## Notes
-
-- The historical scorer reads debate snapshots from `output/debates/`.
-- The debate pipeline now stores versioned per-ticker snapshots plus a latest file for compatibility.
-- `core/quant_filter/` is the canonical implementation of the swing candidate filter; `run_quant_filter.py` is only a wrapper.
-- `orchestrator.py` is the main end-to-end swing-trade pipeline entry point.
+- If generated reports look empty, check `output/top10_candidates.json` and `pipeline.log`.
+- If Gemini budget is exhausted, lower `MAX_CONCURRENT_DEBATES` or reduce the number of candidates.
 
 ## License
 

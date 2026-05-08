@@ -497,6 +497,9 @@ def _empty_result(ticker: str, error: str, sector_key: str = "unknown") -> dict:
         "verdict": {},
         "debate_rounds": 0,
         "consensus_reached": False,
+        "consensus_method": None,
+        "dissenting_agents": [],
+        "agent_votes": [],
         "disagreement_type": None,
         "debate_history": [],
         "raw_data_summary": "",
@@ -552,9 +555,18 @@ async def _run_single_debate(ticker: str, chamber: Any) -> dict:
             "verdict": verdict_dict,
             "debate_rounds": result["round_count"],
             "consensus_reached": result.get("consensus_reached", False),
+            "consensus_method": result.get("consensus_method"),
+            "dissenting_agents": result.get("dissenting_agents", []),
+            "agent_votes": result.get("agent_votes", []),
             "disagreement_type": disagreement_type,
             "debate_history": [
-                {"role": m.role, "content": m.content, "round": m.round_num}
+                {
+                    "role": m.role,
+                    "content": m.content,
+                    "round": m.round_num,
+                    "position": getattr(m, "position", "UNKNOWN"),
+                    "confidence": getattr(m, "confidence", None),
+                }
                 for m in result["debate_history"]
             ],
             "raw_data_summary": result["raw_data"],
@@ -1085,8 +1097,31 @@ def _build_sizing_candidates(top_n: list[dict]) -> list[dict]:
             "rating": verdict.get("rating"),
             "confidence": verdict.get("confidence"),
             "rr_ratio": verdict.get("risk_reward_ratio"),
+            "target_price": verdict.get("target_price"),
+            "expected_return": verdict.get("expected_return"),
         })
     return candidates
+
+
+def _attach_sizing_to_results(results: list[dict], sizing_result: dict | None) -> None:
+    """Attach position sizing and allocation reasoning to selected ticker records."""
+    if not sizing_result:
+        return
+
+    positions = {
+        str(position.get("ticker", "")).upper(): position
+        for position in sizing_result.get("positions", [])
+    }
+    allocation_reasoning = sizing_result.get("allocation_reasoning")
+    scenario_comparison = sizing_result.get("deployment_scenario_comparison")
+
+    for entry in results:
+        ticker = str(entry.get("ticker", "")).upper()
+        if ticker not in positions:
+            continue
+        entry["position_sizing"] = positions[ticker]
+        entry["allocation_reasoning"] = allocation_reasoning
+        entry["deployment_scenario_comparison"] = scenario_comparison
 
 
 def _dry_run_profile(sector_key: str) -> dict[str, Any]:
@@ -1177,27 +1212,46 @@ def _generate_mock_debate_results(
                 "Ini adalah hasil simulasi dry-run untuk menguji parsing, scoring, "
                 "persistensi, dan report generation tanpa API call."
             ),
+            consensus_reached=True,
+            consensus_method="voting",
+            dissenting_agents=["bear"],
         ).model_dump()
 
         results.append({
             "ticker": ticker,
             "verdict": verdict,
             "debate_rounds": 3,
+            "consensus_reached": True,
+            "consensus_method": "voting",
+            "dissenting_agents": ["bear"] if verdict["rating"] in {"BUY", "STRONG_BUY"} else [],
+            "agent_votes": [
+                {"agent": "fundamental_scout", "position": "BUY", "confidence": 0.66, "round": 0},
+                {"agent": "chartist", "position": "BUY", "confidence": 0.64, "round": 0},
+                {"agent": "sentiment_specialist", "position": "HOLD", "confidence": 0.55, "round": 0},
+                {"agent": "bull", "position": "BUY", "confidence": 0.70, "round": 1},
+                {"agent": "bear", "position": "AVOID", "confidence": 0.58, "round": 1},
+            ],
             "debate_history": [
                 {
                     "role": "bull",
-                    "content": "Dry-run bull case: setup teknikal mock mendukung entry bertahap.",
+                    "content": "Dry-run bull case: setup teknikal mock mendukung entry bertahap.\n\nPosition: BUY\nAgent Confidence: 0.70",
                     "round": 1,
+                    "position": "BUY",
+                    "confidence": 0.70,
                 },
                 {
                     "role": "bear",
-                    "content": "Dry-run bear case: kualitas data sintetis tidak boleh dipakai untuk trading.",
+                    "content": "Dry-run bear case: kualitas data sintetis tidak boleh dipakai untuk trading.\n\nPosition: AVOID\nAgent Confidence: 0.58",
                     "round": 1,
+                    "position": "AVOID",
+                    "confidence": 0.58,
                 },
                 {
                     "role": "devils_advocate",
                     "content": "Dry-run challenge: konfirmasi ulang semua level harga dengan data live.",
                     "round": 2,
+                    "position": "HOLD",
+                    "confidence": 0.0,
                 },
             ],
             "raw_data_summary": "DRY_RUN mock data; no provider or Gemini call executed.",
@@ -1297,10 +1351,12 @@ def generate_top3_report(
         # [FIX-7] Reuse skor dari select_top3, bukan hitung ulang
         score = entry.get("conviction_score", 0.0)
         disagreement = entry.get("disagreement_type")
+        consensus_method = entry.get("consensus_method") or "unknown"
+        dissenting_agents = entry.get("dissenting_agents") or []
         consensus_label = (
-            "Reached"
+            f"Reached ({consensus_method})"
             if entry.get("consensus_reached")
-            else f"No ({disagreement or 'unknown'})"
+            else f"No ({consensus_method}; {disagreement or 'unknown'})"
         )
 
         lines += [
@@ -1314,6 +1370,7 @@ def generate_top3_report(
             f"| **CIO Confidence** | {v.get('confidence', 0):.0%} |",
             f"| **Conviction Score** | {score:.2%} |",
             f"| **Debate Consensus** | {consensus_label} |",
+            f"| **Dissenting Agents** | {', '.join(dissenting_agents) if dissenting_agents else '-'} |",
             f"| **Timeframe** | {v.get('timeframe', '1-3 Months')} |",
             "",
             "### Trade Box",
@@ -1369,8 +1426,8 @@ def generate_top3_report(
     lines += [
         "## Full Batch Summary",
         "",
-        "| Ticker | Rating | Confidence | R/R Ratio | Conviction Score | Consensus | Disagreement | Status |",
-        "|---|---|---|---|---|---|---|---|",
+        "| Ticker | Rating | Confidence | R/R Ratio | Conviction Score | Consensus | Method | Dissenting Agents | Disagreement | Status |",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
 
     # [FIX-7] Untuk ticker yang sudah masuk select_top3, skor sudah ada di entry.
@@ -1387,6 +1444,8 @@ def generate_top3_report(
         rr = v.get("risk_reward_ratio", "N/A") if v else "N/A"
         cscore = entry.get("conviction_score", 0.0)
         consensus = "YES" if entry.get("consensus_reached") else "NO"
+        method = entry.get("consensus_method") or "-"
+        dissent = ", ".join(entry.get("dissenting_agents") or []) or "-"
         disagreement = entry.get("disagreement_type") or "-"
 
         if entry.get("error"):
@@ -1401,7 +1460,7 @@ def generate_top3_report(
         rr_str = f"{rr:.2f}" if isinstance(rr, (int, float)) and rr else "N/A"
         lines.append(
             f"| {ticker} | {rating} | {conf:.0%} | {rr_str} | {cscore:.2%} "
-            f"| {consensus} | {disagreement} | {status} |"
+            f"| {consensus} | {method} | {dissent} | {disagreement} | {status} |"
         )
 
     lines += [
@@ -1529,6 +1588,7 @@ async def main(
         f"Deployed: Rp {sizing_result['summary']['total_deployed']:,.0f} "
         f"({sizing_result['summary']['deployed_pct'] * 100:.1f}%)"
     )
+    _attach_sizing_to_results(results, sizing_result)
 
     # Step 4: Persist
     batch_timestamp = datetime.now(ZoneInfo(settings.DATETIME_TIMEZONE)).strftime("%Y%m%d_%H%M%S")

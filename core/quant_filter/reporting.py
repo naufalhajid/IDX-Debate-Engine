@@ -205,8 +205,6 @@ def _build_position_summary(sizing_result: dict | None) -> str:
 
     positions = sizing_result.get("positions") or []
     summary = sizing_result.get("summary") or {}
-    if not positions:
-        return ""
 
     def _rupiah(value: float | int | None) -> str:
         try:
@@ -261,6 +259,53 @@ def _build_position_summary(sizing_result: dict | None) -> str:
         f"| Jumlah Posisi | {_int_id(summary.get('total_positions'))} |",
         f"| Est. Total Biaya Transaksi | {_rupiah(summary.get('total_cost_est'))} |",
     ]
+
+    reasoning = sizing_result.get("allocation_reasoning") or {}
+    if reasoning:
+        risk_factors = reasoning.get("risk_factors_limiting") or []
+        lines += [
+            "",
+            "### Allocation Reasoning",
+            "",
+            "| Item | Nilai |",
+            "|------|-------|",
+            f"| Target Deployment | {float(reasoning.get('target_deployment_pct', 0)):.1f}% |",
+            f"| Actual Deployment | {float(reasoning.get('actual_deployment_pct', 0)):.1f}% |",
+            f"| Market Condition Score | {float(reasoning.get('market_condition_score', 0)):.2f} |",
+            f"| Gap Explanation | {reasoning.get('gap_explanation', '-')} |",
+            f"| Recommendation | {reasoning.get('recommendation', '-')} |",
+            "",
+            "**Risk Factors Limiting Deployment:**",
+        ]
+        lines += [f"- {factor}" for factor in risk_factors]
+
+    comparison = sizing_result.get("deployment_scenario_comparison") or {}
+    deploy_now = comparison.get("deploy_60_now") or {}
+    wait = comparison.get("wait_for_confirmation") or {}
+    if deploy_now or wait:
+        lines += [
+            "",
+            "### Deploy 60% Now vs Wait",
+            "",
+            "| Scenario | Expected Return | Max Drawdown | Catatan |",
+            "|---|---:|---:|---|",
+            (
+                f"| Deploy 60% sekarang | "
+                f"{float(deploy_now.get('expected_return_portfolio_pct', 0)):.2f}% "
+                f"({_rupiah(deploy_now.get('expected_return_rp'))}) | "
+                f"{float(deploy_now.get('max_drawdown_portfolio_pct', 0)):.2f}% "
+                f"({_rupiah(deploy_now.get('max_drawdown_rp'))}) | "
+                f"Return on deployed {float(deploy_now.get('expected_return_on_deployed_pct', 0)):.2f}% |"
+            ),
+            (
+                f"| Tunggu konfirmasi | "
+                f"{float(wait.get('expected_return_portfolio_pct', 0)):.2f}% "
+                f"({_rupiah(wait.get('expected_return_rp'))}) | "
+                f"{float(wait.get('max_drawdown_portfolio_pct', 0)):.2f}% "
+                f"({_rupiah(wait.get('max_drawdown_rp'))}) | "
+                f"{wait.get('tradeoff', '-')} |"
+            ),
+        ]
 
     return "\n".join(lines)
 
