@@ -320,6 +320,10 @@ For Apple Developer Academy, the strongest story is not "I built a stock bot." T
 - If generated reports look empty, check `output/top10_candidates.json` and `pipeline.log`.
 - If Gemini budget is exhausted, lower `MAX_CONCURRENT_DEBATES` or reduce the number of candidates.
 
+## Attribution
+
+This project originally started from a simple Stockbit data scraping repository. I expanded it into a CLI-first IDX research engine with quantitative screening, multi-agent AI debate, conviction scoring, portfolio diversification, position sizing, and automated markdown/JSON reporting.
+
 ## License
 
 MIT License. See `LICENSE` if present in your checkout.
