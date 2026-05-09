@@ -1,0 +1,4 @@
+interface:
+  display_name: "API Extension"
+  short_description: "Add FastAPI resources using repo patterns"
+  default_prompt: "Use $api-extension to add a new database-backed FastAPI endpoint in this project."

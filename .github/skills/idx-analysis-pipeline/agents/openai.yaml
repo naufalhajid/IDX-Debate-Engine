@@ -1,0 +1,4 @@
+interface:
+  display_name: "IDX Analysis Pipeline"
+  short_description: "Run and debug the IDX analysis flow"
+  default_prompt: "Use $idx-analysis-pipeline to run the quant filter, debates, and report pipeline for selected IDX stocks."

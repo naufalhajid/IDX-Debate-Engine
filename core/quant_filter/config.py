@@ -162,7 +162,7 @@ CONFIG = {
     "fresh_breakout_bonus":   +15,
 
     # ── Output
-    "top_n": 15,
+    "top_n": 10,
 }
 
 

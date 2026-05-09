@@ -1,52 +1,52 @@
 [
   {
-    "ticker": "ASGR",
+    "ticker": "OMED",
     "verdict": {
-      "ticker": "ASGR",
-      "rating": "BUY",
-      "confidence": 0.76,
-      "fair_value": 3235.0,
-      "entry_price_range": "1495 - 1525",
-      "target_price": 1660.0,
-      "stop_loss": 1435.0,
-      "current_price": 1595.0,
+      "ticker": "OMED",
+      "rating": "AVOID",
+      "confidence": 0.94,
+      "fair_value": 214.0,
+      "entry_price_range": "264 - 270",
+      "target_price": 252.0,
+      "stop_loss": 254.0,
+      "current_price": 298.0,
       "timeframe": "1-3 Months",
-      "weighted_reasoning": "The decision to approve this trade is primarily driven by two factors: a massive fundamental undervaluation (102.8% discount to Fair Value of Rp 3,235) and a technically sound trade structure (R/R 2.0). The entry zone of Rp 1,495 – Rp 1,525 is strategically placed at the MA50 support, a logical area for a pullback in an established uptrend (price > MA200). The conflict resolution signal (Fundamental ✅ + Technical ✅) supports a BUY rating. However, the rating is not a STRONG_BUY and confidence is capped due to significant mitigating factors. The primary weakness is the lack of an identifiable catalyst within the 1-3 month timeframe, making the trade heavily reliant on technical execution. Furthermore, the Devil's Advocate risk regarding a broader market correction and foreign outflows breaking the MA50 support remains a valid, unanswered concern. The absence of sentiment data also introduces uncertainty. These factors led to the application of a 'no catalyst' confidence cap (max 0.78), which was then adjusted down to 0.76 to reflect the combined risks.",
+      "weighted_reasoning": "The AVOID rating is driven by three critical failures. First, the stock is fundamentally overvalued (Price: 298 vs. Fair Value: 214), creating a significant negative margin of safety, which is the primary reason for rejection. Second, the Python-calculated trade plan is invalid on its face, with a target price (252) below the stop loss (254), yielding a nonsensical R/R of -1.15. This is an automatic disqualification. Third, the Devil's Advocate's concern about profit-taking risk near the 52-week high is highly valid and was not adequately countered, especially given the lack of any near-term catalyst to justify the premium valuation. The consensus winner (Bear) correctly identified these fatal flaws. Consensus override: no 60% vote after 3 rounds, so bear wins by highest numeric confidence. CIO did not override the winner.",
       "critical_risk_factor": "",
       "key_catalysts": [
-        "Significant undervaluation providing a 102.8% discount to Fair Value.",
-        "Favorable Risk/Reward ratio of 2.0.",
-        "Trade entry is aligned with strong technical support at the MA50 (Rp 1,497).",
-        "Stock is in a confirmed long-term uptrend (Price > MA200)."
+        "None identified. The technical momentum cited by the Bull is not a sufficient catalyst to overcome the severe overvaluation."
       ],
       "key_risks": [
-        "Lack of a specific, identifiable catalyst within the 1-3 month swing trading horizon.",
-        "The Devil's Advocate scenario of a broader market correction causing a break of the MA50 support is a key risk.",
-        "Current price (Rp 1,595) is above the target entry zone, requiring a pullback that may not materialize.",
-        "Sentiment data is insufficient, providing no insight into market perception."
+        "Severe Overvaluation: Price is 39.3% above fair value, indicating high risk of a correction towards its intrinsic value.",
+        "Flawed Trade Structure: The target price is below the stop loss, making the trade plan illogical and unprofitable by design.",
+        "Proximity to 52-Week High: Increased risk of significant profit-taking, especially in a volatile market, which could trigger a sharp decline."
       ],
-      "summary": "This trade plan for ASGR is approved with a BUY rating. The stock is significantly undervalued, offering a substantial margin of safety, and the technical setup presents an excellent 2.0 Risk/Reward ratio for an entry on a pullback to the MA50 support. However, conviction is tempered by the absence of a clear short-term catalyst and potential macro headwinds, making a disciplined entry within the specified zone crucial.",
-      "expected_return": "+9.9%",
-      "risk_reward_ratio": 2.0,
-      "is_overvalued": false,
-      "wait_and_see": false,
-      "consensus_reached": true,
-      "consensus_method": "voting",
+      "summary": "This trade plan is rejected. The stock is severely overvalued, trading 39.3% above its fair value, eliminating any margin of safety. Furthermore, the provided trade envelope is fundamentally flawed, with a target price (252) set below the stop loss (254), resulting in a negative risk/reward ratio. This setup presents an unacceptable and illogical risk.",
+      "expected_return": "-5.6%",
+      "risk_reward_ratio": -1.15,
+      "is_overvalued": true,
+      "wait_and_see": true,
+      "consensus_reached": false,
+      "consensus_method": "confidence_winner",
       "dissenting_agents": [
-        "sentiment_specialist"
+        "chartist",
+        "sentiment_specialist",
+        "bull"
       ]
     },
-    "debate_rounds": 1,
-    "consensus_reached": true,
-    "consensus_method": "voting",
+    "debate_rounds": 3,
+    "consensus_reached": false,
+    "consensus_method": "confidence_winner",
     "dissenting_agents": [
-      "sentiment_specialist"
+      "chartist",
+      "sentiment_specialist",
+      "bull"
     ],
     "agent_votes": [
       {
         "agent": "fundamental_scout",
-        "position": "BUY",
-        "confidence": 0.8,
+        "position": "AVOID",
+        "confidence": 0.9,
         "round": 0
       },
       {
@@ -65,12 +65,157 @@
         "agent": "bull",
         "position": "BUY",
         "confidence": 0.6,
+        "round": 3
+      },
+      {
+        "agent": "bear",
+        "position": "AVOID",
+        "confidence": 0.94,
+        "round": 3
+      }
+    ],
+    "disagreement_type": "direction",
+    "debate_history": [
+      {
+        "role": "system",
+        "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 298, Rp 214, Rp 215, Rp 264, Rp 285, Rp 260, Rp 310, Rp 302, Rp 38, Rp 83, Rp 70, Rp 17.0, Rp 34.0, Rp 25",
+        "round": 0,
+        "position": "UNKNOWN",
+        "confidence": null
+      },
+      {
+        "role": "system",
+        "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 298, Rp 214, Rp 215, Rp 264, Rp 285, Rp 260, Rp 310, Rp 302, Rp 38",
+        "round": 0,
+        "position": "UNKNOWN",
+        "confidence": null
+      },
+      {
+        "role": "bull",
+        "content": "… value of Rp 214, a swing trade BUY case can be constructed based on strong technical momentum, contingent on a strategic entry. While the fundamental valuation suggests overvaluation and a negative margin of safety, the company's solid ROE (13.93%), Net Margin (17.19%), and very low Debt/Equity (0.07) provide a stable underlying structure that can support price action driven by technicals.\n\nOMED exhibits a robust structural uptrend, consistently trading above its MA200 (Rp 215), indicating long-term strength. The optimal technical entry zone is identified\n\nPosition: BUY\nAgent Confidence: 0.60",
+        "round": 1,
+        "position": "BUY",
+        "confidence": 0.6
+      },
+      {
+        "role": "bear",
+        "content": "… current price of Rp 298, the reward to the target of Rp 302 is only Rp 4, while the risk to the stop loss of Rp 260 is Rp 38, resulting in an abysmal R/R ratio of approximately 0.10:1. Even if entering at the higher end of the Bull's proposed entry zone, say Rp 285, the reward to target (Rp 302 - Rp 285 = Rp 17) is significantly less than the risk to stop loss (Rp 285 - Rp 260 = Rp 25), yielding an unfavorable R/R of 0.68:1. This poor R/R, combined with the substantial overvaluation and proximity to the 52-week high, makes the trade highly unattractive.\n\nPosition: AVOID\nAgent Confidence: 0.95",
+        "round": 1,
+        "position": "AVOID",
+        "confidence": 0.95
+      },
+      {
+        "role": "bull",
+        "content": "…ovides a fundamental safety net. This strong balance sheet mitigates the risk of a sharp, fundamentally-driven correction, even if the stock is technically trading at a premium. This underlying stability allows the market to price in future growth or sector sentiment, which may not be fully captured by static fair value models, thus absorbing the Bear's risk scenario within a momentum context.\n\nWhile a specific fundamental catalyst is not identified, the technical setup itself acts as a powerful short-term catalyst. The significant surge in current volume,\n\nPosition: BUY\nAgent Confidence: 0.60",
+        "round": 2,
+        "position": "BUY",
+        "confidence": 0.6
+      },
+      {
+        "role": "bear",
+        "content": "… level. Combined with the substantial overvaluation—where the current price is 39.3% above the fair value of Rp 214—any momentum for a breakout beyond Rp 310 is likely to be short-lived and highly susceptible to profit-taking. The Bull's \"fundamental safety net\" argument, based on robust financial health, is irrelevant for a swing trade when the stock trades at such a premium to its intrinsic value. The fair value of Rp 214 *is* the fundamental floor, and the current price's distance from it indicates a negative margin of safety, not a protective buffer.\n\nPosition: AVOID\nAgent Confidence: 0.92",
+        "round": 2,
+        "position": "AVOID",
+        "confidence": 0.92
+      },
+      {
+        "role": "bull",
+        "content": "The Bear's narrow focus on a static reward-to-risk calculation and perceived overvaluation fails to account for the dynamic nature of short-term market movements. The current market price, while trading at a premium to its calculated intrinsic value, is supported by robust technical momentum and significant buying interest, as evidenced by the elevated trading activity. This suggests the market is pricing in factors beyond historical valuation metrics, potentially anticipating future growth or sector-specific tailwinds not captured by the Bear's static assessment. The company's strong financial health, characterized by minimal debt and robust interest coverage, provides a fundamental safety net, mitigating the risk of a sharp, fundamentally-driven correction and allowing for sustained price action driven by technical strength.\n\nThe argument that the recent yearly peak acts as an insurmountable resistance level overlooks the power of sustained buying pressure. Breakouts above such levels are common in strong uptrends, especially when confirmed by high volume, indicating conviction among market participants. Should the initial technical stop be triggered, a significant secondary support level exists at the long-term moving average, which is positioned substantially below the current trading range. This critical long-term\n\nPosition: BUY\nAgent Confidence: 0.60",
+        "round": 3,
+        "position": "BUY",
+        "confidence": 0.6
+      },
+      {
+        "role": "bear",
+        "content": "The Bull's swing setup for OMED is fundamentally flawed, failing to account for the stock's inherent volatility and the substantial overvaluation. The proposed entry zone and stop loss are critically exposed to typical market fluctuations, rendering the risk assessment unreliable.\n\nFirstly, the Bull's entry zone of Rp 264 – Rp 285 and stop loss at Rp 260 are insufficient to withstand the stock's normal price movements. With an ATR(14) of Rp 17.0, a typical 1-week adverse move (2 × ATR) is Rp 34.0. If a trader enters at the upper end of the Bull's proposed range, Rp 285, a 2xATR adverse move would bring the price down to Rp 251. This price point is significantly below the Bull's stated stop loss of Rp 260, indicating that the stop loss is too tight and highly susceptible to being triggered by routine volatility, leading to a larger loss than anticipated. Furthermore, the Bull's target of Rp 302 offers a meager upside of only Rp 17 from the upper entry point of Rp 285, presenting an unfavorable reward-to-risk profile when considering the potential for a Rp 34 adverse move.\n\nSecondly, the Bull's stop loss at Rp 260 is precarious, as its breach would expose the trade to a much deeper decline. Should the price fall below Rp 260, the next significant technical support level is the MA200, positioned substantially lower at Rp 215. This implies a potential maximum loss of Rp 70 from the current price of Rp 298, or Rp 49 from the lower end of the Bull's entry zone at Rp 264, if the MA200 is the true next support. This potential downside is far greater than the Bull's assumed risk to Rp 260, making the actual maximum loss for a swing trade significantly higher and the trade unviable given the limited upside.\n\nFinally, the Bull's reliance on \"strong financial health\" as a \"fundamental safety net\" is misleading for a swing trade when the stock is explicitly overvalued. The current price of Rp 298 is 39.3% above its fair value of Rp 214, indicating a negative margin of safety. The Bull's speculative claim that the market is \"pricing in factors beyond historical valuation metrics\" lacks any concrete, identifiable catalyst within the 1-3 month swing horizon to justify this premium. Even if the stock experiences a 2xATR adverse move of Rp 34 from the current price, bringing it to Rp 264, it would still be trading 23.4% above its fair value of Rp 214. This demonstrates that even a significant short-term correction would not bring the stock close to its fundamental floor, leaving substantial downside risk unaddressed by the Bull's technical setup and negating any perceived \"safety net.\"\n\nPosition: AVOID\nAgent Confidence: 0.94",
+        "round": 3,
+        "position": "AVOID",
+        "confidence": 0.94
+      },
+      {
+        "role": "devils_advocate",
+        "content": "Berikut adalah tantangan terhadap setup trade OMED:\n\n1.  **MACRO/COMPANY RISK & FOREIGN FLOW:**\n    Mengingat OMED saat ini sangat *overvalued* (39.3% di atas nilai wajar Rp 214) dan mendekati harga tertinggi 52 minggu (Rp 310), mungkinkah koreksi pasar IHSG yang lebih luas, ditambah dengan tekanan jual dari dana asing pada saham-saham yang sudah premium, memicu aksi *profit-taking* besar-besaran yang menembus *stop loss* Rp 260 dan mendorong harga turun menuju MA200 di Rp 215 dalam 1-3 bulan ke depan?\n\n2.  **EXECUTION RISK — Transaction Cost\n\nPosition: AVOID\nAgent Confidence: 0.55",
+        "round": 4,
+        "position": "AVOID",
+        "confidence": 0.55
+      }
+    ],
+    "raw_data_summary": "[🚨 MARGIN-OF-SAFETY ALERT — Read Before Debating]\n⚠️ OVERVALUED: Current price (298) is 39.3% above fair value (214). Swing trade is HIGH RISK — margin of safety is negative.\nCurrent Price: Rp 298 | Estimated Fair Value: Rp 214\n────────────────────────────────────────────────────────────\n\n=== FUNDAMENTALS ===\nFAIR VALUE: Rp 214\n\nOMED is currently OVERVALUED, with its market price of Rp 298 trading at a 28.2% premium above its calculated fair value of Rp 214. This valuation is based on a weighted average of P/E Band (Rp 218) and P/B Band (Rp 208) methods, with DDM being invalid. The significant premium suggests a negative margin of safety for swing trades.\n\nKey support metrics show a current ROE of 13.93% and a Net Margin of 17.19%. Three-year trend data for ROE and Net Margin is not available in the provided information. The company maintains a very low Debt/Equity ratio of 0.07 and offers a Dividend Yield of 1.20%.\n\nNo explicit upcoming growth catalyst within the 1-3 month swing trade horizon has been identified. The latest dividend ex-date (08 Jul 25) is a PAST_EVENT_NOT_CATALYST. Quality checks reveal no immediate red flags: ROE (13.93%) is not high while Net Margin (17.19%) is not low; DER (0.07) is low but Interest Coverage (19.59x) is strong; Altman Z-Score (13.54) is high but DER (0.07) is low. Operating Cash Flow data was not explicitly available to check against revenue growth.\n\nGiven the substantial overvaluation and absence of a clear near-term catalyst, a cautious approach is warranted.\n\nPosition: AVOID\nAgent Confidence: 0.90\n\n=== TECHNICALS ===\nOMED menunjukkan setup swing long yang kuat. Saham dalam uptrend struktural karena diperdagangkan di atas MA200. OMED saat ini diperdagangkan di atas MA200, menunjukkan kekuatan tren jangka panjang.\n\nENTRY ZONE: Rp 264 – Rp 285.\nTARGET: Rp 302 (approx. 10.0% from entry mid).\nSTOP LOSS: Rp 260 (1.5× ATR below EMA20).\n\nRSI di 60.2 menunjukkan momentum bullish yang kuat namun belum memasuki zona overbought, memberikan ruang untuk kenaikan lebih lanjut. Volume saat ini (62.2M) jauh lebih tinggi dari rata-rata 20 hari (28.8M), mengkonfirmasi kekuatan pergerakan harga saat ini.\n\nPosition: BUY\nAgent Confidence: 0.85\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 298.0,\n  \"sma20\": 292.0,\n  \"ema20\": 285.0,\n  \"ma50\": 264.0,\n  \"ma200\": 215.0,\n  \"ma200_context\": \"ABOVE\",\n  \"rsi14\": 60.2,\n  \"atr14\": 17.0,\n  \"avg_volume_20d\": 28769985.0,\n  \"52w_high\": 310.0,\n  \"52w_low\": 157.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== DIVIDEND EX-DATE SCAN: OMED ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
+    "error": null,
+    "conviction_score": 0.0,
+    "sector_key": "healthcare"
+  },
+  {
+    "ticker": "MIDI",
+    "verdict": {
+      "ticker": "MIDI",
+      "rating": "HOLD",
+      "confidence": 0.55,
+      "fair_value": 345.0,
+      "entry_price_range": "310 - 316",
+      "target_price": 344.0,
+      "stop_loss": 298.0,
+      "current_price": 348.0,
+      "timeframe": "1-3 Months",
+      "weighted_reasoning": "The rating is downgraded to HOLD primarily due to the negative margin of safety, with the current price (Rp 348) exceeding the fair value (Rp 345). The technical setup is unfavorable for immediate entry, as the price is extended and well above the optimal entry zone of Rp 310-316; the target price of Rp 344 is currently below the market price. The trade is also a higher-risk counter-trend setup (Price < MA200). The Devil's Advocate's concern regarding the 'ROE-Margin Divergence' remains a valid, unmitigated risk. A HOLD rating is appropriate until the price pulls back to the designated entry zone, providing a valid technical entry and a positive margin of safety.",
+      "critical_risk_factor": "",
+      "key_catalysts": [
+        "Potential technical rebound if price pulls back to the MA50 support level around Rp 310-316."
+      ],
+      "key_risks": [
+        "Negative margin of safety: Current price is above fair value.",
+        "Missed entry point: Price is extended and above the optimal technical entry zone.",
+        "Counter-trend trade: Stock is in a structural downtrend below the MA200.",
+        "Unresolved fundamental concern regarding 'ROE-Margin Divergence' suggesting potential earnings quality issues."
+      ],
+      "summary": "The trade plan for MIDI is rated HOLD. The current price of Rp 348 is above both the fair value (Rp 345) and the target price (Rp 344), making an immediate entry invalid. While the proposed trade has a good R/R ratio of 2.07, it is contingent on a significant pullback to the Rp 310-316 entry zone. The lack of short-term catalysts and the stock trading below its MA200 warrant waiting for a more favorable technical setup.",
+      "expected_return": "+9.9%",
+      "risk_reward_ratio": 2.07,
+      "is_overvalued": true,
+      "wait_and_see": true,
+      "consensus_reached": true,
+      "consensus_method": "voting",
+      "dissenting_agents": [
+        "bull",
+        "bear"
+      ]
+    },
+    "debate_rounds": 1,
+    "consensus_reached": true,
+    "consensus_method": "voting",
+    "dissenting_agents": [
+      "bull",
+      "bear"
+    ],
+    "agent_votes": [
+      {
+        "agent": "fundamental_scout",
+        "position": "HOLD",
+        "confidence": 0.65,
+        "round": 0
+      },
+      {
+        "agent": "chartist",
+        "position": "HOLD",
+        "confidence": 0.0,
+        "round": 0
+      },
+      {
+        "agent": "sentiment_specialist",
+        "position": "HOLD",
+        "confidence": 0.0,
+        "round": 0
+      },
+      {
+        "agent": "bull",
+        "position": "AVOID",
+        "confidence": 0.9,
         "round": 1
       },
       {
         "agent": "bear",
-        "position": "BUY",
-        "confidence": 0.6,
+        "position": "AVOID",
+        "confidence": 0.95,
         "round": 1
       }
     ],
@@ -78,107 +223,57 @@
     "debate_history": [
       {
         "role": "bull",
-        "content": "ASGR presents a compelling fundamental undervaluation, trading at Rp 1,595, a significant 102.8% discount to its fair value of Rp 3,235. This provides a robust fundamental floor, supported by strong solvency (Interest Coverage Ratio 69.06x, Total Liabilities/Equity 0.41) and decent profitability (TTM ROE 13.55%, TTM Net Profit Margin 9.14%). While the high dividend yield of 15.11% is attractive, its ex-date (24 Apr 26) is a past event and not a future catalyst for a 1-3 month swing trade.\n\nTechnically, ASGR is in a\n\nPosition: BUY\nAgent Confidence: 0.60",
+        "content": "Based on the provided market data, a strong swing trade BUY case for MIDI (1-3 month horizon) cannot be constructed. The analysis below details why the critical components required for a BUY thesis are not met.\n\n**1. FUNDAMENTAL FLOOR:**\nThe current market price of Rp 348 is 0.9% above the estimated fair value of Rp 345. This indicates a negative margin of safety, which is a significant red flag for a swing trade entry, especially without a compelling catalyst. The \"ROE-Margin Divergence\" also suggests potential quality issues in earnings, further weakening the fundamental floor for a BUY at current levels.\n\n**2. TECHNICAL ENTRY:**\nThe recommended technical entry zone, based on EMA20 (Rp 335) and MA50 (Rp 310), is between Rp 310 – Rp 335. The current price of Rp 348 is *above* this optimal entry zone, indicating that an immediate BUY at current levels is not technically supported. An entry would ideally require a pullback into this support area. Furthermore, the stock is in a structural downtrend, trading below its MA200 (Rp 380), classifying any potential rebound as a higher-risk counter-trend trade.\n\n**3. CATALYST:**\nThere are no specific upcoming growth catalysts, such as earnings reports or new contracts, identified within the 1-3 month swing trade horizon. The latest dividend ex-date (04 Jun 25) is a past event and therefore not a future catalyst. The absence of a clear, imminent catalyst makes it difficult to justify entry above fair value or to project a price appreciation within the swing trade timeframe.\n\n**4. RISK/REWARD:**\nGiven that the current price (Rp 348) is above fair value, above the recommended technical entry zone, and lacks any identified short-term catalyst, a high-probability swing trade BUY setup cannot be established. Defining a favorable risk/reward ratio for an entry at Rp 348 is not feasible, as there is no clear fundamental or technical support to anchor a stop loss, nor a catalyst to drive a target price.\n\nPosition: AVOID\nAgent Confidence: 0.90",
         "round": 1,
-        "position": "BUY",
-        "confidence": 0.6
+        "position": "AVOID",
+        "confidence": 0.9
       },
       {
         "role": "bear",
-        "content": "While ASGR is fundamentally undervalued by 102.8% against its fair value of Rp 3,235, this long-term valuation does not inherently provide a margin of safety for a short-term swing trade given immediate technical and catalyst risks. The current price of Rp 1,595, while below fair value, is at the higher end of the Bull's proposed entry zone and presents an unfavorable risk profile for a swing trade.\n\nTechnically, the setup shows signs of weakness rather than a healthy pullback. The current price of Rp 1,595 is already trading below the EMA20 (Rp 1,598) and SMA20 (Rp 1,604), indicating a loss of short-term\n\nPosition: BUY\nAgent Confidence: 0.60",
+        "content": "As a Forensic Financial Auditor, the provided data for MIDI strongly supports an AVOID position for a swing trade, reinforcing the \"Bull's argument\" against a BUY setup. The current market conditions present significant risks, lacking any margin of safety, exhibiting technical overextension within a downtrend, and offering an unfavorable risk/reward profile without any discernible catalysts.\n\n1.  **OVERVALUATION CHECK**: The current price of Rp 348 is 0.87% above the estimated fair value of Rp 345. This indicates a negative margin of safety, making any swing trade entry at current levels inherently high risk. Entering a trade above fair value, especially without a compelling catalyst, means the investor is paying a premium for a stock that is already fundamentally stretched, leaving no room for error or unexpected market movements.\n\n2.  **TECHNICAL BREAKDOWN RISK**: MIDI is in a structural downtrend, with the current price of Rp 348 trading significantly below its MA200 at Rp 380. While the stock has seen a short-term bounce, its RSI14 of 63.1 indicates it is becoming overextended and potentially overbought in the short term, increasing the probability of a pullback. The current price is above the recommended entry zone of Rp 310 – Rp 335 (based on MA50 and EMA20, respectively), suggesting that the immediate risk is a rejection from current levels and a breakdown towards these support zones. The MA200 at Rp 380 acts as a strong overhead resistance, and a failure to breach it would confirm a lower high in the broader downtrend, signaling further downside risk.\n\n3.  **CATALYST RISK**: There are no identified specific upcoming growth catalysts, such as earnings reports or new contracts, within the 1-3 month swing trade horizon. The latest dividend ex-date of 04 Jun 25 is a PAST_EVENT_NOT_CATALYST. The absence of any imminent positive drivers means there is no fundamental reason to expect a sustained upward price movement. Furthermore, the \"ROE-Margin Divergence\" (ROE 18.05% vs. Net Margin 4.52%) raises concerns about the quality of earnings, suggesting potential leverage or asset revaluation inflating ROE, which could deter institutional interest and prevent any fundamental re-rating.\n\n4.  **UNFAVOURABLE R/R**: Entering at the current price of Rp 348 presents an unattractive risk/reward profile. With the nearest significant resistance being the MA200 at Rp 380, the potential upside is Rp 32. However, placing a stop-loss below the nearest technical support, such as the EMA20 at Rp 335 (e.g., at Rp 330), implies a risk of Rp 18. This yields a Risk/Reward ratio of approximately 1.78:1 (32/18). While numerically acceptable, this ratio is unfavorable given the context: the trade is a high-risk counter-trend bounce, the stock is overvalued, the RSI is overextended, and there is a complete absence of catalysts. The probability of hitting the stop-loss is elevated due to the overextension and structural downtrend, making the potential reward less likely to materialize.\n\nPosition: AVOID\nAgent Confidence: 0.95",
         "round": 1,
-        "position": "BUY",
-        "confidence": 0.6
+        "position": "AVOID",
+        "confidence": 0.95
       },
       {
         "role": "devils_advocate",
-        "content": "1.  **MACRO/COMPANY RISK & FOREIGN FLOW:** If foreign funds continue their net selling trend on the IHSG, coupled with a broader market correction, could ASGR's MA50 support at Rp 1,497 fail, leading to a deeper decline towards its MA200 at Rp 1,172?\n\n2.  **EXECUTION RISK — Transaction Cost Stress Test:**\n    Menghitung total biaya transaksi untuk posisi ini dengan asumsi harga entry Rp 1,595 dan target jual Rp 1,695. Komponen biaya meliputi: biaya beli 0.15%, biaya jual 0.25%, PPh final 0.10% dari nilai jual, dan estimasi slippage 0.15% (karena harga Rp 1,595 >= Rp 500). Total biaya round-trip adalah 0.15% + 0.25% + 0.10% + 0.15% = 0.65%. Dengan target return gross sebesar 6.27% (dihitung dari (Rp 1,695 - Rp 1,595) / Rp 1,595), net return setelah biaya adalah 6.27% - 0.65% = 5.62%. Berdasarkan perhitungan ini, posisi tersebut dikategorikan sebagai **VIABLE after transaction costs**.",
+        "content": "Berikut adalah tantangan terhadap setup trade MIDI:\n\n1.  **MACRO/COMPANY RISK & FOREIGN FLOW**: Jika sentimen pasar global memburuk, memicu aksi jual bersih yang signifikan oleh investor asing di pasar saham Indonesia, atau jika laporan keuangan MIDI yang akan datang mengungkapkan bahwa \"ROE-Margin Divergence\" (ROE 18.05% vs Net Margin 4.52%) disebabkan oleh tingkat leverage yang tidak berkelanjutan, mungkinkah level support MA50 di Rp 310 akan tembus, berpotensi memicu penurunan lebih lanjut menuju level terendah 52 minggu di Rp 260?\n\n2.  **EXECUTION RISK — Transaction Cost Stress Test**:\n    Dengan asumsi harga entry Rp 348 dan target harga Rp 380 (MA200), potensi gross return adalah (380 - 348) / 348 = 9.195%.\n    Total biaya transaksi round-trip adalah sebagai berikut:\n    *   Biaya Beli: 0.15%\n    *   Biaya Jual: 0.25%\n    *   PPh Final: 0.10%\n    *   Slippage (harga < Rp 500): 0.30%\n    Total biaya transaksi = 0.15% + 0.25% + 0.10% + 0.30% = 0.80%.\n    Net return setelah biaya = 9.195% - 0.80% = 8.395%.\n    **VERDICT**: VIABLE after transaction costs.\n\nPosition: BUY\nAgent Confidence: 0.55",
         "round": 2,
-        "position": "UNKNOWN",
-        "confidence": null
+        "position": "BUY",
+        "confidence": 0.55
       }
     ],
-    "raw_data_summary": "=== FUNDAMENTALS ===\nFAIR VALUE: Rp 3,235\n\nASGR is currently trading at Rp 1,595, which is **UNDERVALUED** by 102.8% compared to its fair value of Rp 3,235. This significant discount provides a strong fundamental cushion for a swing trade setup.\n\nKey support metrics include a TTM Return on Equity (ROE) of 13.55% and a TTM Net Profit Margin of 9.14%. The company demonstrates strong solvency with an Interest Coverage Ratio of 69.06x. The Debt/Equity Ratio is not explicitly provided as a numeric value in the latest data, but Total Liabilities/Equity is 0.41. ASGR also offers a high Dividend Yield of 15.11%. Trend data for ROE and Net Margin over 3 years is not available in the provided information.\n\nThe latest dividend ex-date was 24 Apr 26, which is a past event relative to the current date (2026-05-07). No other immediate growth catalysts (e.g., upcoming earnings, new contracts) are identified within the 1-3 month swing trade horizon.\n\n**Quality Check:**\n*   ROE (13.55%) is not >15%, so no ROE-Margin Divergence flag.\n*   Debt/Equity Ratio is null, preventing a full check for \"Low DER tapi Interest Coverage lemah\". However, Interest Coverage (69.06x) is very strong.\n*   Operating Cash Flow data is not available, preventing a check for \"Revenue-CFO Divergence\". Revenue growth (Quarter YoY) is positive at 5.34%.\n*   Altman Z-Score (9.14) is not >10, so no Z-Score vs DER Inconsistency flag.\n✅ No red flags detected based on available data.\n\nPosition: BUY\nAgent Confidence: 0.80\n\n=== TECHNICALS ===\n**ANALISIS TEKNIKAL IHSG (1-3 Bulan)**\n\nSaham dalam uptrend struktural. Swing long searah tren. Harga saat ini sedikit di bawah EMA20, namun masih kokoh di atas MA50 dan MA200, mengindikasikan tren naik jangka panjang yang kuat dengan potensi pullback sehat. ENTRY ZONE: Rp 1,497 – Rp 1,598, memanfaatkan area support dinamis EMA20 dan MA50.\n\nTARGET: Rp 1,695 (approx. 9.53% from entry mid), menargetkan resistensi terdekat di bawah level tertinggi 52 minggu. STOP LOSS: Rp 1,507 (1.5× ATR below EMA20), menjaga risiko tetap terkontrol di bawah support EMA20.\n\nRSI(14) di 52.4 menunjukkan momentum netral cenderung positif, belum memasuki area overbought. Data volume saat ini tidak tersedia untuk konfirmasi pergerakan harga.\n\nPosition: BUY\nAgent Confidence: 0.85\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 1595.0,\n  \"sma20\": 1604.0,\n  \"ema20\": 1598.0,\n  \"ma50\": 1497.0,\n  \"ma200\": 1172.0,\n  \"ma200_context\": \"ABOVE\",\n  \"rsi14\": 52.4,\n  \"atr14\": 61.0,\n  \"avg_volume_20d\": 3180015.0,\n  \"52w_high\": 1719.0,\n  \"52w_low\": 724.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== DIVIDEND EX-DATE SCAN: ASGR ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
+    "raw_data_summary": "[🚨 MARGIN-OF-SAFETY ALERT — Read Before Debating]\n⚠️ OVERVALUED: Current price (348) is 0.9% above fair value (345). Swing trade is HIGH RISK — margin of safety is negative.\nCurrent Price: Rp 348 | Estimated Fair Value: Rp 345\n────────────────────────────────────────────────────────────\n\n=== FUNDAMENTALS ===\nFAIR VALUE: Rp 345\n\nThe current market price of MIDI is Rp 348, which is FAIRLY VALUED, trading at a 0.9% premium to the calculated fair value of Rp 345.\n\nKey support metrics include a strong Return on Equity (TTM) of 18.05% and a Net Profit Margin (Quarter) of 4.52%. No 3-year trend data for ROE or Net Margin is available. The Debt/Equity ratio is not explicitly provided; however, the Total Liabilities/Equity ratio is 1.01. The stock offers a Dividend Yield of 2.11%.\n\nThe latest dividend ex-date of 04 Jun 25 is a PAST_EVENT_NOT_CATALYST relative to the current date. No other specific upcoming growth catalysts, such as earnings reports or new contracts, are identified within the 1-3 month swing trade horizon. A quality check reveals a \"⚠️ ROE-Margin Divergence — verifikasi kualitas laba\" because the ROE (18.05%) is high (>15%) while the Net Margin (4.52%) is low (<5%), suggesting potential inflation of ROE by high leverage or asset revaluation. No other red flags were detected from the available financial data.\n\nPosition: HOLD\nAgent Confidence: 0.65\n\n=== TECHNICALS ===\n**Analisis Teknikal IHSG (MIDI)**\n\nSaham dalam downtrend struktural karena harga saat ini (Rp 348) berada di bawah MA200 (Rp 380). Ini adalah setup counter-trend bounce, sehingga target lebih konservatif dan ukuran posisi disarankan 50% dari normal. MIDI menunjukkan potensi rebound dari level support jangka pendek.\n\nENTRY ZONE: Rp 310 – Rp 335 (berdasarkan EMA20 dan MA50). Harga saat ini (Rp 348) berada di atas zona entri yang direkomendasikan, mengindikasikan bahwa entri optimal untuk setup ini adalah pada saat pullback ke zona tersebut.\n⚠️ Counter-trend trade — kurangi ukuran posisi 5\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 348.0,\n  \"sma20\": 333.0,\n  \"ema20\": 335.0,\n  \"ma50\": 310.0,\n  \"ma200\": 380.0,\n  \"ma200_context\": \"BELOW\",\n  \"rsi14\": 63.1,\n  \"atr14\": 11.0,\n  \"avg_volume_20d\": 18906970.0,\n  \"52w_high\": 478.0,\n  \"52w_low\": 260.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== DIVIDEND EX-DATE SCAN: MIDI ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
     "error": null,
-    "conviction_score": 0.58,
-    "sector_key": "industrials",
-    "position_sizing": {
-      "ticker": "ASGR",
-      "rating": "BUY",
-      "confidence": 0.76,
-      "lot": 1,
-      "shares": 100,
-      "position_value": 159500.0,
-      "allocation_pct": 0.1595,
-      "target_allocation_pct": 0.2,
-      "max_loss_rp": 16000.0,
-      "max_drawdown_pct": 0.016,
-      "expected_return_pct": 9.9,
-      "expected_return_rp": 15790.5,
-      "total_cost_est": 797.5,
-      "entry_price": 1595.0,
-      "stop_loss": 1435.0,
-      "rr_ratio": 2.0
-    },
-    "allocation_reasoning": {
-      "target_deployment_pct": 65.0,
-      "actual_deployment_pct": 44.0,
-      "gap_explanation": "Actual deployment 44.0% masih 21.1 percentage points di bawah target 65.0% karena sizing menghormati lot IHSG, cap per posisi, dan budget risiko stop-loss.",
-      "risk_factors_limiting": [
-        "lot size 100 saham dan harga entry membatasi penambahan posisi tanpa oversizing",
-        "hanya 3 kandidat yang lolos rating dan risk/reward untuk sizing",
-        "cap per posisi 20.0% membuat feasible deployment maksimum sekitar 60.0%",
-        "max drawdown per posisi dibatasi 7.0% sehingga lot tidak dipaksa melewati stop-risk budget"
-      ],
-      "market_condition_score": 0.74,
-      "recommendation": "Deployment sudah cukup aktif untuk swing trade moderat; tambah exposure hanya jika sinyal teknikal menguat tanpa memperbesar drawdown per posisi."
-    },
-    "deployment_scenario_comparison": {
-      "deploy_60_now": {
-        "deployment_pct": 60.0,
-        "expected_return_on_deployed_pct": 8.03,
-        "expected_return_portfolio_pct": 4.82,
-        "expected_return_rp": 48181.0,
-        "max_drawdown_portfolio_pct": 4.2,
-        "max_drawdown_rp": 42000.0
-      },
-      "wait_for_confirmation": {
-        "deployment_pct": 0.0,
-        "expected_return_portfolio_pct": 0.0,
-        "expected_return_rp": 0.0,
-        "max_drawdown_portfolio_pct": 0.0,
-        "max_drawdown_rp": 0.0,
-        "tradeoff": "Cash protects capital while waiting for cleaner entry, but gives up roughly Rp 48,181 if the current 60% deployment scenario works."
-      }
-    }
+    "conviction_score": 0.0,
+    "sector_key": "consumer_staples"
   },
   {
-    "ticker": "ELSA",
+    "ticker": "MARK",
     "verdict": {
-      "ticker": "ELSA",
+      "ticker": "MARK",
       "rating": "HOLD",
-      "confidence": 0.52,
-      "fair_value": 1493.0,
-      "entry_price_range": "740 - 765",
-      "target_price": 840.0,
-      "stop_loss": 710.0,
-      "current_price": 765.0,
+      "confidence": 0.55,
+      "fair_value": 886.0,
+      "entry_price_range": "795 - 810",
+      "target_price": 835.0,
+      "stop_loss": 790.0,
+      "current_price": 840.0,
       "timeframe": "1-3 Months",
-      "weighted_reasoning": "The final rating is determined by the 'soft_hold' consensus rule, which overrides the otherwise positive fundamental and technical signals. The primary positive driver is the significant undervaluation, with the current price of Rp 765 at a 95% discount to the fair value of Rp 1,493, providing a substantial margin of safety. The trade setup itself is attractive, offering a Risk/Reward ratio of 2.06.\n\nHowever, these factors are outweighed by significant risks that justify a HOLD rating. The most critical issue, raised by both the Bear and Devil's Advocate, is the complete lack of an identifiable catalyst within the 1-3 month swing trading horizon. Without a driver, the stock is vulnerable to stagnation or broader market sentiment shifts. The technical picture is also ambiguous; while in a long-term uptrend (above MA200), the price is currently trading below its MA50 (Rp 771), indicating short-term weakness and potential overhead resistance. The Devil's Advocate's concern about a breakdown due to macro pressure is valid and unanswered. Given these uncertainties, a neutral stance is the most prudent course of action. Consensus override: Bull/Bear confidence gap was below 0.15, so the chamber treats this as soft consensus HOLD instead of forcing an entry.",
+      "weighted_reasoning": "The HOLD rating is mandated by the 'soft_hold' consensus rule, which is appropriate given the current market conditions. The primary reason is that the current price (Rp 840) has overshot both the designated entry zone (Rp 795-810) and the target price (Rp 835), making the trade invalid for immediate execution. Although fundamentals are strong (undervalued by 5.2% against FV Rp 886, high ROE) and the technical trend is bullish (price above MA200), the lack of a near-term catalyst makes the stock vulnerable to market-wide pullbacks, as highlighted by the Devil's Advocate. The excellent R/R ratio of 2.60 only applies if entry is secured within the specified zone. Therefore, we will wait for the price to correct to the entry level before considering this trade. Consensus override: Bull/Bear confidence gap was below 0.15, so the chamber treats this as soft consensus HOLD instead of forcing an entry.",
       "critical_risk_factor": "",
       "key_catalysts": [
-        "Significant undervaluation (Price Rp 765 vs. Fair Value Rp 1,493) could attract value investors.",
-        "A potential technical breakout above the MA50 resistance at Rp 771 could signal renewed momentum."
+        "Potential price appreciation towards Fair Value (Rp 886) if market sentiment remains positive.",
+        "Strong financial health and profitability metrics could attract institutional interest."
       ],
       "key_risks": [
-        "Absence of a clear, near-term catalyst to unlock value, leading to price stagnation or drift.",
-        "Technical weakness with price below the MA50 (Rp 771), which may act as resistance.",
-        "Vulnerability to negative market sentiment or sector-wide selling pressure without a strong company-specific driver.",
-        "Sentiment data is unavailable (INSUFFICIENT_DATA), removing a layer of confirmation."
+        "Current price is above the target, requiring a pullback that may not occur.",
+        "Lack of a specific near-term catalyst makes the stock susceptible to broader market downturns and foreign outflow.",
+        "The target return of +4.0% is relatively low for a swing trade, limiting upside potential even if the entry is met."
       ],
-      "summary": "This trade plan is rated HOLD due to a mandatory 'soft_hold' consensus directive, reflecting significant unresolved debate among analysts. While ELSA is deeply undervalued with an excellent R/R of 2.06, the critical absence of a near-term catalyst and mixed technical signals (struggling below MA50) make an immediate entry premature. We will wait for a clearer technical breakout or an identifiable catalyst before committing capital.",
-      "expected_return": "+11.6%",
-      "risk_reward_ratio": 2.06,
+      "summary": "The trade plan for MARK is rated HOLD. While the stock is fundamentally undervalued with a strong technical uptrend and an excellent R/R ratio, the current price of Rp 840 is already above the target price of Rp 835. The plan is not actionable at this level and requires a significant pullback into the Rp 795-810 entry zone to become viable.",
+      "expected_return": "+4.0%",
+      "risk_reward_ratio": 2.6,
       "is_overvalued": false,
       "wait_and_see": true,
       "consensus_reached": true,
@@ -204,6 +299,464 @@
         "agent": "fundamental_scout",
         "position": "BUY",
         "confidence": 0.85,
+        "round": 0
+      },
+      {
+        "agent": "chartist",
+        "position": "BUY",
+        "confidence": 0.85,
+        "round": 0
+      },
+      {
+        "agent": "sentiment_specialist",
+        "position": "HOLD",
+        "confidence": 0.0,
+        "round": 0
+      },
+      {
+        "agent": "bull",
+        "position": "BUY",
+        "confidence": 0.6,
+        "round": 1
+      },
+      {
+        "agent": "bear",
+        "position": "AVOID",
+        "confidence": 0.6,
+        "round": 1
+      }
+    ],
+    "disagreement_type": "timing",
+    "debate_history": [
+      {
+        "role": "bull",
+        "content": "MARK presents a compelling swing trade opportunity (1-3 month horizon) driven by its fundamental undervaluation and strong technical support, despite the absence of an explicit event-driven catalyst.\n\n**1. FUNDAMENTAL FLOOR:**\nMARK is currently trading at Rp 840, representing a 5.19% discount to its calculated fair value of Rp 886. This undervaluation provides a robust fundamental floor for a BUY thesis. The company demonstrates exceptional financial health and profitability, evidenced by a TTM ROE of 30.3% and a Net Margin of 33.3%. Its extremely low Debt/Equity Ratio of 0.01 and high Interest Coverage Ratio of 339.23x further underscore its financial resilience, offering significant\n\nPosition: BUY\nAgent Confidence: 0.60",
+        "round": 1,
+        "position": "BUY",
+        "confidence": 0.6
+      },
+      {
+        "role": "bear",
+        "content": "The Bull's swing trade setup for MARK presents significant risks, making an AVOID position prudent.\n\n**1. OVERVALUATION CHECK:**\nThe Bull's assertion that MARK is undervalued at Rp 840 compared to its fair value of Rp 886 (a 5.19% discount) does not support an overvaluation argument. Based on the provided fundamental analysis, MARK is currently *not* overvalued. However, this perceived undervaluation alone is insufficient to guarantee short-term price appreciation without a specific catalyst, especially when considering the precarious technical setup.\n\n**2. TECHNICAL BREAKDOWN RISK:**\nThe current price of MARK at Rp 840 is already significantly above the Bull's proposed optimal entry zone of Rp 79\n\nPosition: AVOID\nAgent Confidence: 0.60",
+        "round": 1,
+        "position": "AVOID",
+        "confidence": 0.6
+      },
+      {
+        "role": "devils_advocate",
+        "content": "**1. MACRO/COMPANY RISK & FOREIGN FLOW:**\nGiven MARK's lack of a near-term catalyst, if broader market sentiment sours due to global economic concerns, leading to accelerated net foreign selling across the IHSG, could this pressure MARK to break its MA50 support at Rp 796, potentially triggering a deeper correction towards its stop loss at Rp 771?\n\n**2. EXECUTION RISK — Transaction Cost Stress Test:**\nUsing the midpoint of the entry zone, Rp 803, and a target price of Rp 850, the gross return is 5.85%. The total round-trip transaction costs are calculated as follows: 0.15% for buying, 0.25% for selling, 0.10% for PPh final (from sell value), and an estimated 0.15% for slippage (since the price Rp 803 is >= Rp 500). This sums to a total transaction cost of 0.15% + 0.25% + 0.10% + 0.15% = 0.65%. Subtracting these costs from the gross return, the net return is 5.85% - 0.65% = 5.20%. This net return is greater than 3.0%, therefore, the trade is **VIABLE after transaction costs**.\n\nPosition: BUY\nAgent Confidence: 0.55",
+        "round": 2,
+        "position": "BUY",
+        "confidence": 0.55
+      }
+    ],
+    "raw_data_summary": "=== FUNDAMENTALS ===\nFAIR VALUE: Rp 886\n\nMARK is currently trading at Rp 840, which is UNDERVALUED by 5.19% compared to its calculated fair value of Rp 886. The company demonstrates strong profitability with a TTM ROE of 30.3% and a Net Margin of 33.3%. Financial health is robust, indicated by an extremely low Debt/Equity Ratio of 0.01 and a high Dividend Yield of 8.33%.\n\nNo clear upcoming growth catalyst within the 1-3 month swing trade horizon has been identified. The latest dividend ex-date of 06 Nov 2025 is a PAST_EVENT_NOT_CATALYST relative to the current date of 2026-05-09.\n\nQuality Check:\n• ROE (30.3%) is high, but Net Margin (33.3%) is also high, so no ROE-Margin Divergence.\n• DER (0.01) is low, and Interest Coverage Ratio (339.23x) is very strong, so no inconsistency.\n• Revenue growth (23.55% YoY) is positive, and Free Cash Flow (Rp 112 B) is positive, indicating no Revenue-CFO Divergence.\n• Altman Z-Score (19.16) is high, but DER (0.01) is very low, so no Z-Score vs DER Inconsistency.\n✅ No red flags detected.\n\nPosition: BUY\nAgent Confidence: 0.85\n\n=== TECHNICALS ===\n**Analisis Teknis IHSG (1-3 Bulan Swing Trade)**\n\n**TREND CONTEXT:**\nSaham dalam uptrend struktural. Swing long searah tren. Harga saat ini diperdagangkan jauh di atas MA200, mengindikasikan kekuatan tren yang solid.\n\n**ENTRY ZONE & TARGET:**\nENTRY ZONE: Rp 796 – Rp 810 (antara EMA20 dan MA50). TARGET: Rp 850 (approx. 5.85% dari titik tengah entri). Level ini merupakan resistensi kuat berdasarkan orderbook dan mendekati 52-minggu tertinggi. STOP LOSS: Rp 771 (1.5× ATR di bawah EMA20).\n\n**MOMENTUM & VOLUME:**\nRSI(14) di 60.3 menunjukkan momentum bullish yang sehat, dengan ruang untuk kenaikan lebih lanjut sebelum mencapai kondisi overbought. Data volume harian saat ini tidak tersedia untuk perbandingan langsung dengan rata-rata 20 hari. Namun, pergerakan harga positif hari ini (kenaikan 20 poin) perlu dikonfirmasi dengan volume yang lebih tinggi dari rata-rata untuk validasi kuat.\n\nPosition: BUY\nAgent Confidence: 0.85\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 840.0,\n  \"sma20\": 813.0,\n  \"ema20\": 810.0,\n  \"ma50\": 796.0,\n  \"ma200\": 729.0,\n  \"ma200_context\": \"ABOVE\",\n  \"rsi14\": 60.3,\n  \"atr14\": 26.0,\n  \"avg_volume_20d\": 9305445.0,\n  \"52w_high\": 870.0,\n  \"52w_low\": 597.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== DIVIDEND EX-DATE SCAN: MARK ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
+    "error": null,
+    "conviction_score": 0.0,
+    "sector_key": "healthcare"
+  },
+  {
+    "ticker": "AUTO",
+    "verdict": {
+      "ticker": "AUTO",
+      "rating": "BUY",
+      "confidence": 0.77,
+      "fair_value": 6896.0,
+      "entry_price_range": "2530 - 2580",
+      "target_price": 2660.0,
+      "stop_loss": 2510.0,
+      "current_price": 2640.0,
+      "timeframe": "1-3 Months",
+      "weighted_reasoning": "The BUY rating is primarily driven by two factors: 1) Extreme undervaluation, with the current price of Rp 2,640 far below the fair value of Rp 6,896. 2) A robust technical trade plan with a Risk/Reward ratio of 2.33, entering at the confluence of MA50 and EMA20 support. The Fundamental ✅ and Technical ✅ alignment confirms the BUY signal. However, confidence is capped due to the explicit lack of an identifiable 1-3 month catalyst and insufficient sentiment data, preventing a higher rating. The Devil's Advocate's concern about macro risk breaking key support is valid and contributes to the cautious confidence score. The final confidence of 0.77 reflects these constraints, adjusted from the 0.78 cap to avoid anchoring.",
+      "critical_risk_factor": "",
+      "key_catalysts": [
+        "Significant undervaluation (161% discount to Fair Value) may attract value investors, leading to a technical re-rating.",
+        "Price is in a structural uptrend (above MA200), with the proposed entry zone representing a logical bounce point from MA50/EMA20 dynamic support."
+      ],
+      "key_risks": [
+        "Absence of a specific near-term (1-3 month) corporate catalyst to accelerate the price discovery towards its fair value.",
+        "Insufficient social media and news sentiment data indicates low retail visibility, which could result in prolonged consolidation.",
+        "General market risk from macro headwinds or foreign outflows could break the key MA50 support level at Rp 2,531, invalidating the setup."
+      ],
+      "summary": "This is a compelling value and technical setup. AUTO is trading at a massive 161% discount to its fair value, providing a substantial margin of safety. The trade plan offers an excellent risk/reward ratio of 2.33, with a clear entry zone at strong technical support. The primary constraints are the lack of a specific near-term catalyst and insufficient sentiment data, which cap conviction below the 'Strong Buy' level.",
+      "expected_return": "+4.1%",
+      "risk_reward_ratio": 2.33,
+      "is_overvalued": false,
+      "wait_and_see": false,
+      "consensus_reached": true,
+      "consensus_method": "voting",
+      "dissenting_agents": [
+        "sentiment_specialist"
+      ]
+    },
+    "debate_rounds": 1,
+    "consensus_reached": true,
+    "consensus_method": "voting",
+    "dissenting_agents": [
+      "sentiment_specialist"
+    ],
+    "agent_votes": [
+      {
+        "agent": "fundamental_scout",
+        "position": "BUY",
+        "confidence": 0.85,
+        "round": 0
+      },
+      {
+        "agent": "chartist",
+        "position": "BUY",
+        "confidence": 0.88,
+        "round": 0
+      },
+      {
+        "agent": "sentiment_specialist",
+        "position": "HOLD",
+        "confidence": 0.0,
+        "round": 0
+      },
+      {
+        "agent": "bull",
+        "position": "BUY",
+        "confidence": 0.6,
+        "round": 1
+      },
+      {
+        "agent": "bear",
+        "position": "BUY",
+        "confidence": 0.6,
+        "round": 1
+      }
+    ],
+    "disagreement_type": null,
+    "debate_history": [
+      {
+        "role": "bull",
+        "content": "AUTO presents a compelling swing trade BUY opportunity driven by significant undervaluation and a robust technical uptrend, despite the absence of a specific near-term corporate catalyst.\n\n**1. FUNDAMENTAL FLOOR:**\nAUTO is profoundly undervalued, with its current market price of Rp 2,640 representing a substantial 161.2% discount to its calculated fair value of Rp 6,896. This deep discount provides a strong fundamental floor and significant long-term upside potential, making it attractive for a swing trade as the market corrects this disparity. The company's financial health is robust, characterized by a Return on Equity (TTM) of 13.94%, a Net Profit Margin (Quarter) of 10.63%,\n\nPosition: BUY\nAgent Confidence: 0.60",
+        "round": 1,
+        "position": "BUY",
+        "confidence": 0.6
+      },
+      {
+        "role": "bear",
+        "content": "The Bull's argument for a compelling swing trade in AUTO is significantly flawed when subjected to forensic scrutiny, particularly concerning the absence of a short-term catalyst, unfavorable risk-reward, and technical resistance.\n\nWhile the provided data indicates AUTO is fundamentally undervalued with a current price of Rp 2,640 significantly below its fair value of Rp 6,896, this substantial discount does not automatically translate into a compelling swing trade opportunity. Fundamental undervaluation is a long-term investment thesis, not a reliable short-term catalyst for a 1-3 month swing trade. The market can remain irrational for extended periods, and without a specific, near-term trigger, this disparity may persist or even widen, offering no immediate margin of safety for a quick re-rating within\n\nPosition: BUY\nAgent Confidence: 0.60",
+        "round": 1,
+        "position": "BUY",
+        "confidence": 0.6
+      },
+      {
+        "role": "devils_advocate",
+        "content": "**1. MACRO/COMPANY RISK & FOREIGN FLOW:**\nJika sentimen pasar global memburuk atau terjadi percepatan net foreign sell di IHSG, khususnya pada saham-saham berkapitalisasi besar seperti AUTO, mungkinkah support MA50 di Rp 2,531 jebol dalam 1-3 bulan ke depan, memicu koreksi lebih dalam menuju MA200 di Rp 2,356?\n\n**2. EXECUTION RISK — Transaction Cost Stress Test:**\nUntuk posisi BUY AUTO dengan harga entry di tengah zona yang disarankan, yaitu Rp 2,555, dan target harga Rp 2,700, potensi keuntungan kotor adalah 5.675%. Namun, setelah memperhitungkan biaya transaksi, total biaya round-trip adalah 0.65%, yang terdiri dari biaya beli 0.15%, biaya jual 0.25%, PPh final 0.10% dari nilai jual, dan estimasi slippage 0.15% (karena harga saham Rp 2,555 >= Rp 500). Dengan demikian, net return setelah biaya adalah 5.675% - 0.65% = 5.025%. Karena net return ini lebih besar dari 3.0%, posisi ini dianggap **VIABLE after transaction costs**.\n\nPosition: BUY\nAgent Confidence: 0.55",
+        "round": 2,
+        "position": "BUY",
+        "confidence": 0.55
+      }
+    ],
+    "raw_data_summary": "=== FUNDAMENTALS ===\nFAIR VALUE: Rp 6,896\n\nAUTO is significantly UNDERVALUED, with its current market price of Rp 2,640 representing a 161.2% discount to the calculated fair value of Rp 6,896. This substantial undervaluation provides a strong fundamental cushion for a swing trade.\n\nKey support metrics indicate a healthy financial profile: Return on Equity (TTM) stands at 13.94%, and Net Profit Margin (Quarter) is 10.63%. The company exhibits very low leverage with a Debt/Equity Ratio of 0.04 and robust interest coverage at 30.36x. Furthermore, AUTO offers an attractive Dividend Yield of 8.67%. No 3-year trends for ROE or Net Margin were available in the provided data.\n\nNo immediate growth catalysts (e.g., upcoming earnings, new contracts) within the 1-3 month horizon were identified. The latest ex-dividend date (28 Apr 26) is a PAST_EVENT_NOT_CATALYST. A quality check for financial inconsistencies revealed no red flags based on available data. Specifically, there is no ROE-Margin divergence, no low DER with weak interest coverage, and no Altman Z-Score vs. DER inconsistency. The check for Revenue-CFO divergence could not be performed due to the absence of explicit Operating Cash Flow data.\n\nPosition: BUY\nAgent Confidence: 0.85\n\n=== TECHNICALS ===\n**Analisis Teknis IHSG (1-3 Bulan Swing Trade)**\n\nSaham dalam uptrend struktural. Swing long searah tren. Harga saat ini (Rp 2,640) diperdagangkan di atas MA200 (Rp 2,356), mengindikasikan kekuatan tren naik yang berkelanjutan. Ini adalah setup yang kuat untuk posisi long.\n\nZona masuk yang ideal adalah di sekitar support dinamis EMA20 dan MA50.\nENTRY ZONE: Rp 2,531 – Rp 2,578.\nTARGET: Rp 2,700 (approx. 5.7% from entry mid). Target ini mendekati level resistance psikologis dan area 52-minggu tertinggi sebelumnya (Rp 2,721).\nSTOP LOSS: Rp 2,476 (1.5× ATR di bawah EMA20).\n\nIndikator RSI(14) berada di 59.4, menunjukkan momentum bullish yang sehat dan belum memasuki zona overbought, memberikan ruang untuk kenaikan harga lebih lanjut. Data volume harian spesifik tidak tersedia untuk perbandingan langsung, namun aktivitas orderbook menunjukkan minat beli yang cukup kuat di level harga saat ini.\n\nPosition: BUY\nAgent Confidence: 0.88\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 2640.0,\n  \"sma20\": 2577.0,\n  \"ema20\": 2578.0,\n  \"ma50\": 2531.0,\n  \"ma200\": 2356.0,\n  \"ma200_context\": \"ABOVE\",\n  \"rsi14\": 59.4,\n  \"atr14\": 68.0,\n  \"avg_volume_20d\": 2674970.0,\n  \"52w_high\": 2721.0,\n  \"52w_low\": 1799.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== DIVIDEND EX-DATE SCAN: AUTO ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
+    "error": null,
+    "conviction_score": 0.618,
+    "sector_key": "consumer_disc"
+  },
+  {
+    "ticker": "GJTL",
+    "verdict": {
+      "ticker": "GJTL",
+      "rating": "BUY",
+      "confidence": 0.77,
+      "fair_value": 5800.0,
+      "entry_price_range": "1120 - 1140",
+      "target_price": 1240.0,
+      "stop_loss": 1075.0,
+      "current_price": 1185.0,
+      "timeframe": "1-3 Months",
+      "weighted_reasoning": "The BUY rating is primarily driven by two factors: 1) Extreme fundamental undervaluation, with the current price at a 389% discount to the fair value of Rp 5,800. 2) A robust technical uptrend, with the price above all key moving averages (MA50, MA200). The trade plan wisely targets an entry on a pullback to the MA50 support area, creating an excellent R/R of 2.0. The Devil's Advocate risk of a support break is acknowledged and mitigated by the defined stop-loss at Rp 1,075. Confidence is moderated from a higher level to 0.77 due to two key caps: the lack of an identifiable 1-3 month catalyst (max confidence 0.78) and insufficient social media sentiment data (max confidence 0.82), with the lower cap taking precedence.",
+      "critical_risk_factor": "",
+      "key_catalysts": [
+        "Extreme undervaluation providing a strong margin of safety.",
+        "Continuation of the technical uptrend, with price holding above key support levels (MA50 at ~Rp 1,119)."
+      ],
+      "key_risks": [
+        "Lack of a specific short-term (1-3 month) fundamental catalyst to drive price towards fair value.",
+        "A broader market sell-off or negative company news could cause a break of the MA50 support, triggering the stop loss.",
+        "The current price of Rp 1,185 is above the target entry zone, requiring patience for a pullback which may not occur."
+      ],
+      "summary": "The trade plan for GJTL is approved with a BUY rating. The stock is profoundly undervalued, offering a significant margin of safety, and exhibits a strong technical uptrend. The proposed entry on a pullback to the Rp 1,120-1,140 support zone provides an attractive risk/reward ratio of 2.0. However, confidence is capped due to the absence of a clear short-term catalyst and insufficient sentiment data.",
+      "expected_return": "+9.7%",
+      "risk_reward_ratio": 2.0,
+      "is_overvalued": false,
+      "wait_and_see": false,
+      "consensus_reached": true,
+      "consensus_method": "voting",
+      "dissenting_agents": [
+        "sentiment_specialist"
+      ]
+    },
+    "debate_rounds": 1,
+    "consensus_reached": true,
+    "consensus_method": "voting",
+    "dissenting_agents": [
+      "sentiment_specialist"
+    ],
+    "agent_votes": [
+      {
+        "agent": "fundamental_scout",
+        "position": "BUY",
+        "confidence": 0.85,
+        "round": 0
+      },
+      {
+        "agent": "chartist",
+        "position": "BUY",
+        "confidence": 0.9,
+        "round": 0
+      },
+      {
+        "agent": "sentiment_specialist",
+        "position": "HOLD",
+        "confidence": 0.0,
+        "round": 0
+      },
+      {
+        "agent": "bull",
+        "position": "BUY",
+        "confidence": 0.6,
+        "round": 1
+      },
+      {
+        "agent": "bear",
+        "position": "BUY",
+        "confidence": 0.6,
+        "round": 1
+      }
+    ],
+    "disagreement_type": null,
+    "debate_history": [
+      {
+        "role": "bull",
+        "content": "GJTL presents a compelling swing trade BUY opportunity for a 1-3 month horizon, driven by its extreme undervaluation and a robust technical uptrend, despite the absence of a specific fundamental catalyst.\n\n**1. FUNDAMENTAL FLOOR:**\nGJTL is significantly undervalued, trading at Rp 1,185, which represents a substantial 389.5% discount to its fair value estimate of Rp 5,800. This valuation is supported by healthy profitability metrics, including an ROE of 11.72% and a Net Profit Margin of 9.07%. The company maintains a strong balance sheet with a Debt/Equity Ratio of 0.49 and an Interest Coverage Ratio of 4.54x, indicating financial stability\n\nPosition: BUY\nAgent Confidence: 0.60",
+        "round": 1,
+        "position": "BUY",
+        "confidence": 0.6
+      },
+      {
+        "role": "bear",
+        "content": "The Bull's argument for a GJTL BUY opportunity is significantly flawed when subjected to forensic audit, particularly regarding the immediate trade setup and risk profile. While fundamental undervaluation is cited, the absence of a catalyst, coupled with technical vulnerabilities and an unfavorable risk/reward, makes this a high-risk AVOID.\n\n**1. Overvaluation Check & Margin of Safety:**\nThe Bull correctly identifies GJTL as fundamentally undervalued at Rp 1,185 compared to its fair value of Rp 5,800, representing a substantial discount. However, this fundamental undervaluation does not automatically translate into a safe or timely swing trade entry. The current price of Rp 1,185 is already at the upper bound of the Bull's recommended entry zone (Rp 1\n\nPosition: BUY\nAgent Confidence: 0.60",
+        "round": 1,
+        "position": "BUY",
+        "confidence": 0.6
+      },
+      {
+        "role": "devils_advocate",
+        "content": "**Question 1: MACRO/COMPANY RISK & FOREIGN FLOW**\nIf foreign funds initiate a significant net sell-off in the broader market, or if GJTL's upcoming quarterly results show a continued decline in revenue, could the MA50 support at Rp 1,119 break, potentially triggering a fall towards the MA200 at Rp 1,067?\n\n**Question 2: EXECUTION RISK — Transaction Cost Stress Test**\nMenggunakan harga entry Rp 1,177 (batas atas entry zone yang direkomendasikan) dan target price Rp 1,230, gross return yang diproyeksikan adalah ((Rp 1,230 - Rp 1,177) / Rp 1\n\nPosition: AVOID\nAgent Confidence: 0.55",
+        "round": 2,
+        "position": "AVOID",
+        "confidence": 0.55
+      }
+    ],
+    "raw_data_summary": "=== FUNDAMENTALS ===\nFAIR VALUE: Rp 5,800\n\nGJTL is significantly UNDERVALUED at its current market price of Rp 1,185, representing a substantial 389.5% discount to its calculated fair value of Rp 5,800. This valuation is derived from a weighted average of P/E Band (Rp 5,470) and P/B Band (Rp 6,224) methods, with a medium calculation confidence.\n\nKey fundamental metrics include a current Return on Equity (ROE) of 11.72% and a Net Profit Margin of 9.07%. Three-year trend data for ROE and Net Margin is not available in the provided information. The company maintains a Debt/Equity Ratio of 0.49 and offers a Dividend Yield of 4.22%.\n\nNo specific upcoming growth catalysts within the 1-3 month swing trade horizon were identified. The latest dividend ex-date (07 Jul 25) is a past event.\n\nQuality Check:\n• ROE (11.72%) is not high (>15%) and Net Margin (9.07%) is not low (<5%).\n• DER (0.49) is not low (<0.3). Interest Coverage Ratio is 4.54x.\n• Revenue growth (-4.68%) is not positive. Operating Cash Flow data for this specific check is not explicitly available.\n• Altman Z-Score (3.82) is not >10. DER (0.49) is not >1.0.\n✅ No red flags detected.\n\nPosition: BUY\nAgent Confidence: 0.85\n\n=== TECHNICALS ===\n**Analisis Teknis GJTL (1-3 Bulan Swing Trade)**\n\n**TREND CONTEXT:**\nSaham dalam uptrend struktural. Swing long searah tren. GJTL saat ini diperdagangkan di atas semua moving averages utama (MA200, MA50, EMA20), menunjukkan kekuatan tren yang berkelanjutan dan posisi yang baik untuk melanjutkan kenaikan.\n\n**ENTRY ZONE:**\nIdealnya, tunggu pullback ke area support.\nENTRY ZONE: Rp 1,119 – Rp 1,177 (antara MA50 dan EMA20).\n\n**TARGET PRICE:**\nTARGET: Rp 1,230 (approx. 7.1% from entry mid). Level ini merupakan 52-week high dan menunjukkan resistensi signifikan berdasarkan orderbook.\n\n**STOP LOSS:**\nSTOP LOSS: Rp 1,132 (1.5× ATR below EMA20).\n\n**RSI INTERPRETATION:**\nRSI(14) di 54.9 menunjukkan momentum bullish yang moderat, dengan ruang untuk kenaikan lebih lanjut sebelum mencapai kondisi overbought. Ini mendukung potensi kenaikan harga.\n\n**VOLUME SIGNAL:**\nVolume rata-rata 20 hari (6,942,040) cukup sehat, menunjukkan likuiditas yang memadai. Namun, volume transaksi hari ini tidak tersedia untuk konfirmasi langsung pergerakan harga saat ini.\n\nPosition: BUY\nAgent Confidence: 0.90\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 1185.0,\n  \"sma20\": 1189.0,\n  \"ema20\": 1177.0,\n  \"ma50\": 1119.0,\n  \"ma200\": 1067.0,\n  \"ma200_context\": \"ABOVE\",\n  \"rsi14\": 54.9,\n  \"atr14\": 30.0,\n  \"avg_volume_20d\": 6942040.0,\n  \"52w_high\": 1230.0,\n  \"52w_low\": 940.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== DIVIDEND EX-DATE SCAN: GJTL ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
+    "error": null,
+    "conviction_score": 0.635,
+    "sector_key": "consumer_disc",
+    "position_sizing": {
+      "ticker": "GJTL",
+      "rating": "BUY",
+      "confidence": 0.77,
+      "lot": 3,
+      "shares": 300,
+      "position_value": 355500.0,
+      "allocation_pct": 0.3555,
+      "target_allocation_pct": 0.20537124802527648,
+      "max_loss_rp": 33000.0,
+      "max_drawdown_pct": 0.033,
+      "expected_return_pct": 9.7,
+      "expected_return_rp": 34483.49999999999,
+      "total_cost_est": 1777.5,
+      "entry_price": 1185.0,
+      "stop_loss": 1075.0,
+      "rr_ratio": 2.0
+    },
+    "allocation_reasoning": {
+      "target_deployment_pct": 65.0,
+      "actual_deployment_pct": 67.5,
+      "gap_explanation": "Actual deployment 67.5% sudah berada di area target normal 65.0%.",
+      "risk_factors_limiting": [
+        "max drawdown per posisi dibatasi 5.0% sehingga lot tidak dipaksa melewati stop-risk budget"
+      ],
+      "market_condition_score": 0.83,
+      "recommendation": "Deployment sudah cukup aktif untuk swing trade moderat; tambah exposure hanya jika sinyal teknikal menguat tanpa memperbesar drawdown per posisi."
+    },
+    "deployment_scenario_comparison": {
+      "deploy_60_now": {
+        "deployment_pct": 60.0,
+        "expected_return_on_deployed_pct": 9.04,
+        "expected_return_portfolio_pct": 5.42,
+        "expected_return_rp": 54221.0,
+        "max_drawdown_portfolio_pct": 3.0,
+        "max_drawdown_rp": 30000.0
+      },
+      "wait_for_confirmation": {
+        "deployment_pct": 0.0,
+        "expected_return_portfolio_pct": 0.0,
+        "expected_return_rp": 0.0,
+        "max_drawdown_portfolio_pct": 0.0,
+        "max_drawdown_rp": 0.0,
+        "tradeoff": "Cash protects capital while waiting for cleaner entry, but gives up roughly Rp 54,221 if the current 60% deployment scenario works."
+      }
+    }
+  },
+  {
+    "ticker": "ERAA",
+    "verdict": {
+      "ticker": "ERAA",
+      "rating": "BUY",
+      "confidence": 0.71,
+      "fair_value": 1288.0,
+      "entry_price_range": "394 - 406",
+      "target_price": 444.0,
+      "stop_loss": 378.0,
+      "current_price": 406.0,
+      "timeframe": "1-3 Months",
+      "weighted_reasoning": "The decision is weighted heavily towards the significant undervaluation (Current Price Rp 406 vs. Fair Value Rp 1,288) and the favorable Risk/Reward ratio of 2.00. The technical setup supports a bounce from the MA50/EMA20 confluence zone. These factors are strong enough to justify a BUY rating despite key weaknesses: 1) This is a counter-trend trade, as the price is below its MA200, which increases risk. 2) There is no identifiable short-term catalyst to drive the price towards fair value. 3) The Devil's Advocate's concern about macro headwinds breaking support is valid and unanswerable, necessitating the strict stop-loss. Confidence is set at 0.71, reflecting the solid R/R but capped by the counter-trend nature and lack of catalyst.",
+      "critical_risk_factor": "",
+      "key_catalysts": [
+        "Technical bounce from the confluence of MA50 (Rp 399) and EMA20 (Rp 404) support levels.",
+        "Mean reversion play driven by the extreme discount of 217% to its fair value of Rp 1,288."
+      ],
+      "key_risks": [
+        "Counter-trend trade risk: Price remains below the MA200 (Rp 426), indicating a persistent long-term downtrend.",
+        "Lack of a specific short-term (1-3 month) fundamental catalyst to trigger a significant re-rating.",
+        "Macroeconomic headwinds or negative market sentiment could cause a break of technical support, as highlighted by the Devil's Advocate."
+      ],
+      "summary": "This is a BUY recommendation based on a compelling risk/reward setup. The stock is severely undervalued, offering a significant margin of safety, and the trade plan provides a clear 2.0 R/R ratio. However, this is a counter-trend trade without a near-term catalyst, warranting a reduced position size as a precaution.",
+      "expected_return": "+11.0%",
+      "risk_reward_ratio": 2.0,
+      "is_overvalued": false,
+      "wait_and_see": false,
+      "consensus_reached": true,
+      "consensus_method": "voting",
+      "dissenting_agents": [
+        "sentiment_specialist"
+      ]
+    },
+    "debate_rounds": 1,
+    "consensus_reached": true,
+    "consensus_method": "voting",
+    "dissenting_agents": [
+      "sentiment_specialist"
+    ],
+    "agent_votes": [
+      {
+        "agent": "fundamental_scout",
+        "position": "BUY",
+        "confidence": 0.8,
+        "round": 0
+      },
+      {
+        "agent": "chartist",
+        "position": "BUY",
+        "confidence": 0.7,
+        "round": 0
+      },
+      {
+        "agent": "sentiment_specialist",
+        "position": "HOLD",
+        "confidence": 0.0,
+        "round": 0
+      },
+      {
+        "agent": "bull",
+        "position": "BUY",
+        "confidence": 0.6,
+        "round": 1
+      },
+      {
+        "agent": "bear",
+        "position": "BUY",
+        "confidence": 0.6,
+        "round": 1
+      }
+    ],
+    "disagreement_type": null,
+    "debate_history": [
+      {
+        "role": "bull",
+        "content": "ERAA presents a compelling swing trade BUY opportunity (1-3 month horizon) driven by extreme undervaluation and a high-probability technical bounce from established support levels, despite the absence of a specific fundamental catalyst.\n\n**1. FUNDAMENTAL FLOOR:**\nERAA is significantly undervalued, with its current market price of Rp 406 trading at a substantial 217.24% discount to its calculated fair value of Rp 1,288. This deep discount provides a strong fundamental floor, limiting long-term downside risk and offering a compelling value proposition. While a \"ROE-Margin Divergence\" (ROE 15.14% vs. Net Margin 2.02%) suggests potential reliance on leverage, the overall undervaluation remains\n\nPosition: BUY\nAgent Confidence: 0.60",
+        "round": 1,
+        "position": "BUY",
+        "confidence": 0.6
+      },
+      {
+        "role": "bear",
+        "content": "The Bull's argument for a compelling swing trade BUY opportunity in ERAA is significantly flawed, primarily due to the inherent risks of a counter-trend trade, questionable fundamental support for a short-term horizon, and an unfavorable risk-reward profile.\n\n1.  **Misplaced Fundamental Reliance & Catalyst Risk:** While ERAA is indeed fundamentally undervalued at Rp 406 compared to its fair value of Rp 1,288, this deep discount does not constitute a reliable *swing trade catalyst* within a 1-3 month horizon. The Bull explicitly acknowledges the absence of any immediate growth catalysts (earnings, contracts, ex-dividend) for the swing trade period. Furthermore, the \"ROE-Margin Divergence\" (ROE 15.14% vs\n\nPosition: BUY\nAgent Confidence: 0.60",
+        "round": 1,
+        "position": "BUY",
+        "confidence": 0.6
+      },
+      {
+        "role": "devils_advocate",
+        "content": "Berikut adalah tantangan terhadap setup trade ERAA:\n\n1.  **MACRO/COMPANY RISK & FOREIGN FLOW:**\n    Given ERAA's structural downtrend and the 'ROE-Margin Divergence' suggesting potential reliance on leverage, if broader market sentiment sours or foreign funds accelerate their selling pressure on the IHSG, could the Rp 399 MA50 support level break, potentially triggering stops and pushing the price towards its 52-week low of Rp 360?\n\n2.  **EXECUTION RISK — Transaction Cost Stress Test:**\n    Menggunakan harga entry Rp 404 dan target Rp 426, potensi gross return adalah 5.45%. Biaya transaksi round-trip untuk saham ERAA (harga < Rp 500) adalah sebagai berikut: biaya beli 0.15%, biaya jual 0.25%, PPh final 0.10%, dan estimasi slippage 0.30%. Total biaya transaksi adalah 0.15% + 0.25% + 0.10% + 0.30% = 0.80%. Dengan demikian, net return setelah biaya adalah 5.45% - 0.80% = 4.65%. Berdasarkan perhitungan ini, trade ini **VIABLE after transaction costs**.\n\nPosition: HOLD\nAgent Confidence: 0.00",
+        "round": 2,
+        "position": "HOLD",
+        "confidence": 0.0
+      }
+    ],
+    "raw_data_summary": "=== FUNDAMENTALS ===\nFAIR VALUE: Rp 1,288\n\nERAA is significantly UNDERVALUED, with a current market price of Rp 406 representing a 217.24% discount to its calculated fair value of Rp 1,288. Key support metrics include a TTM Return on Equity (ROE) of 15.14%, a TTM Net Margin of 2.02%, a Debt/Equity Ratio of 0.96, and a Dividend Yield of 4.68%.\n\nA quality check reveals a \"⚠️ ROE-Margin Divergence — verifikasi kualitas laba\" as ROE (15.14%) is high while Net Margin (2.02%) is low, suggesting potential reliance on leverage or asset revaluation rather than strong operational profitability. No other red flags were triggered by the available data. No immediate upcoming growth catalyst (earnings, ex-dividend, contract) has been identified within the 1-3 month swing trade horizon, as the latest dividend ex-date (19 Jun 25) is a past event.\n\nPosition: BUY\nAgent Confidence: 0.80\n\n=== TECHNICALS ===\n**Analisis Teknis ERAA (1-3 Bulan Swing)**\n\nSaham dalam downtrend struktural. Ini counter-trend bounce — target lebih konservatif, size 50%. ERAA saat ini diperdagangkan di bawah MA200-nya, mengindikasikan tren jangka panjang yang bearish.\n\nENTRY ZONE: Rp 399 – Rp 404. Harga saat ini (Rp 406) berada sedikit di atas EMA20 (Rp 404), dengan MA50 (Rp 399) sebagai support berikutnya.\n⚠️ Counter-trend trade — kurangi ukuran posisi 50% dari normal.\nTARGET: Rp 426 (approx. 6.10% from entry mid). Target ini adalah level MA200, yang berfungsi sebagai resistensi kuat dalam tren turun.\nSTOP LOSS: Rp 388 (1.5× ATR below EMA20).\n\nRSI(14) berada di 53.4, menunjukkan momentum netral yang sedikit positif, namun belum memasuki zona overbought. Volume data harian spesifik tidak tersedia untuk perbandingan langsung dengan rata-rata volume 20 hari untuk mengkonfirmasi atau menyangkal pergerakan harga.\n\nPosition: BUY\nAgent Confidence: 0.70\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 406.0,\n  \"sma20\": 406.0,\n  \"ema20\": 404.0,\n  \"ma50\": 399.0,\n  \"ma200\": 426.0,\n  \"ma200_context\": \"BELOW\",\n  \"rsi14\": 53.4,\n  \"atr14\": 11.0,\n  \"avg_volume_20d\": 45046385.0,\n  \"52w_high\": 555.0,\n  \"52w_low\": 360.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== DIVIDEND EX-DATE SCAN: ERAA ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
+    "error": null,
+    "conviction_score": 0.555,
+    "sector_key": "consumer_disc"
+  },
+  {
+    "ticker": "MAPI",
+    "verdict": {
+      "ticker": "MAPI",
+      "rating": "HOLD",
+      "confidence": 0.47,
+      "fair_value": 1986.0,
+      "entry_price_range": "1245 - 1270",
+      "target_price": 1380.0,
+      "stop_loss": 1195.0,
+      "current_price": 1455.0,
+      "timeframe": "1-3 Months",
+      "weighted_reasoning": "The HOLD rating is mandated by the 'soft_hold' consensus rule, which is appropriate given the conflict between strong fundamentals and poor technical timing. The stock is undervalued by 36.5% against its fair value of Rp 1,986, supported by a low D/E ratio and healthy ROE. However, the technical picture is unfavorable for a new entry; the price at Rp 1,455 is over 14% above the top of the ideal entry zone, rendering the favorable 1.96 R/R ratio currently invalid. The Devil's Advocate's unanswered risk of a support breakdown during a market-wide correction reinforces the need for patience. A HOLD is prudent until the price re-tests the specified support levels. Consensus override: Bull/Bear confidence gap was below 0.15, so the chamber treats this as soft consensus HOLD instead of forcing an entry.",
+      "critical_risk_factor": "",
+      "key_catalysts": [
+        "Significant undervaluation (36.5% discount to Fair Value of Rp 1,986)",
+        "Strong balance sheet with very low Debt/Equity ratio (0.24)",
+        "Healthy profitability metrics (ROE TTM 16.29%)"
+      ],
+      "key_risks": [
+        "Price is significantly extended, trading well above the ideal entry zone, making the current risk/reward unfavorable.",
+        "The trade plan is entirely dependent on a deep price correction of ~15% which may not materialize.",
+        "Devil's Advocate Risk: A broader market downturn could cause a break of key support levels (MA50), turning a potential pullback into a downtrend.",
+        "Lack of a specific, near-term corporate catalyst beyond existing valuation."
+      ],
+      "summary": "MAPI is fundamentally attractive, trading at a significant discount to its fair value with a strong balance sheet. However, the current market price of Rp 1,455 is severely extended and far above the calculated swing entry zone of Rp 1,245-1,270. The proposed trade plan is valid but not actionable at this time, requiring a substantial pullback to establish a favorable risk/reward profile.",
+      "expected_return": "+9.7%",
+      "risk_reward_ratio": 1.96,
+      "is_overvalued": false,
+      "wait_and_see": true,
+      "consensus_reached": true,
+      "consensus_method": "soft_hold",
+      "dissenting_agents": [
+        "fundamental_scout",
+        "chartist",
+        "bull",
+        "bear"
+      ]
+    },
+    "debate_rounds": 1,
+    "consensus_reached": true,
+    "consensus_method": "soft_hold",
+    "dissenting_agents": [
+      "fundamental_scout",
+      "chartist",
+      "bull",
+      "bear"
+    ],
+    "agent_votes": [
+      {
+        "agent": "fundamental_scout",
+        "position": "BUY",
+        "confidence": 0.8,
         "round": 0
       },
       {
@@ -235,302 +788,310 @@
     "debate_history": [
       {
         "role": "bull",
-        "content": "ELSA presents a compelling fundamental floor, trading at Rp 765, a significant 95.2% discount to its fair value of Rp 1,493. The company exhibits robust financial health, characterized by a TTM Return on Equity of 13.11%, a Net Profit Margin of 5.24%, a low Debt/Equity Ratio of 0.13, and strong Interest Coverage of 10.01x. Additionally, ELSA offers an attractive Dividend Yield of 5.11%. These metrics establish a strong fundamental cushion and long-term value proposition, suggesting the current price is deeply undervalued.\n\nTechnically, ELSA is situated within a strong structural uptrend, with the current price of Rp 7\n\nPosition: BUY\nAgent Confidence: 0.60",
+        "content": "MAPI presents a compelling swing trade opportunity, underpinned by robust fundamentals and a clear technical setup, contingent on a market pullback. The stock is significantly undervalued, trading at Rp 1,455 against a fair value of Rp 1,986, representing a substantial 36.5% discount. This fundamental floor is reinforced by healthy profitability metrics, including a TTM ROE of 16.29% and Net Margin of 5.11%, alongside a very strong balance sheet with a low Debt/Equity ratio of 0.24.\n\nTechnically, MAPI is in a strong structural uptrend, currently at its 52-week high of Rp 1,455, indicating powerful bullish momentum. For a high\n\nPosition: BUY\nAgent Confidence: 0.60",
         "round": 1,
         "position": "BUY",
         "confidence": 0.6
       },
       {
         "role": "bear",
-        "content": "**OVERVALUATION CHECK:** The current price of Rp 765 is significantly *below* the stated fair value of Rp 1,493, representing a substantial discount rather than a premium. While this suggests fundamental undervaluation, for a 1-3 month swing trade, this discount does not inherently provide a margin of safety for *timely price appreciation*. Without an identifiable catalyst to unlock this value within the short swing trade horizon, the fundamental undervaluation is not actionable, meaning the entry lacks a *catalyst-driven* margin of safety for the intended trade duration.\n\n**TECHNICAL BREAKDOWN RISK:** The technical setup presents significant breakdown risks, contradicting the Bull's \"strong structural uptrend\" claim for a short-term swing. The current price of Rp 765 is *below* the MA50 (Rp 771), indicating short-term weakness and potential resistance at this level, not merely \"consolidation.\" A breakdown below the EMA20 (Rp 763), which is included in the Bull's entry zone (Rp 750 – Rp 763), would confirm further bearish momentum. The 52-week high of Rp 1000 suggests a significant pullback, and the inability to reclaim MA50 reinforces the risk of a continued downtrend or sideways consolidation rather than an immediate upward swing. The Bull's entry zone places the trade directly into a potential support breakdown area, with the MA50 acting as overhead resistance.\n\n**CATALYST RISK:** The Bull explicitly states, \"No clear upcoming growth catalyst (e.g., earnings, new contracts) has been identified within the 1-3 month swing trade horizon.\" This is a critical flaw for a swing trade. While ELSA may be fundamentally undervalued, the absence of a specific event or news flow to unlock this value within the short 1-3 month timeframe means the stock could languish or even decline further, making the fundamental undervaluation irrelevant for a swing trading strategy. The past dividend ex-date of 04 Jun 25 is a PAST_EVENT_NOT_CATALYST and offers no forward momentum.\n\n**UNFAVOURABLE R/R:** The proposed swing trade setup exhibits an extremely unfavorable Risk/Reward (R/R) ratio. Using the Bull's suggested entry midpoint of Rp 755, a target price of Rp 78\n\nPosition: AVOID\nAgent Confidence: 0.60",
+        "content": "The Bull's swing trade setup for MAPI, while highlighting fundamental undervaluation, presents significant risks and inconsistencies that make it an AVOID at the current market price.\n\n1.  **OVERVALUATION CHECK**: While MAPI is fundamentally undervalued against its fair value of Rp 1,986, the Bull's proposed *technical entry zone* is Rp 1,244 – Rp 1,284. The current market price of Rp 1,455 is a substantial 13.3% premium above the upper bound of this ideal entry zone (Rp 1,284). Entering at Rp 1,455 *now* provides no margin of safety for a swing trade, as it implies buying significantly above the anticipated\n\nPosition: AVOID\nAgent Confidence: 0.60",
         "round": 1,
         "position": "AVOID",
         "confidence": 0.6
       },
       {
         "role": "devils_advocate",
-        "content": "**Question 1: MACRO/COMPANY RISK & FOREIGN FLOW**\nGiven the absence of a clear catalyst and ELSA's current price being below its MA50, if broader market foreign selling pressure intensifies or negative sentiment hits the energy sector, could ELSA break below the Rp 750 support level, potentially triggering further declines towards its stop loss at Rp 705?\n\n**Question 2: EXECUTION RISK — Transaction Cost Stress Test**\nMenggunakan harga entry tengah yang disarankan Rp 755 dan target harga Rp 785, potensi keuntungan kotor adalah 3.97%. Total biaya transaksi round-trip dihitung sebagai berikut: biaya beli 0.15%, biaya jual 0.25%, PPh final 0.10% dari nilai jual, dan estimasi slippage 0.15% (karena harga saham >= Rp 500). Jadi, total biaya transaksi adalah 0.15% + 0.25% + 0.10% + 0.15% = 0.65%. Setelah dikurangi biaya ini, net return yang diharapkan adalah 3.97% - 0.65% = 3.32%. Berdasarkan perhitungan ini, trade ini dianggap VIABLE after transaction costs.",
-        "round": 2,
-        "position": "UNKNOWN",
-        "confidence": null
-      }
-    ],
-    "raw_data_summary": "=== FUNDAMENTALS ===\nFAIR VALUE: Rp 1,493\n\nThe current market price of Rp 765 for ELSA is significantly UNDERVALUED, presenting a 95.2% upside compared to the calculated fair value of Rp 1,493. This indicates a strong fundamental cushion for a potential swing trade.\n\nKey support metrics include a TTM Return on Equity (ROE) of 13.11% and a Net Profit Margin of 5.24%. The company maintains a very healthy balance sheet with a low Debt/Equity Ratio of 0.13 and robust Interest Coverage of 10.01x. Additionally, ELSA offers a Dividend Yield of 5.11% based on a TTM dividend per share of Rp 39.11. (Note: 3-year trend data for ROE and Net Margin was not provided in the source).\n\nThe latest dividend ex-date of 04 Jun 25 is a PAST_EVENT_NOT_CATALYST relative to the current date (2026-05-07). No clear upcoming growth catalyst (e.g., earnings, new contracts) has been identified within the 1-3 month swing trade horizon.\n\nQuality Check:\n• ROE (13.11%) is not >15%, so \"ROE-Margin Divergence\" is not triggered.\n• DER (0.13) is <0.3, but Interest Coverage (10.01x) is not <3x, so \"Low DER tapi Interest Coverage lemah\" is not triggered.\n• Revenue growth (-2.98%) is not positive, so \"Revenue-CFO Divergence\" is not triggered.\n• Altman Z-Score (4.37) is not >10, so \"Z-Score vs DER Inconsistency\" is not triggered.\n✅ No red flags detected.\n\nPosition: BUY\nAgent Confidence: 0.85\n\n=== TECHNICALS ===\nAnalisis teknikal menunjukkan saham berada dalam uptrend struktural yang kuat, dengan harga saat ini jauh di atas MA200. Ini mendukung strategi swing long searah tren. Harga saat ini (Rp 765) berada di atas EMA20 namun sedikit di bawah MA50, mengindikasikan konsolidasi singkat dalam tren naik.\n\nUntuk setup swing trade 1-3 bulan, zona entri yang ideal adalah pada retest support. Berdasarkan EMA20 (Rp 763) dan MA50 (Rp 771) sebagai batas support, ENTRY ZONE yang disarankan adalah Rp 750 – Rp 763. TARGET PRICE terdekat pada level resistensi kuat adalah Rp 785, yang menawarkan potensi keuntungan sekitar 3.97% dari titik tengah entri (Rp 755). STOP LOSS ditempatkan pada Rp 705, dihitung 1.5× ATR (39.0) di bawah EMA20 (Rp 763).\n\nIndikator RSI(14) berada di 51.3, menunjukkan momentum yang netral, tidak ada kondisi overbought atau oversold yang signifikan. Ini memberikan ruang bagi harga untuk bergerak naik. Informasi volume perdagangan harian saat ini tidak tersedia untuk dibandingkan dengan rata-rata volume 20 hari, sehingga tidak dapat digunakan untuk mengkonfirmasi atau menyangkal pergerakan harga.\n\nPosition: BUY\nAgent Confidence: 0.88\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 765.0,\n  \"sma20\": 749.0,\n  \"ema20\": 763.0,\n  \"ma50\": 771.0,\n  \"ma200\": 584.0,\n  \"ma200_context\": \"ABOVE\",\n  \"rsi14\": 51.3,\n  \"atr14\": 39.0,\n  \"avg_volume_20d\": 66625415.0,\n  \"52w_high\": 1000.0,\n  \"52w_low\": 429.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== DIVIDEND EX-DATE SCAN: ELSA ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
-    "error": null,
-    "conviction_score": 0.0,
-    "sector_key": "energy"
-  },
-  {
-    "ticker": "SRTG",
-    "verdict": {
-      "ticker": "SRTG",
-      "rating": "HOLD",
-      "confidence": 0.45,
-      "fair_value": 8351.0,
-      "entry_price_range": "1735 - 1775",
-      "target_price": 1825.0,
-      "stop_loss": 1720.0,
-      "current_price": 1790.0,
-      "timeframe": "1-3 Months",
-      "weighted_reasoning": "The primary reason for a HOLD rating is the invalidation of the fundamental thesis. The reported 115.41% Net Profit Margin renders the Rp 8,351 fair value calculation untrustworthy, eliminating the perceived margin of safety. While the technical setup is neutral-to-positive (price above key MAs) and the R/R ratio of 2.0 is attractive, the unresolved Devil's Advocate risk of a sell-off triggered by a data correction is too significant to ignore. The `Fundamental ❌ + Technical ✅` conflict resolution matrix points to HOLD in the absence of strong momentum catalysts. The consensus winner was also HOLD, reinforcing this cautious stance.",
-      "critical_risk_factor": "",
-      "key_catalysts": [
-        "Technical support holding at the MA50/MA200 confluence (1739-1742).",
-        "Potential market ignorance of the data anomaly in the short term."
-      ],
-      "key_risks": [
-        "Severe data error (115.41% NPM) makes the fair value calculation invalid.",
-        "A market re-evaluation or data correction could trigger a sharp sell-off, breaking the stop-loss.",
-        "Lack of any near-term fundamental catalyst.",
-        "Sentiment data is insufficient, indicating low retail interest or coverage."
-      ],
-      "summary": "This trade plan is technically sound with a 2.0 R/R ratio, but it's built on a critically flawed fundamental premise. The calculated fair value is unreliable due to an impossible Net Profit Margin figure. This creates significant downside risk if the market re-evaluates the stock, making a new entry too risky. We will hold and wait for either a data correction or a more resilient technical setup.",
-      "expected_return": "+4.0%",
-      "risk_reward_ratio": 2.0,
-      "is_overvalued": false,
-      "wait_and_see": true,
-      "consensus_reached": true,
-      "consensus_method": "voting",
-      "dissenting_agents": [
-        "fundamental_scout",
-        "bull"
-      ]
-    },
-    "debate_rounds": 3,
-    "consensus_reached": true,
-    "consensus_method": "voting",
-    "dissenting_agents": [
-      "fundamental_scout",
-      "bull"
-    ],
-    "agent_votes": [
-      {
-        "agent": "fundamental_scout",
-        "position": "BUY",
-        "confidence": 0.75,
-        "round": 0
-      },
-      {
-        "agent": "chartist",
-        "position": "HOLD",
-        "confidence": 0.0,
-        "round": 0
-      },
-      {
-        "agent": "sentiment_specialist",
-        "position": "HOLD",
-        "confidence": 0.0,
-        "round": 0
-      },
-      {
-        "agent": "bull",
-        "position": "BUY",
-        "confidence": 0.78,
-        "round": 3
-      },
-      {
-        "agent": "bear",
-        "position": "HOLD",
-        "confidence": 0.6,
-        "round": 3
-      }
-    ],
-    "disagreement_type": null,
-    "debate_history": [
-      {
-        "role": "system",
-        "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 1,790, Rp 8,351, Rp 1,739, Rp 1,742, Rp 1,785, Rp 2,030, Rp 1,720, Rp 245, Rp 65.0, Rp 130.0, Rp 1,655, Rp 1,450, Rp 335",
-        "round": 0,
-        "position": "UNKNOWN",
-        "confidence": null
-      },
-      {
-        "role": "system",
-        "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 1,790, Rp 8,351, Rp 1,739, Rp 1,742, Rp 1,785, Rp 2,030, Rp 1,720, Rp 245",
-        "round": 0,
-        "position": "UNKNOWN",
-        "confidence": null
-      },
-      {
-        "role": "bull",
-        "content": "…imary market-driven catalyst for a re-rating towards the 52-week high within the swing trade timeframe, as the market recognizes the deep value and technical strength.\n\n**4. RISK/REWARD:**\nEntry: Rp 1,785 (around EMA20 support)\nTarget: Rp 2,030 (52-week high, representing a re-rating within the established uptrend)\nStop: Rp 1,720 (below MA200 and approximately 1 ATR from entry, protecting against trend breakdown)\nRisk: Rp 65 (1785 - 1720)\nReward: Rp 245 (2030 - 1785)\nR/R ratio: 3.77:1, indicating a highly favorable risk-reward profile for this swing trade.\n\nPosition: BUY\nAgent Confidence: 0.75",
-        "round": 1,
-        "position": "BUY",
-        "confidence": 0.75
-      },
-      {
-        "role": "bear",
-        "content": "…n AVOID stance.\n\n**1. OVERVALUATION CHECK:**\nThe Bull's claim of \"profound undervaluation\" is based on a highly unreliable fair value calculation. While the current price of Rp 1,790 is significantly below the stated fair value of Rp 8,351, the underlying fundamental data reports an impossible TTM Net Profit Margin of 115.41%. A net profit margin exceeding 100% indicates a severe data error, rendering the calculated fair value of Rp 8,351 completely untrustworthy. Consequently, the perceived \"fundamental floor\" and \"margin of safety\" are non-existent, as\n\nPosition: AVOID\nAgent Confidence: 0.60",
-        "round": 1,
-        "position": "AVOID",
-        "confidence": 0.6
-      },
-      {
-        "role": "bull",
-        "content": "…nt was not initially identified, the company's intrinsic quality serves as a powerful, ongoing driver for a re-rating. Its strong balance sheet, characterized by minimal debt, and demonstrated operational efficiency, reflected in its positive profitability metrics, position it as an attractive asset in the current market. This fundamental strength, combined with the significant discount to its underlying value, acts as a continuous catalyst, drawing market attention and supporting a gradual re-evaluation towards its true worth over the swing trade horizon.\n\nPosition: BUY\nAgent Confidence: 0.70",
+        "content": "Berikut adalah tantangan terhadap setup trade MAPI:\n\n1.  **MACRO/COMPANY RISK & FOREIGN FLOW**: Jika MAPI, yang saat ini diperdagangkan jauh di atas zona entri yang disarankan, mengalami koreksi dan mencapai support MA50 di Rp 1,244, mungkinkah sentimen negatif pasar yang lebih luas (misalnya, pelemahan IHSG) ditambah dengan tekanan jual bersih yang berkelanjutan dari investor asing pada saham-saham ritel berkapitalisasi besar, memicu penembusan support ini dan mendorong harga lebih rendah menuju MA200 di Rp 1,226 dalam 1-3 bulan ke depan?\n\n2.  **EXECUTION RISK — Transaction Cost Stress Test**:\n    Dengan menggunakan harga entri tengah dari Trade Envelope yaitu Rp 1,264 dan target harga Rp 1,400, estimasi gross return adalah 10.76%. Total biaya transaksi round-trip dihitung sebagai berikut: biaya beli 0.15%, biaya jual 0.25%, PPh final 0.10% dari nilai jual, dan estimasi slippage 0.15% (karena harga > Rp 500). Jadi, total biaya transaksi adalah 0.15% + 0.25% + 0.10% + 0.15% = 0.65%. Setelah memperhitungkan biaya ini, net return yang diharapkan adalah 10.76% - 0.65% = 10.11%. Berdasarkan kalkulasi ini, trade MAPI dinilai **VIABLE after transaction costs**.\n\nPosition: BUY\nAgent Confidence: 0.55",
         "round": 2,
         "position": "BUY",
-        "confidence": 0.7
-      },
-      {
-        "role": "bear",
-        "content": "…ificant support level is not a minor pullback but the 52-week low at Rp 1,450. This represents a substantial downside risk from the Bull's proposed entry zone. If an entry is executed at Rp 1,785 and the price subsequently drops to the 52-week low of Rp 1,450, the actual maximum loss would be Rp 335 per share. This potential loss is significantly greater than any implied \"margin of safety\" derived from the Bull's unverified fundamental claims or the fragile technical supports, making the trade unviable for swing execution given the disproportionate risk.\n\nPosition: AVOID\nAgent Confidence: 0.85",
-        "round": 2,
-        "position": "AVOID",
-        "confidence": 0.85
-      },
-      {
-        "role": "bull",
-        "content": "The Bear's assertion that the 52-week low represents the next significant support level, implying a substantial downside, overlooks critical intermediate technical floors. While the MA200 provides a robust structural foundation, should that long-term average be tested, historical price action indicates a strong demand zone around the 1610 level. This intermediate support, well above the extreme annual low, significantly limits the potential downside risk, providing a more realistic floor for price consolidation before any further significant retracement.\n\nRegarding the challenge to valuation due to the reported net profit margin anomaly, we acknowledge the data discrepancy. However, the company's fundamental strength is not solely reliant on a single metric. Its exceptionally low debt-to-equity ratio and consistent positive return on equity independently underscore a financially sound and operationally efficient enterprise. These core metrics provide a strong basis for intrinsic value, suggesting the stock is trading at a profound discount to its true worth, irrespective of the specific fair value calculation.\n\nThis inherent value proposition ensures that the current market valuation offers a considerable margin of safety. Even if the market price were to retrace towards its annual lows, the underlying fundamental value, supported by a robust balance sheet and profitability, would still represent a significant premium. This wide gap between the current price and its conservative intrinsic value is more than sufficient to absorb the Bear's projected downside scenario, making the risk-reward profile highly favorable for a swing trade. The market's eventual recognition of this deep-seated quality serves as a continuous catalyst for re-rating.\n\nPosition: BUY\nAgent Confidence: 0.78",
-        "round": 3,
-        "position": "BUY",
-        "confidence": 0.78
-      },
-      {
-        "role": "bear",
-        "content": "The Bull's swing setup relies on a series of unsubstantiated claims and overlooks critical short-term risks. Firstly, the assertion of a \"strong demand zone around the 1610 level\" lacks any specific historical data or technical justification within the provided context, making it an unreliable intermediate support. If the primary moving average supports, specifically the MA200 at Rp 1,739, fail to hold, the price could face a more significant retracement. Without a robust intermediate floor, the next discernible structural support could be considerably lower than the Bull's claimed Rp 1,610. For instance, a retest of prior consolidation levels could see the price drop towards Rp 1,550. If an entry is made at the upper\n\nPosition: HOLD\nAgent Confidence: 0.60",
-        "round": 3,
-        "position": "HOLD",
-        "confidence": 0.6
-      },
-      {
-        "role": "devils_advocate",
-        "content": "**1. MACRO/COMPANY RISK & FOREIGN FLOW:**\nGiven the acknowledged data discrepancy regarding SRTG's 115.41% Net Profit Margin, if a market correction or a re-evaluation of the company's actual profitability triggers a sell-off, could the Rp 1,720 stop loss (below MA200) break, potentially leading to a retest of the 52-week low at Rp 1,450?\n\n**2. EXECUTION RISK — Transaction Cost Stress Test:**\nMenggunakan harga entry Rp 1,785, total biaya transaksi round-trip dihitung sebagai berikut: biaya beli 0.15%, biaya jual 0.25%, PPh final 0.10%, dan estimasi slippage 0.15% (karena harga Rp 1,785 >= Rp 500). Total biaya transaksi adalah 0.15% + 0.25% + 0.10% + 0.15% = 0.65%. Dengan target return sebesar (Rp 2,030 - Rp 1,785) / Rp 1,785 = 13.73%, net return setelah biaya adalah 13.73% - 0.65% = 13.08%. Berdasarkan kalkulasi ini, net return > 3.0%, sehingga trade ini **VIABLE after transaction costs**.",
-        "round": 4,
-        "position": "UNKNOWN",
-        "confidence": null
+        "confidence": 0.55
       }
     ],
-    "raw_data_summary": "=== FUNDAMENTALS ===\nFAIR VALUE: Rp 8,351\n\nSRTG is significantly undervalued, with a current market price of Rp 1,790, representing a substantial +366.5% upside to its calculated fair value of Rp 8,351. This valuation is derived from a weighted average of P/E and P/B band methods, indicating a strong fundamental cushion for a swing trade setup.\n\nKey support metrics include a TTM Return on Equity (ROE) of 12.43% and a TTM Net Profit Margin of 115.41%. Historical 3-year trend data for ROE and Net Margin are not available in the provided dataset. The company exhibits a very low Debt/Equity ratio of 0.06 (based on Total Liabilities/Equity) and offers a Dividend Yield of 0.82%.\n\nNo specific upcoming growth catalysts within the 1-3 month horizon were identified; the latest dividend ex-date (07 Jul 25) is a past event. Regarding quality checks, the Cash From Operations (TTM) data is missing, preventing verification of the Revenue-CFO Divergence. However, no other red flags were detected based on the available data, including ROE-Margin Divergence, DER-Interest Coverage, or Altman Z-Score vs DER Inconsistency.\n\nPosition: BUY\nAgent Confidence: 0.75\n\n=== TECHNICALS ===\nBerdasarkan analisis teknikal IHSG untuk kerangka waktu 1-3 bulan:\n\n**TREND CONTEXT:** Saham dalam uptrend struktural. Swing long searah tren. Harga IHSG saat ini diperdagangkan di atas MA200, MA50, dan EMA20, menunjukkan kekuatan tren naik meskipun ada pullback minor.\n\n**ENTRY ZONE:** EMA20 (Rp 1,785) dan MA50 (Rp 1,742) berfungsi sebagai level support. Oleh karena itu, zona entri optimal adalah pada pullback ke kisaran Rp 1,742 – Rp 1,785. Harga saat ini (Rp 1,790) berada sedikit di atas EMA20, mengindikasikan\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 1790.0,\n  \"sma20\": 1786.0,\n  \"ema20\": 1785.0,\n  \"ma50\": 1742.0,\n  \"ma200\": 1739.0,\n  \"ma200_context\": \"ABOVE\",\n  \"rsi14\": 52.2,\n  \"atr14\": 65.0,\n  \"avg_volume_20d\": 9431845.0,\n  \"52w_high\": 2030.0,\n  \"52w_low\": 1450.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== DIVIDEND EX-DATE SCAN: SRTG ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
-    "error": null,
-    "conviction_score": 0.0,
-    "sector_key": "finance_nonbank"
-  },
-  {
-    "ticker": "ERAA",
-    "verdict": {
-      "ticker": "ERAA",
-      "rating": "HOLD",
-      "confidence": 0.0,
-      "fair_value": 1288.0,
-      "entry_price_range": "396 - 408",
-      "target_price": 422.0,
-      "stop_loss": 392.0,
-      "current_price": 408.0,
-      "timeframe": "1-3 Months",
-      "weighted_reasoning": "",
-      "critical_risk_factor": "",
-      "key_catalysts": [],
-      "key_risks": [],
-      "summary": "CIO parse error — raw response stored. Error: ",
-      "expected_return": "+5.0%",
-      "risk_reward_ratio": 2.0,
-      "is_overvalued": false,
-      "wait_and_see": true,
-      "consensus_reached": true,
-      "consensus_method": "soft_hold",
-      "dissenting_agents": [
-        "fundamental_scout",
-        "bull",
-        "bear"
-      ]
-    },
-    "debate_rounds": 1,
-    "consensus_reached": true,
-    "consensus_method": "soft_hold",
-    "dissenting_agents": [
-      "fundamental_scout",
-      "bull",
-      "bear"
-    ],
-    "agent_votes": [
-      {
-        "agent": "fundamental_scout",
-        "position": "AVOID",
-        "confidence": 0.75,
-        "round": 0
-      },
-      {
-        "agent": "chartist",
-        "position": "HOLD",
-        "confidence": 0.0,
-        "round": 0
-      },
-      {
-        "agent": "sentiment_specialist",
-        "position": "HOLD",
-        "confidence": 0.0,
-        "round": 0
-      },
-      {
-        "agent": "bull",
-        "position": "BUY",
-        "confidence": 0.6,
-        "round": 1
-      },
-      {
-        "agent": "bear",
-        "position": "AVOID",
-        "confidence": 0.6,
-        "round": 1
-      }
-    ],
-    "disagreement_type": "timing",
-    "debate_history": [
-      {
-        "role": "bull",
-        "content": "ERAA presents a compelling fundamental discount, trading at Rp 408, a significant 215.7% below its calculated fair value of Rp 1,288. Valuation metrics such as a P/E of 4.5x (vs. historical 15.0x) and P/B of 0.7x (vs. historical 2.0x) underscore this deep undervaluation. While this discount provides a long-term fundamental floor, it is crucial to note the detected quality red flags, specifically the Revenue-CFO Divergence (positive revenue growth but negative free cash flow). This raises concerns about the cash-backing of reported earnings, which could temper short-term appreciation despite the deep discount.\n\nTechnically\n\nPosition: BUY\nAgent Confidence: 0.60",
-        "round": 1,
-        "position": "BUY",
-        "confidence": 0.6
-      },
-      {
-        "role": "bear",
-        "content": "As a Forensic Financial Auditor, the proposed swing trade for ERAA presents significant risks, making an AVOID stance imperative. The perceived undervaluation is fundamentally flawed, technical support is unreliable in a strong downtrend, and a clear short-term catalyst is absent, leading to an unfavorable risk profile.\n\n1.  **OVERVALUATION CHECK: Illusory Margin of Safety**\n    The stated fair value of Rp 1,288, suggesting a 215.7% discount from the current price of Rp 408, provides an illusory margin of safety. The fundamental analysis explicitly flags a critical \"Revenue-CFO Divergence,\" where positive revenue growth (41.12% YoY) is contradicted by negative Free Cash Flow Per Share (-3\n\nPosition: AVOID\nAgent Confidence: 0.60",
-        "round": 1,
-        "position": "AVOID",
-        "confidence": 0.6
-      },
-      {
-        "role": "devils_advocate",
-        "content": "**Devil's Advocate Challenge for ERAA Swing Trade:**\n\n1.  **MACRO/COMPANY RISK & FOREIGN FLOW:**\n    Given the significant \"Revenue-CFO Divergence\" indicating poor cash conversion and the stock's structural downtrend, if foreign funds accelerate selling pressure on Indonesian equities or if the upcoming earnings report confirms persistent negative free cash flow, could the Rp 400 MA50 support level break, potentially leading to a retest of the 52-week low at Rp 360?\n\n2.  **EXECUTION RISK — Transaction Cost Stress Test:**\n    Untuk posisi ERAA dengan harga entry yang dipakai dalam kalkulasi adalah Rp 402 dan target jual Rp 427, estimasi gross return adalah 6.22%. Total biaya transaksi round-trip dihitung sebagai berikut: biaya beli 0.15%, biaya jual 0.25%, PPh final 0.10% dari nilai jual, dan estimasi slippage 0.30% (karena harga < Rp 500). Dengan menjumlahkan semua komponen ini, total biaya transaksi adalah 0.15% + 0.25% + 0.10% + 0.30% = 0.80%. Setelah dikurangi biaya transaksi, net return yang diproyeksikan adalah 6.22% - 0.80% = 5.42%. Berdasarkan kriteria, net return sebesar 5.42% ini dikategorikan sebagai **VIABLE after transaction costs**.",
-        "round": 2,
-        "position": "UNKNOWN",
-        "confidence": null
-      }
-    ],
-    "raw_data_summary": "=== FUNDAMENTALS ===\nFAIR VALUE: Rp 1,288\n\nERAA is significantly undervalued with a current market price of Rp 408, representing a 215.7% discount to its calculated fair value of Rp 1,288. The fair value calculation, derived from P/E Band (Rp 1,359) and P/B Band (Rp 1,197) methods, indicates a strong fundamental upside. Key valuation metrics show a current P/E of 4.5x (vs. historical average 15.0x) and P/B of 0.7x (vs. historical average 2.0x), further supporting the undervaluation thesis.\n\nSupport metrics include a TTM ROE of 15.14%, a TTM Net Margin of 2.02%, a Debt/Equity Ratio of 0.96, and a Dividend Yield of 4.66%. No clear short-term growth catalyst within the next 1-3 months has been identified; the latest dividend ex-date (19 Jun 25) is a PAST_EVENT_NOT_CATALYST.\n\nHowever, several quality red flags are detected. There is a ⚠️ ROE-Margin Divergence, with ROE (15.14%) > 15% but Net Margin (2.02%) < 5%, suggesting that high leverage (Debt/Equity 0.96, Financial Leverage 3.31) may be inflating ROE, warranting verification of earnings quality. More critically, a ⚠️ Revenue-CFO Divergence is present, where Revenue (Quarter YoY Growth) is positive at 41.12% but Free Cashflow Per Share (TTM) is negative at -31.89 and Free Cash Flow (Quarter) is negative at (1,047 B). This indicates that reported earnings may not be cash-backed, raising concerns about the sustainability and quality of profit generation.\n\nGiven the significant fundamental quality concerns, particularly the negative free cash flow despite revenue growth, the extreme undervaluation should be approached with caution. The reliability of the earnings used in the fair value calculation is questionable due to the lack of cash conversion. For a 1-3 month swing trade, these fundamental issues are unlikely to resolve and could prevent price appreciation despite the deep discount.\n\nPosition: AVOID\nAgent Confidence: 0.75\n\n=== TECHNICALS ===\nSaham ERAA saat ini berada dalam downtrend struktural. Ini adalah setup counter-trend bounce, sehingga target lebih konservatif dan disarankan untuk mengurangi ukuran posisi sebesar 50% dari normal. Harga saat ini Rp 408 berada di bawah MA200 Rp 427, mengkonfirmasi tren turun jangka panjang.\n\nENTRY ZONE yang ideal adalah pada kisaran support Rp 400 – Rp 404, didukung oleh EMA20 dan MA50. Harga saat ini Rp 408 berada sedikit di atas zona entry yang direkomendasikan. TARGET PRICE untuk bounce ini adalah Rp 427 (approx. 6.2% dari entry mid Rp 402), yang merupakan level MA200\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 408.0,\n  \"sma20\": 402.0,\n  \"ema20\": 404.0,\n  \"ma50\": 400.0,\n  \"ma200\": 427.0,\n  \"ma200_context\": \"BELOW\",\n  \"rsi14\": 56.1,\n  \"atr14\": 10.0,\n  \"avg_volume_20d\": 45061040.0,\n  \"52w_high\": 555.0,\n  \"52w_low\": 360.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== DIVIDEND EX-DATE SCAN: ERAA ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
+    "raw_data_summary": "=== FUNDAMENTALS ===\nBerdasarkan laporan Fair Value, MAPI memiliki **FAIR VALUE: Rp 1,986**. Dengan harga pasar saat ini Rp 1,455, saham MAPI dinilai **UNDERVALUED** sebesar 36.5% terhadap nilai wajarnya. Kalkulasi fair value memiliki tingkat kepercayaan MEDIUM karena 2 dari 3 metode valid.\n\nMetrik pendukung menunjukkan ROE TTM sebesar 16.29% dan Net Margin TTM sebesar 5.11%, mengindikasikan profitabilitas yang sehat. Rasio Debt/Equity sangat rendah di 0.24, menunjukkan struktur modal yang kuat dan risiko utang yang minimal. Dividend Yield tercatat 0.69%. Data tren 3 tahun untuk ROE dan Net Margin tidak tersedia dalam laporan ini.\n\nTidak ada katalis pertumbuhan spesifik yang teridentifikasi dalam 1-3 bulan ke depan. Tanggal ex-dividend terakhir yang tercatat (09 Jul 25) adalah PAST_EVENT_NOT_CATALYST. Dari sisi kualitas laporan keuangan, tidak ada inkonsistensi yang terdeteksi: ROE (16.29%) tidak menunjukkan divergensi dengan Net Margin (5.11%), DER (0.24) yang rendah didukung oleh Interest Coverage (7.07) yang kuat, Revenue growth (32.17%) positif dan Free Cash Flow (729 B) juga positif, serta Altman Z-Score (4.31) tidak menunjukkan inkonsistensi dengan DER.\n\nSecara keseluruhan, MAPI menunjukkan fundamental yang kuat dengan valuasi yang menarik di bawah fair value. Struktur modal yang sehat dan profitabilitas yang baik mendukung potensi kenaikan harga.\n\nPosition: BUY\nAgent Confidence: 0.80\n\n=== TECHNICALS ===\nSaham dalam uptrend struktural. Swing long searah tren. Harga saat ini berada di level tertinggi 52 minggu, menunjukkan momentum bullish yang sangat kuat. Setup ini mengindikasikan potensi kelanjutan tren naik setelah koreksi minor.\n\nUntuk setup swing long, zona entri ideal adalah pada support dinamis. ENTRY ZONE: Rp 1,244 – Rp 1,284, yang merupakan area di sekitar EMA20 dan MA50. TARGET: Rp 1,400 (approx. 10.8% from entry mid), yang merupakan level resistance psikologis dan area volume bid tinggi sebelumnya. STOP LOSS: Rp 1,190 (1.5× ATR below EMA20), untuk membatasi risiko jika terjadi pembalikan tren.\n\nIndikator RSI(14) di 64.6 menunjukkan momentum bullish yang kuat dan sehat, belum memasuki zona overbought yang ekstrem. Data volume saat ini tidak tersedia untuk mengkonfirmasi pergerakan harga, namun rata-rata volume 20 hari sebesar 23,300,475 menunjukkan likuiditas yang cukup.\n\nPosition: BUY\nAgent Confidence: 0.88\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 1455.0,\n  \"sma20\": 1287.0,\n  \"ema20\": 1284.0,\n  \"ma50\": 1244.0,\n  \"ma200\": 1226.0,\n  \"ma200_context\": \"ABOVE\",\n  \"rsi14\": 64.6,\n  \"atr14\": 63.0,\n  \"avg_volume_20d\": 23300475.0,\n  \"52w_high\": 1455.0,\n  \"52w_low\": 1080.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== DIVIDEND EX-DATE SCAN: MAPI ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
     "error": null,
     "conviction_score": 0.0,
     "sector_key": "consumer_disc"
   },
   {
-    "ticker": "INDF",
+    "ticker": "ULTJ",
     "verdict": {
-      "ticker": "INDF",
-      "rating": "HOLD",
-      "confidence": 0.55,
-      "fair_value": 18197.0,
-      "entry_price_range": "6550 - 6675",
-      "target_price": 7250.0,
-      "stop_loss": 6300.0,
-      "current_price": 7050.0,
+      "ticker": "ULTJ",
+      "rating": "BUY",
+      "confidence": 0.77,
+      "fair_value": 1938.0,
+      "entry_price_range": "1550 - 1600",
+      "target_price": 1705.0,
+      "stop_loss": 1510.0,
+      "current_price": 1600.0,
       "timeframe": "1-3 Months",
-      "weighted_reasoning": "The final rating is a mandatory HOLD, dictated by the 'soft_hold' consensus mechanism due to conflicting agent signals (Fundamental BUY vs. Technical HOLD/Bear AVOID). The primary positive factor is the extreme undervaluation, with the current price of Rp 7,050 representing a 158% discount to the fair value of Rp 18,197. The proposed trade plan itself is well-structured with an attractive R/R of 2.04. However, this is outweighed by significant cautionary factors: 1) The stock is in a structural downtrend, trading below its MA200 (Rp 7,162), making this a higher-risk counter-trend trade. 2) The current price is approximately 6.5% above the top of the designated entry zone (Rp 6,675), rendering the trade inactive and requiring a significant pullback. 3) The Devil's Advocate highlights the risk of foreign outflow breaking key support levels. Therefore, a HOLD rating is appropriate until the price enters the specified buy zone and shows signs of stabilization. Consensus override: Bull/Bear confidence gap was below 0.15, so the chamber treats this as soft consensus HOLD instead of forcing an entry.",
+      "weighted_reasoning": "The decision to approve this trade is primarily driven by the compelling quantitative metrics of the trade envelope. The stock is fundamentally undervalued by 21.1% (Price Rp 1,600 vs. FV Rp 1,938), providing a substantial margin of safety. The technical setup is constructive, with the price above all key moving averages and the entry zone situated at a confluence of support (MA50/EMA20). Most importantly, the risk/reward ratio is a solid 2.00, meeting our minimum threshold for a high-quality swing trade.\n\nHowever, confidence is moderated due to two key factors. First, there is a lack of a specific, identifiable catalyst within the 1-3 month timeframe, which introduces timing risk and is the reason for applying a confidence cap of 0.78. Second, the significant directional disagreement among the agents (Bull/Chartist vs. Bear) warrants caution and triggers a mandatory -0.05 confidence penalty. The Devil's Advocate concern regarding transaction costs is noted, but the official target of Rp 1,705 provides a sufficient +8.3% gross return, which remains attractive after costs.",
       "critical_risk_factor": "",
       "key_catalysts": [
-        "Significant undervaluation providing a strong margin of safety.",
-        "Potential technical bounce from the MA50 support level if the price pulls back to the entry zone."
+        "Market recognition of significant undervaluation (21.1% discount to fair value)",
+        "Continuation of the established technical uptrend from key MA50/EMA20 support levels"
       ],
       "key_risks": [
-        "Structural downtrend (price below MA200) makes this a risky counter-trend trade.",
-        "Current price is far above the entry zone, requiring a pullback that may not occur.",
-        "Risk of foreign outflow and negative market sentiment breaking the MA50 support, as highlighted by the Devil's Advocate.",
-        "Lack of a clear, short-term fundamental catalyst to drive the price up."
+        "Lack of a specific, near-term catalyst could lead to price stagnation, failing to reach the target within the 1-3 month timeframe.",
+        "A broader market correction could break the MA50 support at Rp 1,574, triggering the stop loss despite strong company fundamentals.",
+        "Significant disagreement among analysts regarding the stock's short-term direction, indicating a lack of clear market consensus."
       ],
-      "summary": "The trade plan is rated HOLD due to a mandatory 'soft_hold' consensus rule, reflecting significant disagreement between fundamental and technical analyses. While INDF is deeply undervalued with a solid R/R of 2.04, the current price is far above the optimal entry zone, and the stock remains in a structural downtrend. A pullback to the Rp 6,550 - Rp 6,675 entry zone is required before considering an entry.",
-      "expected_return": "+9.6%",
-      "risk_reward_ratio": 2.04,
+      "summary": "The trade plan for ULTJ is approved with a BUY rating. The stock is significantly undervalued with a strong 2.0 R/R ratio, supported by a clear technical uptrend and entry near key moving averages. The primary drawbacks are the lack of a near-term catalyst and disagreement among analysts on direction, which tempers confidence but does not invalidate the attractive risk-adjusted setup.",
+      "expected_return": "+8.3%",
+      "risk_reward_ratio": 2.0,
+      "is_overvalued": false,
+      "wait_and_see": false,
+      "consensus_reached": true,
+      "consensus_method": "voting",
+      "dissenting_agents": [
+        "sentiment_specialist",
+        "bear"
+      ]
+    },
+    "debate_rounds": 1,
+    "consensus_reached": true,
+    "consensus_method": "voting",
+    "dissenting_agents": [
+      "sentiment_specialist",
+      "bear"
+    ],
+    "agent_votes": [
+      {
+        "agent": "fundamental_scout",
+        "position": "BUY",
+        "confidence": 0.85,
+        "round": 0
+      },
+      {
+        "agent": "chartist",
+        "position": "BUY",
+        "confidence": 0.85,
+        "round": 0
+      },
+      {
+        "agent": "sentiment_specialist",
+        "position": "HOLD",
+        "confidence": 0.0,
+        "round": 0
+      },
+      {
+        "agent": "bull",
+        "position": "BUY",
+        "confidence": 0.6,
+        "round": 1
+      },
+      {
+        "agent": "bear",
+        "position": "AVOID",
+        "confidence": 0.88,
+        "round": 1
+      }
+    ],
+    "disagreement_type": null,
+    "debate_history": [
+      {
+        "role": "bull",
+        "content": "ULTJ presents a fundamentally strong and technically supported setup for a swing trade, albeit with notable caveats regarding the immediate catalyst and risk/reward profile.\n\n**1. FUNDAMENTAL FLOOR:**\nULTJ is currently trading at Rp 1,600, representing a significant 21.1% discount to its calculated fair value of Rp 1,938. This undervaluation provides a robust fundamental cushion. The company exhibits exceptional financial health, characterized by a strong Return on Equity (ROE) of 17.02%, a healthy Net Profit Margin of 17.81%, and a very conservative debt profile with a Total Liabilities/Equity ratio of 0.14 and an Interest Coverage Ratio of 14,312.37x. The high Altman Z-Score of 14.87 further confirms its fundamental strength and low bankruptcy risk.\n\n**2. TECHNICAL ENTRY:**\nULTJ is in a clear structural uptrend, with the current price trading above its MA200 (Rp 1,440), EMA20 (Rp 1,596), and MA50 (Rp 1,574). The recommended entry zone of Rp 1,574 – Rp 1,596 is well-supported by these key moving averages, specifically the MA50 at Rp 1,574 and EMA20 at Rp 1,596, which are acting as dynamic support levels. The RSI(14) at 51.3 indicates neutral momentum, suggesting room for further upside without being overbought.\n\n**3. CATALYST:**\nNo specific, forward-looking event catalyst (e.g., earnings report, new contracts) within the 1-3 month swing trade horizon is identified in the provided data. The primary drivers for potential price appreciation are the significant undervaluation (21.1% discount to fair value) and the established structural uptrend. The market's recognition of ULTJ's strong fundamentals and healthy financial position is expected to drive the price towards its fair value over the swing trade period.\n\n**4. RISK/REWARD:**\nBased on the provided technicals:\nEntry: Rp 1,585 (midpoint of the recommended entry zone Rp 1,574 – Rp 1,596)\nTarget: Rp 1,635\nStop Loss: Rp 1,490\nRisk = Rp 1,585 - Rp 1,490 = Rp 95\nReward = Rp 1,635 - Rp 1,585 = Rp 50\nR/R ratio: 0.53:1. This R/R ratio is unfavorable, indicating that the potential reward is less than the potential risk for this specific trade setup. This significantly reduces the attractiveness of the swing trade despite strong underlying fundamentals and technical support.\n\nPosition: BUY\nAgent Confidence: 0.60",
+        "round": 1,
+        "position": "BUY",
+        "confidence": 0.6
+      },
+      {
+        "role": "bear",
+        "content": "As a Forensic Financial Auditor, the proposed swing trade setup for ULTJ presents significant risks that warrant an AVOID recommendation, despite the stated fundamental undervaluation. The entry lacks a sufficient margin of safety for a swing trade, technical indicators suggest vulnerability, and the risk/reward profile is highly unfavorable.\n\n1.  **OVERVALUATION CHECK (Lack of Swing Trade Margin of Safety):** While ULTJ is fundamentally undervalued by 21.1% (current price Rp 1,600 vs. fair value Rp 1,938), this alone does not guarantee a profitable swing trade. For a 1-3 month horizon, fundamental undervaluation without a specific catalyst to unlock that value often means the price can remain stagnant or even decline. The current price is not above fair value, but the *swing trade entry* lacks a margin of safety due to other factors, primarily the unfavorable technical setup and absence of a catalyst, which are critical for short-term price appreciation.\n\n2.  **TECHNICAL BREAKDOWN RISK:** The Bull's recommended entry zone is Rp 1,574 – Rp 1,596. The current price of Rp 1,600 is already *above* this zone, meaning any entry at the current level would be at a higher price, immediately eroding the intended margin of safety. While the price is above MA200 (Rp 1,440), EMA20 (Rp 1,596), and MA50 (Rp 1,574), its close proximity to the EMA20 at Rp 1,596 makes it vulnerable to a retest or breakdown below this dynamic support. Crucially, the Bull notes \"Informasi volume harian saat ini tidak tersedia,\" which prevents confirmation of price movements and makes it impossible to identify bearish volume divergence, a critical indicator of potential trend weakness. Furthermore, the 52-week high of Rp 1,700 acts as a significant overhead resistance, with the Bull's target of Rp 1,635 offering limited upside before encountering this potential selling pressure.\n\n3.  **CATALYST RISK:** The Bull explicitly states, \"No specific, forward-looking event catalyst (e.g., earnings report, new contracts) within the 1-3 month swing trade horizon is identified.\" This is a critical deficiency for a swing trade. Without a clear, time-bound catalyst, the market has no immediate trigger to re-rate the stock and realize its fundamental undervaluation within the short timeframe. Relying solely on an \"established structural uptrend\" without a catalyst is speculative, as trends can stall or reverse in the absence of fresh positive news, leaving the trade without momentum.\n\n4.  **UNFAVOURABLE R/R:** The Bull's own calculation of a 0.53:1 Risk/Reward ratio is already unfavorable. However, calculating from the current price of Rp 1,600, the situation is even worse. With a stop loss at Rp 1,490, the potential risk is Rp 110 (Rp 1,600 - Rp 1,490). The target of Rp 1,635 offers a potential reward of only Rp 35 (Rp 1,635 - Rp 1,600). This results in an R/R ratio of approximately 0.31:1 (Rp 35 reward / Rp 110 risk). This extremely unfavorable ratio means that for every unit of potential gain, there are more than three units of potential loss, making the trade highly unattractive and speculative.\n\nPosition: AVOID\nAgent Confidence: 0.88",
+        "round": 1,
+        "position": "AVOID",
+        "confidence": 0.88
+      },
+      {
+        "role": "devils_advocate",
+        "content": "1.  **MACRO/COMPANY RISK & FOREIGN FLOW:**\n    If a broader IHSG correction triggers significant foreign fund outflows from Indonesian equities, could ULTJ's MA50 support at Rp 1,574 break, pushing the stock towards its stop loss at Rp 1,490, especially without a clear catalyst to attract new buyers within the next 1-3 months?\n\n2.  **EXECUTION RISK — Transaction Cost Stress Test:**\n    Menghitung total biaya transaksi untuk posisi ULTJ dengan harga entry Rp 1,585 (midpoint dari entry zone) dan target Rp 1,635. Biaya beli adalah 0.15%, biaya jual 0.25%, PPh final 0.10% dari nilai jual, dan estimasi slippage 0.15% (karena harga Rp 1,585 >= Rp 500). Total biaya transaksi round-trip adalah 0.15% + 0.25% + 0.10% + 0.15% = 0.65%. Dengan potensi keuntungan kotor sebesar ((Rp 1,635 - Rp 1,585) / Rp 1,585) = 3.15%, maka net return setelah biaya adalah 3.15% - 0.65% = 2.50%. Ini dikategorikan sebagai **MARGINAL — only proceed if conviction high**, karena biaya transaksi menggerus sebagian signifikan dari projected gain.\n\nPosition: HOLD\nAgent Confidence: 0.00",
+        "round": 2,
+        "position": "HOLD",
+        "confidence": 0.0
+      }
+    ],
+    "raw_data_summary": "=== FUNDAMENTALS ===\nFAIR VALUE: Rp 1,938\n\nULTJ is currently trading at Rp 1,600, which is UNDERVALUED by 21.1% compared to its calculated fair value of Rp 1,938. The fair value calculation is based on a weighted average of P/E Band and P/B Band methods, indicating a strong fundamental cushion for a swing trade setup.\n\nKey support metrics include a robust Return on Equity (ROE) of 17.02% and a healthy Net Profit Margin of 17.81%. The company demonstrates strong solvency with a Total Liabilities/Equity ratio of 0.14 and an exceptionally high Interest Coverage Ratio of 14,312.37x, indicating minimal debt burden and excellent ability to cover interest expenses. The dividend yield is attractive at 8.12%. Three-year trends for ROE and Net Margin are not explicitly provided in the current data.\n\nThe latest dividend ex-date was 2026-05-04, which is a PAST_EVENT_NOT_CATALYST relative to the current date (2026-05-09). No other specific upcoming growth catalysts (e.g., earnings reports, new contracts) within the 1-3 month swing trade horizon are identified in the provided data.\n\nA thorough quality check reveals no significant inconsistencies in the financial reporting. ROE (17.02%) is high, but Net Margin (17.81%) is also strong, indicating healthy profitability without excessive leverage. The low Total Liabilities/Equity (0.14) combined with very high Interest Coverage (14,312.37x) suggests a very conservative debt profile. Positive revenue growth (21.84% YoY) is supported by positive free cash flow (Rp 552 B Quarter), implying cash-backed earnings. The Altman Z-Score of 14.87 is high, and the low Total Liabilities/Equity of 0.14 confirms fundamental health rather than market cap inflation.\n✅ No red flags detected.\n\nPosition: BUY\nAgent Confidence: 0.85\n\n=== TECHNICALS ===\nSaham dalam uptrend struktural. Swing long searah tren. Harga saat ini berada di atas MA200, EMA20, dan MA50, menunjukkan kekuatan tren naik yang solid.\n\nENTRY ZONE: Rp 1,574 – Rp 1,596. Area ini didukung oleh EMA20 dan MA50, yang berfungsi sebagai level support dinamis.\n\nTARGET: Rp 1,635 (approx. 3.15% from entry mid). Level ini merupakan resistance kuat berdasarkan volume di orderbook dan berada dalam rentang target profit yang konservatif.\nSTOP LOSS: Rp 1,490 (1.5× ATR below EMA20). Ini memberikan buffer yang cukup terhadap volatilitas harian.\n\nRSI(14) di 51.3 menunjukkan momentum yang netral, tidak overbought maupun oversold, memberikan ruang untuk kenaikan lebih lanjut. Informasi volume harian saat ini tidak tersedia untuk mengkonfirmasi pergerakan harga.\n\nPosition: BUY\nAgent Confidence: 0.85\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 1600.0,\n  \"sma20\": 1580.0,\n  \"ema20\": 1596.0,\n  \"ma50\": 1574.0,\n  \"ma200\": 1440.0,\n  \"ma200_context\": \"ABOVE\",\n  \"rsi14\": 51.3,\n  \"atr14\": 71.0,\n  \"avg_volume_20d\": 4045785.0,\n  \"52w_high\": 1700.0,\n  \"52w_low\": 1265.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== DIVIDEND EX-DATE SCAN: ULTJ ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
+    "error": null,
+    "conviction_score": 0.585,
+    "sector_key": "consumer_staples",
+    "position_sizing": {
+      "ticker": "ULTJ",
+      "rating": "BUY",
+      "confidence": 0.77,
+      "lot": 2,
+      "shares": 200,
+      "position_value": 320000.0,
+      "allocation_pct": 0.32,
+      "target_allocation_pct": 0.20537124802527648,
+      "max_loss_rp": 18000.0,
+      "max_drawdown_pct": 0.018,
+      "expected_return_pct": 8.3,
+      "expected_return_rp": 26560.0,
+      "total_cost_est": 1600.0,
+      "entry_price": 1600.0,
+      "stop_loss": 1510.0,
+      "rr_ratio": 2.0
+    },
+    "allocation_reasoning": {
+      "target_deployment_pct": 65.0,
+      "actual_deployment_pct": 67.5,
+      "gap_explanation": "Actual deployment 67.5% sudah berada di area target normal 65.0%.",
+      "risk_factors_limiting": [
+        "max drawdown per posisi dibatasi 5.0% sehingga lot tidak dipaksa melewati stop-risk budget"
+      ],
+      "market_condition_score": 0.83,
+      "recommendation": "Deployment sudah cukup aktif untuk swing trade moderat; tambah exposure hanya jika sinyal teknikal menguat tanpa memperbesar drawdown per posisi."
+    },
+    "deployment_scenario_comparison": {
+      "deploy_60_now": {
+        "deployment_pct": 60.0,
+        "expected_return_on_deployed_pct": 9.04,
+        "expected_return_portfolio_pct": 5.42,
+        "expected_return_rp": 54221.0,
+        "max_drawdown_portfolio_pct": 3.0,
+        "max_drawdown_rp": 30000.0
+      },
+      "wait_for_confirmation": {
+        "deployment_pct": 0.0,
+        "expected_return_portfolio_pct": 0.0,
+        "expected_return_rp": 0.0,
+        "max_drawdown_portfolio_pct": 0.0,
+        "max_drawdown_rp": 0.0,
+        "tradeoff": "Cash protects capital while waiting for cleaner entry, but gives up roughly Rp 54,221 if the current 60% deployment scenario works."
+      }
+    }
+  },
+  {
+    "ticker": "ACES",
+    "verdict": {
+      "ticker": "ACES",
+      "rating": "BUY",
+      "confidence": 0.71,
+      "fair_value": 682.0,
+      "entry_price_range": "368 - 380",
+      "target_price": 402.0,
+      "stop_loss": 360.0,
+      "current_price": 380.0,
+      "timeframe": "1-3 Months",
+      "weighted_reasoning": "The BUY rating is primarily anchored on the substantial fundamental undervaluation, with the current price at a deep discount to the fair value of Rp 682, providing a strong margin of safety. The trade structure is validated by an attractive 2.0 Risk/Reward ratio. However, confidence is moderated to 0.71 due to significant countervailing factors: (1) The trade is counter-trend (price is below MA200), increasing risk. (2) There is no identifiable short-term catalyst to drive the price towards the target. (3) The Devil's Advocate risk of macro pressure breaking the fragile support at Rp 368-380 is valid and unanswered. The entry is timing-sensitive, relying on the current support holding without a strong technical or sentimental confirmation.",
+      "critical_risk_factor": "",
+      "key_catalysts": [
+        "Significant undervaluation acting as a price floor and attracting value investors."
+      ],
+      "key_risks": [
+        "Counter-trend trade: Stock is in a structural downtrend (below MA200), making it vulnerable to further selling pressure.",
+        "Lack of near-term catalyst: Without a specific positive trigger, the stock may continue to drift or consolidate.",
+        "Macro Headwinds: Negative market sentiment or foreign outflow could easily break the current technical support, triggering the stop loss."
+      ],
+      "summary": "This is a value-driven swing trade on ACES, capitalizing on its significant undervaluation (current price Rp 380 vs. fair value Rp 682). The trade plan offers a solid 2.0 R/R ratio. However, this is a counter-trend setup as the stock is below its 200-day moving average, making it a higher-risk 'bounce' play that is sensitive to timing and broader market sentiment. The absence of a near-term catalyst warrants a cautious position size.",
+      "expected_return": "+7.5%",
+      "risk_reward_ratio": 2.0,
+      "is_overvalued": false,
+      "wait_and_see": false,
+      "consensus_reached": true,
+      "consensus_method": "voting",
+      "dissenting_agents": [
+        "chartist",
+        "sentiment_specialist"
+      ]
+    },
+    "debate_rounds": 1,
+    "consensus_reached": true,
+    "consensus_method": "voting",
+    "dissenting_agents": [
+      "chartist",
+      "sentiment_specialist"
+    ],
+    "agent_votes": [
+      {
+        "agent": "fundamental_scout",
+        "position": "BUY",
+        "confidence": 0.85,
+        "round": 0
+      },
+      {
+        "agent": "chartist",
+        "position": "HOLD",
+        "confidence": 0.0,
+        "round": 0
+      },
+      {
+        "agent": "sentiment_specialist",
+        "position": "HOLD",
+        "confidence": 0.0,
+        "round": 0
+      },
+      {
+        "agent": "bull",
+        "position": "BUY",
+        "confidence": 0.6,
+        "round": 1
+      },
+      {
+        "agent": "bear",
+        "position": "BUY",
+        "confidence": 0.6,
+        "round": 1
+      }
+    ],
+    "disagreement_type": null,
+    "debate_history": [
+      {
+        "role": "bull",
+        "content": "ACES presents a compelling fundamental undervaluation, currently trading at Rp 380 against a fair value of Rp 682, indicating a substantial 79.5% upside potential. The company's financial health is robust, characterized by an exceptionally low Debt/Equity Ratio of 0.01, strong Interest Coverage of 14.22x, and a healthy Return on Equity (TTM) of 10.33%. These metrics establish a solid fundamental floor, suggesting long-term value.\n\nFrom a technical perspective, ACES is in a structural downtrend, with the current price of Rp 380 below the MA200 (Rp 422). However, the price is positioned within a potential short-\n\nPosition: BUY\nAgent Confidence: 0.60",
+        "round": 1,
+        "position": "BUY",
+        "confidence": 0.6
+      },
+      {
+        "role": "bear",
+        "content": "As a Forensic Financial Auditor, a thorough examination of ACES reveals significant risks that make a swing trade entry highly unattractive, despite the stated fundamental undervaluation. The Bull's argument for a counter-trend bounce is severely undermined by the prevailing technical structure, absence of catalysts, and an unfavorable risk/reward profile for a prudent swing trade.\n\nFirstly, while ACES is fundamentally undervalued at Rp 380 against a fair value of Rp 682, this long-term value proposition does not translate into a safe swing trade entry. The stock is in a clear structural downtrend, trading significantly below its MA200 at Rp 422. The Bull's cited \"entry zone\" of Rp 378 – Rp 381, based on EMA\n\nPosition: BUY\nAgent Confidence: 0.60",
+        "round": 1,
+        "position": "BUY",
+        "confidence": 0.6
+      },
+      {
+        "role": "devils_advocate",
+        "content": "1. MACRO/COMPANY RISK & FOREIGN FLOW: Given ACES's structural downtrend and the absence of immediate catalysts, if foreign funds accelerate selling pressure on the broader market, or if ACES reports weaker-than-expected Q1 2026 results, could the Rp 378-381 support level break, potentially triggering a fall towards the 52-week low of Rp 350?\n\n2. EXECUTION RISK — Transaction Cost Stress Test:\nUsing an entry price of Rp 380 and a target price of Rp 410, the gross return is 7.89%. The total transaction costs for a round-trip trade on ACES (given its price of Rp 380, which is < Rp 500) are calculated as follows: 0.15% for buying, 0.25% for selling, 0.10% for PPh final (from sell value), and an estimated 0.30% for slippage. This sums up to a total round-trip cost of 0.80%. Subtracting these costs from the gross return, the net return is 7.89% - 0.80% = 7.09%. This is VIABLE after transaction costs.\n\nPosition: BUY\nAgent Confidence: 0.55",
+        "round": 2,
+        "position": "BUY",
+        "confidence": 0.55
+      }
+    ],
+    "raw_data_summary": "=== FUNDAMENTALS ===\nFAIR VALUE: Rp 682\nACES is currently trading at Rp 380, which is significantly UNDERVALUED compared to its calculated fair value of Rp 682. This represents an upside potential of 79.5% from the current market price. The fair value calculation confidence is rated as MEDIUM, with 2 out of 3 methods being valid.\n\nKey support metrics indicate a fundamentally sound company. The Return on Equity (TTM) is 10.33%, and the Net Profit Margin (Quarter) is 6.95%. A 3-year trend for both ROE and Net Margin is not available in the provided data. The Debt/Equity Ratio (Quarter) is exceptionally low at 0.01, indicating minimal leverage. The company offers an attractive Dividend Yield of 8.91%.\n\nNo immediate growth catalyst within the 1-3 month swing trade horizon has been identified. The latest dividend ex-date (26 Jun 25) is a past event and not a future catalyst. For quality checks, no red flags were detected: ROE (10.33%) is not high enough to trigger a divergence with Net Margin (6.95%); a low Debt/Equity Ratio (0.01) is coupled with strong Interest Coverage (14.22x); and while Revenue growth is positive (10.14% YoY), Operating Cash Flow data was not explicitly available to check for divergence. The Altman Z-Score (10.70) is high, but the Debt/Equity Ratio (0.01) is low, not triggering an inconsistency.\n\nPosition: BUY\nAgent Confidence: 0.85\n\n=== TECHNICALS ===\n**Analisis Teknikal IHSG (ACES) - Swing Trade (1-3 Bulan)**\n\nSaham dalam downtrend struktural karena harga saat ini (Rp 380) berada di bawah MA200 (Rp 422). Ini adalah setup counter-trend bounce, sehingga target lebih konservatif dan ukuran posisi disarankan 50% dari normal. Harga saat ini berada di antara EMA20 dan MA50, menunjukkan potensi konsolidasi atau pantulan dari level support jangka pendek.\n\nENTRY ZONE: Rp 378 – Rp 381 (berdasarkan EMA20 dan MA50).\n⚠️ Counter-trend trade — kurangi ukuran posisi 50% dari normal.\n\nTARGET: Rp 410 (approx.\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 380.0,\n  \"sma20\": 375.0,\n  \"ema20\": 378.0,\n  \"ma50\": 381.0,\n  \"ma200\": 422.0,\n  \"ma200_context\": \"BELOW\",\n  \"rsi14\": 50.9,\n  \"atr14\": 16.0,\n  \"avg_volume_20d\": 43654865.0,\n  \"52w_high\": 556.0,\n  \"52w_low\": 350.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== DIVIDEND EX-DATE SCAN: ACES ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
+    "error": null,
+    "conviction_score": 0.555,
+    "sector_key": "consumer_disc"
+  },
+  {
+    "ticker": "AKRA",
+    "verdict": {
+      "ticker": "AKRA",
+      "rating": "HOLD",
+      "confidence": 0.47,
+      "fair_value": 1637.0,
+      "entry_price_range": "1345 - 1370",
+      "target_price": 1490.0,
+      "stop_loss": 1290.0,
+      "current_price": 1500.0,
+      "timeframe": "1-3 Months",
+      "weighted_reasoning": "The HOLD rating is mandated by the 'soft_hold' consensus rule, which correctly resolves the conflict between strong fundamentals (✅) and a poor technical entry point (❌). While AKRA is undervalued against its fair value of Rp 1,637, the current price of Rp 1,500 is extended, sitting above the target price of Rp 1,490 and far from the designated entry zone of Rp 1,345-1,370. The R/R of 1.96 is only valid on a pullback. The Devil's Advocate risk of a correction from near the 52-week high further supports waiting for a better entry. The lack of near-term catalysts and insufficient sentiment data also contribute to a cautious stance. Consensus override: Bull/Bear confidence gap was below 0.15, so the chamber treats this as soft consensus HOLD instead of forcing an entry.",
+      "critical_risk_factor": "",
+      "key_catalysts": [
+        "Strong fundamental valuation (9.1% discount to FV)",
+        "Solid financial health (ROE 19.99%, low DER 0.39)",
+        "High dividend yield (6.67%)"
+      ],
+      "key_risks": [
+        "Price is significantly extended above the optimal entry zone",
+        "Current price (Rp 1,500) is near the 52-week high (Rp 1,540), increasing reversal risk",
+        "Lack of identifiable near-term catalysts within the 1-3 month timeframe",
+        "The trade plan's target price (Rp 1,490) is below the current market price."
+      ],
+      "summary": "AKRA shows strong fundamental undervaluation, but the current price of Rp 1,500 is significantly extended and well above the optimal entry zone (Rp 1,345-1,370). The trade plan's target price is below the current market price, making a new entry unfavorable. We recommend HOLDing and waiting for a significant pullback to the specified entry zone to re-evaluate the risk/reward profile.",
+      "expected_return": "+9.8%",
+      "risk_reward_ratio": 1.96,
       "is_overvalued": false,
       "wait_and_see": true,
       "consensus_reached": true,
@@ -553,13 +1114,13 @@
       {
         "agent": "fundamental_scout",
         "position": "BUY",
-        "confidence": 0.85,
+        "confidence": 0.75,
         "round": 0
       },
       {
         "agent": "chartist",
-        "position": "HOLD",
-        "confidence": 0.0,
+        "position": "UNKNOWN",
+        "confidence": 0.85,
         "round": 0
       },
       {
@@ -585,462 +1146,29 @@
     "debate_history": [
       {
         "role": "bull",
-        "content": "**Trade Thesis: INDF - Conditional Buy on Pullback**\n\nINDF presents a compelling fundamental floor, trading at a significant 158.1% discount to its calculated fair value of Rp 18,197, with a current market price of Rp 7,050. This substantial undervaluation provides a strong cushion, making the stock attractive from a value perspective for a potential counter-trend bounce. Key metrics like ROE (14.12%) and Net Profit Margin (8.73%) further support a positive outlook.\n\nTechnically, INDF is in a structural downtrend, with the current price (Rp 7,050) below the MA200 (Rp 7,162). However, a\n\nPosition: BUY\nAgent Confidence: 0.60",
+        "content": "AKRA presents a fundamentally undervalued profile, trading at Rp 1,500, which is a 9.1% discount to its fair value of Rp 1,637. The company's financial health is robust, supported by a strong Return on Equity (TTM) of 19.99%, a Net Profit Margin (Quarter) of 5.07%, and a low Debt to Equity Ratio (Quarter) of 0.39. Its Interest Coverage (TTM) of 44.59x further confirms financial stability, establishing a solid fundamental floor.\n\nTechnically, AKRA is in a strong structural uptrend, with the current price of Rp 1,500 trading above its EMA20 (\n\nPosition: BUY\nAgent Confidence: 0.60",
         "round": 1,
         "position": "BUY",
         "confidence": 0.6
       },
       {
         "role": "bear",
-        "content": "The Bull's swing trade thesis for INDF faces significant challenges, rendering it an unattractive proposition for a short-term counter-trend bounce.\n\nFirstly, while the fundamental analysis indicates a substantial undervaluation with the current price of Rp 7,050 at a 158.1% discount to the calculated fair value of Rp 18,197, this long-term valuation metric provides no immediate margin of safety for a swing trade in a prevailing downtrend. The current price is not above the stated fair value, but this fundamental cushion does not negate short-term technical risks or the absence of catalysts.\n\nSecondly, the technical setup presents considerable breakdown risk. INDF is firmly entrenched in a structural downtrend, with the current price of Rp\n\nPosition: AVOID\nAgent Confidence: 0.60",
+        "content": "As a Forensic Financial Auditor, a thorough examination of the AKRA trade setup reveals significant risks that warrant an AVOID recommendation for a swing trade at current price levels. While the fundamental valuation suggests a discount, the technical setup and risk-reward profile are highly unfavorable for a short-term entry.\n\n1.  **OVERVALUATION CHECK (Immediate Resistance, Not Overvaluation):** The Bull correctly identifies AKRA as fundamentally undervalued, trading at Rp 1,500 against a fair value of Rp 1,637, representing a 9.1% discount. This suggests a long-term margin of safety. However, for a 1-3 month swing trade, the immediate concern shifts to price action relative to resistance. The current price of Rp 1,500 is alarmingly close to its 52-week high of Rp 1,540. This proximity to a significant resistance level means that the immediate upside for a swing trade is severely capped at just Rp 40 (2.67%) before hitting a potential ceiling. Entering at this level offers minimal immediate upside before encountering strong selling pressure, effectively negating the fundamental undervaluation for a short-term speculative play.\n\n2.  **TECHNICAL BREAKDOWN RISK (Entry Above Optimal Zone & Near Resistance):** While AKRA is in a structural uptrend with the current price (Rp 1,500) trading above its EMA20 (Rp 1,455), MA50 (Rp 1,344), and MA200 (Rp 1,230), the immediate technical setup for a swing entry is highly precarious. The Bull's own technical analysis recommends an \"ENTRY ZONE\" between Rp 1,344 and Rp 1,455. The current price of Rp 1,500 is significantly *above* this recommended entry zone, indicating that the optimal entry point has been missed. Entering at Rp 1,500 means buying into a price that is Rp 45 (3.1%) above the upper bound of the suggested entry range. Furthermore, the Bull's target price of Rp 1,540 precisely matches the 52-week high, suggesting this level acts as a strong resistance. Buying near the 52-week high, rather than at a support level, significantly increases the risk of a reversal or consolidation, making the cited moving average supports less relevant for a *new* entry at current prices.\n\n3.  **CATALYST RISK (Absence of Near-Term Drivers):** The Bull's argument for a \"BUY\" position lacks any identifiable near-term catalyst to drive the price higher within the 1-3 month swing trade horizon\n\nPosition: AVOID\nAgent Confidence: 0.60",
         "round": 1,
         "position": "AVOID",
         "confidence": 0.6
       },
       {
         "role": "devils_advocate",
-        "content": "Berikut adalah tantangan Devil's Advocate untuk setup trade INDF:\n\n1.  **MACRO/COMPANY RISK & FOREIGN FLOW:**\n    Jika sentimen pasar global memburuk atau terjadi percepatan tekanan jual bersih oleh investor asing pada saham-saham big cap di IHSG, mungkinkah support MA50 di Rp 6,546 akan ditembus, berpotensi memicu penurunan lebih lanjut menuju level terendah 52 minggu di Rp 5,900?\n\n2.  **EXECUTION RISK — Transaction Cost Stress Test:**\n    Dengan asumsi harga entry di Rp 6,825 dan target jual di Rp 7,162, estimasi gross return adalah 4.94%. Total biaya transaksi round-trip dihitung sebagai berikut: biaya beli 0.15% (dari Rp 6,825), biaya jual 0.25% (dari Rp 7,162), PPh final 0.10% (dari Rp 7,162), dan slippage 0.15% (karena harga saham >= Rp 500). Total biaya transaksi adalah 0.15% + 0.25% + 0.10% + 0.15% = 0.65%. Setelah dikurangi biaya ini, net return yang diharapkan adalah 4.94% - 0.65% = 4.29%. Berdasarkan kalkulasi ini, trade ini **VIABLE after transaction costs**.",
+        "content": "Berikut adalah tantangan Devil's Advocate untuk setup trade AKRA:\n\n1.  **MACRO/COMPANY RISK & FOREIGN FLOW:**\n    Mengingat harga AKRA saat ini Rp 1,500 yang mendekati 52-week high Rp 1,540 dan di atas zona entri optimal, jika terjadi koreksi IHSG yang lebih luas atau tekanan jual bersih signifikan dari investor asing, mungkinkah support MA50 di Rp 1,344 akan ditembus, memicu penurunan lebih lanjut menuju MA200 di Rp 1,230 dalam 1-3 bulan ke depan?\n\n2.  **EXECUTION RISK — Transaction Cost Stress Test:**\n    Dengan menggunakan harga entry Rp 1,400 (midpoint dari entry zone Rp 1,344 – Rp 1,455) dan target harga Rp 1,540, gross return yang diproyeksikan adalah 10.0%. Total biaya transaksi round-trip dihitung sebagai berikut: biaya beli 0.15%, biaya jual 0.25%, PPh final 0.10% dari nilai jual, dan estimasi slippage 0.15% (karena harga saham >= Rp 500). Jadi, total biaya transaksi adalah 0.15% + 0.25% + 0.10% + 0.15% = 0.65%. Setelah dikurangi biaya ini, net return yang diharapkan adalah 10.0% - 0.65% = 9.35%. Berdasarkan perhitungan ini, posisi AKRA ini **VIABLE after transaction costs**.\n\nPosition: BUY\nAgent Confidence: 0.55",
         "round": 2,
-        "position": "UNKNOWN",
-        "confidence": null
+        "position": "BUY",
+        "confidence": 0.55
       }
     ],
-    "raw_data_summary": "=== FUNDAMENTALS ===\nFAIR VALUE: Rp 18,197\n\nINDF is significantly undervalued, with a current market price of Rp 7,050, representing a 158.1% discount to its calculated fair value of Rp 18,197. This valuation is derived from a weighted average of P/E Band and P/B Band methods, indicating a strong fundamental cushion for a swing trade setup.\n\nKey fundamental metrics support a positive outlook: Return on Equity (TTM) stands at 14.12%, and Net Profit Margin (Quarter) is 8.73%. The Debt to Equity Ratio (Quarter) is 0.99, indicating moderate leverage, while the Dividend Yield is 3.97%.\n\nNo clear upcoming growth catalyst, such as earnings or new contract announcements, has been identified within the 1-3 month swing trade horizon. The latest dividend ex-date (02 Jul 25) is a past event. Regarding quality checks, no red flags were detected for ROE-Margin Divergence, Low DER/Interest Coverage, or Z-Score vs DER Inconsistency based on available data. However, the check for Revenue-CFO Divergence could not be fully performed due to the absence of explicit Operating Cash Flow data in the provided API.\n\nPosition: BUY\nAgent Confidence: 0.85\n\n=== TECHNICALS ===\nAnalisis teknikal IHSG menunjukkan saham ini berada dalam downtrend struktural karena harga saat ini (Rp 7,050) berada di bawah MA200 (Rp 7,162). Ini mengindikasikan potensi setup counter-trend bounce, sehingga target harus lebih konservatif dan ukuran posisi disarankan 50% dari normal.\n\nUntuk setup swing trade ini, zona masuk yang ideal adalah pada support EMA20 dan MA50. ENTRY ZONE: Rp 6,546 – Rp 6,825. ⚠️ Counter-trend trade — kurangi ukuran posisi 50% dari normal. Target harga terdekat adalah MA200 sebagai resistensi kuat. TARGET: Rp 7,162 (approx.\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 7050.0,\n  \"sma20\": 6870.0,\n  \"ema20\": 6825.0,\n  \"ma50\": 6546.0,\n  \"ma200\": 7162.0,\n  \"ma200_context\": \"BELOW\",\n  \"rsi14\": 64.6,\n  \"atr14\": 136.0,\n  \"avg_volume_20d\": 10259055.0,\n  \"52w_high\": 8525.0,\n  \"52w_low\": 5900.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== DIVIDEND EX-DATE SCAN: INDF ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
+    "raw_data_summary": "=== FUNDAMENTALS ===\nFAIR VALUE: Rp 1,637\n\nAKRA is currently undervalued, with a market price of Rp 1,500, representing a 9.1% discount to its calculated fair value of Rp 1,637. This valuation is derived from a weighted average of P/E Band and P/B Band methods, indicating potential upside for a 1-3 month swing trade horizon.\n\nKey support metrics include a strong Return on Equity (TTM) of 19.99% and a Net Profit Margin (Quarter) of 5.07%. The company maintains a healthy balance sheet with a low Debt to Equity Ratio (Quarter) of 0.39 and robust Interest Coverage (TTM) at 44.59x. Furthermore, AKRA offers an attractive Dividend Yield of 6.67%. Trend data for ROE and Net Margin over 3 years is not available in the provided dataset.\n\nThe latest dividend ex-date was 07 May 2026, which is a PAST_EVENT_NOT_CATALYST relative to the current date of 2026-05-09. No other specific upcoming growth catalysts (e.g., earnings reports, new contracts) within the 1-3 month horizon are identified in the provided data. Based on the specified quality check criteria and available data, no red flags were detected. The combination of high ROE (19.99%) and Net Margin (5.07%) does not trigger the divergence flag. Similarly, the DER (0.39) and Interest Coverage (44.59x) do not indicate hidden liabilities. The Altman Z-Score (3.47) is not inflated relative to DER. The check for Revenue growth vs. Operating Cash Flow could not be performed due to the absence of explicit Operating Cash Flow data.\n\nPosition: BUY\nAgent Confidence: 0.75\n\n=== TECHNICALS ===\nSaham dalam uptrend struktural. Swing long searah tren. Harga saat ini (Rp 1,500) diperdagangkan di atas EMA20, MA50, dan MA200, mengindikasikan kekuatan tren naik yang solid dan mendekati level tertinggi 52 minggu.\n\nENTRY ZONE: Rp 1,344 – Rp 1,455. TARGET: Rp 1,540 (approx. 10.0% from entry mid). STOP LOSS: Rp 1,370 (1.5× ATR below EMA20).\n\nRSI di 59.0 menunjukkan momentum bullish yang kuat dan belum memasuki area overbought, memberikan ruang untuk kenaikan lebih lanjut. Volume data untuk perbandingan dengan rata-rata 20 hari tidak tersedia, sehingga sinyal volume tidak dapat dikonfirmasi. Harga saat ini berada di atas zona entri yang direkomendasikan, mengindikasikan perlunya menunggu koreksi harga untuk entri yang optimal.\n\nPosition: WAIT_AND_SEE\nAgent Confidence: 0.85\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 1500.0,\n  \"sma20\": 1456.0,\n  \"ema20\": 1455.0,\n  \"ma50\": 1344.0,\n  \"ma200\": 1230.0,\n  \"ma200_context\": \"ABOVE\",\n  \"rsi14\": 59.0,\n  \"atr14\": 55.0,\n  \"avg_volume_20d\": 19416065.0,\n  \"52w_high\": 1540.0,\n  \"52w_low\": 1031.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== DIVIDEND EX-DATE SCAN: AKRA ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
     "error": null,
     "conviction_score": 0.0,
-    "sector_key": "consumer_staples"
-  },
-  {
-    "ticker": "JPFA",
-    "verdict": {},
-    "debate_rounds": 0,
-    "consensus_reached": false,
-    "consensus_method": null,
-    "dissenting_agents": [],
-    "agent_votes": [],
-    "disagreement_type": null,
-    "debate_history": [],
-    "raw_data_summary": "",
-    "error": "",
-    "conviction_score": 0.0,
-    "sector_key": "consumer_staples"
-  },
-  {
-    "ticker": "GJTL",
-    "verdict": {
-      "ticker": "GJTL",
-      "rating": "BUY",
-      "confidence": 0.74,
-      "fair_value": 5800.0,
-      "entry_price_range": "1115 - 1135",
-      "target_price": 1235.0,
-      "stop_loss": 1070.0,
-      "current_price": 1180.0,
-      "timeframe": "1-3 Months",
-      "weighted_reasoning": "The decision is weighted heavily towards the compelling fundamental undervaluation (Price Rp 1,180 vs. Fair Value Rp 5,800) and the supportive technical structure (price above MA50/MA200). The R/R ratio of 2.00 is a key positive factor. These strengths are tempered by the absence of a specific, hard catalyst for the 1-3 month timeframe, which is a notable weakness for a swing trade. The Devil's Advocate's concern regarding significant net foreign selling is valid and has been factored in by capping the confidence and emphasizing the need for a disciplined entry at the support zone (Rp 1,115-1,135). The 'INSUFFICIENT_DATA' from sentiment analysis also contributes to a more conservative confidence score.",
-      "critical_risk_factor": "",
-      "key_catalysts": [
-        "Market re-rating due to extreme undervaluation (Price/Book 0.4x).",
-        "Continuation of the established technical uptrend, leading to a retest of the 52-week high resistance at Rp 1,230-1,235."
-      ],
-      "key_risks": [
-        "Sustained net foreign selling pressure could break the MA50 support at Rp 1,115, invalidating the setup.",
-        "Lack of a specific, near-term fundamental catalyst could lead to prolonged consolidation or sideways movement, failing to reach the target within the 1-3 month timeframe.",
-        "The current price of Rp 1,180 is above the ideal entry zone, requiring a pullback which may not occur."
-      ],
-      "summary": "This is a BUY recommendation based on significant fundamental undervaluation and a confirmed technical uptrend. The trade offers an attractive 2.0 R/R ratio, targeting a retest of the 52-week high. However, the lack of a clear near-term catalyst and recent foreign selling pressure warrant a cautious entry within the specified zone and cap the confidence.",
-      "expected_return": "+9.8%",
-      "risk_reward_ratio": 2.0,
-      "is_overvalued": false,
-      "wait_and_see": false,
-      "consensus_reached": true,
-      "consensus_method": "voting",
-      "dissenting_agents": [
-        "sentiment_specialist"
-      ]
-    },
-    "debate_rounds": 1,
-    "consensus_reached": true,
-    "consensus_method": "voting",
-    "dissenting_agents": [
-      "sentiment_specialist"
-    ],
-    "agent_votes": [
-      {
-        "agent": "fundamental_scout",
-        "position": "BUY",
-        "confidence": 0.85,
-        "round": 0
-      },
-      {
-        "agent": "chartist",
-        "position": "BUY",
-        "confidence": 0.85,
-        "round": 0
-      },
-      {
-        "agent": "sentiment_specialist",
-        "position": "HOLD",
-        "confidence": 0.0,
-        "round": 0
-      },
-      {
-        "agent": "bull",
-        "position": "BUY",
-        "confidence": 0.8,
-        "round": 1
-      },
-      {
-        "agent": "bear",
-        "position": "BUY",
-        "confidence": 0.6,
-        "round": 1
-      }
-    ],
-    "disagreement_type": null,
-    "debate_history": [
-      {
-        "role": "bull",
-        "content": "GJTL presents a compelling swing trade BUY opportunity (1-3 month horizon) driven by extreme undervaluation and a robust technical setup, despite the absence of an immediate fundamental news catalyst.\n\n**1. Fundamental Floor:**\nGJTL is significantly undervalued, trading at Rp 1,180 against a fair value estimate of Rp 5,800, representing a substantial +391.5% upside. This deep discount is supported by attractive valuation multiples, including a TTM P/E of 3.2x and P/B of 0.4x, both well below historical averages. The company's financial health is solid, with a TTM ROE of 11.72%, Net Profit Margin of 9.07%, and a manageable Debt/Equity Ratio of 0.49. This strong fundamental floor provides a significant margin of safety and underpins the potential for a market re-rating within the swing trade timeframe.\n\n**2. Technical Entry:**\nTechnically, GJTL is in a strong structural uptrend, trading above its MA200 (Rp 1,065), MA50 (Rp 1,115), and EMA20 (Rp 1,174). The optimal entry zone is identified between Rp 1,115 and Rp 1,174, aligning with key dynamic support levels. Specifically, the EMA20 at Rp 1,174 acts as immediate support, while the MA50 at Rp 1,115 provides a robust secondary support, having historically held firm. The RSI(14) at 54.5 indicates healthy bullish momentum without being overbought, suggesting ample room for upward movement. While recent trading saw a slight price dip and net foreign selling, this is interpreted as short-term profit-taking within the broader bullish trend, offering an attractive accumulation opportunity at these support levels.\n\n**3. Catalyst:**\nThe primary catalyst for a 1-3 month swing to the target is the market's re-rating of GJTL, driven by increasing recognition of its extreme undervaluation and the continuation of its established structural uptrend. This dynamic is expected to culminate in a retest and potential breakout above the 52-week high of Rp 1,230 within the swing trade horizon. This price action event, fueled by the fundamental disconnect and sustained technical momentum, will serve as the specific driver for the price to reach its target.\n\n**4. Risk/Reward:**\nBased on the technical analysis:\nEntry: Rp 1,145 (midpoint of the Rp 1,115 – Rp 1,174 entry zone)\nTarget: Rp 1,230 (52-week high)\nStop Loss: Rp 1,123 (1.5x ATR below EMA20)\n\nRisk = Rp 1,145 - Rp 1,123 = Rp 22\nReward = Rp 1,230 - Rp 1,145 = Rp 85\nR/R ratio: 85 / 22 ≈ 3.86:1\n\nEntry Rp 1,145 → Target Rp 1,230 → Stop Rp 1,123 → R/R ratio: 3.86:1\n\nPosition: BUY\nAgent Confidence: 0.80",
-        "round": 1,
-        "position": "BUY",
-        "confidence": 0.8
-      },
-      {
-        "role": "bear",
-        "content": "As a Forensic Financial Auditor, the swing trade BUY case for GJTL presents significant risks, leading to an AVOID recommendation. While the fundamental valuation suggests undervaluation, the immediate technical setup, lack of a concrete catalyst, and an unfavorable risk/reward profile for an entry at current levels make this trade highly speculative for a 1-3 month horizon.\n\nFirstly, regarding the **OVERVALUATION CHECK**, GJTL is indeed fundamentally undervalued, trading at Rp 1,180 against a fair value of Rp 5,800. This implies a substantial upside of +391.5% to fair value, meaning the current price is *not* above fair value. Therefore, the swing trade entry does not suffer from overvaluation in a fundamental sense. However\n\nPosition: BUY\nAgent Confidence: 0.60",
-        "round": 1,
-        "position": "BUY",
-        "confidence": 0.6
-      },
-      {
-        "role": "devils_advocate",
-        "content": "**1. MACRO/COMPANY RISK & FOREIGN FLOW:**\nGiven the recent \"net foreign selling yang signifikan\" and the absence of an immediate fundamental catalyst, if foreign funds continue to accelerate their selling pressure on GJTL, could the MA50 support at Rp 1,115 break, potentially triggering a deeper correction towards the MA200 at Rp 1,065?\n\n**2. EXECUTION RISK — Transaction Cost Stress Test:**\nMenggunakan harga entry Rp 1,145 dan target Rp 1,230, estimasi target return adalah (1230 - 1145) / 1145 = 7.42%. Total biaya transaksi round-trip dihitung sebagai berikut: biaya beli 0.15%, biaya jual 0.25%, PPh final 0.10% dari nilai jual, dan slippage 0.15% (karena harga saham >= Rp 500). Jadi, total biaya adalah 0.15% + 0.25% + 0.10% + 0.15% = 0.65%. Net return setelah biaya adalah 7.42% - 0.65% = 6.77%. Dengan net return sebesar 6.77%, trade ini dianggap **VIABLE after transaction costs**.",
-        "round": 2,
-        "position": "UNKNOWN",
-        "confidence": null
-      }
-    ],
-    "raw_data_summary": "=== FUNDAMENTALS ===\nFAIR VALUE: Rp 5,800\n\nGJTL is significantly UNDERVALUED with a current market price of Rp 1,180, representing a substantial +391.5% upside to its calculated fair value of Rp 5,800. This valuation is supported by a TTM P/E of 3.2x and P/B of 0.4x, both well below historical averages of 15.0x and 2.0x respectively.\n\nKey fundamental metrics include a TTM Return on Equity (ROE) of 11.72%, a Net Profit Margin of 9.07%, and a healthy Debt/Equity Ratio of 0.49. The company also offers a Dividend Yield of 4.24%. No clear upcoming growth catalyst (earnings, ex-dividend, contract) has been identified within the next 1-3 months, as the latest dividend ex-date (07 Jul 25) is a past event.\n\nA quality check of financial statements reveals no immediate red flags. ROE (11.72%) is not excessively high while Net Margin (9.07%) is reasonable. Debt/Equity (0.49) is not low enough to trigger a check against Interest Coverage (4.54x). Revenue growth is negative (-4.68% YoY), so the revenue-CFO divergence check is not applicable. Altman Z-Score (3.82) is not high enough to conflict with the DER.\n\nPosition: BUY\nAgent Confidence: 0.85\n\n=== TECHNICALS ===\n**Analisis Teknikal IHSG (GJTL)**\n\nSaham dalam uptrend struktural. Swing long searah tren. GJTL saat ini diperdagangkan di atas MA200, MA50, dan EMA20, mengindikasikan kekuatan tren naik yang solid.\n\nENTRY ZONE: Rp 1,115 – Rp 1,174. Zona ini didasarkan pada support dinamis EMA20 (Rp 1,174) dan MA50 (Rp 1,115), yang merupakan area ideal untuk akumulasi dalam tren naik.\n\nTARGET: Rp 1,230 (approx. 7.46% from entry mid). Target ini mengacu pada level tertinggi 52 minggu (52w_high) yang juga merupakan area resistensi kuat berdasarkan orderbook.\nSTOP LOSS: Rp 1,123 (1.5× ATR below EMA20). Stop loss ini ditempatkan di bawah support EMA20 dengan buffer volatilitas yang memadai.\n\nRSI(14) berada di 54.5, menunjukkan momentum bullish yang moderat dan sehat, tanpa kondisi overbought. Volume perdagangan hari ini menunjukkan harga ditutup turun 10 poin, disertai dengan net foreign selling yang signifikan, mengindikasikan adanya tekanan jual atau profit taking jangka pendek meskipun tren utama masih bullish.\n\nPosition: BUY\nAgent Confidence: 0.85\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 1180.0,\n  \"sma20\": 1182.0,\n  \"ema20\": 1174.0,\n  \"ma50\": 1115.0,\n  \"ma200\": 1065.0,\n  \"ma200_context\": \"ABOVE\",\n  \"rsi14\": 54.5,\n  \"atr14\": 34.0,\n  \"avg_volume_20d\": 7325805.0,\n  \"52w_high\": 1230.0,\n  \"52w_low\": 940.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== DIVIDEND EX-DATE SCAN: GJTL ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
-    "error": null,
-    "conviction_score": 0.62,
-    "sector_key": "consumer_disc",
-    "position_sizing": {
-      "ticker": "GJTL",
-      "rating": "BUY",
-      "confidence": 0.74,
-      "lot": 1,
-      "shares": 100,
-      "position_value": 118000.0,
-      "allocation_pct": 0.118,
-      "target_allocation_pct": 0.2,
-      "max_loss_rp": 11000.0,
-      "max_drawdown_pct": 0.011,
-      "expected_return_pct": 9.8,
-      "expected_return_rp": 11564.0,
-      "total_cost_est": 590.0,
-      "entry_price": 1180.0,
-      "stop_loss": 1070.0,
-      "rr_ratio": 2.0
-    },
-    "allocation_reasoning": {
-      "target_deployment_pct": 65.0,
-      "actual_deployment_pct": 44.0,
-      "gap_explanation": "Actual deployment 44.0% masih 21.1 percentage points di bawah target 65.0% karena sizing menghormati lot IHSG, cap per posisi, dan budget risiko stop-loss.",
-      "risk_factors_limiting": [
-        "lot size 100 saham dan harga entry membatasi penambahan posisi tanpa oversizing",
-        "hanya 3 kandidat yang lolos rating dan risk/reward untuk sizing",
-        "cap per posisi 20.0% membuat feasible deployment maksimum sekitar 60.0%",
-        "max drawdown per posisi dibatasi 7.0% sehingga lot tidak dipaksa melewati stop-risk budget"
-      ],
-      "market_condition_score": 0.74,
-      "recommendation": "Deployment sudah cukup aktif untuk swing trade moderat; tambah exposure hanya jika sinyal teknikal menguat tanpa memperbesar drawdown per posisi."
-    },
-    "deployment_scenario_comparison": {
-      "deploy_60_now": {
-        "deployment_pct": 60.0,
-        "expected_return_on_deployed_pct": 8.03,
-        "expected_return_portfolio_pct": 4.82,
-        "expected_return_rp": 48181.0,
-        "max_drawdown_portfolio_pct": 4.2,
-        "max_drawdown_rp": 42000.0
-      },
-      "wait_for_confirmation": {
-        "deployment_pct": 0.0,
-        "expected_return_portfolio_pct": 0.0,
-        "expected_return_rp": 0.0,
-        "max_drawdown_portfolio_pct": 0.0,
-        "max_drawdown_rp": 0.0,
-        "tradeoff": "Cash protects capital while waiting for cleaner entry, but gives up roughly Rp 48,181 if the current 60% deployment scenario works."
-      }
-    }
-  },
-  {
-    "ticker": "BFIN",
-    "verdict": {
-      "ticker": "BFIN",
-      "rating": "BUY",
-      "confidence": 0.74,
-      "fair_value": 1496.0,
-      "entry_price_range": "755 - 770",
-      "target_price": 800.0,
-      "stop_loss": 745.0,
-      "current_price": 810.0,
-      "timeframe": "1-3 Months",
-      "weighted_reasoning": "The BUY rating is primarily driven by two factors: 1) The stock is trading at a significant discount to its fair value of Rp 1,496, providing a strong fundamental cushion. 2) The Python-calculated trade envelope offers an attractive R/R of 2.14, which meets our criteria for a favorable swing trade. The technical picture is supportive, with the price above all key moving averages, validating the 'buy on pullback' strategy. Confidence is capped at 0.74 due to the absence of a specific 1-3 month catalyst and the Devil's Advocate's valid concern about missing debt data and potential foreign outflow risk, which was not fully rebutted. The 'INSUFFICIENT_DATA' sentiment signal also adds a minor penalty, preventing a higher conviction rating.",
-      "critical_risk_factor": "",
-      "key_catalysts": [
-        "Deep undervaluation (trading significantly below Fair Value of Rp 1,496) acting as a price anchor.",
-        "Favorable technical structure (price above MA50/MA200) supporting a pullback entry strategy."
-      ],
-      "key_risks": [
-        "Absence of a specific near-term (1-3 month) catalyst could lead to price stagnation.",
-        "Devil's Advocate Risk: Missing Debt/Equity data combined with potential foreign selling pressure could break key technical support at Rp 753.",
-        "Execution risk: The trade requires a price pullback to the Rp 755-770 entry zone, which may not occur if momentum continues."
-      ],
-      "summary": "The trade plan for BFIN is rated BUY based on a significant undervaluation against its fair value and a strong risk/reward ratio of 2.14. The technical setup is favorable, targeting a pullback entry into an established uptrend. However, confidence is moderated by the lack of a clear near-term catalyst and unaddressed risks regarding missing debt metrics, making this a fundamentally-backed technical play rather than a catalyst-driven one.",
-      "expected_return": "+4.9%",
-      "risk_reward_ratio": 2.14,
-      "is_overvalued": false,
-      "wait_and_see": false,
-      "consensus_reached": true,
-      "consensus_method": "voting",
-      "dissenting_agents": [
-        "sentiment_specialist"
-      ]
-    },
-    "debate_rounds": 1,
-    "consensus_reached": true,
-    "consensus_method": "voting",
-    "dissenting_agents": [
-      "sentiment_specialist"
-    ],
-    "agent_votes": [
-      {
-        "agent": "fundamental_scout",
-        "position": "BUY",
-        "confidence": 0.75,
-        "round": 0
-      },
-      {
-        "agent": "chartist",
-        "position": "BUY",
-        "confidence": 0.95,
-        "round": 0
-      },
-      {
-        "agent": "sentiment_specialist",
-        "position": "HOLD",
-        "confidence": 0.0,
-        "round": 0
-      },
-      {
-        "agent": "bull",
-        "position": "BUY",
-        "confidence": 0.6,
-        "round": 1
-      },
-      {
-        "agent": "bear",
-        "position": "BUY",
-        "confidence": 0.6,
-        "round": 1
-      }
-    ],
-    "disagreement_type": null,
-    "debate_history": [
-      {
-        "role": "bull",
-        "content": "**BFIN: Swing Trade BUY Case (1-3 Month Horizon)**\n\n**1. FUNDAMENTAL FLOOR:**\nBFIN presents a compelling fundamental floor, currently trading at Rp 810, a significant 84.7% discount to its calculated fair value of Rp 1,496. This deep undervaluation provides a robust cushion and a strong long-term pull for the stock. Supporting this valuation are solid financial metrics, including a TTM Return on Equity (ROE) of 13.98%, a healthy TTM Net Margin of 20.76%, and an attractive Dividend Yield of 8.27%. While the Debt/Equity Ratio is not available, the Total Liabilities/Equity of 1.31 is\n\nPosition: BUY\nAgent Confidence: 0.60",
-        "round": 1,
-        "position": "BUY",
-        "confidence": 0.6
-      },
-      {
-        "role": "bear",
-        "content": "The Bull's swing trade BUY case for BFIN is fundamentally flawed, presenting significant risks that warrant an AVOID recommendation.\n\nFirstly, while BFIN is currently trading below its stated fair value of Rp 1,496, the Bull's claim of being \"undervalued by 84.7%\" is misleading. The current price of Rp 810 represents a 45.85% discount to fair value, not an 84.7% undervaluation. The 84.7% figure represents the *upside potential* to reach fair value, which is a different metric. More critically, the \"fundamental floor\" cited by the Bull is compromised by significant data gaps. The Debt/Equity Ratio and Interest Coverage, crucial\n\nPosition: BUY\nAgent Confidence: 0.60",
-        "round": 1,
-        "position": "BUY",
-        "confidence": 0.6
-      },
-      {
-        "role": "devils_advocate",
-        "content": "**1. MACRO/COMPANY RISK & FOREIGN FLOW:**\nGiven the missing Debt/Equity Ratio and Interest Coverage data, if foreign funds accelerate selling pressure on BFIN due to broader market concerns or if new regulations negatively impact the multi-finance sector, could the MA50 support at Rp 753 break, triggering stops down to Rp 690 within the next 1-3 months?\n\n**2. EXECUTION RISK — Transaction Cost Stress Test:**\nMenghitung total biaya transaksi untuk posisi BFIN dengan harga entry Rp 769 dan target harga Rp 845: Biaya beli adalah 0.15%, biaya jual 0.25%, PPh final 0.10% dari nilai jual, dan estimasi slippage 0.15% (karena harga entry Rp 769 >= Rp 500). Total biaya transaksi round-trip adalah 0.15% + 0.25% + 0.10% + 0.15% = 0.65%. Dengan potensi keuntungan kotor sebesar 9.88% (dari Rp 769 ke Rp 845), net return setelah biaya adalah 9.88% - 0.65% = 9.23%. Ini menunjukkan bahwa posisi ini **VIABLE after transaction costs**.",
-        "round": 2,
-        "position": "UNKNOWN",
-        "confidence": null
-      }
-    ],
-    "raw_data_summary": "=== FUNDAMENTALS ===\nFAIR VALUE: Rp 1,496\n\nBFIN is currently trading at Rp 810, indicating it is UNDERVALUED by 84.7% compared to its calculated fair value of Rp 1,496. This significant discount suggests a strong fundamental cushion for a potential swing trade.\n\nKey support metrics include a TTM Return on Equity (ROE) of 13.98% and a TTM Net Margin of 20.76%. The Debt/Equity Ratio is not available (null), but the Total Liabilities/Equity stands at 1.31. The stock offers an attractive Dividend Yield of 8.27%. No specific upcoming growth catalyst (earnings, ex-dividend, contract) within the 1-3 month swing trade horizon was identified from the provided data, as the latest ex-dividend date (11 Dec 25) is in the past.\n\nA quality check for financial inconsistencies reveals no red flags from the performable checks. ROE (13.98%) is not high while Net Margin (20.76%) is not low. Revenue growth (3.05%) is positive, and Operating Cash Flow (Rp 2,049 B) is also positive. The Altman Z-Score (2.85) is not above 10. Checks involving Debt/Equity Ratio and Interest Coverage could not be performed due to insufficient data.\n\nPosition: BUY\nAgent Confidence: 0.75\n\n=== TECHNICALS ===\n**Analisis Teknis IHSG (1-3 Bulan)**\n\n**TREND CONTEXT:** Saham dalam uptrend struktural. Swing long searah tren. Harga saat ini (Rp 810) diperdagangkan di atas semua moving average utama (EMA20, MA50, MA200), menunjukkan kekuatan tren naik yang solid.\n\n**ENTRY ZONE:** Berdasarkan support EMA20 dan MA50, zona beli yang ideal adalah antara Rp 753 – Rp 785. Harga saat ini berada di atas zona ini, mengindikasikan potensi pullback ke zona support sebelum entri optimal.\n\n**TARGET PRICE:** Target harga terdekat yang merupakan level resistensi kuat dan memberikan potensi keuntungan 3-10% dari titik tengah entri (Rp 769) adalah Rp 845 (approx. 9.88% dari entry mid). Level ini didukung oleh volume penawaran yang signifikan di orderbook.\n\n**STOP LOSS:** Untuk mengelola risiko, stop loss disarankan pada Rp 690 (1.5× ATR di bawah EMA20).\n\n**RSI INTERPRETATION:** RSI(14) di 55.1 menunjukkan momentum bullish yang moderat, dengan ruang untuk kenaikan lebih lanjut sebelum mencapai kondisi overbought. Ini mendukung potensi kenaikan harga.\n\n**VOLUME SIGNAL:** Data volume harian spesifik tidak tersedia untuk konfirmasi pergerakan harga saat ini. Namun, rata-rata volume 20 hari sebesar 53.97 juta saham menunjukkan likuiditas yang sehat untuk saham ini.\n\nPosition: BUY\nAgent Confidence: 0.95\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 810.0,\n  \"sma20\": 783.0,\n  \"ema20\": 785.0,\n  \"ma50\": 753.0,\n  \"ma200\": 742.0,\n  \"ma200_context\": \"ABOVE\",\n  \"rsi14\": 55.1,\n  \"atr14\": 63.0,\n  \"avg_volume_20d\": 53976385.0,\n  \"52w_high\": 905.0,\n  \"52w_low\": 665.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== DIVIDEND EX-DATE SCAN: BFIN ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
-    "error": null,
-    "conviction_score": 0.584,
-    "sector_key": "finance_nonbank",
-    "position_sizing": {
-      "ticker": "BFIN",
-      "rating": "BUY",
-      "confidence": 0.74,
-      "lot": 2,
-      "shares": 200,
-      "position_value": 162000.0,
-      "allocation_pct": 0.162,
-      "target_allocation_pct": 0.2,
-      "max_loss_rp": 13000.0,
-      "max_drawdown_pct": 0.013,
-      "expected_return_pct": 4.9,
-      "expected_return_rp": 7938.0,
-      "total_cost_est": 810.0,
-      "entry_price": 810.0,
-      "stop_loss": 745.0,
-      "rr_ratio": 2.14
-    },
-    "allocation_reasoning": {
-      "target_deployment_pct": 65.0,
-      "actual_deployment_pct": 44.0,
-      "gap_explanation": "Actual deployment 44.0% masih 21.1 percentage points di bawah target 65.0% karena sizing menghormati lot IHSG, cap per posisi, dan budget risiko stop-loss.",
-      "risk_factors_limiting": [
-        "lot size 100 saham dan harga entry membatasi penambahan posisi tanpa oversizing",
-        "hanya 3 kandidat yang lolos rating dan risk/reward untuk sizing",
-        "cap per posisi 20.0% membuat feasible deployment maksimum sekitar 60.0%",
-        "max drawdown per posisi dibatasi 7.0% sehingga lot tidak dipaksa melewati stop-risk budget"
-      ],
-      "market_condition_score": 0.74,
-      "recommendation": "Deployment sudah cukup aktif untuk swing trade moderat; tambah exposure hanya jika sinyal teknikal menguat tanpa memperbesar drawdown per posisi."
-    },
-    "deployment_scenario_comparison": {
-      "deploy_60_now": {
-        "deployment_pct": 60.0,
-        "expected_return_on_deployed_pct": 8.03,
-        "expected_return_portfolio_pct": 4.82,
-        "expected_return_rp": 48181.0,
-        "max_drawdown_portfolio_pct": 4.2,
-        "max_drawdown_rp": 42000.0
-      },
-      "wait_for_confirmation": {
-        "deployment_pct": 0.0,
-        "expected_return_portfolio_pct": 0.0,
-        "expected_return_rp": 0.0,
-        "max_drawdown_portfolio_pct": 0.0,
-        "max_drawdown_rp": 0.0,
-        "tradeoff": "Cash protects capital while waiting for cleaner entry, but gives up roughly Rp 48,181 if the current 60% deployment scenario works."
-      }
-    }
-  },
-  {
-    "ticker": "MIDI",
-    "verdict": {
-      "ticker": "MIDI",
-      "rating": "HOLD",
-      "confidence": 0.48,
-      "fair_value": 345.0,
-      "entry_price_range": "308 - 316",
-      "target_price": 344.0,
-      "stop_loss": 296.0,
-      "current_price": 352.0,
-      "timeframe": "1-3 Months",
-      "weighted_reasoning": "The decision is a firm HOLD, primarily driven by valuation and timing. The current price (Rp 352) is 2.0% above the calculated fair value (Rp 345), eliminating any margin of safety. Furthermore, the price is significantly above the optimal entry zone (Rp 308-316), making the trade technically extended and invalid at current levels. The conflict resolution signal (Fundamental ✅ + Technical ❌) correctly identifies this divergence. The structural downtrend (Price < MA200) and the unanswered Devil's Advocate risk regarding a potential support break at MA50 reinforce the need for caution. We will wait for a significant pullback into the entry zone before reconsidering. Confidence is capped at 0.55 for a HOLD rating and further penalized for directional disagreement among agents and unaddressed risks.",
-      "critical_risk_factor": "",
-      "key_catalysts": [
-        "No specific short-term catalyst identified. A potential re-rating requires a significant price pullback to the entry zone to create value."
-      ],
-      "key_risks": [
-        "Valuation Risk: Trading above fair value with a negative margin of safety.",
-        "Technical Risk: Price is extended and in a long-term downtrend (below MA200), making it vulnerable to pullbacks.",
-        "Execution Risk: The entry window has been missed; chasing the price here invalidates the trade plan's R/R.",
-        "Fundamental Quality Flag: ROE-Margin divergence raises questions about earnings quality."
-      ],
-      "summary": "Rating is HOLD. The current price of Rp 352 is above both the fair value (Rp 345) and the calculated entry zone (Rp 308-316), indicating a negative margin of safety and a missed entry window. While the trade plan offers a decent 2.0 R/R ratio on a pullback, entering now is ill-advised due to the overextended technicals and the stock's position within a long-term downtrend (below MA200).",
-      "expected_return": "+10.3%",
-      "risk_reward_ratio": 2.0,
-      "is_overvalued": true,
-      "wait_and_see": true,
-      "consensus_reached": true,
-      "consensus_method": "voting",
-      "dissenting_agents": [
-        "bull",
-        "bear"
-      ]
-    },
-    "debate_rounds": 1,
-    "consensus_reached": true,
-    "consensus_method": "voting",
-    "dissenting_agents": [
-      "bull",
-      "bear"
-    ],
-    "agent_votes": [
-      {
-        "agent": "fundamental_scout",
-        "position": "HOLD",
-        "confidence": 0.55,
-        "round": 0
-      },
-      {
-        "agent": "chartist",
-        "position": "HOLD",
-        "confidence": 0.0,
-        "round": 0
-      },
-      {
-        "agent": "sentiment_specialist",
-        "position": "HOLD",
-        "confidence": 0.0,
-        "round": 0
-      },
-      {
-        "agent": "bull",
-        "position": "BUY",
-        "confidence": 0.6,
-        "round": 1
-      },
-      {
-        "agent": "bear",
-        "position": "AVOID",
-        "confidence": 0.95,
-        "round": 1
-      }
-    ],
-    "disagreement_type": null,
-    "debate_history": [
-      {
-        "role": "bull",
-        "content": "The objective is to build the strongest possible swing trade BUY case for MIDI within a 1-3 month horizon. However, a thorough analysis of the provided market data reveals significant obstacles that prevent the construction of a robust BUY thesis.\n\n1.  **FUNDAMENTAL FLOOR:** MIDI is currently trading at Rp 352, which is 2.0% above its estimated fair value of Rp 345. This indicates a negative margin of safety, making a fundamental entry at current levels unattractive for a swing trade. While the TTM Return on Equity (ROE) of 18.05% suggests decent profitability, a significant quality flag exists due to ROE-Margin Divergence (Net Profit Margin 4.52% < 5%). The absence of a clear discount to fair value and the identified quality concerns undermine the fundamental floor required for a strong BUY recommendation.\n\n2.  **TECHNICAL ENTRY:** The stock is in a structural downtrend, confirmed by\n\nPosition: BUY\nAgent Confidence: 0.60",
-        "round": 1,
-        "position": "BUY",
-        "confidence": 0.6
-      },
-      {
-        "role": "bear",
-        "content": "A forensic audit of MIDI reveals a highly unfavorable setup for a swing trade, warranting an AVOID recommendation due to significant overvaluation, technical breakdown risks, absence of catalysts, and an extremely poor risk/reward profile.\n\n1.  **OVERVALUATION CHECK:** The current price of Rp 352 is 2.0% above its estimated fair value of Rp 345. This indicates a negative margin of safety, meaning the swing trade entry at current levels has **NO margin of safety**. Entering an overvalued asset, especially for a short-term swing, inherently increases risk and limits upside potential from a fundamental perspective.\n\n2.  **TECHNICAL BREAKDOWN RISK:** MIDI is firmly entrenched in a structural downtrend, with the current price of Rp 352 trading significantly below its MA200 of Rp 380. This confirms a long-term bearish bias, making any counter-trend bounce inherently fragile. The Bull's suggested \"ENTRY ZONE\" of Rp 309 (MA50) – Rp 332 (EMA20) has already been surpassed, with the current price at Rp 352, indicating that the stock has already experienced a significant portion of its \"bounce.\" Furthermore, the RSI14 at 66.6 suggests the current upward momentum is nearing overbought conditions, increasing the likelihood of a reversal or pullback rather than sustained upward movement. The MA200 at Rp 380 stands as a formidable overhead resistance, capping any potential upside.\n\n3.  **CATALYST RISK:** There is a complete absence of identified positive catalysts within the 1-3 month swing trade horizon. The latest dividend ex-date (04 Jun 25) is a PAST_EVENT_NOT_CATALYST, and no other growth drivers are cited. Fundamentally, the detected ROE-Margin Divergence (ROE 18.05% > 15% but Net Margin 4.52% < 5%) raises a quality flag regarding earnings sustainability, which could deter investor interest. The lack of data for Debt/Equity also prevents a full solvency assessment, adding to fundamental uncertainty. Without a compelling catalyst, any price appreciation is speculative and lacks fundamental conviction, making the trade highly susceptible to market sentiment shifts.\n\n4.  **UNFAVOURABLE R/R:** Entering at the current price of Rp 352 with the Bull's stated target of Rp 354 offers a meager potential reward of only Rp 2. Conversely, a logical stop-loss placed below the short-term moving averages, such as the SMA20 at Rp 330, would expose the trade to a risk of Rp 22 (Rp 352 - Rp 330). This results in an abysmal Risk/Reward ratio of 0.09:1 (Rp 2 reward / Rp 22 risk). Such an unfavorable ratio makes the trade highly unattractive, as the potential loss is significantly greater than the potential gain, even before considering the inherent risks of a counter-trend trade in an overvalued stock.\n\nPosition: AVOID\nAgent Confidence: 0.95",
-        "round": 1,
-        "position": "AVOID",
-        "confidence": 0.95
-      },
-      {
-        "role": "devils_advocate",
-        "content": "Berikut adalah tantangan terhadap setup trade MIDI:\n\n1.  **MACRO/COMPANY RISK & FOREIGN FLOW:**\n    Jika sentimen pasar global memburuk atau terjadi percepatan net foreign sell di IHSG, ditambah dengan kekhawatiran atas ROE-Margin Divergence MIDI yang belum terverifikasi, mungkinkah level support MA50 di Rp 309 akan ditembus, memicu penurunan lebih lanjut menuju 52-week low di Rp 260 dalam 1-3 bulan ke depan?\n\n2.  **EXECUTION RISK — Transaction Cost Stress Test:**\n    Untuk menghitung biaya transaksi, kita akan menggunakan harga entry dari \"ENTRY ZONE\" yang disarankan, yaitu Rp 321 (midpoint dari Rp 3",
-        "round": 2,
-        "position": "UNKNOWN",
-        "confidence": null
-      }
-    ],
-    "raw_data_summary": "[🚨 MARGIN-OF-SAFETY ALERT — Read Before Debating]\n⚠️ OVERVALUED: Current price (352) is 2.0% above fair value (345). Swing trade is HIGH RISK — margin of safety is negative.\nCurrent Price: Rp 352 | Estimated Fair Value: Rp 345\n────────────────────────────────────────────────────────────\n\n=== FUNDAMENTALS ===\nFAIR VALUE: Rp 345. MIDI is currently trading at Rp 352, representing a 2.0% premium to its fair value, resulting in a FAIRLY_VALUED verdict as per the pre-calculated report.\n\nSupport metrics show a TTM Return on Equity (ROE) of 18.05% and a Net Profit Margin of 4.52%. Three-year trend data for these metrics is not available. The Debt/Equity ratio is null, indicating insufficient data for a complete solvency assessment. Dividend Yield stands at 2.09%.\n\nNo specific growth catalyst within the 1-3 month horizon has been identified; the latest dividend ex-date (04 Jun 25) is a PAST_EVENT_NOT_CATALYST. A significant quality flag is detected: ⚠️ ROE-Margin Divergence — verifikasi kualitas laba (ROE 18.05% > 15% but Net Margin 4.52% < 5%). Checks for low DER with weak Interest Coverage and Revenue-CFO divergence could not be performed due to missing Debt/Equity and explicit Operating Cash Flow data, respectively. No other red flags were detected.\n\nPosition: HOLD\nAgent Confidence: 0.55\n\n=== TECHNICALS ===\nSaham dalam downtrend struktural. Ini counter-trend bounce — target lebih konservatif, size 50%. Harga saat ini Rp 352 masih berada di bawah MA200 (Rp 380), mengkonfirmasi tren turun jangka panjang.\n\nENTRY ZONE: Rp 309 – Rp 332 (berdasarkan MA50 dan EMA20). Perlu dicatat bahwa harga saat ini Rp 352 sudah berada di atas zona entri yang disarankan, sehingga potensi entri baru pada level ini memiliki risiko yang lebih tinggi. ⚠️ Counter-trend trade — kurangi ukuran posisi 50% dari normal.\n\nTARGET: Rp 354 (approx. 10.45% from entry mid\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 352.0,\n  \"sma20\": 330.0,\n  \"ema20\": 332.0,\n  \"ma50\": 309.0,\n  \"ma200\": 380.0,\n  \"ma200_context\": \"BELOW\",\n  \"rsi14\": 66.6,\n  \"atr14\": 11.0,\n  \"avg_volume_20d\": 18349300.0,\n  \"52w_high\": 478.0,\n  \"52w_low\": 260.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== DIVIDEND EX-DATE SCAN: MIDI ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
-    "error": null,
-    "conviction_score": 0.0,
-    "sector_key": "consumer_staples"
-  },
-  {
-    "ticker": "ULTJ",
-    "verdict": {},
-    "debate_rounds": 0,
-    "consensus_reached": false,
-    "consensus_method": null,
-    "dissenting_agents": [],
-    "agent_votes": [],
-    "disagreement_type": null,
-    "debate_history": [],
-    "raw_data_summary": "",
-    "error": "Error calling model 'gemini-2.5-flash' (RESOURCE_EXHAUSTED): 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap. Learn more at https://ai.google.dev/gemini-api/docs/billing#project-spend-caps. ', 'status': 'RESOURCE_EXHAUSTED'}}",
-    "conviction_score": 0.0,
-    "sector_key": "consumer_staples"
+    "sector_key": "energy"
   }
 ]
