@@ -260,9 +260,43 @@ class CIOVerdict(BaseDataClass):
         #    Prices are now kept so the UI can always display the trade setup;
         #    the rating + wait_and_see flag already communicate the caution signal.
 
+        entry_bounds = self._parse_entry_bounds()
+        if (
+            entry_bounds is not None
+            and self.stop_loss is not None
+            and self.target_price is not None
+            and self.stop_loss > 0
+            and self.target_price > 0
+        ):
+            entry_low, entry_high = entry_bounds
+            if not (self.stop_loss < entry_low <= entry_high < self.target_price):
+                raise ValueError(
+                    "Invalid swing price ordering: expected "
+                    "stop_loss < entry_low <= entry_high < target_price"
+                )
+
         return self
 
     # ── Helpers ───────────────────────────────────────────────────────────────
+
+    def _parse_entry_bounds(self) -> tuple[float, float] | None:
+        if not self.entry_price_range:
+            return None
+        try:
+            text = re.sub(r"[Rr][Pp]\.?\s*", "", self.entry_price_range).strip()
+            parts = re.split(r"\s*[-â€“]\s*", text, maxsplit=1)
+            if len(parts) < 2:
+                return None
+
+            def _to_float(value: str) -> float:
+                value = value.strip()
+                value = re.sub(r"\.(?=\d{3}(?!\d))", "", value)
+                value = value.replace(",", "")
+                return float(value)
+
+            return _to_float(parts[0]), _to_float(parts[1])
+        except Exception:
+            return None
 
     def _parse_entry_mid(self) -> float:
         """
@@ -445,6 +479,7 @@ class DebateChamberState(TypedDict):
     # Identity
     ticker: str
     current_price: float          # ← NEW: last traded price (IDR)
+    market_data: dict             # Cached yfinance data fetched once per ticker
 
     # Parallel data collection outputs (Phase 1)
     fundamental_data: str
@@ -453,6 +488,7 @@ class DebateChamberState(TypedDict):
 
     # Merged string fed into the debate (includes margin-of-safety warnings)
     raw_data: str
+    decision_brief: str
 
     # Pre-computed technical indicators from yfinance (Python ground truth)
     # Keys: current_price, sma20, ma50, ma200, rsi14, atr14, avg_volume_20d, 52w_high, 52w_low
@@ -476,6 +512,7 @@ class DebateChamberState(TypedDict):
 
     # Final output
     final_verdict: str            # JSON-serialized CIOVerdict
+    metadata: dict
 
     # Error propagation
     error: str | None

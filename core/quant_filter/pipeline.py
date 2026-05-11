@@ -12,14 +12,18 @@ import pandas as pd
 import yfinance as yf
 
 from core.quant_filter.config import (
-    CONFIG,
+    NAME_SECTOR_KEYWORDS,
     SECTOR_PBV_BENCHMARK,
     TICKER_SECTOR_HARDCODE,
-    _NAME_SECTOR_KEYWORDS,
     _find_latest_xlsx,
 )
 from core.quant_filter.reporting import _build_markdown_report
-from utils.exdate_scanner import ExDateInfo, scan_exdate
+from utils.exdate_scanner import (
+    CRITICAL_WINDOW_DAYS,
+    ExDateInfo,
+    WARNING_WINDOW_DAYS,
+    scan_exdate,
+)
 from utils.technicals import compute_atr, compute_rsi, snap_to_tick
 
 try:
@@ -90,7 +94,7 @@ def _build_sector_map(
         # Lapis 3: keyword matching dari nama perusahaan
         name_lower = names.get(t, "").lower()
         matched = False
-        for keywords, sector in _NAME_SECTOR_KEYWORDS:
+        for keywords, sector in NAME_SECTOR_KEYWORDS:
             if any(kw in name_lower for kw in keywords):
                 result[t] = sector
                 matched = True
@@ -135,10 +139,8 @@ def _resolve_exdate(
          - Jika semua format parse gagal (ValueError): lanjut ke lapis 3
       3. scan_exdate() via yfinance — fallback lambat, hanya jika lapis 1-2 gagal
 
-    Catatan: import CRITICAL_WINDOW_DAYS / WARNING_WINDOW_DAYS dilakukan
-    di level modul — tidak perlu import ulang di dalam fungsi ini.
+    Mengembalikan risk tier berbasis jarak hari ke ex-date.
     """
-    from utils.exdate_scanner import CRITICAL_WINDOW_DAYS, WARNING_WINDOW_DAYS
 
     # Lapis 1: xlsx adapter
     if adapter is not None:
@@ -195,15 +197,17 @@ def _resolve_exdate(
 def setup_logging(log_dir: str) -> logging.Logger:
     os.makedirs(log_dir, exist_ok=True)
     log_file = os.path.join(log_dir, f"scan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-        handlers=[
-            logging.FileHandler(log_file, encoding="utf-8"),
-            logging.StreamHandler(),
-        ],
-    )
-    return logging.getLogger("quant_filter")
+    logger = logging.getLogger("quant_filter")
+    logger.setLevel(logging.INFO)
+    if not logger.handlers:
+        formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+        file_handler = logging.FileHandler(log_file, encoding="utf-8")
+        file_handler.setFormatter(formatter)
+        stream_handler = logging.StreamHandler()
+        stream_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+        logger.addHandler(stream_handler)
+    return logger
 
 
 def download_yf_with_retry(
@@ -538,6 +542,7 @@ def _analyze_ticker(
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run_pipeline(cfg: dict) -> pd.DataFrame:
+    cfg = dict(cfg)
     logger = setup_logging(cfg["scratch_dir"])
     os.makedirs(cfg["output_dir"], exist_ok=True)
     os.makedirs(cfg["scratch_dir"], exist_ok=True)
@@ -785,6 +790,7 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
     for _, row in filtered.iterrows():
         t_yf = row["Ticker"] + ".JK"
         if t_yf not in data.columns.get_level_values(0):
+            logger.warning(f"[{row['Ticker']}] Data yfinance tidak tersedia, skip.")
             continue
         df_t = data[t_yf].dropna(how="all")
         if len(df_t) < cfg["min_bars"]:
@@ -831,4 +837,4 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
 # ── REPORT BUILDER ────────────────────────────────────────────════════════════
 # ══════════════════════════════════════════════════════════════════════════════
 
-__all__ = ["CONFIG", "run_pipeline"]
+__all__ = ["run_pipeline"]

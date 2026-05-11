@@ -3,55 +3,52 @@
   "verdict": {
     "ticker": "BBCA",
     "rating": "HOLD",
-    "confidence": 0.0,
+    "confidence": 0.52,
     "fair_value": 10474.0,
-    "entry_price_range": "5800 - 5975",
-    "target_price": 6500.0,
-    "stop_loss": 5575.0,
-    "current_price": 5975.0,
+    "entry_price_range": "6000 - 6175",
+    "target_price": 6750.0,
+    "stop_loss": 5750.0,
+    "current_price": 6175.0,
     "timeframe": "1-3 Months",
-    "weighted_reasoning": "",
+    "weighted_reasoning": "The decision is a HOLD, driven by the mandatory conflict resolution rule: Fundamental ✅ + Technical ❌. The significant undervaluation (69.6% below fair value) and an attractive R/R of 1.96 are compelling, forming the basis for the fundamental 'BUY' case. However, this is completely negated by the severe technical weakness. The stock is in a structural downtrend, trading below its MA50 and MA200, making this a high-risk counter-trend setup. The Devil's Advocate's concern about the 52-week low support breaking is valid and is the primary reason for caution. We will wait for technical confirmation, such as a break above the MA50 or a bullish reversal pattern with volume, before considering an entry.",
     "critical_risk_factor": "",
-    "key_catalysts": [],
-    "key_risks": [],
-    "summary": "CIO parse error — raw response stored. Error: Expecting ',' delimiter: line 6 column 115 (char 504)",
-    "expected_return": "+10.4%",
+    "key_catalysts": [
+      "Potential mean reversion towards its significant undervaluation (Fair Value Rp 10,474)."
+    ],
+    "key_risks": [
+      "Continuation of the strong technical downtrend, leading to a break of the 52-week low support at Rp 5,850.",
+      "Lack of any identifiable short-term (1-3 month) catalyst to trigger a price reversal.",
+      "Potential for sustained foreign selling pressure on the banking sector."
+    ],
+    "summary": "BBCA presents a classic 'value trap' scenario for a swing trader. While fundamentally undervalued with a strong R/R of 1.96, the technical picture is decisively bearish, with the stock in a clear downtrend below all key moving averages. The risk of the downtrend continuing and breaking the 52-week low outweighs the potential reward in the short term. A HOLD rating is prudent until clear technical confirmation of a bottoming pattern emerges.",
+    "expected_return": "+10.9%",
     "risk_reward_ratio": 1.96,
     "is_overvalued": false,
-    "wait_and_see": true
+    "wait_and_see": true,
+    "consensus_reached": true,
+    "consensus_method": "voting",
+    "dissenting_agents": [
+      "chartist",
+      "sentiment_specialist"
+    ]
   },
-  "debate_rounds": 2,
+  "debate_rounds": 1,
   "debate_history": [
     {
-      "role": "system",
-      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 5,975, Rp 10,474",
-      "round": 0
-    },
-    {
       "role": "bull",
-      "content": "BBCA presents a compelling fundamental undervaluation, trading at Rp 5,975, which is a substantial 75.3% discount to its estimated fair value of Rp 10,474. This significant gap provides a strong fundamental floor for a potential swing trade. The company's robust profitability, evidenced by a TTM ROE of 22.4",
+      "content": "BBCA presents a compelling fundamental undervaluation, trading at Rp 6,175, a significant 69.6% discount to its fair value estimate of Rp 10,474. This substantial margin of safety, supported by robust financials such as a 22.4% Return on Equity and a 49.5% Net Margin, establishes a strong fundamental floor for the stock. While the fair value calculation confidence is medium, the magnitude of the discount provides a solid basis for considering a swing trade entry, anticipating a reversion towards intrinsic value.\n\nTechnically, BBCA is currently in a structural downtrend, trading below its MA200 (Rp 7,409), MA50 (Rp 6,508\n\nPosition: BUY\nAgent Confidence: 0.60",
       "round": 1
     },
     {
       "role": "bear",
-      "content": "As a Forensic Financial Auditor, the proposed swing trade for BBCA presents significant risks, warranting an AVOID verdict. The Bull's argument for a \"strong fundamental floor\" is severely undermined by the prevailing technical weakness and absence of a forward-looking catalyst.\n\n1.  **OVERVALUATION CHECK (Not Applicable):** The premise of an overvaluation check is not met",
+      "content": "BBCA presents a highly speculative swing trade entry, despite the stated fundamental undervaluation. While the Bull's argument highlights BBCA trading at Rp 6,175, a significant 69.6% discount to its fair value of Rp 10,474, this perceived \"margin of safety\" is entirely negated for a swing trade entry by the stock's severe technical breakdown. The current price is not above fair value; rather, it is deeply discounted. However, this discount does not translate into a safe swing trade entry given the prevailing market conditions.\n\nTechnically, BBCA is in a clear structural downtrend, with the current price of Rp 6,175 trading significantly below all key moving averages: EMA20 (Rp 6,214), SMA20 (Rp 6,271), MA50 (Rp 6,508), and MA200 (Rp 7,409). This indicates strong bearish momentum across all timeframes, making any \"counter-trend bounce\" highly speculative and prone to failure. The stock is also dangerously close to its 52-week low of Rp 5,850. A breakdown below this critical support level would confirm further downside, invalidating any short-term bullish thesis. The RSI14 at 45.5 is not oversold, suggesting there is still room for price depreciation before any significant buying interest might emerge.\n\nThe Bull's reliance on \"reversion towards intrinsic value\" as a catalyst for a 1-3 month swing trade is highly problematic. The provided data explicitly states \"No specific upcoming growth catalyst... has been identified within the 1-3 month horizon.\" Undervaluation alone is not a time-bound catalyst; markets can remain irrational for extended periods, especially when technicals are strongly bearish. Without a concrete event or news trigger, the timing of any potential \"reversion\" is purely speculative, making the trade highly susceptible to prolonged sideways movement or further declines.\n\nFurthermore, the risk/reward profile for a counter-trend bounce is unfavorable. Assuming an entry at Rp 6,175 and a conservative stop-loss just below the 52-week low at Rp 5,840 (risk of Rp 335), the most realistic conservative target for a bounce would be the MA50 at Rp 6,508 (reward of Rp 333). This yields an unattractive R\n\nPosition: BUY\nAgent Confidence: 0.60",
       "round": 1
-    },
-    {
-      "role": "bull",
-      "content": "The Bear's assertion that technical weakness undermines the fundamental floor overlooks the sheer magnitude of the current market valuation's divergence from its estimated intrinsic worth. While the stock exhibits technical weakness, trading below key moving averages, this merely reflects a market sentiment that has yet to recognize the underlying value. The current price, which also marks the 52-week low, suggests that much of the technical downside has already been absorbed. Any",
-      "round": 2
-    },
-    {
-      "role": "bear",
-      "content": "The Bull's assertion that the 52-week low of Rp 5,975 represents an absorbed downside, underpinned by a theoretical fundamental floor, is a dangerous misinterpretation for a swing trade. The \"fair value\" of Rp 10,474, while suggesting significant undervaluation, is a long-term metric. Its reliability as a short-term",
-      "round": 2
     },
     {
       "role": "devils_advocate",
-      "content": "Here are two specific challenges to the BBCA swing trade setup:\n\n1.  Given BBCA is at its 52-week low of Rp 5,975, could sustained foreign fund outflows from Indonesian banking, exacerbated by a broader IHSG downturn, break this critical support, potentially triggering a deeper fall towards Rp 5,500 within 1-3 months",
-      "round": 3
+      "content": "**Question 1: MACRO/COMPANY RISK & FOREIGN FLOW**\nGiven BBCA's structural downtrend and proximity to its 52-week low, if sustained foreign selling pressure on the broader banking sector intensifies or if the general IHSG market sentiment deteriorates further, could the critical Rp 5,850 support level break, triggering a deeper decline?\n\n**Question 2: EXECUTION RISK — Transaction Cost Stress Test**\nUntuk posisi BUY BBCA dengan harga entry Rp 6,175 dan target konservatif MA50 di Rp 6,508, potensi gross return adalah 5.39%. Total biaya transaksi round-trip dihitung sebagai berikut: biaya beli 0.15%, biaya jual 0.25%, PPh final 0.10%, dan estimasi slippage 0.15% (karena harga Rp 6,175 > Rp 500). Ini menghasilkan total biaya transaksi sebesar 0.65%. Setelah dikurangi biaya, net return yang diharapkan adalah 5.39% - 0.65% = 4.74%. Dengan net return di atas 3.0%, posisi ini dianggap **VIABLE after transaction costs**.\n\nPosition: BUY\nAgent Confidence: 0.55",
+      "round": 2
     }
   ],
-  "raw_data_summary": "=== FUNDAMENTALS ===\nFAIR VALUE: Rp 10,474\n\nVALUATION VERDICT: BBCA is UNDERVALUED by 75.3% compared to its fair value of Rp 10,474, with a current market price of Rp 5,975. This indicates a strong fundamental cushion for a potential swing trade.\n\nSUPPORT METRICS:\n*   ROE (TTM): 22.41% (Note: 3-year trend data not available in provided information. The summary table's 0.0% ROE is inconsistent with raw API data.)\n*   Net Margin (Quarter): 49.52% (Note: 3-year trend data not available in provided information. The summary table's 0.0% Net Margin is inconsistent with raw API data.)\n*   Debt/Equity: null (Data not available in raw API.)\n*   Dividend Yield: 5.62% (The summary table's DPS of Rp 0 is inconsistent with raw API data.)\n\nGROWTH CATALYST: The latest dividend ex-date was 30 Mar 26, which is a PAST_EVENT_NOT_CATALYST. There is INSUFFICIENT_DATA for a specific upcoming growth catalyst (e.g., earnings release, new contract) within the 1-3 month swing trade horizon.\n\n=== TECHNICALS ===\nIHSG is currently in a strong downtrend, with the current price of Rp 5,975 trading significantly below both the MA50 (Rp 6,635) and MA200 (Rp 7,474). This indicates a bearish long-term and intermediate-term trend. The price is also below the SMA20 (Rp \n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 5975.0,\n  \"sma20\": 6434.0,\n  \"ma50\": 6635.0,\n  \"ma200\": 7474.0,\n  \"rsi14\": 32.2,\n  \"atr14\": 159.0,\n  \"avg_volume_20d\": 141181065.0,\n  \"52w_high\": 9232.0,\n  \"52w_low\": 5975.0\n}\n\n=== SENTIMENT ===\n**PAST_EVENT_NOT_CATALYST**: The provided social stream data is dated April 8, 2026. As the current date is April 29, 2026, this event is in the past and cannot be used as a catalyst for a 1-3 month forward-looking swing trade thesis. This analysis reflects the sentiment prevalent on April 8, 2026.\n\nOn April 8, 2026, the overall market mood was **BULLISH (90% confidence)**, as explicitly stated by the Stockbit Investment Analyst Team: \"sentimen pasar hari ini berpotensi sangat positif dengan dua katalis yang saling memperkuat.\" The dominant discussion theme revolved around two key positive catalysts: a temporary US-Iran ceasefire leading to a significant drop in oil prices (Brent -16%, WTI -19%), and FTSE Russell's confirmation of Indonesia's Secondary Emerging Market status in its Interim Review. These events were expected to reduce Indonesia's risk premium, attract foreign inflow into big caps and banking, and benefit conglomerate and metals sectors, while potentially pressuring the energy sector.\n\nRegarding volume anomaly, the provided data indicates 78 replies and 505 likes. However, without historical baseline data for comparison, it is **INSUFFICIENT_DATA** to determine if this discussion volume was abnormally high or low at the time. The swing-trade timing signal, based on this analyst commentary, was **trending with price**, as the analysts anticipated a very positive market opening and subsequent rally. This was a directional forecast rather than an indication of extreme contrarian sentiment from the broader crowd.\n\nNo significant red flags were identified. The post originates from a verified \"Stockbit\" admin and Investment Analyst Team, suggesting a professional and well-researched perspective. The commentary provides a balanced view, acknowledging both positive and negative sectoral impacts, and includes important caveats about the temporary nature of the ceasefire and factors to monitor (e.g., further negotiations, MSCI review, future FTSE updates). There is no language indicative of coordinated pump signals, insider leaks, or panic patterns.\n\n=== DIVIDEND EX-DATE SCAN: BBCA ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n"
+  "raw_data_summary": "=== FUNDAMENTALS ===\nFAIR VALUE: Rp 10,474\n\nBBCA is currently priced at Rp 6,175, indicating it is UNDERVALUED by 69.6% compared to its calculated fair value of Rp 10,474. This significant discount suggests a strong fundamental cushion for a potential swing trade. The fair value calculation confidence is MEDIUM, based on two valid valuation methods.\n\nKey support metrics include a robust Return on Equity (ROE) of 22.4% and a high Net Margin of 49.5%. The dividend yield is 5.44%. The Debt/Equity Ratio and Interest Coverage Ratio are not available in the provided data, thus cannot be assessed. No 3-year trend data for ROE or Net Margin was provided.\n\nNo specific upcoming growth catalyst, such as earnings announcements or new contracts, has been identified within the 1-3 month horizon. The latest dividend ex-date (30 Mar 26) is a past event and not a future catalyst.\n\nRegarding quality checks: No ROE-Margin Divergence was detected as both are high (ROE 22.4%, Net Margin 49.5%). The checks for \"Low DER tapi Interest Coverage lemah\" and \"Revenue-CFO Divergence\" could not be performed due to INSUFFICIENT_DATA (missing Debt/Equity, Interest Coverage, and truncated Cash From Operations). The Altman Z-Score of 0.97 does not trigger the \"Z-Score vs DER Inconsistency\" flag as it is not above 10.\n\nPosition: BUY\nAgent Confidence: 0.85\n\n=== TECHNICALS ===\n**Analisis Teknikal IHSG (1-3 Bulan)**\n\n**TREND CONTEXT:**\nSaham dalam downtrend struktural karena harga saat ini berada di bawah MA200. Ini adalah setup counter-trend bounce, sehingga target lebih konservatif dan ukuran posisi disarankan 50% dari normal. IHSG menunjukkan tekanan jual yang signifikan, diperdagangkan jauh di bawah MA200 dan MA50.\n\n**ENTRY ZONE:**\n⚠️ Counter-trend trade — kurangi ukuran posisi 50% dari normal.\nMengingat harga saat ini di Rp 6,175 berada di bawah EMA20 (Rp 6,214) dan MA50 (Rp 6,508), level-level ini bert\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 6175.0,\n  \"sma20\": 6271.0,\n  \"ema20\": 6214.0,\n  \"ma50\": 6508.0,\n  \"ma200\": 7409.0,\n  \"ma200_context\": \"BELOW\",\n  \"rsi14\": 45.5,\n  \"atr14\": 171.0,\n  \"avg_volume_20d\": 173011490.0,\n  \"52w_high\": 9232.0,\n  \"52w_low\": 5850.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== DIVIDEND EX-DATE SCAN: BBCA ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n"
 }

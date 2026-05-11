@@ -3,40 +3,43 @@
   "verdict": {
     "ticker": "MIDI",
     "rating": "HOLD",
-    "confidence": 0.55,
+    "confidence": 0.54,
     "fair_value": 345.0,
     "entry_price_range": "310 - 316",
     "target_price": 344.0,
     "stop_loss": 298.0,
     "current_price": 348.0,
     "timeframe": "1-3 Months",
-    "weighted_reasoning": "The rating is downgraded to HOLD primarily due to the negative margin of safety, with the current price (Rp 348) exceeding the fair value (Rp 345). The technical setup is unfavorable for immediate entry, as the price is extended and well above the optimal entry zone of Rp 310-316; the target price of Rp 344 is currently below the market price. The trade is also a higher-risk counter-trend setup (Price < MA200). The Devil's Advocate's concern regarding the 'ROE-Margin Divergence' remains a valid, unmitigated risk. A HOLD rating is appropriate until the price pulls back to the designated entry zone, providing a valid technical entry and a positive margin of safety.",
+    "weighted_reasoning": "The HOLD rating is mandated by the 'soft_hold' consensus rule, reflecting significant disagreement among agents on the stock's direction. The current price of Rp 348 is above the fair value of Rp 345, eliminating any margin of safety. The technical setup is a high-risk counter-trend bounce (price below MA200), and the entry signal is currently invalid as the price is extended far above the target entry zone of Rp 310-316. The Devil's Advocate risk regarding the potential failure of the MA50 support, which has been breached within the last year, remains a key concern. The favorable R/R of 2.07 is only achievable if the price pulls back significantly, justifying a 'wait and see' approach. Consensus override: Bull/Bear confidence gap was below 0.15, so the chamber treats this as soft consensus HOLD instead of forcing an entry.",
     "critical_risk_factor": "",
     "key_catalysts": [
-      "Potential technical rebound if price pulls back to the MA50 support level around Rp 310-316."
+      "Technical pullback to MA50 support (Rp 310) could trigger a short-term bounce."
     ],
     "key_risks": [
-      "Negative margin of safety: Current price is above fair value.",
-      "Missed entry point: Price is extended and above the optimal technical entry zone.",
-      "Counter-trend trade: Stock is in a structural downtrend below the MA200.",
-      "Unresolved fundamental concern regarding 'ROE-Margin Divergence' suggesting potential earnings quality issues."
+      "Structural downtrend (price below MA200) limits upside potential.",
+      "Current price is extended, making the R/R from this level highly unfavorable.",
+      "Lack of fundamental catalysts for a sustained move.",
+      "MA50 support has failed in the past year, as evidenced by the 52-week low of Rp 260.",
+      "ROE-Margin Divergence suggests potential earnings quality issues."
     ],
-    "summary": "The trade plan for MIDI is rated HOLD. The current price of Rp 348 is above both the fair value (Rp 345) and the target price (Rp 344), making an immediate entry invalid. While the proposed trade has a good R/R ratio of 2.07, it is contingent on a significant pullback to the Rp 310-316 entry zone. The lack of short-term catalysts and the stock trading below its MA200 warrant waiting for a more favorable technical setup.",
+    "summary": "The trade plan for MIDI is rated HOLD. While the proposed pullback entry to the 310-316 zone offers a favorable R/R of 2.07, the current price of 348 is extended and trading slightly above fair value. The stock is in a structural downtrend, making this a higher-risk counter-trend play without a clear catalyst. Awaiting a significant price correction to the entry zone is necessary before considering this trade.",
     "expected_return": "+9.9%",
     "risk_reward_ratio": 2.07,
     "is_overvalued": true,
     "wait_and_see": true,
     "consensus_reached": true,
-    "consensus_method": "voting",
+    "consensus_method": "soft_hold",
     "dissenting_agents": [
+      "chartist",
       "bull",
       "bear"
     ]
   },
-  "debate_rounds": 1,
+  "debate_rounds": 2,
   "consensus_reached": true,
-  "consensus_method": "voting",
+  "consensus_method": "soft_hold",
   "dissenting_agents": [
+    "chartist",
     "bull",
     "bear"
   ],
@@ -44,13 +47,13 @@
     {
       "agent": "fundamental_scout",
       "position": "HOLD",
-      "confidence": 0.65,
+      "confidence": 0.75,
       "round": 0
     },
     {
       "agent": "chartist",
-      "position": "HOLD",
-      "confidence": 0.0,
+      "position": "BUY",
+      "confidence": 0.75,
       "round": 0
     },
     {
@@ -61,47 +64,71 @@
     },
     {
       "agent": "bull",
-      "position": "AVOID",
-      "confidence": 0.9,
-      "round": 1
+      "position": "BUY",
+      "confidence": 0.7,
+      "round": 2
     },
     {
       "agent": "bear",
       "position": "AVOID",
-      "confidence": 0.95,
-      "round": 1
+      "confidence": 0.6,
+      "round": 2
     }
   ],
-  "disagreement_type": null,
+  "disagreement_type": "timing",
   "debate_history": [
     {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 348, Rp 345, Rp 380, Rp 335, Rp 310, Rp 322.5, Rp 352, Rp 318.5, Rp 29.5",
+      "round": 0,
+      "position": "UNKNOWN",
+      "confidence": null
+    },
+    {
       "role": "bull",
-      "content": "Based on the provided market data, a strong swing trade BUY case for MIDI (1-3 month horizon) cannot be constructed. The analysis below details why the critical components required for a BUY thesis are not met.\n\n**1. FUNDAMENTAL FLOOR:**\nThe current market price of Rp 348 is 0.9% above the estimated fair value of Rp 345. This indicates a negative margin of safety, which is a significant red flag for a swing trade entry, especially without a compelling catalyst. The \"ROE-Margin Divergence\" also suggests potential quality issues in earnings, further weakening the fundamental floor for a BUY at current levels.\n\n**2. TECHNICAL ENTRY:**\nThe recommended technical entry zone, based on EMA20 (Rp 335) and MA50 (Rp 310), is between Rp 310 – Rp 335. The current price of Rp 348 is *above* this optimal entry zone, indicating that an immediate BUY at current levels is not technically supported. An entry would ideally require a pullback into this support area. Furthermore, the stock is in a structural downtrend, trading below its MA200 (Rp 380), classifying any potential rebound as a higher-risk counter-trend trade.\n\n**3. CATALYST:**\nThere are no specific upcoming growth catalysts, such as earnings reports or new contracts, identified within the 1-3 month swing trade horizon. The latest dividend ex-date (04 Jun 25) is a past event and therefore not a future catalyst. The absence of a clear, imminent catalyst makes it difficult to justify entry above fair value or to project a price appreciation within the swing trade timeframe.\n\n**4. RISK/REWARD:**\nGiven that the current price (Rp 348) is above fair value, above the recommended technical entry zone, and lacks any identified short-term catalyst, a high-probability swing trade BUY setup cannot be established. Defining a favorable risk/reward ratio for an entry at Rp 348 is not feasible, as there is no clear fundamental or technical support to anchor a stop loss, nor a catalyst to drive a target price.\n\nPosition: AVOID\nAgent Confidence: 0.90",
+      "content": "… move towards resistance. This trade is a pure technical play, capitalizing on the identified support levels and momentum for a short-term price appreciation.\n\nThe risk/reward profile for this trade is highly favorable. An entry at the midpoint of the suggested zone, Rp 322.5, targets a resistance level at Rp 352. A stop loss is set at Rp 318.5, which is 1.5x ATR below the EMA20.\nEntry Rp 322.5 → Target Rp 352 → Stop Rp 318.5 → R/R ratio: 7.375:1. This exceptional ratio provides a significant buffer for managing the inherent risks of a counter-trend trade.\n\nPosition: BUY\nAgent Confidence: 0.65",
+      "round": 1,
+      "position": "BUY",
+      "confidence": 0.65
+    },
+    {
+      "role": "bear",
+      "content": "…he Bull's \"exceptional\" R/R ratio of 7.375:1 is misleading, as it is based on a hypothetical entry at Rp 322.5. From the *current price* of Rp 348, the risk/reward profile is severely unfavorable. With a target at Rp 352, the potential upside is only Rp 4 (Rp 352 - Rp 348). Conversely, the stop loss at Rp 318.5 implies a potential downside of Rp 29.5 (Rp 348 - Rp 318.5). This results in an actual R/R ratio of approximately 0.14:1 (Rp 4 / Rp 29.5), which is extremely unattractive and exposes traders to significant downside risk for minimal potential gain.\n\nPosition: AVOID\nAgent Confidence: 0.90",
       "round": 1,
       "position": "AVOID",
       "confidence": 0.9
     },
     {
+      "role": "bull",
+      "content": "The Bear's assessment of an unfavorable risk/reward ratio is predicated on an immediate entry at the current market price (Rp 348), which fundamentally misinterprets the proposed strategy. The technical analysis explicitly defines an \"ENTRY ZONE\" between Rp 310 and Rp 335. This zone is critical for establishing a favorable risk-reward profile, aligning with the counter-trend bounce methodology. Entering at Rp 348, above this designated zone, would indeed expose a trader to disproportionate downside relative to the immediate upside towards the initial target (Rp 352). Our thesis is not to chase the current price, but to patiently await a pullback into the identified support confluence, where the trade setup's integrity and risk management parameters are optimized. The Bear's argument, therefore, highlights the risk of deviating from the recommended entry discipline, rather than an inherent flaw in the trade's potential.\n\nThe Bear's concern regarding downside risk, while valid for a premature entry, is mitigated by robust technical levels. The initial stop loss at Rp 318.5 is strategically positioned to protect capital if the short-term bounce falters. Should this level be breached, a significant secondary support exists at the MA50, currently at Rp 310. This level not only forms the lower boundary of our recommended entry zone but also represents a strong historical price anchor, providing a clear floor for potential price consolidation. This layered support structure limits the overall downside exposure, even in a scenario where the immediate bounce loses momentum.\n\nWhile the fundamental analysis notes an absence of traditional growth catalysts, this swing trade is explicitly a technical play, driven by short-term momentum. The \"catalyst\" for this counter-trend bounce is the current bullish momentum, evidenced by the RSI(14) at 63.1 and the price trading above both the EMA20 (Rp 335) and MA50 (Rp 310). This indicates a tactical shift in short-term sentiment within the broader downtrend. Regarding the fair value, the slight premium of the current price (Rp 348) over the estimated fair value (Rp 345) results in a negative margin of safety. However, for a disciplined, short-duration technical swing trade, the primary focus is on price action, support/resistance dynamics, and momentum indicators, rather than fundamental undervaluation. The trade is designed to capture a tactical price movement, not to capitalize on a fundamental re-rating.\n\nPosition: BUY\nAgent Confidence: 0.70",
+      "round": 2,
+      "position": "BUY",
+      "confidence": 0.7
+    },
+    {
       "role": "bear",
-      "content": "As a Forensic Financial Auditor, the provided data for MIDI strongly supports an AVOID position for a swing trade, reinforcing the \"Bull's argument\" against a BUY setup. The current market conditions present significant risks, lacking any margin of safety, exhibiting technical overextension within a downtrend, and offering an unfavorable risk/reward profile without any discernible catalysts.\n\n1.  **OVERVALUATION CHECK**: The current price of Rp 348 is 0.87% above the estimated fair value of Rp 345. This indicates a negative margin of safety, making any swing trade entry at current levels inherently high risk. Entering a trade above fair value, especially without a compelling catalyst, means the investor is paying a premium for a stock that is already fundamentally stretched, leaving no room for error or unexpected market movements.\n\n2.  **TECHNICAL BREAKDOWN RISK**: MIDI is in a structural downtrend, with the current price of Rp 348 trading significantly below its MA200 at Rp 380. While the stock has seen a short-term bounce, its RSI14 of 63.1 indicates it is becoming overextended and potentially overbought in the short term, increasing the probability of a pullback. The current price is above the recommended entry zone of Rp 310 – Rp 335 (based on MA50 and EMA20, respectively), suggesting that the immediate risk is a rejection from current levels and a breakdown towards these support zones. The MA200 at Rp 380 acts as a strong overhead resistance, and a failure to breach it would confirm a lower high in the broader downtrend, signaling further downside risk.\n\n3.  **CATALYST RISK**: There are no identified specific upcoming growth catalysts, such as earnings reports or new contracts, within the 1-3 month swing trade horizon. The latest dividend ex-date of 04 Jun 25 is a PAST_EVENT_NOT_CATALYST. The absence of any imminent positive drivers means there is no fundamental reason to expect a sustained upward price movement. Furthermore, the \"ROE-Margin Divergence\" (ROE 18.05% vs. Net Margin 4.52%) raises concerns about the quality of earnings, suggesting potential leverage or asset revaluation inflating ROE, which could deter institutional interest and prevent any fundamental re-rating.\n\n4.  **UNFAVOURABLE R/R**: Entering at the current price of Rp 348 presents an unattractive risk/reward profile. With the nearest significant resistance being the MA200 at Rp 380, the potential upside is Rp 32. However, placing a stop-loss below the nearest technical support, such as the EMA20 at Rp 335 (e.g., at Rp 330), implies a risk of Rp 18. This yields a Risk/Reward ratio of approximately 1.78:1 (32/18). While numerically acceptable, this ratio is unfavorable given the context: the trade is a high-risk counter-trend bounce, the stock is overvalued, the RSI is overextended, and there is a complete absence of catalysts. The probability of hitting the stop-loss is elevated due to the overextension and structural downtrend, making the potential reward less likely to materialize.\n\nPosition: AVOID\nAgent Confidence: 0.95",
-      "round": 1,
+      "content": "The Bull's assertion that MA50 at Rp 310 serves as a \"strong historical price anchor\" is fundamentally flawed. The provided data clearly shows a 52-week low of Rp 260. This indicates that the stock has traded significantly below the current MA50 level within the past year, demonstrating that the MA50 has *already failed* to act as a reliable floor in recent history. Relying on a level that has previously been breached as a robust support for a counter-trend bounce introduces substantial unacknowledged risk.\n\nFurthermore, the Bull's layered support structure is precarious. The proposed stop loss at Rp 318.5 is only Rp 8.5 above the MA50 at Rp 310\n\nPosition: AVOID\nAgent Confidence: 0.60",
+      "round": 2,
       "position": "AVOID",
-      "confidence": 0.95
+      "confidence": 0.6
     },
     {
       "role": "devils_advocate",
-      "content": "Berikut adalah tantangan terhadap setup trade MIDI:\n\n1.  **MACRO/COMPANY RISK & FOREIGN FLOW**: Jika sentimen pasar global memburuk, memicu aksi jual bersih yang signifikan oleh investor asing di pasar saham Indonesia, atau jika laporan keuangan MIDI yang akan datang mengungkapkan bahwa \"ROE-Margin Divergence\" (ROE 18.05% vs Net Margin 4.52%) disebabkan oleh tingkat leverage yang tidak berkelanjutan, mungkinkah level support MA50 di Rp 310 akan tembus, berpotensi memicu penurunan lebih lanjut menuju level terendah 52 minggu di Rp 260?\n\n2.  **EXECUTION RISK — Transaction Cost Stress Test**:\n    Dengan asumsi harga entry Rp 348 dan target harga Rp 380 (MA200), potensi gross return adalah (380 - 348) / 348 = 9.195%.\n    Total biaya transaksi round-trip adalah sebagai berikut:\n    *   Biaya Beli: 0.15%\n    *   Biaya Jual: 0.25%\n    *   PPh Final: 0.10%\n    *   Slippage (harga < Rp 500): 0.30%\n    Total biaya transaksi = 0.15% + 0.25% + 0.10% + 0.30% = 0.80%.\n    Net return setelah biaya = 9.195% - 0.80% = 8.395%.\n    **VERDICT**: VIABLE after transaction costs.\n\nPosition: BUY\nAgent Confidence: 0.55",
-      "round": 2,
-      "position": "BUY",
-      "confidence": 0.55
+      "content": "1.  **MACRO/COMPANY RISK & FOREIGN FLOW:** Mengingat MIDI berada dalam downtrend struktural dan adanya ROE-Margin Divergence, jika terjadi akselerasi net foreign sell di IHSG atau sentimen negatif pasar yang lebih luas, mungkinkah support MA50 di Rp 310 gagal menahan, mendorong harga menuju 52-week low di Rp 260?\n\n2.  **EXECUTION RISK — Transaction Cost Stress Test:**\n    Untuk posisi ini dengan harga entry Rp 322.5 dan target jual Rp 352, total biaya transaksi round-trip adalah sebagai berikut: biaya beli 0.15%, biaya jual 0.25%, PPh final 0.10% dari nilai jual, dan estimasi slippage 0.30% (karena harga Rp 322.5 < Rp 500). Total biaya transaksi adalah 0.15% + 0.25% + 0.10% + 0.30% = 0.80%. Dengan potensi keuntungan kotor sebesar 9.15% (dari Rp 322.5 ke Rp 352), net return setelah biaya adalah 9.15% - 0.80% = 8.35%. Berdasarkan kriteria, ini adalah **VIABLE after transaction costs**.\n\nPosition: HOLD\nAgent Confidence: 0.00",
+      "round": 3,
+      "position": "HOLD",
+      "confidence": 0.0
     }
   ],
-  "raw_data_summary": "[🚨 MARGIN-OF-SAFETY ALERT — Read Before Debating]\n⚠️ OVERVALUED: Current price (348) is 0.9% above fair value (345). Swing trade is HIGH RISK — margin of safety is negative.\nCurrent Price: Rp 348 | Estimated Fair Value: Rp 345\n────────────────────────────────────────────────────────────\n\n=== FUNDAMENTALS ===\nFAIR VALUE: Rp 345\n\nThe current market price of MIDI is Rp 348, which is FAIRLY VALUED, trading at a 0.9% premium to the calculated fair value of Rp 345.\n\nKey support metrics include a strong Return on Equity (TTM) of 18.05% and a Net Profit Margin (Quarter) of 4.52%. No 3-year trend data for ROE or Net Margin is available. The Debt/Equity ratio is not explicitly provided; however, the Total Liabilities/Equity ratio is 1.01. The stock offers a Dividend Yield of 2.11%.\n\nThe latest dividend ex-date of 04 Jun 25 is a PAST_EVENT_NOT_CATALYST relative to the current date. No other specific upcoming growth catalysts, such as earnings reports or new contracts, are identified within the 1-3 month swing trade horizon. A quality check reveals a \"⚠️ ROE-Margin Divergence — verifikasi kualitas laba\" because the ROE (18.05%) is high (>15%) while the Net Margin (4.52%) is low (<5%), suggesting potential inflation of ROE by high leverage or asset revaluation. No other red flags were detected from the available financial data.\n\nPosition: HOLD\nAgent Confidence: 0.65\n\n=== TECHNICALS ===\n**Analisis Teknikal IHSG (MIDI)**\n\nSaham dalam downtrend struktural karena harga saat ini (Rp 348) berada di bawah MA200 (Rp 380). Ini adalah setup counter-trend bounce, sehingga target lebih konservatif dan ukuran posisi disarankan 50% dari normal. MIDI menunjukkan potensi rebound dari level support jangka pendek.\n\nENTRY ZONE: Rp 310 – Rp 335 (berdasarkan EMA20 dan MA50). Harga saat ini (Rp 348) berada di atas zona entri yang direkomendasikan, mengindikasikan bahwa entri optimal untuk setup ini adalah pada saat pullback ke zona tersebut.\n⚠️ Counter-trend trade — kurangi ukuran posisi 5\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 348.0,\n  \"sma20\": 333.0,\n  \"ema20\": 335.0,\n  \"ma50\": 310.0,\n  \"ma200\": 380.0,\n  \"ma200_context\": \"BELOW\",\n  \"rsi14\": 63.1,\n  \"atr14\": 11.0,\n  \"avg_volume_20d\": 18906970.0,\n  \"52w_high\": 478.0,\n  \"52w_low\": 260.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== DIVIDEND EX-DATE SCAN: MIDI ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
+  "raw_data_summary": "[🚨 MARGIN-OF-SAFETY ALERT — Read Before Debating]\n⚠️ OVERVALUED: Current price (348) is 0.9% above fair value (345). Swing trade is HIGH RISK — margin of safety is negative.\nCurrent Price: Rp 348 | Estimated Fair Value: Rp 345\n────────────────────────────────────────────────────────────\n\n=== FUNDAMENTALS ===\nFAIR VALUE: Rp 345\n\nMIDI is currently FAIRLY VALUED, with its market price of Rp 348 trading at a 0.9% premium to the calculated fair value of Rp 345. The fair value calculation has a medium confidence, derived from two valid valuation methods (P/E Band and P/B Band).\n\nKey support metrics indicate a TTM Return on Equity (ROE) of 18.05% and a TTM Net Margin of 4.52%. Three-year trend data for ROE and Net Margin are not available in the provided information. The Debt/Equity Ratio is null, preventing a direct assessment of debt leverage. The company offers a Dividend Yield of 2.11%.\n\nNo immediate growth catalysts are identified within the 1-3 month swing trade horizon. The latest dividend ex-date of 04 Jun 25 is a PAST_EVENT_NOT_CATALYST. A quality check reveals a ⚠️ ROE-Margin Divergence, where ROE (18.05%) is high (>15%) but Net Margin (4.52%) is low (<5%), suggesting a need to verify the quality of earnings, potentially inflated by high leverage or asset revaluation. The absence of a Debt/Equity Ratio prevents a comprehensive solvency check, and Operating Cash Flow data is not explicitly available to assess revenue quality. Altman Z-Score (3.03) does not meet the threshold for the Z-Score vs DER inconsistency check.\n\nGiven the stock is fairly valued with a slight premium, coupled with a notable ROE-Margin divergence and the absence of immediate catalysts, a cautious stance is warranted.\n\nPosition: HOLD\nAgent Confidence: 0.75\n\n=== TECHNICALS ===\nSaham ini berada dalam downtrend struktural karena harga saat ini (Rp 348) diperdagangkan di bawah MA200 (Rp 380). Ini adalah setup *counter-trend bounce*, yang berarti target lebih konservatif dan ukuran posisi harus dikurangi 50% dari normal. Harga saat ini berada di atas EMA20 dan MA50, menunjukkan adanya pantulan jangka pendek dalam tren turun yang lebih besar.\n\nUntuk entri, zona support terdekat berada di antara EMA20 dan MA50.\nENTRY ZONE: Rp 310 – Rp 335.\n⚠️ Counter-trend trade — kurangi ukuran posisi 50% dari normal.\n\nDengan titik tengah entri di Rp 322.5, target harga terdekat yang merupakan resistensi kuat dan memberikan potensi keuntungan 3-10% adalah Rp 352, yang juga berada di bawah MA200.\nTARGET: Rp 352 (approx. 9.15% from entry mid).\nSTOP LOSS: Rp 318.5 (1.5× ATR di bawah EMA20).\n\nRSI(14) di 63.1 menunjukkan momentum bullish yang kuat, namun belum memasuki area overbought, mendukung potensi kenaikan lebih lanjut dalam pantulan ini. Data volume harian saat ini tidak tersedia untuk mengkonfirmasi pergerakan harga secara spesifik.\n\nPosition: BUY\nAgent Confidence: 0.75\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 348.0,\n  \"sma20\": 333.0,\n  \"ema20\": 335.0,\n  \"ma50\": 310.0,\n  \"ma200\": 380.0,\n  \"ma200_context\": \"BELOW\",\n  \"rsi14\": 63.1,\n  \"atr14\": 11.0,\n  \"avg_volume_20d\": 18906970.0,\n  \"52w_high\": 478.0,\n  \"52w_low\": 260.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== DIVIDEND EX-DATE SCAN: MIDI ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
+  "metadata": {
+    "prompt_version": "2026-05-11-critical-audit-v1",
+    "market_data_source": "yfinance",
+    "market_data_cached": true,
+    "batch_timestamp": "20260511_080316",
+    "versioned_output": true
+  },
   "error": null,
   "conviction_score": 0.0,
-  "sector_key": "consumer_staples",
-  "metadata": {
-    "batch_timestamp": "20260509_145357",
-    "versioned_output": true
-  }
+  "sector_key": "consumer_staples"
 }

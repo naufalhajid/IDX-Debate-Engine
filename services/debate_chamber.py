@@ -24,7 +24,6 @@ import re
 from typing import Literal
 
 import pandas as pd
-import yfinance as yf
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel, Field
@@ -46,7 +45,13 @@ from providers.gemini import get_flash_llm, get_pro_llm
 from schemas.debate import CIOVerdict, DebateChamberState, DebateMessage, validate_swing_targets
 from services.stockbit_api_client import StockbitApiClient
 from services.fair_value_calculator import build_fair_value_report
+from services.debate_prompt_registry import PROMPT_REGISTRY, PROMPT_VERSION
 from utils.logger_config import logger
+from utils.market_data_cache import (
+    derive_current_price,
+    prefetch_market_data,
+    scan_exdate_from_market_data,
+)
 from utils.technicals import compute_atr, compute_rsi, snap_to_tick
 
 
@@ -121,398 +126,33 @@ class ConsensusSchema(BaseModel):
 
 # ── Phase 1 Data Scouts (run on Flash — cheap, fast) ────────────────────────
 
-FUNDAMENTAL_SCOUT_PROMPT = """\
-You are a Fundamental Data Scout specializing in IHSG stocks for SWING TRADE analysis (1-3 month horizon).
+FUNDAMENTAL_SCOUT_PROMPT = PROMPT_REGISTRY.prompts["FUNDAMENTAL_SCOUT_PROMPT"]
 
-PRIMARY MISSION — Calculate Fair Value:
-  1. FAIR VALUE (most important): Your python system has pre-calculated the fair value.
-     Locate the "FAIR VALUE REPORT" injected at the start of your data.
-     Extract the value of "FAIR VALUE (weighted avg)". Label it clearly: "FAIR VALUE: Rp X,XXX".
-  2. VALUATION VERDICT: Is the current price UNDERVALUED, FAIRLY VALUED, or OVERVALUED vs fair value?
-     State the discount/premium as a percentage.
-  3. SUPPORT METRICS: ROE trend (3yr), Net Margin trend (3yr), Debt/Equity, Dividend Yield.
-  4. GROWTH CATALYST: One specific upcoming event (earnings, ex-dividend, contract) within 1-3 months.
-  5. QUALITY CHECK — Deteksi inkonsistensi laporan keuangan (wajib, bukan opsional):
-     Periksa kombinasi berikut yang sering terjadi di emiten Indonesia:
+CHARTIST_PROMPT = PROMPT_REGISTRY.prompts["CHARTIST_PROMPT"]
 
-     • ROE tinggi (>15%) tapi Net Margin rendah (<5%):
-       → Kemungkinan ROE digelembungkan oleh leverage tinggi atau revaluasi aset.
-       → Flag: "⚠️ ROE-Margin Divergence — verifikasi kualitas laba"
-
-     • DER rendah (<0.3) tapi Interest Coverage Ratio juga rendah (<3x):
-       → Kemungkinan ada off-balance-sheet liability atau utang tersembunyi.
-       → Flag: "⚠️ Low DER tapi Interest Coverage lemah — cek catatan kaki laporan keuangan"
-
-     • Revenue growth positif tapi Operating Cash Flow negatif:
-       → Kemungkinan revenue recognition agresif atau piutang menumpuk.
-       → Flag: "⚠️ Revenue-CFO Divergence — laba mungkin tidak cash-backed"
-
-     • Altman Z-Score > 10 tapi DER > 1.0:
-       → Kemungkinan Z-Score inflated oleh market cap besar, bukan fundamental sehat.
-       → Flag: "⚠️ Z-Score vs DER Inconsistency — cross-check dengan interest coverage"
-
-     Jika tidak ada inkonsistensi ditemukan: tulis "✅ No red flags detected."
-     Jika data tidak tersedia untuk cek tertentu: skip cek tersebut, jangan fabrikasi.
-
-RULES: Numbers ONLY. No vague statements. Rupiah prices must be explicit. Max 2500 tokens. Write 3-4 compact technical paragraphs — do NOT pad for length."""
-
-CHARTIST_PROMPT = """\
-You are a Technical Chartist specializing in IHSG swing trade entry/exit timing (1-3 month frame).
-
-CRITICAL: The PRE-COMPUTED TECHNICALS section below contains Python-calculated indicator values.
-These are GROUND TRUTH — reference them directly. Do NOT recalculate any indicator.
-
-PRIMARY MISSION — Interpret the Trade Setup using provided technical data:
-  1. TREND CONTEXT:
-     Use the MA200 and ma200_context values available in PRE-COMPUTED TECHNICALS.
-     Your interpretation MUST follow this matrix — do not override it:
-     • ma200_context = "ABOVE"            → "Saham dalam uptrend struktural. Swing long searah tren."
-     • ma200_context = "BELOW"            → "Saham dalam downtrend struktural. Ini counter-trend bounce — target lebih konservatif, size 50%."
-     • ma200_context = "CROSSOVER_RECENT" → "Golden cross MA200 baru terjadi. Setup swing terkuat — konfirmasi dengan volume."
-     • ma200_context = "INSUFFICIENT_DATA"→ "Data MA200 tidak cukup. Gunakan EMA20 sebagai satu-satunya trend reference."
-     After the matrix interpretation, add one ticker-specific context sentence.
-  2. ENTRY ZONE: Use EMA20 (not SMA20) and MA50 from PRE-COMPUTED TECHNICALS as support boundaries.
-     If ma200_context = "BELOW", add this warning:
-     "⚠️ Counter-trend trade — kurangi ukuran posisi 50% dari normal."
-     State as a range: "ENTRY ZONE: Rp X,XXX – Rp Y,YYY".
-  3. TARGET PRICE: The nearest strong resistance level that would yield 3-10% gain from entry midpoint.
-     State as: "TARGET: Rp Z,ZZZ (approx. X% from entry mid)".
-  4. STOP-LOSS: Reference the ATR(14) value provided. A stop at 1.5× ATR below EMA20 is standard.
-     State as: "STOP LOSS: Rp W,WWW (1.5× ATR below EMA20)".
-  5. RSI INTERPRETATION: Using the provided RSI(14) value, assess momentum state.
-  6. VOLUME SIGNAL: Is current volume confirming or denying the price move?
-
-RULES: All prices in Rupiah. Use the pre-computed numbers as your foundation — do not
-fabricate MA/RSI values. Max 2500 tokens. Write 3-4 compact technical paragraphs — do NOT pad for length.
-Additional rules:
-- MA200 and ma200_context are Python GROUND TRUTH — do not recalculate or override them.
-- If ma200_context = "BELOW", the maximum target price is MA200 itself as first resistance.
-- Do not describe MA200 as support when ma200_context = "BELOW"."""
-
-SENTIMENT_PROMPT = """\
-You are a Sentiment Specialist monitoring Stockbit social signal data for IHSG swing trade timing.
-
-PRE-CHECK — Lakukan ini SEBELUM analisis apapun:
-
-Hitung jumlah post/entry dalam data sentiment yang diterima.
-
-Jika jumlah post < 5 ATAU data sentiment kosong/null:
-  Kembalikan HANYA JSON berikut dan BERHENTI — jangan lanjutkan analisis:
-  {
-    "sentiment": "INSUFFICIENT_DATA",
-    "confidence": 0,
-    "dominant_theme": null,
-    "volume_anomaly": null,
-    "swing_signal": null,
-    "red_flags": [],
-    "reason": "Data sosial tidak mencukupi (< 5 post)"
-  }
-  JANGAN fabrikasi sentiment. JANGAN lanjut ke analisis di bawah.
-
-Jika jumlah post >= 5, lanjutkan analisis normal di bawah ini.
-Kembalikan hasil dalam format JSON yang sama dengan field di atas —
-semua field harus terisi. JANGAN kembalikan paragraf prosa.
-Output harus selalu JSON, baik untuk path insufficient maupun sufficient.
-
-Analyze the raw stream/social JSON and extract:
-  • Overall mood: BULLISH / NEUTRAL / BEARISH with a % confidence estimate
-  • Dominant discussion theme (e.g., dividend rumour, earnings miss concern)
-  • Volume anomaly: Is discussion volume abnormally high or low vs baseline?
-  • Swing-trade timing signal: Is sentiment at EXTREME (contrarian opportunity) or trending with price?
-  • Red flags: Any coordinated pump signals, insider-leak language, or panic patterns?
-
-RULES: Max 2500 tokens. Write 3-4 compact technical paragraphs. Be specific — note if sentiment is diverging from price action."""
+SENTIMENT_PROMPT = PROMPT_REGISTRY.prompts["SENTIMENT_PROMPT"]
 
 # ── Phase 2 Debate Agents (Bull/Bear on Flash; Pro reserved for final CIO reasoning) ──────────
 
-BULL_SYSTEM_PROMPT_R1 = """\
-You are a Senior Equity Analyst building the strongest possible swing trade BUY case (1-3 month horizon).
+BULL_SYSTEM_PROMPT_R1 = PROMPT_REGISTRY.prompts["BULL_SYSTEM_PROMPT_R1"]
 
-ROUND 1 OBJECTIVE — Build the Trade Thesis:
-  1. FUNDAMENTAL FLOOR: Cite the fair value estimate and confirm current price is at a discount.
-     If price is ABOVE fair value, you must explain why the momentum/catalyst still justifies entry.
-  2. TECHNICAL ENTRY: Confirm the entry zone from Chartist data is a high-probability support.
-     Cite the specific level (e.g., "MA50 at Rp 4,850 has held 3 times in 6 months").
-  3. CATALYST: Name ONE specific event within 1-3 months that will drive the price to target.
-  4. RISK/REWARD: State explicitly: "Entry Rp X → Target Rp Y → Stop Rp Z → R/R ratio: N:1"
+BULL_SYSTEM_PROMPT_R2 = PROMPT_REGISTRY.prompts["BULL_SYSTEM_PROMPT_R2"]
 
-RULES: Swing trade frame ONLY (1-3 months). No long-term narratives. Cite exact prices. Max 2500 tokens. Write 3-4 compact technical paragraphs."""
+BEAR_SYSTEM_PROMPT_R1 = PROMPT_REGISTRY.prompts["BEAR_SYSTEM_PROMPT_R1"]
 
-BULL_SYSTEM_PROMPT_R2 = """\
-You are a Senior Equity Analyst in Cross-Examination mode — swing trade frame.
-
-ROUND 2 OBJECTIVE — Defend Entry Timing Against the Bear:
-  ⛔ DO NOT repeat ANY price level, ratio, or argument from your Round 1 response.
-  ✅ Attack the Bear's specific stop-loss / target / valuation arguments.
-  ✅ If the Bear said the support will break, name a secondary support below it that limits downside.
-  ✅ If the Bear challenged the catalyst, provide corroborating evidence or a fallback catalyst.
-  ✅ Address whether the current price-to-fair-value gap is wide enough to absorb the Bear's risk scenario.
-
-RULES: No repeated data. Attack specific Bear arguments. Max 2500 tokens. Write 3-4 compact technical paragraphs."""
-
-BEAR_SYSTEM_PROMPT_R1 = """\
-You are a Forensic Financial Auditor building the strongest possible swing trade AVOID/SELL case.
-
-ROUND 1 OBJECTIVE — Challenge the Trade Setup:
-  1. OVERVALUATION CHECK: Is the current price above fair value? State the premium as a percentage.
-     If it is, the swing trade entry has NO margin of safety — state this bluntly.
-  2. TECHNICAL BREAKDOWN RISK: Is there a pattern (lower-highs, breakdown below MA50/MA200,
-     bearish volume divergence) that makes the support level cited by the Bull unreliable?
-     Cite exact price levels.
-  3. CATALYST RISK: What could prevent the Bull's catalyst from materialising within 1-3 months?
-  4. UNFAVOURABLE R/R: If the stop-loss is close to entry but resistance is far away, state the
-     actual R/R ratio and explain why it makes the trade unattractive.
-
-RULES: Cite exact prices to counter every Bull price level. Max 2500 tokens. Write 3-4 compact technical paragraphs."""
-
-BEAR_SYSTEM_PROMPT_R2 = """\
-You are a Forensic Financial Auditor in Cross-Examination mode — swing trade frame.
-
-ROUND 2 OBJECTIVE — Destroy the Bull's Swing Setup:
-  ⛔ DO NOT repeat ANY price level, ratio, or argument from your Round 1 response.
-  ✅ Dismantle the Bull's specific entry zone, target, or catalyst claims from Round 1.
-  ✅ If the Bull cited MA50 as support, show prior instances where MA50 failed for this stock.
-  ✅ If the Bull cited a fundamental floor, show if the floor has drifted lower with declining earnings.
-  ✅ Present an alternative price scenario: "If support breaks, next support is Rp X — making
-     the actual max loss Rp Y, not Rp Z as the Bull assumes."
-  ✅ MARGIN OF SAFETY STRESS TEST: If ATR(14) data is available in the technical summary,
-     calculate the maximum 1-week adverse move (2 × ATR). Compare this to the Bull's claimed
-     margin of safety. If 2×ATR wipes out the margin of safety, the trade is unviable
-     for swing execution — state this explicitly.
-
-RULES: No repeated data. Every counter-argument must cite a specific price. Max 2500 tokens. Write 3-4 compact technical paragraphs."""
+BEAR_SYSTEM_PROMPT_R2 = PROMPT_REGISTRY.prompts["BEAR_SYSTEM_PROMPT_R2"]
 
 # ── Adaptive nodes ───────────────────────────────────────────────────────────
 
-CONSENSUS_PROMPT = """\
-You are a Consensus Evaluator. Read the Bull and Bear arguments below.
-Determine: do both agents overwhelmingly agree on the same investment direction
-(e.g., both conclude HOLD or both conclude BUY) with NO major unresolved objections?
+CONSENSUS_PROMPT = PROMPT_REGISTRY.prompts["CONSENSUS_PROMPT"]
 
-Return true only if consensus is genuine and unambiguous. Return false if there is
-meaningful disagreement or if one side raised a critical unaddressed risk.
+STATE_CLEANER_PROMPT = PROMPT_REGISTRY.prompts["STATE_CLEANER_PROMPT"]
 
-Respond ONLY with valid JSON in one of these two formats:
-
-If consensus IS reached (both agents agree on direction with no major unresolved objection):
-{"consensus_reached": true, "disagreement_type": null}
-
-If consensus is NOT reached, identify the PRIMARY source of disagreement:
-{"consensus_reached": false, "disagreement_type": "<type>"}
-
-Where <type> must be exactly one of:
-- "direction"  → Bull says BUY, Bear says AVOID (fundamental disagreement)
-- "timing"     → Both agree on direction but disagree on WHEN to enter
-- "valuation"  → Disagree on whether current price has margin of safety
-- "catalyst"   → Disagree on whether the catalyst will materialise in 1-3 months
-
-Rules:
-- If multiple disagreement types exist, pick the most dominant one.
-- "timing" is the most common in IHSG sideways market — use it when both agents
-  agree the stock is good but disagree on entry point or RSI readiness.
-- Do NOT return any text outside the JSON object."""
-
-STATE_CLEANER_PROMPT = """\
-You are a Context Pruner for a swing trade debate. Compress the history below into:
-
-BULL TRADE CASE (3-5 bullets — preserve ALL price numbers: entry zone, target, stop, fair value):
-BEAR COUNTER-CASE (3-5 bullets — preserve ALL price numbers they challenged):
-UNRESOLVED TENSION (1-2 sentences — the core price/timing disagreement):
-
-Max 200 words. Every Rupiah price cited in the original MUST appear in the summary. Discard all filler."""
-
-DEVILS_ADVOCATE_PROMPT = """\
-You are the Devil's Advocate for IHSG swing trade analysis.
-Challenge the trade setup with TWO specific questions:
-
-1. MACRO/COMPANY RISK & FOREIGN FLOW: One specific scenario that could break the cited support level
-   within 1-3 months. Explicitly inject Foreign Flow metrics if relevant (e.g. Net Foreign Sell 
-   pressure) or Dividend Ex-Date traps.
-   Example: "If this stock enters Ex-Date next month, or foreign funds accelerate dumping, 
-   could the Rp 4,850 MA50 support break, triggering stops all the way to Rp 4,400?"
-
-2. EXECUTION RISK — Transaction Cost Stress Test:
-   Hitung total biaya transaksi IHSG yang sebenarnya untuk posisi ini:
-
-   Komponen biaya (gunakan nilai entry price dari Trade Envelope):
-   • Beli  : 0.15% dari nilai posisi
-   • Jual  : 0.25% dari nilai posisi
-   • PPh final: 0.10% dari nilai jual (bukan dari profit)
-   • Slippage: estimasi 0.30% untuk saham dengan harga < Rp 500,
-               estimasi 0.15% untuk saham dengan harga >= Rp 500
-   • Total biaya round-trip: jumlahkan semua komponen di atas
-
-   Kemudian:
-   • Hitung net return setelah biaya: target_return% - total_biaya%
-   • Jika net return < 2.0%: flag sebagai "INSUFFICIENT NET RETURN — biaya transaksi
-     menggerus terlalu besar dari projected gain"
-   • Jika net return 2.0–3.0%: flag sebagai "MARGINAL — only proceed if conviction high"
-   • Jika net return > 3.0%: "VIABLE after transaction costs"
-
-   Format jawaban: satu paragraf dengan breakdown biaya eksplisit dan verdict akhir.
-   Sebutkan harga entry yang dipakai dalam kalkulasi.
-
-Format:
-- Question 1: satu pertanyaan singkat (<60 kata) dengan satu harga spesifik.
-- Question 2: satu paragraf kalkulasi biaya eksplisit dengan verdict akhir
-  (INSUFFICIENT NET RETURN / MARGINAL / VIABLE). Tidak ada batasan kata untuk question 2.
-  Setiap harga yang dipakai dalam kalkulasi harus disebutkan eksplisit."""
+DEVILS_ADVOCATE_PROMPT = PROMPT_REGISTRY.prompts["DEVILS_ADVOCATE_PROMPT"]
 
 # ── CIO Judge — Swing Trade Edition (Phase 4) ───────────────────────────────
 
-CIO_SYSTEM_PROMPT = """\
-You are the Chief Investment Officer specializing in IHSG Swing Trading (1-3 month horizon, 3-10% target).
-
-YOUR MANDATE — Validate the Python-Calculated Trade Plan:
-
-IMPORTANT: The TRADE ENVELOPE below was calculated by Python using real market data.
-You MUST use the provided entry, target, and stop-loss prices VERBATIM.
-Do NOT invent or override these price levels. Your job is to APPROVE or REJECT the plan.
-
-STEP 0 — PRE-CHECK DISQUALIFIERS (jalankan SEBELUM semua step lain):
-
-Cek field "ExDate Risk" dan "ExDate Date" dari Trade Envelope.
-
-Hitung selisih hari antara tanggal analisis dan ExDate:
-
-• Jika ExDate <= 7 hari dari sekarang:
-  → WAJIB rating AVOID, confidence 0.10
-  → weighted_reasoning harus dimulai dengan:
-    "AUTO-DISQUALIFIED: Ex-dividend date dalam X hari (ExDate: [tanggal]).
-     Entry baru tidak disarankan — risiko price drop dividen langsung
-     mengancam stop loss sebelum trade sempat berkembang."
-  → STOP — jangan lanjutkan ke STEP 1 dst.
-
-• Jika ExDate 8-14 hari dari sekarang:
-  → Lanjutkan analisis normal, tapi:
-  → Tambahkan ke weighted_reasoning:
-    "⚠️ ExDate Warning: Ex-dividend dalam X hari.
-     Kurangi position size 50% dan set target lebih konservatif."
-  → Confidence di-cap maksimal 0.65 untuk rating BUY apapun.
-
-• Jika ExDate > 14 hari atau ExDate Risk = "CLEAR":
-  → Lanjutkan analisis normal, tidak ada adjustment.
-
-Catatan: Jika ExDate Date tidak tersedia atau null,
-asumsikan CLEAR dan lanjutkan normal.
-
-STEP 1 — FAIR VALUE:
-  Read the fair value from the Trade Envelope. It is pre-calculated by Python.
-  If current price is ABOVE fair value, you MUST flag this in weighted_reasoning and
-  strongly consider a HOLD or AVOID rating — a negative margin of safety is the #1 swing trade killer.
-
-STEP 2 — TRADE ENVELOPE VALIDATION:
-  Review the Python-calculated entry/target/stop prices.
-  Confirm they align with the debate findings.
-  Use the pre-computed R/R ratio to guide your rating.
-
-STEP 3 — CONFLICT RESOLUTION (MANDATORY):
-  Read the CONFLICT RESOLUTION signal provided. Apply this strict matrix:
-  Catatan urutan: Selesaikan STEP 1-4 untuk menentukan rating terlebih dahulu.
-  Kalkulasi confidence (Step A, B, C) dilakukan setelah rating ditentukan,
-  di section CONFIDENCE CALIBRATION di bawah STEP 4.
-  Step 3 ini hanya menentukan adjustment yang akan diterapkan di Step B nanti.
-
-  • Fundamental ✅ + Technical ✅  → BUY; choose final confidence using the calibration rubric, caps, and Devil's Advocate penalty.
-  • Fundamental ✅ + Technical ❌  → HOLD ("Wait for technical confirmation")
-  • Fundamental ❌ + Technical ✅  → If strongly positive Foreign Flow / Momentum with Volume breakout, Lean BUY (Momentum Play, size 50%). Otherwise, HOLD.
-  • Fundamental ❌ + Technical ❌  → AVOID
-  • Any ✅ + Sentiment EXTREME    → Lower confidence by 0.10 (contrarian caution)
-
-  CONSENSUS DISAGREEMENT ADJUSTMENT:
-  Baca field "disagreement_type" dari hasil debate.
-
-  • disagreement_type = "direction":
-    → Ini adalah disagreement terkuat — Bull dan Bear tidak sepakat arah.
-    → WAJIB turunkan confidence sebesar 0.05 dari hasil kalkulasi Step B.
-    → Jika rating BUY, pertimbangkan apakah R/R >= 2.0 cukup kuat untuk
-      override disagreement. Jika R/R < 2.0 DAN direction disagreement,
-      downgrade ke HOLD.
-
-  • disagreement_type = "valuation":
-    → Turunkan confidence 0.03.
-
-  • disagreement_type = "catalyst":
-    → Turunkan confidence 0.02. Terapkan cap "no catalyst" (max 0.78).
-
-  • disagreement_type = "timing":
-    → Tidak ada penalty confidence — timing disagreement adalah normal
-      di pasar IHSG sideways. Catat di weighted_reasoning sebagai
-      "timing-sensitive entry, tunggu konfirmasi teknikal."
-
-  • disagreement_type = null (consensus = YES):
-    → Bonus: +0.02 confidence (kedua agent sepakat).
-
-STEP 4 — FINAL RATING RULES:
-  • STRONG_BUY  : Price < Fair Value, R/R ≥ 2.0, clear catalyst, strong support confirmed.
-  • BUY         : Price ≤ Fair Value, R/R ≥ 1.5, support holds.
-  • HOLD        : Price near Fair Value OR R/R < 1.5 OR target < 3%.
-  • AVOID       : Price > Fair Value (overvalued) OR R/R < 1.0 OR no clear catalyst.
-
-CONFIDENCE CALIBRATION — MANDATORY DERIVATION PROCESS:
-
-STEP A — Tentukan band dulu berdasarkan evidence:
-  • 0.90-0.95: Exceptional — catalyst jelas, sentiment/volume konfirmasi,
-    R/R >= 2.5, support kuat, Devil's Advocate terjawab penuh.
-  • 0.80-0.89: Strong BUY — fundamental + teknikal solid, R/R >= 2.0,
-    risiko terkontrol.
-  • 0.70-0.79: Normal BUY — setup positif tapi ada kelemahan: catalyst
-    kurang jelas, ada resistance dekat, atau DA risk tidak terjawab penuh.
-  • 0.60-0.69: Weak BUY — R/R acceptable tapi timing, support, atau
-    catalyst masih questionable.
-  • <0.60: HOLD/AVOID territory.
-
-STEP B — Pilih angka spesifik dalam band menggunakan checklist ini.
-  Mulai dari midpoint band, lalu geser naik/turun berdasarkan:
-  [+0.02] Catalyst spesifik dalam 30 hari terkonfirmasi
-  [+0.02] Volume surge >= 2x rata-rata mengkonfirmasi price action
-  [+0.02] Sentiment BULLISH dengan confidence >= 0.7
-  [+0.01] Piotroski F-Score >= 7
-  [-0.02] Devil's Advocate risk tidak terjawab dengan evidence spesifik
-  [-0.02] ma200_context = BELOW (counter-trend trade)
-  [-0.01] Sentiment INSUFFICIENT_DATA
-  [-0.01] ExDate dalam 14-30 hari ke depan
-
-  Jumlahkan semua adjustment. Clip ke batas band.
-
-STEP C — Verifikasi anti-anchor:
-  Sebelum finalize, cek: apakah angkamu adalah 0.60, 0.65, 0.68, 0.70,
-  0.72, 0.75, 0.78, 0.80, 0.85, 0.90?
-  Jika ya, WAJIB geser ±0.01 atau ±0.02 berdasarkan checklist Step B.
-  Angka bulat atau "nice" adalah tanda anchor, bukan derivasi.
-  Contoh valid: 0.63, 0.71, 0.76, 0.82, 0.87, 0.91
-  Contoh invalid: 0.65, 0.70, 0.75, 0.80, 0.85
-
-HOLD/AVOID CONFIDENCE RULES (hard cap, tidak bisa dioverride):
-  • Rating HOLD  → confidence MAX 0.55. Lebih dari ini adalah kontradiksi
-    logis — HOLD bukan setup high-conviction.
-  • Rating AVOID → confidence MAX 0.40.
-  • Rating BUY   → confidence MIN 0.60, MAX 0.89.
-  • Rating STRONG_BUY → confidence MIN 0.80, MAX 0.95.
-  Jika hasil kalkulasi Step B melewati cap ini, gunakan nilai cap.
-
-ORDERED CAPS (berlaku di atas band, bukan menggantikan):
-  1. Sentiment INSUFFICIENT_DATA → BUY max 0.82
-  2. Tidak ada catalyst 1-3 bulan → BUY max 0.78
-  3. Keduanya berlaku → gunakan cap terendah: 0.78
-  4. OVEREXTENDED FLAG → gunakan lower end band, bukan upper half
-  Caps tidak additive.
-
-DEVIL'S ADVOCATE PENALTY:
-  • DA risk tidak terjawab dengan evidence spesifik → kurangi 0.10
-    dari hasil Step B (sebelum cap)
-  • DA risk terjawab sebagian → gunakan lower end band
-
-STEP 5 — ADDRESS the Devil's Advocate scenario in your weighted_reasoning.
-         Apply the confidence calibration rules above when deciding the final score.
-
-STEP 6 — Use the exact entry_price_range, target_price, stop_loss, and fair_value
-         from the Trade Envelope. Do NOT change them.
-
-CRITICAL OUTPUT FORMAT:
-Respond ONLY with a valid JSON object. Do NOT include any text, explanation,
-or markdown fences (``` or ```json) before or after the JSON object.
-Your entire response must be parseable by json.loads() with no preprocessing."""
+CIO_SYSTEM_PROMPT = PROMPT_REGISTRY.prompts["CIO_SYSTEM_PROMPT"]
 
 
 # ---------------------------------------------------------------------------
@@ -541,19 +181,12 @@ def post_evaluator_router(
 
 BASE_URL = "https://exodus.stockbit.com"
 CONSENSUS_THRESHOLD = 0.60
+ROUND1_CONSENSUS_THRESHOLD = 0.80
 CONSENSUS_AGENT_COUNT = 5
 MAX_DEBATE_ROUNDS = 3
 SOFT_HOLD_CONFIDENCE_DELTA = 0.15
 
-AGENT_SIGNAL_PROMPT = """\
-
-MANDATORY AGENT SIGNAL:
-End every argument with exactly these two lines:
-Position: BUY | HOLD | AVOID
-Agent Confidence: 0.xx
-
-The confidence score must be numeric from 0.00 to 1.00. Do not use percentages
-in the final Agent Confidence line."""
+AGENT_SIGNAL_PROMPT = PROMPT_REGISTRY.prompts["AGENT_SIGNAL_PROMPT"]
 
 
 class DebateChamber:
@@ -584,6 +217,7 @@ class DebateChamber:
         self.pro_llm = pro_llm or get_pro_llm()
         self.stockbit_client = stockbit_client or StockbitApiClient()
         self.app = self._build_graph()
+        self.prompt_version = PROMPT_VERSION
 
     # -- Agent signal helpers -------------------------------------------------
 
@@ -610,6 +244,20 @@ class DebateChamber:
         if token in {"HOLD", "NEUTRAL", "WAIT", "WAIT_AND_SEE"}:
             return "HOLD"
         return "UNKNOWN"
+
+    @staticmethod
+    def _compact_text(text: str, limit: int = 1_200) -> str:
+        clean = re.sub(r"\s+", " ", str(text or "")).strip()
+        if len(clean) <= limit:
+            return clean
+        return clean[:limit].rstrip() + "..."
+
+    @classmethod
+    def _redact_debate_prices(cls, text: str) -> str:
+        return cls._PRICE_RE.sub(
+            "Rp [REDACTED: use Python Trade Envelope]",
+            str(text or ""),
+        )
 
     @classmethod
     def _extract_confidence(cls, content: str, default: float | None = None) -> float | None:
@@ -784,16 +432,26 @@ class DebateChamber:
                 and bull_pos != bear_pos
                 and abs(bull_conf - bear_conf) < SOFT_HOLD_CONFIDENCE_DELTA
             ):
+                if round_count >= 2:
+                    return {
+                        "consensus_reached": True,
+                        "consensus_method": "soft_hold",
+                        "disagreement_type": "timing",
+                        "dissenting_agents": self._dissenters(votes, "HOLD"),
+                        "consensus_winner": {
+                            "agent": "soft_hold_rule",
+                            "position": "HOLD",
+                            "confidence": round(max(bull_conf, bear_conf), 2),
+                        },
+                        "agent_votes": votes,
+                    }
+
                 return {
-                    "consensus_reached": True,
-                    "consensus_method": "soft_hold",
+                    "consensus_reached": False,
+                    "consensus_method": None,
                     "disagreement_type": "timing",
-                    "dissenting_agents": self._dissenters(votes, "HOLD"),
-                    "consensus_winner": {
-                        "agent": "soft_hold_rule",
-                        "position": "HOLD",
-                        "confidence": round(max(bull_conf, bear_conf), 2),
-                    },
+                    "dissenting_agents": [],
+                    "consensus_winner": None,
                     "agent_votes": votes,
                 }
 
@@ -805,7 +463,12 @@ class DebateChamber:
         counts = Counter(known_positions)
         if counts:
             position, count = counts.most_common(1)[0]
-            if count / CONSENSUS_AGENT_COUNT >= CONSENSUS_THRESHOLD:
+            threshold = (
+                ROUND1_CONSENSUS_THRESHOLD
+                if round_count <= 1
+                else CONSENSUS_THRESHOLD
+            )
+            if count / CONSENSUS_AGENT_COUNT >= threshold:
                 majority_votes = [v for v in votes if v.get("position") == position]
                 winner = max(majority_votes, key=lambda v: float(v.get("confidence", 0.0) or 0.0))
                 return {
@@ -919,12 +582,7 @@ Current Date (Asia/Jakarta): {current_date}
         stop=stop_after_attempt(3),
         retry=retry_if_exception(_is_transient_error),
     )
-    async def _invoke_llm_with_retry(self, llm, messages, tier: str):
-        if tier == "pro":
-            await check_and_increment_pro_budget()
-        else:
-            await check_and_increment_flash_budget()
-
+    async def _invoke_llm_attempt(self, llm, messages):
         try:
             resp = await llm.ainvoke(messages)
         except asyncio.CancelledError:
@@ -948,6 +606,14 @@ Current Date (Asia/Jakarta): {current_date}
             )
         return resp
 
+    async def _invoke_llm_with_retry(self, llm, messages, tier: str):
+        if tier == "pro":
+            await check_and_increment_pro_budget()
+        else:
+            await check_and_increment_flash_budget()
+
+        return await self._invoke_llm_attempt(llm, messages)
+
     @retry(
         wait=wait_exponential(min=2, max=10),
         stop=stop_after_attempt(3),
@@ -961,6 +627,9 @@ Current Date (Asia/Jakarta): {current_date}
             raise
 
     # ── Phase 1 — Parallel Data Nodes (all on Flash) ────────────────────────
+
+    async def _fetch_market_data(self, ticker: str) -> dict:
+        return await prefetch_market_data(ticker)
 
     async def _fundamental_node(self, state: DebateChamberState) -> dict:
         ticker = state["ticker"]
@@ -1001,9 +670,7 @@ Current Date (Asia/Jakarta): {current_date}
         # ── 1. Download real price history from yfinance ─────────────────────
         tech_indicators: dict = {}
         try:
-            df_yf = await asyncio.to_thread(
-                yf.download, f"{ticker}.JK", period="1y", progress=False
-            )
+            df_yf = (state.get("market_data") or {}).get("history")
             if df_yf is not None and len(df_yf) >= 20:
                 # yfinance 1.3.0+ returns MultiIndex columns for single tickers:
                 # ('Close', 'ADRO.JK') — flatten to plain column names
@@ -1115,7 +782,7 @@ Current Date (Asia/Jakarta): {current_date}
         so that debate agents are immediately aware of overvaluation risk.
         """
         logger.info("[Synthesizer] Merging parallel data + margin-of-safety check")
-        from utils.exdate_scanner import scan_exdate, format_exdate_block
+        from utils.exdate_scanner import format_exdate_block
 
         ticker = state["ticker"]
         f = state.get("fundamental_data", "Missing")
@@ -1125,8 +792,10 @@ Current Date (Asia/Jakarta): {current_date}
         tech = state.get("technical_indicators", {})
 
         # Fetch ex-date info (non-blocking — returns CLEAR on failure)
-        exdate_info = await asyncio.to_thread(
-            scan_exdate, ticker, current_price
+        exdate_info = scan_exdate_from_market_data(
+            ticker,
+            state.get("market_data") or {},
+            current_price,
         )
         exdate_block = format_exdate_block(ticker, exdate_info)
 
@@ -1174,8 +843,21 @@ Current Date (Asia/Jakarta): {current_date}
                 "Analysts must caveat conclusions accordingly.]\n\n" + raw
             )
 
+        decision_brief = (
+            f"Ticker: {ticker}\n"
+            f"Current Price: Rp {current_price:,.0f}\n"
+            f"Fair Value Estimate: "
+            f"{f'Rp {fair_value_estimate:,.0f}' if fair_value_estimate else 'INSUFFICIENT_DATA'}\n"
+            f"Technical Indicators: {json.dumps(tech, ensure_ascii=False) if tech else '{}'}\n\n"
+            f"Fundamental Brief: {self._compact_text(f, 1_000)}\n\n"
+            f"Technical Brief: {self._compact_text(t, 1_000)}\n\n"
+            f"Sentiment Brief: {self._compact_text(s, 800)}\n\n"
+            f"{exdate_block}"
+        )
+
         return {
             "raw_data": raw,
+            "decision_brief": decision_brief,
             "fair_value_estimate": fair_value_estimate,
         }
 
@@ -1356,9 +1038,10 @@ Current Date (Asia/Jakarta): {current_date}
             f"[{m.role.upper()} R{m.round_num}]: {m.content}"
             for m in state["debate_history"]
         )
+        decision_context = state.get("decision_brief") or state.get("raw_data", "")
         messages = [
             SystemMessage(content=DEVILS_ADVOCATE_PROMPT),
-            HumanMessage(content=f"Data:\n{state['raw_data']}\n\nDebate:\n{hist}"),
+            HumanMessage(content=f"Decision Brief:\n{decision_context}\n\nDebate:\n{hist}"),
         ]
         resp = await self._invoke_llm(self.flash_llm, messages)
         content, signal = self._ensure_signal_footer(str(resp.content), "devils_advocate")
@@ -1771,8 +1454,12 @@ Current Date (Asia/Jakarta): {current_date}
         # ── Build CIO prompt ─────────────────────────────────────────────────
         consensus_directive = self._format_consensus_directive(state)
         hist = "\n".join(
-            f"[{m.role.upper()} R{m.round_num}]: {m.content}"
+            f"[{m.role.upper()} R{m.round_num}]: {self._redact_debate_prices(m.content)}"
             for m in state["debate_history"]
+        )
+        decision_context = state.get("decision_brief") or self._compact_text(
+            state.get("raw_data", ""),
+            3_000,
         )
         user_content = (
             f"Ticker: {ticker}\n"
@@ -1783,8 +1470,8 @@ Current Date (Asia/Jakarta): {current_date}
             f"{conflict_signal}\n\n"
             f"=== CONSENSUS DIRECTIVE ===\n"
             f"{consensus_directive}\n\n"
-            f"Synthesized Market Data:\n{state['raw_data']}\n\n"
-            f"Full Debate Transcript:\n{hist}\n\n"
+            f"Decision Brief (compressed, no raw source dump):\n{decision_context}\n\n"
+            f"Debate Transcript (price mentions redacted; Trade Envelope is the only price source):\n{hist}\n\n"
             f"Devil's Advocate Challenge:\n{state.get('devils_advocate_question', 'N/A')}"
         )
 
@@ -1950,13 +1637,18 @@ Start your response with '{' and end with '}'. Nothing else."""
             Access the verdict via: json.loads(result["final_verdict"])
             For the Svelte trade card: CIOVerdict(**json.loads(...)).to_trade_card()
         """
+        market_data = await self._fetch_market_data(ticker)
+        if current_price <= 0:
+            current_price = derive_current_price(market_data)
         initial_state: DebateChamberState = {
             "ticker": ticker,
             "current_price": current_price,
+            "market_data": market_data,
             "fundamental_data": "",
             "technical_data": "",
             "sentiment_data": "",
             "raw_data": "",
+            "decision_brief": "",
             "technical_indicators": {},
             "fair_value_estimate": 0.0,
             "debate_history": [],
@@ -1969,6 +1661,11 @@ Start your response with '{' and end with '}'. Nothing else."""
             "disagreement_type": None,
             "devils_advocate_question": "",
             "final_verdict": "",
+            "metadata": {
+                "prompt_version": getattr(self, "prompt_version", PROMPT_VERSION),
+                "market_data_source": market_data.get("source", "unknown"),
+                "market_data_cached": True,
+            },
             "error": None,
         }
         logger.info(f"[DebateChamber] ▶ Starting swing-trade pipeline for {ticker} @ Rp {current_price:,.0f}")

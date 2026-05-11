@@ -32,7 +32,7 @@ _RATING_PRIORITY = {
 }
 
 
-def _to_float(value: Any, default: float = 0.0) -> float:
+def _to_float(value: Any, default: float | None = 0.0) -> float | None:
     try:
         if value is None:
             return default
@@ -54,18 +54,18 @@ def _normalise_pct(value: Any, default: float) -> float:
     pct = _to_float(value, default)
     if pct > 1.0:
         pct = pct / 100.0
-    return max(0.0, min(pct, 0.95))
+    return max(0.0, min(pct, 1.0))
 
 
 def _parse_expected_return_pct(candidate: dict, current_price: float) -> float:
     value = candidate.get("expected_return")
     if isinstance(value, str):
         cleaned = value.strip().replace("%", "").replace("+", "")
-        parsed = _to_float(cleaned, 0.0)
-        if parsed:
+        parsed = _to_float(cleaned, None)
+        if parsed is not None:
             return parsed
-    parsed = _to_float(value, 0.0)
-    if parsed:
+    parsed = _to_float(value, None)
+    if parsed is not None:
         return parsed * 100 if abs(parsed) <= 1.0 else parsed
 
     target_price = _to_float(candidate.get("target_price"))
@@ -116,7 +116,11 @@ def _can_add_lot(
 def _weighted_average_expected_return(positions: list[dict]) -> float:
     total_value = sum(p.get("position_value", 0.0) for p in positions)
     if total_value <= 0:
-        values = [p.get("expected_return_pct", 0.0) for p in positions if p.get("expected_return_pct")]
+        values = [
+            p["expected_return_pct"]
+            for p in positions
+            if p.get("expected_return_pct") is not None
+        ]
         return sum(values) / len(values) if values else 0.0
     return (
         sum(p.get("position_value", 0.0) * p.get("expected_return_pct", 0.0) for p in positions)
@@ -249,27 +253,27 @@ def _allocation_reasoning(
 
 def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
     """Calculate lot-sized IHSG positions from CIO verdict candidates."""
-    assert user_config["total_capital"] > 0, "total_capital tidak valid"
-    assert 0 < user_config["max_loss_pct"] <= 0.10, "max_loss_pct tidak valid"
-
     total_capital = _to_float(user_config.get("total_capital"))
     max_loss_pct = _to_float(user_config.get("max_loss_pct"))
     max_positions = _to_int(user_config.get("max_positions"))
+
+    if total_capital <= 0:
+        raise ValueError("total_capital must be greater than 0.")
+    if not (0 < max_loss_pct <= 0.10):
+        raise ValueError(
+            "max_loss_pct must be greater than 0 and less than or equal to 0.10."
+        )
+    if max_positions <= 0:
+        raise ValueError("max_positions must be greater than 0.")
+
+    allocation_cap = 1 / max_positions
     target_deployment_pct = _normalise_pct(
         user_config.get("target_deployment_pct"),
         0.65,
     )
     target_deployment_pct = min(max(target_deployment_pct, 0.40), 0.70)
 
-    if total_capital <= 0:
-        raise ValueError("total_capital must be greater than 0.")
-    if max_loss_pct <= 0:
-        raise ValueError("max_loss_pct must be greater than 0.")
-    if max_positions <= 0:
-        raise ValueError("max_positions must be greater than 0.")
-
     max_loss_budget = total_capital * max_loss_pct
-    allocation_cap = 1 / max_positions
     max_deployed = total_capital * 0.95
     desired_deployed = min(total_capital * target_deployment_pct, max_deployed)
     eligible: list[dict] = []
@@ -347,7 +351,8 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
     positions.sort(key=_position_sort_key)
     positions = positions[:max_positions]
 
-    while sum(p["position_value"] for p in positions) < desired_deployed:
+    total_deployed = sum(p["position_value"] for p in positions)
+    while total_deployed < desired_deployed:
         added = False
         for position in sorted(positions, key=_position_sort_key):
             if not _can_add_lot(
@@ -358,12 +363,13 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
             ):
                 continue
             added_value = position["entry_price"] * LOT_SIZE
-            if sum(p["position_value"] for p in positions) + added_value > max_deployed:
+            if total_deployed + added_value > max_deployed:
                 continue
             position["lot"] += 1
             _recompute_position(position, total_capital)
+            total_deployed += added_value
             added = True
-            if sum(p["position_value"] for p in positions) >= desired_deployed:
+            if total_deployed >= desired_deployed:
                 break
         if not added:
             break

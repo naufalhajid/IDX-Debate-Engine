@@ -33,6 +33,8 @@ def _find_latest_xlsx(output_dir: str = "output") -> str:
 
 CONFIG = {
     # v3.2 — swing trade optimized
+    "version":           "v3.2",
+
     # ── Path
     # input_file = None → auto-detect xlsx terbaru di output_dir saat runtime
     "input_file":        None,
@@ -133,10 +135,10 @@ CONFIG = {
     "prof_roe_tier2":         0.15,
 
     # ── RSI Scoring Weights per tier (v3.1 — asimetris, swing-trade aware)
-    # Oversold (<45)    -> 60%  (potensi reversal, menarik tapi butuh konfirmasi)
+    # Oversold (<45)    -> 40%  (potensi reversal, menarik tapi butuh konfirmasi)
     # Akumulasi (45-55) -> 100% (sweet spot entry swing)
     # Uptrend (55-70)   -> 80%  (momentum kuat, masih oke)
-    # Overbought (>70)  -> 20%  (hard-reject sudah >75, tapi 70-75 tetap lemah)
+    # Overbought (>70)  -> 30%  (hard-reject sudah >80, tapi 70-80 tetap lemah)
     "rsi_weight_oversold":    0.40,
     "rsi_weight_accum":       1.00,
     "rsi_weight_uptrend":     0.80,
@@ -235,7 +237,7 @@ TICKER_SECTOR_HARDCODE: dict[str, str] = {
 }
 
 # Kata kunci di kolom 'Name' untuk inferensi sektor — lapis-3
-_NAME_SECTOR_KEYWORDS: list[tuple[list[str], str]] = [
+NAME_SECTOR_KEYWORDS: list[tuple[list[str], str]] = [
     (["bank", "banking", "syariah bank", "bpr"],                     "bank"),
     (["multifinance", "finance", "leasing", "asuransi", "insurance"], "finance_nonbank"),
     (["properti", "property", "real estate", "realty", "realestate"], "property"),
@@ -262,4 +264,9 @@ _NAME_SECTOR_KEYWORDS: list[tuple[list[str], str]] = [
 # ── SEKTOR RESOLVER — 4-lapis prioritas ──────────────────────────────────────
 # ══════════════════════════════════════════════════════════════════════════════
 
-__all__ = ["CONFIG", "SECTOR_PBV_BENCHMARK", "TICKER_SECTOR_HARDCODE"]
+__all__ = [
+    "CONFIG",
+    "NAME_SECTOR_KEYWORDS",
+    "SECTOR_PBV_BENCHMARK",
+    "TICKER_SECTOR_HARDCODE",
+]

@@ -7,7 +7,6 @@ from dotenv import load_dotenv
 
 from services.debate_chamber import DebateChamber
 from utils.logger_config import logger
-from utils.price_fetcher import fetch_current_price
 
 load_dotenv()
 
@@ -47,14 +46,7 @@ async def _debate_one(ticker: str, chamber: DebateChamber, output_dir: Path) -> 
     logger.info(f"{'=' * 60}")
 
     try:
-        # Auto-fetch current price so the CIO has real data for trade envelope
-        current_price = await fetch_current_price(ticker)
-        if current_price == 0.0:
-            logger.warning(
-                f"Could not fetch price for {ticker} — CIO trade levels will be degraded"
-            )
-
-        result = await chamber.run(ticker, current_price=current_price)
+        result = await chamber.run(ticker)
 
         if result.get("error") is not None:
             logger.error(f"Debate aborted for {ticker}: {result['error']}")
@@ -70,6 +62,7 @@ async def _debate_one(ticker: str, chamber: DebateChamber, output_dir: Path) -> 
                 for m in result["debate_history"]
             ],
             "raw_data_summary": result["raw_data"],
+            "metadata": result.get("metadata", {}),
         }
 
         report_path = output_dir / f"{ticker}_debate.json"

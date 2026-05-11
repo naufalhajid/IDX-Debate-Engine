@@ -6,12 +6,16 @@ import asyncio
 import json
 from types import SimpleNamespace
 
+import pandas as pd
 import pytest
 from tenacity import stop_after_attempt, wait_fixed
 
-from schemas.debate import DebateMessage
+from core.budget import BudgetExhaustedError
+from schemas.debate import CIOVerdict, DebateMessage
 from services import debate_chamber as dc
+from services import debate_prompt_registry
 from services.debate_chamber import DebateChamber
+from utils import market_data_cache as mdc
 
 
 class FakeLLM:
@@ -33,7 +37,7 @@ def _chamber() -> DebateChamber:
 
 
 @pytest.mark.asyncio
-async def test_llm_retry_charges_budget_per_attempt(monkeypatch):
+async def test_llm_retry_charges_budget_once_per_operation(monkeypatch):
     chamber = _chamber()
     charges: list[int] = []
 
@@ -49,16 +53,37 @@ async def test_llm_retry_charges_budget_per_attempt(monkeypatch):
         ]
     )
 
-    retrying_call = chamber._invoke_llm_with_retry.retry_with(
+    retrying_attempt = chamber._invoke_llm_attempt.retry_with(
         wait=wait_fixed(0),
         stop=stop_after_attempt(3),
     )
 
-    response = await retrying_call(chamber, llm, [], "flash")
+    async def fast_attempt(llm_arg, messages_arg):
+        return await retrying_attempt(chamber, llm_arg, messages_arg)
+
+    monkeypatch.setattr(chamber, "_invoke_llm_attempt", fast_attempt)
+
+    response = await chamber._invoke_llm_with_retry(llm, [], "flash")
 
     assert response.content == "usable response"
     assert llm.calls == 3
-    assert len(charges) == 3
+    assert len(charges) == 1
+
+
+@pytest.mark.asyncio
+async def test_budget_exhaustion_happens_before_llm_call(monkeypatch):
+    chamber = _chamber()
+    llm = FakeLLM()
+
+    async def exhausted_flash_budget():
+        raise BudgetExhaustedError("spent")
+
+    monkeypatch.setattr(dc, "check_and_increment_flash_budget", exhausted_flash_budget)
+
+    with pytest.raises(BudgetExhaustedError):
+        await chamber._invoke_llm_with_retry(llm, [], "flash")
+
+    assert llm.calls == 0
 
 
 @pytest.mark.asyncio
@@ -84,7 +109,7 @@ async def test_cancelled_error_is_not_wrapped_or_retried():
 
 
 @pytest.mark.asyncio
-async def test_consensus_soft_hold_when_bull_bear_confidence_gap_is_small(monkeypatch):
+async def test_consensus_round_one_soft_hold_waits_for_more_debate(monkeypatch):
     chamber = _chamber()
 
     async def fake_invoke(llm, messages, inject_rules=True):
@@ -103,13 +128,38 @@ async def test_consensus_soft_hold_when_bull_bear_confidence_gap_is_small(monkey
         }
     )
 
+    assert result["consensus_reached"] is False
+    assert result["consensus_method"] is None
+    assert result["disagreement_type"] == "timing"
+
+
+@pytest.mark.asyncio
+async def test_consensus_round_two_soft_hold_can_conclude(monkeypatch):
+    chamber = _chamber()
+
+    async def fake_invoke(llm, messages, inject_rules=True):
+        raise AssertionError("consensus evaluator should be deterministic")
+
+    monkeypatch.setattr(chamber, "_invoke_llm", fake_invoke)
+    chamber.pro_llm = FakeLLM(model="gemini-2.5-pro")
+
+    result = await chamber._consensus_evaluator_node(
+        {
+            "round_count": 2,
+            "debate_history": [
+                DebateMessage(role="bull", content="Buy", round_num=2),
+                DebateMessage(role="bear", content="Avoid", round_num=2),
+            ],
+        }
+    )
+
     assert result["consensus_reached"] is True
     assert result["consensus_method"] == "soft_hold"
     assert result["dissenting_agents"] == ["bull", "bear"]
 
 
 @pytest.mark.asyncio
-async def test_consensus_requires_three_of_five_votes(monkeypatch):
+async def test_consensus_round_one_two_of_five_is_not_enough(monkeypatch):
     chamber = _chamber()
 
     async def fake_invoke(llm, messages, inject_rules=True):
@@ -133,7 +183,7 @@ async def test_consensus_requires_three_of_five_votes(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_consensus_voting_three_of_five(monkeypatch):
+async def test_consensus_round_one_three_of_five_waits_for_more_debate(monkeypatch):
     chamber = _chamber()
 
     async def fake_invoke(llm, messages, inject_rules=True):
@@ -150,6 +200,60 @@ async def test_consensus_voting_three_of_five(monkeypatch):
             "debate_history": [
                 DebateMessage(role="bull", content="Position: BUY\nAgent Confidence: 0.72", round_num=1),
                 DebateMessage(role="bear", content="Position: AVOID\nAgent Confidence: 0.40", round_num=1),
+            ],
+        }
+    )
+
+    assert result["consensus_reached"] is False
+    assert result["consensus_method"] is None
+    assert result["disagreement_type"] == "direction"
+
+
+@pytest.mark.asyncio
+async def test_consensus_round_one_requires_four_of_five_votes(monkeypatch):
+    chamber = _chamber()
+
+    async def fake_invoke(llm, messages, inject_rules=True):
+        raise AssertionError("consensus evaluator should be deterministic")
+
+    monkeypatch.setattr(chamber, "_invoke_llm", fake_invoke)
+
+    result = await chamber._consensus_evaluator_node(
+        {
+            "round_count": 1,
+            "fundamental_data": "Position: BUY\nAgent Confidence: 0.70",
+            "technical_data": "Position: BUY\nAgent Confidence: 0.66",
+            "sentiment_data": "Position: BUY\nAgent Confidence: 0.52",
+            "debate_history": [
+                DebateMessage(role="bull", content="Position: BUY\nAgent Confidence: 0.72", round_num=1),
+                DebateMessage(role="bear", content="Position: AVOID\nAgent Confidence: 0.40", round_num=1),
+            ],
+        }
+    )
+
+    assert result["consensus_reached"] is True
+    assert result["consensus_method"] == "voting"
+    assert result["dissenting_agents"] == ["bear"]
+
+
+@pytest.mark.asyncio
+async def test_consensus_round_two_allows_three_of_five_votes(monkeypatch):
+    chamber = _chamber()
+
+    async def fake_invoke(llm, messages, inject_rules=True):
+        raise AssertionError("consensus evaluator should be deterministic")
+
+    monkeypatch.setattr(chamber, "_invoke_llm", fake_invoke)
+
+    result = await chamber._consensus_evaluator_node(
+        {
+            "round_count": 2,
+            "fundamental_data": "Position: BUY\nAgent Confidence: 0.70",
+            "technical_data": "Position: BUY\nAgent Confidence: 0.66",
+            "sentiment_data": "Position: HOLD\nAgent Confidence: 0.52",
+            "debate_history": [
+                DebateMessage(role="bull", content="Position: BUY\nAgent Confidence: 0.72", round_num=2),
+                DebateMessage(role="bear", content="Position: AVOID\nAgent Confidence: 0.40", round_num=2),
             ],
         }
     )
@@ -209,6 +313,167 @@ async def test_cio_invalid_current_price_fallback_has_no_trade_levels():
     assert verdict["entry_price_range"] is None
     assert verdict["target_price"] is None
     assert verdict["stop_loss"] is None
+
+
+@pytest.mark.asyncio
+async def test_market_data_cache_prefetches_one_yfinance_bundle(monkeypatch):
+    calls: list[str] = []
+
+    class FakeTicker:
+        def __init__(self, symbol: str):
+            calls.append(symbol)
+
+        def history(self, period: str):
+            assert period == "1y"
+            return pd.DataFrame(
+                {
+                    "Close": [100.0, 105.0],
+                    "High": [101.0, 106.0],
+                    "Low": [99.0, 104.0],
+                    "Volume": [1_000, 1_100],
+                }
+            )
+
+        @property
+        def info(self):
+            return {"currentPrice": 105.0}
+
+        @property
+        def fast_info(self):
+            return {"last_price": 105.0}
+
+        @property
+        def calendar(self):
+            return {}
+
+        @property
+        def dividends(self):
+            return pd.Series(dtype=float)
+
+    monkeypatch.setattr(mdc.yf, "Ticker", FakeTicker)
+    cache = mdc.TickerDataCache()
+
+    data = await cache.prefetch("BBRI")
+    same_data = await cache.prefetch("bbri")
+
+    assert calls == ["BBRI.JK"]
+    assert same_data is data
+    assert data["current_price"] == 105.0
+
+
+@pytest.mark.asyncio
+async def test_debate_run_derives_current_price_and_adds_prompt_metadata(monkeypatch):
+    chamber = _chamber()
+    chamber.prompt_version = "test-version"
+
+    class FakeApp:
+        async def ainvoke(self, state):
+            return state
+
+    async def fake_market_data(ticker):
+        return {
+            "history": pd.DataFrame({"Close": [990.0, 1010.0]}),
+            "info": {},
+            "fast_info": {},
+            "source": "fake",
+            "current_price": 1010.0,
+        }
+
+    chamber.app = FakeApp()
+    monkeypatch.setattr(chamber, "_fetch_market_data", fake_market_data)
+
+    result = await chamber.run("BBRI")
+
+    assert result["current_price"] == 1010.0
+    assert result["metadata"]["prompt_version"] == "test-version"
+    assert result["metadata"]["market_data_cached"] is True
+
+
+def test_prompt_registry_loads_required_prompts_and_version():
+    registry = debate_prompt_registry.PROMPT_REGISTRY
+
+    assert registry.prompt_version == "2026-05-11-critical-audit-v1"
+    assert set(debate_prompt_registry.REQUIRED_PROMPTS).issubset(registry.prompts)
+    assert "CONFIDENCE CALIBRATION" in registry.prompts["CIO_SYSTEM_PROMPT"]
+
+
+@pytest.mark.asyncio
+async def test_cio_uses_decision_brief_and_redacts_debate_prices(monkeypatch):
+    chamber = _chamber()
+    captured = {}
+
+    async def fake_invoke(llm, messages, inject_rules=True):
+        captured["human"] = messages[-1].content
+        return SimpleNamespace(
+            content=json.dumps(
+                {
+                    "ticker": "BBRI",
+                    "rating": "BUY",
+                    "confidence": 0.72,
+                    "summary": "Valid setup.",
+                    "weighted_reasoning": "Envelope-driven decision.",
+                    "key_catalysts": ["volume"],
+                    "key_risks": ["breakdown"],
+                    "timeframe": "1-3 Months",
+                    "entry_price_range": "1 - 2",
+                    "target_price": 3,
+                    "stop_loss": 1,
+                    "current_price": 1000,
+                    "fair_value": 1200,
+                    "expected_return": "+5.0%",
+                    "risk_reward_ratio": 2.0,
+                    "consensus_reached": False,
+                    "consensus_method": None,
+                    "dissenting_agents": [],
+                }
+            )
+        )
+
+    monkeypatch.setattr(chamber, "_invoke_llm", fake_invoke)
+    chamber.pro_llm = FakeLLM(model="gemini-2.5-pro")
+
+    result = await chamber._cio_judge_node(
+        {
+            "ticker": "BBRI",
+            "current_price": 1000.0,
+            "technical_indicators": {"ma50": 980, "atr14": 30},
+            "fair_value_estimate": 1200.0,
+            "debate_history": [
+                DebateMessage(role="bull", content="Buy at Rp 999 target Rp 1200", round_num=1)
+            ],
+            "raw_data": "SHOULD_NOT_LEAK_RAW_DATA",
+            "decision_brief": "COMPACT_DECISION_BRIEF",
+            "consensus_reached": False,
+            "consensus_method": None,
+            "dissenting_agents": [],
+            "agent_votes": [],
+            "disagreement_type": "direction",
+            "devils_advocate_question": "What if support breaks?",
+        }
+    )
+
+    verdict = json.loads(result["final_verdict"])
+    human_prompt = captured["human"]
+
+    assert verdict["entry_price_range"] != "1 - 2"
+    assert "COMPACT_DECISION_BRIEF" in human_prompt
+    assert "SHOULD_NOT_LEAK_RAW_DATA" not in human_prompt
+    assert "Rp 999" not in human_prompt
+    assert "Rp [REDACTED: use Python Trade Envelope]" in human_prompt
+
+
+def test_cio_verdict_rejects_invalid_price_ordering():
+    with pytest.raises(ValueError, match="Invalid swing price ordering"):
+        CIOVerdict(
+            ticker="BAD",
+            rating="BUY",
+            confidence=0.7,
+            entry_price_range="100 - 110",
+            target_price=105,
+            stop_loss=90,
+            current_price=100,
+            fair_value=120,
+        )
 
 
 def test_sanitize_json_preserves_url_and_hash_inside_strings():

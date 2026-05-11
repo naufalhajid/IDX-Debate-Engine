@@ -78,8 +78,11 @@ def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
     lines = []
     lines.append(f"# 🏆 Top {cfg['top_n']} High-Conviction IHSG Swing Candidates")
     lines.append(f"*Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
-    lines.append("*Engine: v3.1 — Absolute scoring | Asymmetric RSI | Piotroski integrated | Bank-aware valuation*")
-    lines.append(f"**Filter Version:** {cfg.get('version', 'v3.2')} — Swing Trade Optimized")
+    lines.append(
+        f"*Engine: {cfg.get('version', 'v3.x')} — Absolute scoring | "
+        "Asymmetric RSI | Piotroski integrated | Bank-aware valuation*"
+    )
+    lines.append(f"**Filter Version:** {cfg.get('version', 'v3.x')} — Swing Trade Optimized")
     lines.append("")
     lines.append(
         "| Rank | Ticker | Sektor | Harga | Stop Loss | Graham Fair Value "
@@ -88,10 +91,18 @@ def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
     lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
 
     for i, (_, r) in enumerate(final_df.iterrows(), 1):
-        fv_str = (
-            f"Rp {r['Graham_Bear']:,.0f} – Rp {r['Graham_Bull']:,.0f}"
-            if r["Est. Fair Value (Graham)"] > 0 else "N/A"
-        )
+        graham_bear = r.get("Graham_Bear")
+        graham_bull = r.get("Graham_Bull")
+        if (
+            r["Est. Fair Value (Graham)"] > 0
+            and graham_bear is not None
+            and graham_bull is not None
+            and not pd.isna(graham_bear)
+            and not pd.isna(graham_bull)
+        ):
+            fv_str = f"Rp {float(graham_bear):,.0f} – Rp {float(graham_bull):,.0f}"
+        else:
+            fv_str = "N/A"
         exdate_icon = " ⚠️" if r["ExDate Risk"] == "WARNING" else ""
         ex_src = f" [{r.get('ExDate Source','?')}]" if r.get("ExDate Source") else ""
         piotroski_icon = (
@@ -308,10 +319,3 @@ def _build_position_summary(sizing_result: dict | None) -> str:
         ]
 
     return "\n".join(lines)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# ── ENTRY POINT ───────────────────────────────────────────────────────────────
-# ══════════════════════════════════════════════════════════════════════════════
-
-__all__ = ["_build_markdown_report", "_build_position_summary"]

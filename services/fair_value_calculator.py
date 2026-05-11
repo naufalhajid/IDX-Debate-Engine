@@ -14,10 +14,10 @@ SOLUSI:
 
 from __future__ import annotations
 
-import math
 import re
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
+
+from utils.logger_config import logger
 
 
 # ---------------------------------------------------------------------------
@@ -82,9 +82,6 @@ def _parse_stockbit_flat(api_response: dict) -> dict[str, str]:
     This flat dict is then consumed by extract_keystats via _lookup().
     Logging which fields were found makes it easy to add new mappings later.
     """
-    import logging as _logging
-    _log = _logging.getLogger(__name__)
-
     flat: dict[str, str] = {}
     try:
         groups = (
@@ -99,9 +96,9 @@ def _parse_stockbit_flat(api_response: dict) -> dict[str, str]:
                 if name and value not in (None, "", "-", "N/A"):
                     flat[name] = str(value)
     except Exception as e:
-        _log.warning(f"[FairValue] _parse_stockbit_flat failed: {e}")
+        logger.warning("[FairValue] _parse_stockbit_flat failed: {}", e)
 
-    _log.debug(f"[FairValue] Stockbit flat fields found: {list(flat.keys())}")
+    logger.debug("[FairValue] Stockbit flat fields found: {}", list(flat.keys()))
     return flat
 
 
@@ -137,13 +134,11 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
     Debug log menampilkan field mana yang berhasil di-parse sehingga mudah
     menambah mapping baru jika Stockbit mengubah nama field.
     """
-    import logging as _logging
-    _log = _logging.getLogger(__name__)
-
     stats = KeyStats(ticker=ticker)
 
     # ── Strategy A: parse by field name (live Stockbit format) ────────────────
     flat = _parse_stockbit_flat(api_response)
+    flat_lower = {k.lower(): v for k, v in flat.items()}
 
     def _lookup(name_patterns: list[str], pct: bool = False) -> float:
         """
@@ -159,8 +154,6 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
 
         pct=True: divide by 100 if value > 1 (normalise percent to decimal).
         """
-        flat_lower = {k.lower(): v for k, v in flat.items()}
-
         for pattern in name_patterns:
             # 1. Exact
             val_str = flat.get(pattern)
@@ -170,10 +163,10 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
             if val_str is None:
                 # 3. Case-insensitive partial — pattern is substring of a key
                 pl = pattern.lower()
-                for k, v in flat_lower.items():
-                    if pl in k:
-                        val_str = v
-                        break
+                partial_matches = [(k, v) for k, v in flat_lower.items() if pl in k]
+                if partial_matches:
+                    # Prefer the shortest key (most specific match)
+                    val_str = min(partial_matches, key=lambda x: len(x[0]))[1]
             if val_str is not None:
                 v = _clean_numeric(val_str)
                 if pct and v > 1.0:
@@ -192,12 +185,8 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
         #   EPS = price / PE
         if stats.eps_ttm == 0.0:
             pe_ttm = _lookup(["Current PE Ratio (TTM)", "PE Ratio (TTM)", "Current PE Ratio (Annualised)"])
-            if pe_ttm > 0 and api_response.get("current_price", 0.0) == 0.0:
-                # We'll inject current_price after keystats is built (in build_fair_value_report)
-                # Store raw PE for now; EPS back-calc happens in build_fair_value_report
-                stats.raw_pe_current = pe_ttm
-            elif pe_ttm > 0:
-                # current_price not in api_response for this endpoint; skip back-calc here
+            if pe_ttm > 0:
+                # EPS back-calc dilakukan di build_fair_value_report setelah current_price tersedia
                 stats.raw_pe_current = pe_ttm
 
         stats.eps_forward = _lookup([
@@ -245,7 +234,7 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
     # ── Strategy B: legacy flat key-value fallback ────────────────────────────
     # Only runs if Strategy A found nothing useful (flat dict empty or all zeros)
     if not flat or (stats.eps_ttm == 0 and stats.book_value_per_share == 0 and stats.dps == 0):
-        _log.info(f"[FairValue] {ticker}: closure_fin_items structure empty, trying legacy key-value")
+        logger.info("[FairValue] {}: closure_fin_items structure empty, trying legacy key-value", ticker)
 
         def _get_legacy(keys: list[str], default: float = 0.0) -> float:
             for key in keys:
@@ -257,7 +246,7 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
                         return float(val)
                 except (KeyError, TypeError, ValueError):
                     continue
-            # Recursive search in sub-dicts
+            # Shallow sub-dict search — satu level dalam dari top-level api_response
             simple_keys = {k.split(".")[-1].lower() for k in keys}
             for top_val in api_response.values():
                 if not isinstance(top_val, dict):
@@ -279,9 +268,12 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
         stats.raw_pe_current     = _get_legacy(["pe", "priceEarnings", "data.Current.PE", "PE"])
         stats.raw_pb_current     = _get_legacy(["pb", "priceBook", "data.Current.PBV", "PBV"])
 
-        if stats.roe > 1.0:    stats.roe = stats.roe / 100.0
-        if stats.net_margin > 1.0: stats.net_margin = stats.net_margin / 100.0
-        if stats.roa > 1.0:    stats.roa = stats.roa / 100.0
+        if stats.roe > 1.0:
+            stats.roe = stats.roe / 100.0
+        if stats.net_margin > 1.0:
+            stats.net_margin = stats.net_margin / 100.0
+        if stats.roa > 1.0:
+            stats.roa = stats.roa / 100.0
 
     # ── Derive DPS from dividend yield × price if DPS still missing ──────────
     # BBCA dan bank besar lain kadang tidak expose DPS langsung di keystats
@@ -300,10 +292,14 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
                 stats.dps = round((div_yield_pct / 100.0) * price_for_dps, 2) \
                     if div_yield_pct > 1.0 \
                     else round(div_yield_pct * price_for_dps, 2)
-                _log.info(
-                    f"[FairValue] {ticker}: DPS derived from yield "
-                    f"({div_yield_pct:.2f}%) × price ({price_for_dps:,.0f}) "
-                    f"= {stats.dps:.2f}"
+                logger.info(
+                    "[FairValue] {}: DPS derived from yield "
+                    "({:.2f}%) × price ({:,.0f}) "
+                    "= {:.2f}",
+                    ticker,
+                    div_yield_pct,
+                    price_for_dps,
+                    stats.dps,
                 )
 
     # ── Debug summary ─────────────────────────────────────────────────────────
@@ -317,12 +313,14 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
     }
     zeros = [k for k, v in parsed.items() if str(v) in ("0", "0.0", "0.0%")]
     if zeros:
-        _log.warning(
-            f"[FairValue] {ticker}: fields still 0 after parse: {zeros}. "
-            "Add the missing Stockbit field name to the mapping list in extract_keystats()."
+        logger.warning(
+            "[FairValue] {}: fields still 0 after parse: {}. "
+            "Add the missing Stockbit field name to the mapping list in extract_keystats().",
+            ticker,
+            zeros,
         )
     else:
-        _log.info(f"[FairValue] {ticker}: all key stats parsed OK: {parsed}")
+        logger.info("[FairValue] {}: all key stats parsed OK: {}", ticker, parsed)
 
     return stats
 
@@ -365,6 +363,14 @@ class FairValueCalculator:
         self.stats = stats
         self.sector = sector or self.TICKER_SECTOR.get(stats.ticker.upper(), "default")
         self.weights = self.SECTOR_WEIGHTS[self.sector]
+        self._weighted_result_cache: dict | None = None
+        assert abs(sum(self.weights.values()) - 1.0) < 1e-9, (
+            f"SECTOR_WEIGHTS['{self.sector}'] tidak menjumlah 1.0: {self.weights}"
+        )
+
+    def _cache_weighted_result(self, result: dict) -> dict:
+        self._weighted_result_cache = result
+        return result
 
     # ── Metode 1: P/E Band ───────────────────────────────────────────────────
 
@@ -422,18 +428,21 @@ class FairValueCalculator:
         ddm_fv = self.fair_value_ddm()
 
         results = {}
-        if pe_fv:  results["pe"]  = pe_fv
-        if pb_fv:  results["pb"]  = pb_fv
-        if ddm_fv: results["ddm"] = ddm_fv
+        if pe_fv is not None:
+            results["pe"] = pe_fv
+        if pb_fv is not None:
+            results["pb"] = pb_fv
+        if ddm_fv is not None:
+            results["ddm"] = ddm_fv
 
         if not results:
-            return {
+            return self._cache_weighted_result({
                 "fair_value": None,
                 "breakdown": {},
                 "confidence": "INSUFFICIENT_DATA",
                 "margin_of_safety_pct": None,
                 "valuation_verdict": "DATA_UNAVAILABLE",
-            }
+            })
 
         total_weight = sum(self.weights[m] for m in results)
         weighted_fv = sum(
@@ -463,13 +472,13 @@ class FairValueCalculator:
             else:
                 verdict = "OVERVALUED"
 
-        return {
+        return self._cache_weighted_result({
             "fair_value": weighted_fv,
             "breakdown": {k: int(v) for k, v in results.items()},
             "confidence": confidence,
             "margin_of_safety_pct": mos,
             "valuation_verdict": verdict,
-        }
+        })
 
     # ── Target & Stop Calculator ─────────────────────────────────────────────
 
@@ -499,10 +508,12 @@ class FairValueCalculator:
     # ── Build Report String (untuk diinjeksi ke raw_data) ───────────────────
 
     def build_report(self, current_price: float | None = None) -> str:
+        if current_price is not None and current_price != self.stats.current_price:
+            self._weighted_result_cache = None
         if current_price is not None:   # ← fix: `if current_price:` is False for 0.0
             self.stats.current_price = current_price
 
-        result = self.fair_value_weighted()
+        result = self._weighted_result_cache or self.fair_value_weighted()
         fv     = result["fair_value"]
         bdown  = result["breakdown"]
         mos    = result["margin_of_safety_pct"]
@@ -715,17 +726,18 @@ def build_fair_value_report(
     api_response: dict,
     ticker: str,
     current_price: float,
-) -> tuple[str, float]:
-    import logging as _logging
-    _log = _logging.getLogger(__name__)
-
+) -> tuple[str, float | None]:
     multiples = extract_historical_multiples(api_response, ticker)
     stats = extract_keystats(api_response, ticker=ticker)
 
-    if multiples.get("pe"): stats.historical_pe_avg = multiples["pe"]
-    if multiples.get("pb"): stats.historical_pb_avg = multiples["pb"]
-    if multiples.get("cost_of_equity"): stats.cost_of_equity = multiples["cost_of_equity"]
-    if multiples.get("growth_rate"): stats.growth_rate = multiples["growth_rate"]
+    if multiples.get("pe") is not None:
+        stats.historical_pe_avg = multiples["pe"]
+    if multiples.get("pb") is not None:
+        stats.historical_pb_avg = multiples["pb"]
+    if multiples.get("cost_of_equity") is not None:
+        stats.cost_of_equity = multiples["cost_of_equity"]
+    if multiples.get("growth_rate") is not None:
+        stats.growth_rate = multiples["growth_rate"]
 
     stats.current_price = current_price
 
@@ -735,13 +747,23 @@ def build_fair_value_report(
     # and the live price, we can back-calculate a reasonable EPS estimate.
     if stats.eps_ttm == 0.0 and stats.raw_pe_current > 0 and current_price > 0:
         stats.eps_ttm = round(current_price / stats.raw_pe_current, 2)
-        _log.info(
-            f"[FairValue] {ticker}: EPS back-calculated from PE "
-            f"({current_price} / {stats.raw_pe_current} = {stats.eps_ttm})"
+        logger.info(
+            "[FairValue] {}: EPS back-calculated from PE "
+            "({} / {} = {})",
+            ticker,
+            current_price,
+            stats.raw_pe_current,
+            stats.eps_ttm,
         )
 
     calc   = FairValueCalculator(stats)
-    report = calc.build_report(current_price=current_price)
     result = calc.fair_value_weighted()
+    report = calc.build_report(current_price=current_price)
 
-    return report, result["fair_value"]
+    fv = result["fair_value"]
+    if fv is None:
+        logger.warning(
+            "[FairValue] {}: fair value tidak dapat dikalkulasi — semua metode gagal",
+            ticker,
+        )
+    return report, fv

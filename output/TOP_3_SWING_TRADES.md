@@ -1,76 +1,73 @@
 # TOP 3 HIGH-CONVICTION IHSG SWING TRADES
 
-> **Generated**: 2026-05-09 14:53 WIB
+> **Generated**: 2026-05-11 08:03 WIB
 > **Pipeline**: Quant Scouting -> Multi-Agent Debate -> CIO Verdict
-> **Stocks Debated**: 10 | **Eligible (BUY/STRONG_BUY)**: 5 | **Selected**: 3
+> **Stocks Debated**: 10 | **Eligible (BUY/STRONG_BUY)**: 3 | **Selected**: 3
 
 ---
 
-## #1 - GJTL
+## #1 - MAPI
 
 ### Final Rating & Confidence
 
 | Metric | Value |
 |---|---|
 | **Rating** | `BUY` |
-| **CIO Confidence** | 77% |
-| **Conviction Score** | 63.50% |
-| **Debate Consensus** | Reached (voting) |
-| **Dissenting Agents** | sentiment_specialist |
+| **CIO Confidence** | 88% |
+| **Conviction Score** | 63.60% |
+| **Debate Consensus** | No (confidence_winner; direction) |
+| **Dissenting Agents** | chartist, sentiment_specialist, bear |
 | **Timeframe** | 1-3 Months |
 
 ### Trade Box
 
 | Parameter | Level |
 |---|---|
-| **Buy Range** | Rp 1120 - 1140 |
-| **Target Price** | Rp 1,240 |
-| **Stop Loss** | Rp 1,075 |
-| **Fair Value** | Rp 5,800 |
+| **Buy Range** | Rp 1245 - 1270 |
+| **Target Price** | Rp 1,380 |
+| **Stop Loss** | Rp 1,195 |
+| **Fair Value** | Rp 1,986 |
 | **Expected Return** | +9.7% |
-| **Risk/Reward** | 2.0 |
+| **Risk/Reward** | 1.96 |
 
 *Semua harga sudah di-round ke tick IHSG dan dihitung oleh Python.*
 
 ### Winning Argument
 
-> GJTL presents a compelling swing trade BUY opportunity for a 1-3 month horizon, driven by its extreme undervaluation and a robust technical uptrend, despite the absence of a specific fundamental catalyst.
-
-**1. FUNDAMENTAL FLOOR:**
-GJTL is significantly undervalued, trading at Rp 1,185, which represents a substantial 389.5% discount to its fair value estimate of Rp 5,800. This valuation is supported by healthy profitability metrics, including an ROE of 11.72% and a Net Profit Margin of 9.07%....
+> The Bear's dismissal of fundamental valuation as a swing trade factor is a critical oversight. While a calculated intrinsic value estimate is a long-term anchor, the substantial fundamental discount at the present market valuation provides a robust margin of safety for any position. This significant undervaluation implies a strong gravitational pull towards a higher price, making even modest short-term technical targets more probable and less susceptible to minor market fluctuations. The wide...
 
 ### Devil's Advocate Warning
 
 > **Question 1: MACRO/COMPANY RISK & FOREIGN FLOW**
-If foreign funds initiate a significant net sell-off in the broader market, or if GJTL's upcoming quarterly results show a continued decline in revenue, could the MA50 support at Rp 1,119 break, potentially triggering a fall towards the MA200 at Rp 1,067?
+If foreign funds accelerate net selling in the broader market or MAPI faces unexpected negative retail sector news, could the MA50 support at Rp 1,244 break, triggering a deeper correction towards the MA200 at Rp 1,226 within the next 1-3 months?
 
 **Question 2: EXECUTION RISK — Transaction Cost Stress Test**
-Menggunakan harga entry Rp 1...
+Untuk menguji risiko eksekusi, mari h...
 
 ### CIO Summary
 
-The trade plan for GJTL is approved with a BUY rating. The stock is profoundly undervalued, offering a significant margin of safety, and exhibits a strong technical uptrend. The proposed entry on a pullback to the Rp 1,120-1,140 support zone provides an attractive risk/reward ratio of 2.0. However, confidence is capped due to the absence of a clear short-term catalyst and insufficient sentiment data.
+This is a conditional BUY, contingent on a significant price pullback to the Rp 1,245 - Rp 1,270 entry zone. While fundamentally undervalued with a fair value of Rp 1,986, the current price of Rp 1,455 is technically extended and far from the ideal entry point. The trade plan offers a decent R/R of 1.96, but entry at the current price is strongly discouraged; this rating approves the plan's structure, not an immediate call to action.
 
 **Key Catalysts:**
-- Extreme undervaluation providing a strong margin of safety.
-- Continuation of the technical uptrend, with price holding above key support levels (MA50 at ~Rp 1,119).
+- Significant fundamental undervaluation (36.5% discount to Fair Value) creating a margin of safety.
+- Potential for price to revert to technical support (MA50) which would activate the trade plan.
 
 **Key Risks:**
-- Lack of a specific short-term (1-3 month) fundamental catalyst to drive price towards fair value.
-- A broader market sell-off or negative company news could cause a break of the MA50 support, triggering the stop loss.
-- The current price of Rp 1,185 is above the target entry zone, requiring patience for a pullback which may not occur.
+- Extreme execution risk: Current price (Rp 1,455) is far above the specified entry zone (Rp 1,245 - Rp 1,270), making the plan currently inactive.
+- Price is at a 52-week high, making it vulnerable to profit-taking and sharp pullbacks.
+- The Devil's Advocate risk of MA50 support breaking during a market sell-off remains high, which would invalidate the entire trade thesis.
 
 ---
 
-## #2 - AUTO
+## #2 - MARK
 
 ### Final Rating & Confidence
 
 | Metric | Value |
 |---|---|
 | **Rating** | `BUY` |
-| **CIO Confidence** | 77% |
-| **Conviction Score** | 61.80% |
+| **CIO Confidence** | 74% |
+| **Conviction Score** | 63.00% |
 | **Debate Consensus** | Reached (voting) |
 | **Dissenting Agents** | sentiment_specialist |
 | **Timeframe** | 1-3 Months |
@@ -79,42 +76,43 @@ The trade plan for GJTL is approved with a BUY rating. The stock is profoundly u
 
 | Parameter | Level |
 |---|---|
-| **Buy Range** | Rp 2530 - 2580 |
-| **Target Price** | Rp 2,660 |
-| **Stop Loss** | Rp 2,510 |
-| **Fair Value** | Rp 6,896 |
-| **Expected Return** | +4.1% |
-| **Risk/Reward** | 2.33 |
+| **Buy Range** | Rp 795 - 810 |
+| **Target Price** | Rp 835 |
+| **Stop Loss** | Rp 790 |
+| **Fair Value** | Rp 886 |
+| **Expected Return** | +4.0% |
+| **Risk/Reward** | 2.6 |
 
 *Semua harga sudah di-round ke tick IHSG dan dihitung oleh Python.*
 
 ### Winning Argument
 
-> AUTO presents a compelling swing trade BUY opportunity driven by significant undervaluation and a robust technical uptrend, despite the absence of a specific near-term corporate catalyst.
+> MARK presents a compelling swing trade BUY opportunity (1-3 month horizon) driven by its fundamental undervaluation and robust technical uptrend, despite the absence of a specific event-driven catalyst.
 
-**1. FUNDAMENTAL FLOOR:**
-AUTO is profoundly undervalued, with its current market price of Rp 2,640 representing a substantial 161.2% discount to its calculated fair value of Rp 6,896. This deep discount provides a strong fundamental floor and significant long-term upside potential, making it attractive for...
+**FUNDAMENTAL FLOOR:**
+MARK is currently undervalued, trading at Rp 840 against a fair value estimate of Rp 886, representing a 5.5% discount. The company exhibits exceptionally strong fundamentals, with a Return on Equity (TTM) of 30.26% and a Net Margin (TTM) of 33.26%, indicating high prof...
 
 ### Devil's Advocate Warning
 
 > **1. MACRO/COMPANY RISK & FOREIGN FLOW:**
-Jika sentimen pasar global memburuk atau terjadi percepatan net foreign sell di IHSG, khususnya pada saham-saham berkapitalisasi besar seperti AUTO, mungkinkah support MA50 di Rp 2,531 jebol dalam 1-3 bulan ke depan, memicu koreksi lebih dalam menuju MA200 di Rp 2,356?
+If a broader market correction triggers significant net foreign *selling* pressure on MARK, or if the fundamental valuation issues highlighted by the Bear R1 lead to a re-rating, could the Rp 796 MA50 support level break, triggering a deeper correction?
 
 **2. EXECUTION RISK — Transaction Cost Stress Test:**
-Untuk posisi BUY AUTO dengan h...
+Menggunakan harga entry tengah dari Trade Enve...
 
 ### CIO Summary
 
-This is a compelling value and technical setup. AUTO is trading at a massive 161% discount to its fair value, providing a substantial margin of safety. The trade plan offers an excellent risk/reward ratio of 2.33, with a clear entry zone at strong technical support. The primary constraints are the lack of a specific near-term catalyst and insufficient sentiment data, which cap conviction below the 'Strong Buy' level.
+This is a valid BUY plan contingent on a price pullback. The trade offers an excellent 2.60 R/R ratio, supported by strong fundamentals and a bullish technical trend. However, execution is strictly conditional on the price entering the Rp 795-810 zone. The current price of Rp 840 is above the target; do not chase the price.
 
 **Key Catalysts:**
-- Significant undervaluation (161% discount to Fair Value) may attract value investors, leading to a technical re-rating.
-- Price is in a structural uptrend (above MA200), with the proposed entry zone representing a logical bounce point from MA50/EMA20 dynamic support.
+- Strong fundamental metrics (ROE 30%, Net Margin 33%, D/E 0.01)
+- Bullish technical structure with price above key moving averages (MA50, MA200)
+- High R/R entry opportunity on a potential pullback to the MA50 support level.
 
 **Key Risks:**
-- Absence of a specific near-term (1-3 month) corporate catalyst to accelerate the price discovery towards its fair value.
-- Insufficient social media and news sentiment data indicates low retail visibility, which could result in prolonged consolidation.
-- General market risk from macro headwinds or foreign outflows could break the key MA50 support level at Rp 2,531, invalidating the setup.
+- Execution Risk: The current price (Rp 840) is already above the target (Rp 835), requiring significant patience for a pullback to the entry zone.
+- Valuation Uncertainty: A dissenting agent noted a potential inconsistency in the DDM model used for the fair value calculation.
+- Lack of a specific short-term catalyst could lead to prolonged sideways movement before the target is reached.
 
 ---
 
@@ -125,8 +123,8 @@ This is a compelling value and technical setup. AUTO is trading at a massive 161
 | Metric | Value |
 |---|---|
 | **Rating** | `BUY` |
-| **CIO Confidence** | 77% |
-| **Conviction Score** | 58.50% |
+| **CIO Confidence** | 74% |
+| **Conviction Score** | 62.00% |
 | **Debate Consensus** | Reached (voting) |
 | **Dissenting Agents** | sentiment_specialist, bear |
 | **Timeframe** | 1-3 Months |
@@ -146,31 +144,28 @@ This is a compelling value and technical setup. AUTO is trading at a massive 161
 
 ### Winning Argument
 
-> ULTJ presents a fundamentally strong and technically supported setup for a swing trade, albeit with notable caveats regarding the immediate catalyst and risk/reward profile.
-
-**1. FUNDAMENTAL FLOOR:**
-ULTJ is currently trading at Rp 1,600, representing a significant 21.1% discount to its calculated fair value of Rp 1,938. This undervaluation provides a robust fundamental cushion. The company exhibits exceptional financial health, characterized by a strong Return on Equity (ROE) of 17.02%, a h...
+> The Bear's assertion that undervaluation alone is insufficient for a swing trade misinterprets the nature of market re-ratings. For a company exhibiting robust financial health, characterized by high profitability and negligible leverage, the persistent gap between its intrinsic worth and market price *is* a potent short-term catalyst. The market, over a 1-3 month horizon, frequently corrects such discrepancies, especially when the stock is already in a structural uptrend, as evidenced by its...
 
 ### Devil's Advocate Warning
 
-> 1.  **MACRO/COMPANY RISK & FOREIGN FLOW:**
-    If a broader IHSG correction triggers significant foreign fund outflows from Indonesian equities, could ULTJ's MA50 support at Rp 1,574 break, pushing the stock towards its stop loss at Rp 1,490, especially without a clear catalyst to attract new buyers within the next 1-3 months?
+> **Question 1: MACRO/COMPANY RISK & FOREIGN FLOW**
+If a broader IHSG correction, driven by rising global interest rates, triggers accelerated foreign fund outflows from liquid stocks like ULTJ, could the Rp 1,574-Rp 1,596 entry zone and the Rp 1,490 stop loss be breached, pushing the price towards Rp 1,440?
 
-2.  **EXECUTION RISK — Transaction Cost Stress Test:**
-    Menghitu...
+**Question 2: EXECUTION RISK — Transaction Cost Stress Test**
+Untuk posisi ini dengan ha...
 
 ### CIO Summary
 
-The trade plan for ULTJ is approved with a BUY rating. The stock is significantly undervalued with a strong 2.0 R/R ratio, supported by a clear technical uptrend and entry near key moving averages. The primary drawbacks are the lack of a near-term catalyst and disagreement among analysts on direction, which tempers confidence but does not invalidate the attractive risk-adjusted setup.
+This trade plan for ULTJ is approved based on a compelling combination of significant fundamental undervaluation and a confirmed technical uptrend. The stock trades at a 21% discount to its fair value, providing a strong margin of safety. With a favorable Risk/Reward ratio of 2.0, the plan is attractive, though confidence is moderated by the absence of a specific near-term catalyst.
 
 **Key Catalysts:**
-- Market recognition of significant undervaluation (21.1% discount to fair value)
-- Continuation of the established technical uptrend from key MA50/EMA20 support levels
+- Market re-rating towards its fair value of Rp 1,938, driven by strong fundamentals (high ROE, low debt).
+- Continuation of the technical uptrend with price holding above key moving averages (MA50, MA200), attracting momentum traders.
 
 **Key Risks:**
-- Lack of a specific, near-term catalyst could lead to price stagnation, failing to reach the target within the 1-3 month timeframe.
-- A broader market correction could break the MA50 support at Rp 1,574, triggering the stop loss despite strong company fundamentals.
-- Significant disagreement among analysts regarding the stock's short-term direction, indicating a lack of clear market consensus.
+- Absence of a specific short-term catalyst could lead to price stagnation, failing to reach the target within the 1-3 month timeframe.
+- A broader market correction or significant foreign outflow could breach technical support and trigger the stop loss.
+- Lack of recent volume confirmation suggests waiting for buying interest to appear before entering.
 
 ---
 
@@ -178,8 +173,8 @@ The trade plan for ULTJ is approved with a BUY rating. The stock is significantl
 
 | # | Ticker | Rating | Lot | Saham | Nilai Posisi | Alokasi | Max Loss | Est. Biaya |
 |---|--------|--------|-----|-------|-------------|---------|----------|------------|
-| 1 | GJTL | BUY | 3 | 300 | Rp 355.500 | 35.5% | Rp 33.000 | Rp 1.778 |
-| 2 | ULTJ | BUY | 2 | 200 | Rp 320.000 | 32.0% | Rp 18.000 | Rp 1.600 |
+| 1 | MAPI | BUY | 1 | 100 | Rp 145.500 | 18.2% | Rp 26.000 | Rp 728 |
+| 2 | MARK | BUY | 4 | 400 | Rp 336.000 | 42.0% | Rp 20.000 | Rp 1.680 |
 
 ---
 
@@ -187,32 +182,33 @@ The trade plan for ULTJ is approved with a BUY rating. The stock is significantl
 
 | Item | Nilai |
 |------|-------|
-| Total Modal | Rp 1.000.000 |
-| Total Deployed | Rp 675.500 |
-| Sisa Cash | Rp 324.500 |
-| % Deployed | 67.5% |
+| Total Modal | Rp 800.000 |
+| Total Deployed | Rp 481.500 |
+| Sisa Cash | Rp 318.500 |
+| % Deployed | 60.2% |
 | Jumlah Posisi | 2 |
-| Est. Total Biaya Transaksi | Rp 3.378 |
+| Est. Total Biaya Transaksi | Rp 2.408 |
 
 ### Allocation Reasoning
 
 | Item | Nilai |
 |------|-------|
 | Target Deployment | 65.0% |
-| Actual Deployment | 67.5% |
-| Market Condition Score | 0.83 |
-| Gap Explanation | Actual deployment 67.5% sudah berada di area target normal 65.0%. |
+| Actual Deployment | 60.2% |
+| Market Condition Score | 0.88 |
+| Gap Explanation | Actual deployment 60.2% masih 4.8 percentage points di bawah target 65.0% karena sizing menghormati lot IHSG, cap per posisi, dan budget risiko stop-loss. |
 | Recommendation | Deployment sudah cukup aktif untuk swing trade moderat; tambah exposure hanya jika sinyal teknikal menguat tanpa memperbesar drawdown per posisi. |
 
 **Risk Factors Limiting Deployment:**
-- max drawdown per posisi dibatasi 5.0% sehingga lot tidak dipaksa melewati stop-risk budget
+- lot size 100 saham dan harga entry membatasi penambahan posisi tanpa oversizing
+- max drawdown per posisi dibatasi 4.0% sehingga lot tidak dipaksa melewati stop-risk budget
 
 ### Deploy 60% Now vs Wait
 
 | Scenario | Expected Return | Max Drawdown | Catatan |
 |---|---:|---:|---|
-| Deploy 60% sekarang | 5.42% (Rp 54.221) | 3.00% (Rp 30.000) | Return on deployed 9.04% |
-| Tunggu konfirmasi | 0.00% (Rp 0) | 0.00% (Rp 0) | Cash protects capital while waiting for cleaner entry, but gives up roughly Rp 54,221 if the current 60% deployment scenario works. |
+| Deploy 60% sekarang | 3.43% (Rp 27.468) | 2.40% (Rp 19.200) | Return on deployed 5.72% |
+| Tunggu konfirmasi | 0.00% (Rp 0) | 0.00% (Rp 0) | Cash protects capital while waiting for cleaner entry, but gives up roughly Rp 27,468 if the current 60% deployment scenario works. |
 
 ---
 
@@ -220,16 +216,16 @@ The trade plan for ULTJ is approved with a BUY rating. The stock is significantl
 
 | Ticker | Rating | Confidence | R/R Ratio | Conviction Score | Consensus | Method | Dissenting Agents | Disagreement | Status |
 |---|---|---|---|---|---|---|---|---|---|
-| GJTL | BUY | 77% | 2.00 | 63.50% | YES | voting | sentiment_specialist | - | Selected |
-| AUTO | BUY | 77% | 2.33 | 61.80% | YES | voting | sentiment_specialist | - | Selected |
-| ULTJ | BUY | 77% | 2.00 | 58.50% | YES | voting | sentiment_specialist, bear | - | Selected |
-| ERAA | BUY | 71% | 2.00 | 55.50% | YES | voting | sentiment_specialist | - | - |
-| ACES | BUY | 71% | 2.00 | 55.50% | YES | voting | chartist, sentiment_specialist | - | - |
-| OMED | AVOID | 94% | -1.15 | 0.00% | NO | confidence_winner | chartist, sentiment_specialist, bull | direction | Excluded |
-| MIDI | HOLD | 55% | 2.07 | 0.00% | YES | voting | bull, bear | - | Excluded |
-| MARK | HOLD | 55% | 2.60 | 0.00% | YES | soft_hold | fundamental_scout, chartist, bull, bear | timing | Excluded |
-| MAPI | HOLD | 47% | 1.96 | 0.00% | YES | soft_hold | fundamental_scout, chartist, bull, bear | timing | Excluded |
-| AKRA | HOLD | 47% | 1.96 | 0.00% | YES | soft_hold | fundamental_scout, bull, bear | timing | Excluded |
+| MAPI | BUY | 88% | 1.96 | 63.60% | NO | confidence_winner | chartist, sentiment_specialist, bear | direction | Selected |
+| MARK | BUY | 74% | 2.60 | 63.00% | YES | voting | sentiment_specialist | - | Selected |
+| ULTJ | BUY | 74% | 2.00 | 62.00% | YES | voting | sentiment_specialist, bear | - | Selected |
+| OMED | ERROR | 0% | N/A | 0.00% | NO | - | - | - | Error |
+| MIDI | HOLD | 54% | 2.07 | 0.00% | YES | soft_hold | chartist, bull, bear | timing | Excluded |
+| AUTO | HOLD | 52% | 2.33 | 0.00% | YES | soft_hold | fundamental_scout, bull, bear | timing | Excluded |
+| GJTL | HOLD | 54% | 2.00 | 0.00% | YES | soft_hold | fundamental_scout, chartist, bull, bear | timing | Excluded |
+| ERAA | HOLD | 46% | 2.00 | 0.00% | YES | soft_hold | fundamental_scout, bull, bear | timing | Excluded |
+| ACES | AVOID | 92% | 2.00 | 0.00% | NO | confidence_winner | fundamental_scout, sentiment_specialist, bull | direction | Excluded |
+| AKRA | HOLD | 47% | 1.96 | 0.00% | YES | soft_hold | fundamental_scout, chartist, bull, bear | timing | Excluded |
 
 ---
-*Laporan dibuat oleh `orchestrator.py` pada 2026-05-09 14:53 WIB*
+*Laporan dibuat oleh `orchestrator.py` pada 2026-05-11 08:03 WIB*

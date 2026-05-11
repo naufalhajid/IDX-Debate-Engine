@@ -1,0 +1,8 @@
+from core.orchestrator import legacy as _legacy
+
+save_full_results = _legacy.save_full_results
+save_individual_debates = _legacy.save_individual_debates
+save_individual_debates_versioned = _legacy.save_individual_debates_versioned
+generate_top3_report = _legacy.generate_top3_report
+_print_error_summary = _legacy._print_error_summary
+_print_top3_summary = _legacy._print_top3_summary

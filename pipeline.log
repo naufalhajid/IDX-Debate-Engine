@@ -1924,3 +1924,483 @@
 2026-05-09 14:53:57.544 | INFO     | services.debate_chamber:run:1976 - [DebateChamber] ✅ Pipeline complete for AKRA
 2026-05-09 14:53:57.544 | INFO     | __main__:_run_single_debate:549 - [Debate] ✅ Selesai: AKRA
 2026-05-09 14:53:57.545 | INFO     | __main__:_run_single_debate:552 - [Debate] AKRA disagreement_type=timing
+2026-05-11 07:53:56.221 | INFO     | core.orchestrator.legacy:run_batch_debates:831 - [Orchestrator] Meluncurkan 10 debate (concurrency=3, RPM=10)
+2026-05-11 07:54:03.047 | INFO     | services.stockbit_api_client:_request_challenge:308 - Logged in successfully with existing token!
+2026-05-11 07:54:03.628 | INFO     | core.orchestrator.legacy:_guarded:760 - [OMED] Budget terpakai: 1/200
+2026-05-11 07:54:03.628 | INFO     | core.orchestrator.legacy:_run_single_debate:523 - [Debate] Mulai: OMED
+2026-05-11 07:54:03.642 | INFO     | core.orchestrator.legacy:_guarded:760 - [MIDI] Budget terpakai: 2/200
+2026-05-11 07:54:03.644 | INFO     | core.orchestrator.legacy:_run_single_debate:523 - [Debate] Mulai: MIDI
+2026-05-11 07:54:03.661 | INFO     | core.orchestrator.legacy:_guarded:760 - [MARK] Budget terpakai: 3/200
+2026-05-11 07:54:03.662 | INFO     | core.orchestrator.legacy:_run_single_debate:523 - [Debate] Mulai: MARK
+2026-05-11 07:54:04.227 | INFO     | services.debate_chamber:run:1671 - [DebateChamber] ▶ Starting swing-trade pipeline for OMED @ Rp 298
+2026-05-11 07:54:04.237 | INFO     | services.debate_chamber:_chartist_node:667 - [Chartist] Fetching OHLCV + orderbook for OMED
+2026-05-11 07:54:04.237 | INFO     | services.debate_chamber:_fundamental_node:637 - [Fundamental] Fetching for OMED
+2026-05-11 07:54:04.237 | INFO     | services.debate_chamber:_sentiment_node:759 - [Sentiment] Fetching for OMED
+2026-05-11 07:54:04.669 | INFO     | services.fair_value_calculator:extract_keystats:295 - [FairValue] OMED: DPS derived from yield (1.20%) × price (3) = 0.03
+2026-05-11 07:54:04.675 | INFO     | services.fair_value_calculator:extract_keystats:323 - [FairValue] OMED: all key stats parsed OK: {'eps_ttm': 14.51, 'bvps': 104.17, 'dps': 0.03, 'roe': '13.9%', 'pe': 20.54, 'pb': 2.86}
+2026-05-11 07:54:04.686 | INFO     | services.debate_chamber:_fundamental_node:646 - [Fundamental] Fair value for OMED: 214.0
+2026-05-11 07:54:04.704 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:54:04.712 | INFO     | services.debate_chamber:run:1671 - [DebateChamber] ▶ Starting swing-trade pipeline for MIDI @ Rp 348
+2026-05-11 07:54:04.714 | INFO     | services.debate_chamber:_chartist_node:667 - [Chartist] Fetching OHLCV + orderbook for MIDI
+2026-05-11 07:54:04.714 | INFO     | services.debate_chamber:_fundamental_node:637 - [Fundamental] Fetching for MIDI
+2026-05-11 07:54:04.714 | INFO     | services.debate_chamber:_sentiment_node:759 - [Sentiment] Fetching for MIDI
+2026-05-11 07:54:04.714 | INFO     | services.debate_chamber:run:1671 - [DebateChamber] ▶ Starting swing-trade pipeline for MARK @ Rp 840
+2026-05-11 07:54:04.715 | INFO     | services.debate_chamber:_chartist_node:667 - [Chartist] Fetching OHLCV + orderbook for MARK
+2026-05-11 07:54:04.715 | INFO     | services.debate_chamber:_fundamental_node:637 - [Fundamental] Fetching for MARK
+2026-05-11 07:54:04.716 | INFO     | services.debate_chamber:_sentiment_node:759 - [Sentiment] Fetching for MARK
+2026-05-11 07:54:04.747 | INFO     | services.debate_chamber:_chartist_node:727 - [Chartist] Technicals computed: MA50=264.0, RSI=60.2
+2026-05-11 07:54:05.011 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:54:05.205 | INFO     | services.fair_value_calculator:extract_keystats:295 - [FairValue] MARK: DPS derived from yield (8.33%) × price (3) = 0.27
+2026-05-11 07:54:05.205 | INFO     | services.fair_value_calculator:extract_keystats:323 - [FairValue] MARK: all key stats parsed OK: {'eps_ttm': 78.23, 'bvps': 258.51, 'dps': 0.27, 'roe': '30.3%', 'pe': 10.74, 'pb': 3.25}
+2026-05-11 07:54:05.205 | INFO     | services.debate_chamber:_fundamental_node:646 - [Fundamental] Fair value for MARK: 886.0
+2026-05-11 07:54:05.207 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:54:05.227 | INFO     | services.debate_chamber:_chartist_node:727 - [Chartist] Technicals computed: MA50=310.0, RSI=63.1
+2026-05-11 07:54:05.235 | INFO     | services.debate_chamber:_chartist_node:727 - [Chartist] Technicals computed: MA50=796.0, RSI=60.3
+2026-05-11 07:54:05.259 | INFO     | services.fair_value_calculator:extract_keystats:295 - [FairValue] MIDI: DPS derived from yield (2.11%) × price (2) = 0.05
+2026-05-11 07:54:05.259 | INFO     | services.fair_value_calculator:extract_keystats:323 - [FairValue] MIDI: all key stats parsed OK: {'eps_ttm': 25.95, 'bvps': 143.78, 'dps': 0.05, 'roe': '18.1%', 'pe': 13.41, 'pb': 2.42}
+2026-05-11 07:54:05.260 | INFO     | services.debate_chamber:_fundamental_node:646 - [Fundamental] Fair value for MIDI: 345.0
+2026-05-11 07:54:05.262 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:54:05.401 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:54:05.411 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:54:06.140 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:54:06.143 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:54:06.159 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:54:07.992 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:54:08.126 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:54:08.367 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:54:13.414 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:54:14.498 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:54:14.502 | INFO     | services.debate_chamber:_synthesizer_node:784 - [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-11 07:54:14.502 | WARNING  | services.debate_chamber:_synthesizer_node:838 - [Synthesizer] Overvaluation detected: 298.0 > 214.0
+2026-05-11 07:54:14.503 | INFO     | services.debate_chamber:_bullish_node:869 - [Bull] Round 1 for OMED
+2026-05-11 07:54:14.504 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:54:15.182 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:54:20.260 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:54:22.201 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:54:22.207 | INFO     | services.debate_chamber:_synthesizer_node:784 - [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-11 07:54:22.208 | INFO     | services.debate_chamber:_bullish_node:869 - [Bull] Round 1 for MARK
+2026-05-11 07:54:22.209 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:54:22.862 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:54:22.868 | INFO     | services.debate_chamber:_synthesizer_node:784 - [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-11 07:54:22.868 | WARNING  | services.debate_chamber:_synthesizer_node:838 - [Synthesizer] Overvaluation detected: 348.0 > 345.0
+2026-05-11 07:54:22.870 | INFO     | services.debate_chamber:_bullish_node:869 - [Bull] Round 1 for MIDI
+2026-05-11 07:54:22.871 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:54:35.478 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:54:35.485 | INFO     | services.debate_chamber:_bearish_node:906 - [Bear] Round 1 for OMED
+2026-05-11 07:54:35.487 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:54:38.957 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:54:38.964 | INFO     | services.debate_chamber:_bearish_node:906 - [Bear] Round 1 for MIDI
+2026-05-11 07:54:38.966 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:54:43.120 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:54:43.130 | INFO     | services.debate_chamber:_bearish_node:906 - [Bear] Round 1 for MARK
+2026-05-11 07:54:43.134 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:54:55.824 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:54:55.830 | INFO     | services.debate_chamber:_consensus_evaluator_node:955 - [Consensus] Evaluating 5-agent votes
+2026-05-11 07:54:55.832 | INFO     | services.debate_chamber:_consensus_evaluator_node:958 - [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-11 07:54:55.835 | INFO     | services.debate_chamber:_state_cleaner_node:991 - [State Cleaner] Deterministic pruning (no LLM)
+2026-05-11 07:54:55.836 | INFO     | services.debate_chamber:_bullish_node:869 - [Bull] Round 2 for OMED
+2026-05-11 07:54:55.839 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:54:59.826 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:54:59.833 | INFO     | services.debate_chamber:_consensus_evaluator_node:955 - [Consensus] Evaluating 5-agent votes
+2026-05-11 07:54:59.834 | INFO     | services.debate_chamber:_consensus_evaluator_node:958 - [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-11 07:54:59.836 | INFO     | services.debate_chamber:_state_cleaner_node:991 - [State Cleaner] Deterministic pruning (no LLM)
+2026-05-11 07:54:59.837 | INFO     | services.debate_chamber:_bullish_node:869 - [Bull] Round 2 for MIDI
+2026-05-11 07:54:59.838 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:55:03.266 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:55:03.270 | INFO     | services.debate_chamber:_consensus_evaluator_node:955 - [Consensus] Evaluating 5-agent votes
+2026-05-11 07:55:03.270 | INFO     | services.debate_chamber:_consensus_evaluator_node:958 - [Consensus] Result: reached=True method=voting winner={'agent': 'chartist', 'position': 'BUY', 'confidence': 0.9, 'round': 0} dissent=['sentiment_specialist']
+2026-05-11 07:55:03.272 | INFO     | services.debate_chamber:_devils_advocate_node:1036 - [Devil's Advocate] Injecting adversarial scenario
+2026-05-11 07:55:03.273 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:55:12.814 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:55:12.820 | INFO     | services.debate_chamber:_cio_judge_node:1394 - [CIO] Deliberating on MARK (current price: 840)
+2026-05-11 07:55:12.822 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:55:14.216 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:55:14.221 | INFO     | services.debate_chamber:_bearish_node:906 - [Bear] Round 2 for OMED
+2026-05-11 07:55:14.222 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:55:17.522 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:55:17.526 | INFO     | services.debate_chamber:_bearish_node:906 - [Bear] Round 2 for MIDI
+2026-05-11 07:55:17.527 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:55:35.271 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:55:35.287 | INFO     | services.debate_chamber:_consensus_evaluator_node:955 - [Consensus] Evaluating 5-agent votes
+2026-05-11 07:55:35.288 | INFO     | services.debate_chamber:_consensus_evaluator_node:958 - [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-11 07:55:35.290 | INFO     | services.debate_chamber:_state_cleaner_node:991 - [State Cleaner] Deterministic pruning (no LLM)
+2026-05-11 07:55:35.291 | INFO     | services.debate_chamber:_bullish_node:869 - [Bull] Round 3 for OMED
+2026-05-11 07:55:35.292 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:55:39.609 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:55:39.614 | INFO     | services.debate_chamber:_consensus_evaluator_node:955 - [Consensus] Evaluating 5-agent votes
+2026-05-11 07:55:39.615 | INFO     | services.debate_chamber:_consensus_evaluator_node:958 - [Consensus] Result: reached=True method=soft_hold winner={'agent': 'soft_hold_rule', 'position': 'HOLD', 'confidence': 0.7} dissent=['chartist', 'bull', 'bear']
+2026-05-11 07:55:39.617 | INFO     | services.debate_chamber:_devils_advocate_node:1036 - [Devil's Advocate] Injecting adversarial scenario
+2026-05-11 07:55:39.618 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:55:46.161 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:55:46.186 | INFO     | services.debate_chamber:_cio_judge_node:1559 - [CIO] JSON parsed successfully for MARK
+2026-05-11 07:55:46.186 | INFO     | services.debate_chamber:_cio_judge_node:1577 - [CIO] Verdict delivered for MARK
+2026-05-11 07:55:46.188 | INFO     | services.debate_chamber:run:1673 - [DebateChamber] ✅ Pipeline complete for MARK
+2026-05-11 07:55:46.189 | INFO     | core.orchestrator.legacy:_run_single_debate:542 - [Debate] ✅ Selesai: MARK
+2026-05-11 07:55:46.714 | INFO     | core.orchestrator.legacy:_guarded:760 - [AUTO] Budget terpakai: 4/200
+2026-05-11 07:55:46.714 | INFO     | core.orchestrator.legacy:_run_single_debate:523 - [Debate] Mulai: AUTO
+2026-05-11 07:55:47.614 | INFO     | services.debate_chamber:run:1671 - [DebateChamber] ▶ Starting swing-trade pipeline for AUTO @ Rp 2,640
+2026-05-11 07:55:47.615 | INFO     | services.debate_chamber:_chartist_node:667 - [Chartist] Fetching OHLCV + orderbook for AUTO
+2026-05-11 07:55:47.615 | INFO     | services.debate_chamber:_fundamental_node:637 - [Fundamental] Fetching for AUTO
+2026-05-11 07:55:47.615 | INFO     | services.debate_chamber:_sentiment_node:759 - [Sentiment] Fetching for AUTO
+2026-05-11 07:55:47.705 | INFO     | services.fair_value_calculator:extract_keystats:295 - [FairValue] AUTO: DPS derived from yield (8.67%) × price (1) = 0.07
+2026-05-11 07:55:47.705 | INFO     | services.fair_value_calculator:extract_keystats:323 - [FairValue] AUTO: all key stats parsed OK: {'eps_ttm': 468.57, 'bvps': 3362.55, 'dps': 0.07, 'roe': '13.9%', 'pe': 5.63, 'pb': 0.79}
+2026-05-11 07:55:47.705 | INFO     | services.debate_chamber:_fundamental_node:646 - [Fundamental] Fair value for AUTO: 6896.0
+2026-05-11 07:55:47.707 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:55:48.134 | INFO     | services.debate_chamber:_chartist_node:727 - [Chartist] Technicals computed: MA50=2531.0, RSI=59.4
+2026-05-11 07:55:48.213 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:55:48.660 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:55:48.830 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:55:48.834 | INFO     | services.debate_chamber:_cio_judge_node:1394 - [CIO] Deliberating on MIDI (current price: 348)
+2026-05-11 07:55:48.835 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:55:50.160 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:55:55.815 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:55:55.822 | INFO     | services.debate_chamber:_bearish_node:906 - [Bear] Round 3 for OMED
+2026-05-11 07:55:55.823 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:56:01.528 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:56:09.302 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:56:09.307 | INFO     | services.debate_chamber:_synthesizer_node:784 - [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-11 07:56:09.308 | INFO     | services.debate_chamber:_bullish_node:869 - [Bull] Round 1 for AUTO
+2026-05-11 07:56:09.309 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:56:14.680 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:56:14.685 | INFO     | services.debate_chamber:_cio_judge_node:1559 - [CIO] JSON parsed successfully for MIDI
+2026-05-11 07:56:14.685 | INFO     | services.debate_chamber:_cio_judge_node:1577 - [CIO] Verdict delivered for MIDI
+2026-05-11 07:56:14.686 | INFO     | services.debate_chamber:run:1673 - [DebateChamber] ✅ Pipeline complete for MIDI
+2026-05-11 07:56:14.686 | INFO     | core.orchestrator.legacy:_run_single_debate:542 - [Debate] ✅ Selesai: MIDI
+2026-05-11 07:56:14.686 | INFO     | core.orchestrator.legacy:_run_single_debate:545 - [Debate] MIDI disagreement_type=timing
+2026-05-11 07:56:15.224 | INFO     | core.orchestrator.legacy:_guarded:760 - [GJTL] Budget terpakai: 5/200
+2026-05-11 07:56:15.224 | INFO     | core.orchestrator.legacy:_run_single_debate:523 - [Debate] Mulai: GJTL
+2026-05-11 07:56:16.117 | INFO     | services.debate_chamber:run:1671 - [DebateChamber] ▶ Starting swing-trade pipeline for GJTL @ Rp 1,185
+2026-05-11 07:56:16.118 | INFO     | services.debate_chamber:_chartist_node:667 - [Chartist] Fetching OHLCV + orderbook for GJTL
+2026-05-11 07:56:16.118 | INFO     | services.debate_chamber:_fundamental_node:637 - [Fundamental] Fetching for GJTL
+2026-05-11 07:56:16.118 | INFO     | services.debate_chamber:_sentiment_node:759 - [Sentiment] Fetching for GJTL
+2026-05-11 07:56:16.216 | INFO     | services.fair_value_calculator:extract_keystats:295 - [FairValue] GJTL: DPS derived from yield (4.22%) × price (0) = 0.02
+2026-05-11 07:56:16.217 | INFO     | services.fair_value_calculator:extract_keystats:323 - [FairValue] GJTL: all key stats parsed OK: {'eps_ttm': 364.64, 'bvps': 3112.19, 'dps': 0.02, 'roe': '11.7%', 'pe': 3.25, 'pb': 0.38}
+2026-05-11 07:56:16.217 | INFO     | services.debate_chamber:_fundamental_node:646 - [Fundamental] Fair value for GJTL: 5800.0
+2026-05-11 07:56:16.219 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:56:16.472 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:56:16.476 | INFO     | services.debate_chamber:_consensus_evaluator_node:955 - [Consensus] Evaluating 5-agent votes
+2026-05-11 07:56:16.477 | INFO     | services.debate_chamber:_consensus_evaluator_node:958 - [Consensus] Result: reached=False method=confidence_winner winner={'agent': 'chartist', 'position': 'BUY', 'confidence': 0.9, 'round': 0} dissent=['fundamental_scout', 'sentiment_specialist', 'bear']
+2026-05-11 07:56:16.478 | INFO     | services.debate_chamber:_devils_advocate_node:1036 - [Devil's Advocate] Injecting adversarial scenario
+2026-05-11 07:56:16.480 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:56:16.631 | INFO     | services.debate_chamber:_chartist_node:727 - [Chartist] Technicals computed: MA50=1119.0, RSI=54.9
+2026-05-11 07:56:16.704 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:56:17.196 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:56:18.870 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:56:26.154 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:56:26.640 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:56:26.645 | INFO     | services.debate_chamber:_synthesizer_node:784 - [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-11 07:56:26.646 | INFO     | services.debate_chamber:_bullish_node:869 - [Bull] Round 1 for GJTL
+2026-05-11 07:56:26.648 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:56:30.437 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:56:30.444 | INFO     | services.debate_chamber:_cio_judge_node:1394 - [CIO] Deliberating on OMED (current price: 298)
+2026-05-11 07:56:30.446 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:56:32.871 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:56:32.877 | INFO     | services.debate_chamber:_bearish_node:906 - [Bear] Round 1 for AUTO
+2026-05-11 07:56:32.878 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:56:47.544 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:56:47.548 | INFO     | services.debate_chamber:_bearish_node:906 - [Bear] Round 1 for GJTL
+2026-05-11 07:56:47.549 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:56:55.478 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:56:55.483 | INFO     | services.debate_chamber:_consensus_evaluator_node:955 - [Consensus] Evaluating 5-agent votes
+2026-05-11 07:56:55.483 | INFO     | services.debate_chamber:_consensus_evaluator_node:958 - [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-11 07:56:55.485 | INFO     | services.debate_chamber:_state_cleaner_node:991 - [State Cleaner] Deterministic pruning (no LLM)
+2026-05-11 07:56:55.486 | INFO     | services.debate_chamber:_bullish_node:869 - [Bull] Round 2 for AUTO
+2026-05-11 07:56:55.486 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:56:56.246 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:56:56.272 | WARNING  | services.debate_chamber:_cio_judge_node:1561 - [CIO] Primary JSON parse failed (1 validation error for CIOVerdict
+  Value error, Invalid swing price ordering: expected stop_loss < entry_low <= entry_high < target_price [type=value_error, input_value={'ticker': 'OMED', 'ratin...nt_specialist', 'bear']}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.13/v/value_error); using safe fallback verdict
+2026-05-11 07:56:56.274 | ERROR    | core.orchestrator.legacy:_run_single_debate:575 - [Debate] 🚨 OMED gagal: 1 validation error for CIOVerdict
+  Value error, Invalid swing price ordering: expected stop_loss < entry_low <= entry_high < target_price [type=value_error, input_value={'ticker': 'OMED', 'ratin...nt_specialist', 'bear']}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.13/v/value_error
+2026-05-11 07:56:56.796 | INFO     | core.orchestrator.legacy:_guarded:760 - [ERAA] Budget terpakai: 6/200
+2026-05-11 07:56:56.796 | INFO     | core.orchestrator.legacy:_run_single_debate:523 - [Debate] Mulai: ERAA
+2026-05-11 07:56:57.867 | INFO     | services.debate_chamber:run:1671 - [DebateChamber] ▶ Starting swing-trade pipeline for ERAA @ Rp 406
+2026-05-11 07:56:57.868 | INFO     | services.debate_chamber:_chartist_node:667 - [Chartist] Fetching OHLCV + orderbook for ERAA
+2026-05-11 07:56:57.868 | INFO     | services.debate_chamber:_fundamental_node:637 - [Fundamental] Fetching for ERAA
+2026-05-11 07:56:57.868 | INFO     | services.debate_chamber:_sentiment_node:759 - [Sentiment] Fetching for ERAA
+2026-05-11 07:56:57.966 | INFO     | services.fair_value_calculator:extract_keystats:295 - [FairValue] ERAA: DPS derived from yield (4.68%) × price (1) = 0.03
+2026-05-11 07:56:57.966 | INFO     | services.fair_value_calculator:extract_keystats:323 - [FairValue] ERAA: all key stats parsed OK: {'eps_ttm': 90.62, 'bvps': 598.63, 'dps': 0.03, 'roe': '15.1%', 'pe': 4.48, 'pb': 0.68}
+2026-05-11 07:56:57.966 | INFO     | services.debate_chamber:_fundamental_node:646 - [Fundamental] Fair value for ERAA: 1288.0
+2026-05-11 07:56:57.968 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:56:58.385 | INFO     | services.debate_chamber:_chartist_node:727 - [Chartist] Technicals computed: MA50=399.0, RSI=53.4
+2026-05-11 07:56:58.456 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:56:58.994 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:57:00.586 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:57:07.644 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:57:07.648 | INFO     | services.debate_chamber:_consensus_evaluator_node:955 - [Consensus] Evaluating 5-agent votes
+2026-05-11 07:57:07.649 | INFO     | services.debate_chamber:_consensus_evaluator_node:958 - [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-11 07:57:07.650 | INFO     | services.debate_chamber:_state_cleaner_node:991 - [State Cleaner] Deterministic pruning (no LLM)
+2026-05-11 07:57:07.650 | INFO     | services.debate_chamber:_bullish_node:869 - [Bull] Round 2 for GJTL
+2026-05-11 07:57:07.651 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:57:13.013 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:57:14.068 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:57:14.072 | INFO     | services.debate_chamber:_bearish_node:906 - [Bear] Round 2 for AUTO
+2026-05-11 07:57:14.073 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:57:20.405 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:57:20.409 | INFO     | services.debate_chamber:_synthesizer_node:784 - [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-11 07:57:20.409 | INFO     | services.debate_chamber:_bullish_node:869 - [Bull] Round 1 for ERAA
+2026-05-11 07:57:20.410 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:57:22.962 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:57:22.968 | INFO     | services.debate_chamber:_bearish_node:906 - [Bear] Round 2 for GJTL
+2026-05-11 07:57:22.969 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:57:36.916 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:57:36.920 | INFO     | services.debate_chamber:_consensus_evaluator_node:955 - [Consensus] Evaluating 5-agent votes
+2026-05-11 07:57:36.921 | INFO     | services.debate_chamber:_consensus_evaluator_node:958 - [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-11 07:57:36.923 | INFO     | services.debate_chamber:_state_cleaner_node:991 - [State Cleaner] Deterministic pruning (no LLM)
+2026-05-11 07:57:36.924 | INFO     | services.debate_chamber:_bullish_node:869 - [Bull] Round 3 for AUTO
+2026-05-11 07:57:36.925 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:57:39.433 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:57:39.439 | INFO     | services.debate_chamber:_consensus_evaluator_node:955 - [Consensus] Evaluating 5-agent votes
+2026-05-11 07:57:39.448 | INFO     | services.debate_chamber:_consensus_evaluator_node:958 - [Consensus] Result: reached=True method=soft_hold winner={'agent': 'soft_hold_rule', 'position': 'HOLD', 'confidence': 0.88} dissent=['fundamental_scout', 'chartist', 'bull', 'bear']
+2026-05-11 07:57:39.449 | INFO     | services.debate_chamber:_devils_advocate_node:1036 - [Devil's Advocate] Injecting adversarial scenario
+2026-05-11 07:57:39.450 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:57:40.999 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:57:41.003 | INFO     | services.debate_chamber:_bearish_node:906 - [Bear] Round 1 for ERAA
+2026-05-11 07:57:41.004 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:57:48.263 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:57:48.268 | INFO     | services.debate_chamber:_cio_judge_node:1394 - [CIO] Deliberating on GJTL (current price: 1,185)
+2026-05-11 07:57:48.269 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:57:57.440 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:57:57.445 | INFO     | services.debate_chamber:_bearish_node:906 - [Bear] Round 3 for AUTO
+2026-05-11 07:57:57.446 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:58:01.149 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:58:01.249 | INFO     | services.debate_chamber:_consensus_evaluator_node:955 - [Consensus] Evaluating 5-agent votes
+2026-05-11 07:58:01.250 | INFO     | services.debate_chamber:_consensus_evaluator_node:958 - [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-11 07:58:01.251 | INFO     | services.debate_chamber:_state_cleaner_node:991 - [State Cleaner] Deterministic pruning (no LLM)
+2026-05-11 07:58:01.252 | INFO     | services.debate_chamber:_bullish_node:869 - [Bull] Round 2 for ERAA
+2026-05-11 07:58:01.253 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:58:15.246 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:58:15.251 | INFO     | services.debate_chamber:_cio_judge_node:1559 - [CIO] JSON parsed successfully for GJTL
+2026-05-11 07:58:15.251 | INFO     | services.debate_chamber:_cio_judge_node:1577 - [CIO] Verdict delivered for GJTL
+2026-05-11 07:58:15.252 | INFO     | services.debate_chamber:run:1673 - [DebateChamber] ✅ Pipeline complete for GJTL
+2026-05-11 07:58:15.252 | INFO     | core.orchestrator.legacy:_run_single_debate:542 - [Debate] ✅ Selesai: GJTL
+2026-05-11 07:58:15.252 | INFO     | core.orchestrator.legacy:_run_single_debate:545 - [Debate] GJTL disagreement_type=timing
+2026-05-11 07:58:15.776 | INFO     | core.orchestrator.legacy:_guarded:760 - [MAPI] Budget terpakai: 7/200
+2026-05-11 07:58:15.776 | INFO     | core.orchestrator.legacy:_run_single_debate:523 - [Debate] Mulai: MAPI
+2026-05-11 07:58:16.840 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:58:16.844 | INFO     | services.debate_chamber:_consensus_evaluator_node:955 - [Consensus] Evaluating 5-agent votes
+2026-05-11 07:58:16.845 | INFO     | services.debate_chamber:_consensus_evaluator_node:958 - [Consensus] Result: reached=True method=soft_hold winner={'agent': 'soft_hold_rule', 'position': 'HOLD', 'confidence': 0.6} dissent=['fundamental_scout', 'bull', 'bear']
+2026-05-11 07:58:16.846 | INFO     | services.debate_chamber:_devils_advocate_node:1036 - [Devil's Advocate] Injecting adversarial scenario
+2026-05-11 07:58:16.848 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:58:17.860 | INFO     | services.debate_chamber:run:1671 - [DebateChamber] ▶ Starting swing-trade pipeline for MAPI @ Rp 1,455
+2026-05-11 07:58:17.861 | INFO     | services.debate_chamber:_chartist_node:667 - [Chartist] Fetching OHLCV + orderbook for MAPI
+2026-05-11 07:58:17.861 | INFO     | services.debate_chamber:_fundamental_node:637 - [Fundamental] Fetching for MAPI
+2026-05-11 07:58:17.861 | INFO     | services.debate_chamber:_sentiment_node:759 - [Sentiment] Fetching for MAPI
+2026-05-11 07:58:17.987 | INFO     | services.fair_value_calculator:extract_keystats:295 - [FairValue] MAPI: DPS derived from yield (0.69%) × price (2) = 1.14
+2026-05-11 07:58:17.987 | INFO     | services.fair_value_calculator:extract_keystats:323 - [FairValue] MAPI: all key stats parsed OK: {'eps_ttm': 143.79, 'bvps': 882.62, 'dps': 1.14, 'roe': '16.3%', 'pe': 10.12, 'pb': 1.65}
+2026-05-11 07:58:17.988 | INFO     | services.debate_chamber:_fundamental_node:646 - [Fundamental] Fair value for MAPI: 1986.0
+2026-05-11 07:58:17.990 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:58:18.374 | INFO     | services.debate_chamber:_chartist_node:727 - [Chartist] Technicals computed: MA50=1244.0, RSI=64.6
+2026-05-11 07:58:18.530 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:58:18.917 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:58:20.457 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:58:20.836 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:58:20.840 | INFO     | services.debate_chamber:_bearish_node:906 - [Bear] Round 2 for ERAA
+2026-05-11 07:58:20.842 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:58:30.981 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:58:30.984 | INFO     | services.debate_chamber:_cio_judge_node:1394 - [CIO] Deliberating on AUTO (current price: 2,640)
+2026-05-11 07:58:30.986 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:58:32.851 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:58:40.615 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:58:40.624 | INFO     | services.debate_chamber:_consensus_evaluator_node:955 - [Consensus] Evaluating 5-agent votes
+2026-05-11 07:58:40.625 | INFO     | services.debate_chamber:_consensus_evaluator_node:958 - [Consensus] Result: reached=True method=soft_hold winner={'agent': 'soft_hold_rule', 'position': 'HOLD', 'confidence': 0.88} dissent=['fundamental_scout', 'bull', 'bear']
+2026-05-11 07:58:40.628 | INFO     | services.debate_chamber:_devils_advocate_node:1036 - [Devil's Advocate] Injecting adversarial scenario
+2026-05-11 07:58:40.629 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:58:42.133 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:58:42.138 | INFO     | services.debate_chamber:_synthesizer_node:784 - [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-11 07:58:42.139 | INFO     | services.debate_chamber:_bullish_node:869 - [Bull] Round 1 for MAPI
+2026-05-11 07:58:42.140 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:58:49.637 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:58:49.649 | INFO     | services.debate_chamber:_cio_judge_node:1394 - [CIO] Deliberating on ERAA (current price: 406)
+2026-05-11 07:58:49.651 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:58:55.831 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:58:55.836 | INFO     | services.debate_chamber:_cio_judge_node:1559 - [CIO] JSON parsed successfully for AUTO
+2026-05-11 07:58:55.836 | INFO     | services.debate_chamber:_cio_judge_node:1577 - [CIO] Verdict delivered for AUTO
+2026-05-11 07:58:55.838 | INFO     | services.debate_chamber:run:1673 - [DebateChamber] ✅ Pipeline complete for AUTO
+2026-05-11 07:58:55.838 | INFO     | core.orchestrator.legacy:_run_single_debate:542 - [Debate] ✅ Selesai: AUTO
+2026-05-11 07:58:55.838 | INFO     | core.orchestrator.legacy:_run_single_debate:545 - [Debate] AUTO disagreement_type=timing
+2026-05-11 07:58:56.375 | INFO     | core.orchestrator.legacy:_guarded:760 - [ULTJ] Budget terpakai: 8/200
+2026-05-11 07:58:56.375 | INFO     | core.orchestrator.legacy:_run_single_debate:523 - [Debate] Mulai: ULTJ
+2026-05-11 07:58:57.951 | INFO     | services.debate_chamber:run:1671 - [DebateChamber] ▶ Starting swing-trade pipeline for ULTJ @ Rp 1,600
+2026-05-11 07:58:57.954 | INFO     | services.debate_chamber:_chartist_node:667 - [Chartist] Fetching OHLCV + orderbook for ULTJ
+2026-05-11 07:58:57.955 | INFO     | services.debate_chamber:_fundamental_node:637 - [Fundamental] Fetching for ULTJ
+2026-05-11 07:58:57.955 | INFO     | services.debate_chamber:_sentiment_node:759 - [Sentiment] Fetching for ULTJ
+2026-05-11 07:58:58.149 | INFO     | services.fair_value_calculator:extract_keystats:295 - [FairValue] ULTJ: DPS derived from yield (8.12%) × price (2) = 0.16
+2026-05-11 07:58:58.150 | INFO     | services.fair_value_calculator:extract_keystats:323 - [FairValue] ULTJ: all key stats parsed OK: {'eps_ttm': 142.74, 'bvps': 838.74, 'dps': 0.16, 'roe': '17.0%', 'pe': 11.21, 'pb': 1.91}
+2026-05-11 07:58:58.150 | INFO     | services.debate_chamber:_fundamental_node:646 - [Fundamental] Fair value for ULTJ: 1938.0
+2026-05-11 07:58:58.154 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:58:58.480 | INFO     | services.debate_chamber:_chartist_node:727 - [Chartist] Technicals computed: MA50=1574.0, RSI=51.3
+2026-05-11 07:58:58.704 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:58:59.078 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:59:00.904 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:59:02.703 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:59:02.709 | INFO     | services.debate_chamber:_bearish_node:906 - [Bear] Round 1 for MAPI
+2026-05-11 07:59:02.711 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:59:08.006 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:59:09.885 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:59:09.904 | INFO     | services.debate_chamber:_synthesizer_node:784 - [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-11 07:59:09.906 | INFO     | services.debate_chamber:_bullish_node:869 - [Bull] Round 1 for ULTJ
+2026-05-11 07:59:09.908 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:59:16.180 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:59:16.186 | INFO     | services.debate_chamber:_cio_judge_node:1559 - [CIO] JSON parsed successfully for ERAA
+2026-05-11 07:59:16.186 | INFO     | services.debate_chamber:_cio_judge_node:1577 - [CIO] Verdict delivered for ERAA
+2026-05-11 07:59:16.187 | INFO     | services.debate_chamber:run:1673 - [DebateChamber] ✅ Pipeline complete for ERAA
+2026-05-11 07:59:16.187 | INFO     | core.orchestrator.legacy:_run_single_debate:542 - [Debate] ✅ Selesai: ERAA
+2026-05-11 07:59:16.188 | INFO     | core.orchestrator.legacy:_run_single_debate:545 - [Debate] ERAA disagreement_type=timing
+2026-05-11 07:59:16.730 | INFO     | core.orchestrator.legacy:_guarded:760 - [ACES] Budget terpakai: 9/200
+2026-05-11 07:59:16.731 | INFO     | core.orchestrator.legacy:_run_single_debate:523 - [Debate] Mulai: ACES
+2026-05-11 07:59:17.405 | INFO     | services.debate_chamber:run:1671 - [DebateChamber] ▶ Starting swing-trade pipeline for ACES @ Rp 380
+2026-05-11 07:59:17.408 | INFO     | services.debate_chamber:_chartist_node:667 - [Chartist] Fetching OHLCV + orderbook for ACES
+2026-05-11 07:59:17.408 | INFO     | services.debate_chamber:_fundamental_node:637 - [Fundamental] Fetching for ACES
+2026-05-11 07:59:17.408 | INFO     | services.debate_chamber:_sentiment_node:759 - [Sentiment] Fetching for ACES
+2026-05-11 07:59:17.504 | INFO     | services.fair_value_calculator:extract_keystats:295 - [FairValue] ACES: DPS derived from yield (8.91%) × price (1) = 0.09
+2026-05-11 07:59:17.504 | INFO     | services.fair_value_calculator:extract_keystats:323 - [FairValue] ACES: all key stats parsed OK: {'eps_ttm': 40.34, 'bvps': 390.49, 'dps': 0.09, 'roe': '10.3%', 'pe': 9.42, 'pb': 0.97}
+2026-05-11 07:59:17.504 | INFO     | services.debate_chamber:_fundamental_node:646 - [Fundamental] Fair value for ACES: 682.0
+2026-05-11 07:59:17.507 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:59:17.922 | INFO     | services.debate_chamber:_chartist_node:727 - [Chartist] Technicals computed: MA50=381.0, RSI=50.9
+2026-05-11 07:59:17.996 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:59:18.539 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:59:21.269 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:59:22.146 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:59:22.152 | INFO     | services.debate_chamber:_consensus_evaluator_node:955 - [Consensus] Evaluating 5-agent votes
+2026-05-11 07:59:22.154 | INFO     | services.debate_chamber:_consensus_evaluator_node:958 - [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-11 07:59:22.157 | INFO     | services.debate_chamber:_state_cleaner_node:991 - [State Cleaner] Deterministic pruning (no LLM)
+2026-05-11 07:59:22.159 | INFO     | services.debate_chamber:_bullish_node:869 - [Bull] Round 2 for MAPI
+2026-05-11 07:59:22.161 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:59:27.876 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:59:29.020 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:59:29.025 | INFO     | services.debate_chamber:_bearish_node:906 - [Bear] Round 1 for ULTJ
+2026-05-11 07:59:29.028 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:59:34.013 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:59:34.020 | INFO     | services.debate_chamber:_synthesizer_node:784 - [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-11 07:59:34.022 | INFO     | services.debate_chamber:_bullish_node:869 - [Bull] Round 1 for ACES
+2026-05-11 07:59:34.024 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:59:35.916 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:59:35.921 | INFO     | services.debate_chamber:_bearish_node:906 - [Bear] Round 2 for MAPI
+2026-05-11 07:59:35.923 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:59:49.632 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:59:49.637 | INFO     | services.debate_chamber:_consensus_evaluator_node:955 - [Consensus] Evaluating 5-agent votes
+2026-05-11 07:59:49.638 | INFO     | services.debate_chamber:_consensus_evaluator_node:958 - [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-11 07:59:49.641 | INFO     | services.debate_chamber:_state_cleaner_node:991 - [State Cleaner] Deterministic pruning (no LLM)
+2026-05-11 07:59:49.642 | INFO     | services.debate_chamber:_bullish_node:869 - [Bull] Round 2 for ULTJ
+2026-05-11 07:59:49.645 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:59:55.600 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:59:55.608 | INFO     | services.debate_chamber:_bearish_node:906 - [Bear] Round 1 for ACES
+2026-05-11 07:59:55.610 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 07:59:57.279 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 07:59:57.285 | INFO     | services.debate_chamber:_consensus_evaluator_node:955 - [Consensus] Evaluating 5-agent votes
+2026-05-11 07:59:57.287 | INFO     | services.debate_chamber:_consensus_evaluator_node:958 - [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-11 07:59:57.289 | INFO     | services.debate_chamber:_state_cleaner_node:991 - [State Cleaner] Deterministic pruning (no LLM)
+2026-05-11 07:59:57.291 | INFO     | services.debate_chamber:_bullish_node:869 - [Bull] Round 3 for MAPI
+2026-05-11 07:59:57.293 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 08:00:03.304 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 08:00:03.312 | INFO     | services.debate_chamber:_bearish_node:906 - [Bear] Round 2 for ULTJ
+2026-05-11 08:00:03.313 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 08:00:14.506 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 08:00:14.513 | INFO     | services.debate_chamber:_consensus_evaluator_node:955 - [Consensus] Evaluating 5-agent votes
+2026-05-11 08:00:14.515 | INFO     | services.debate_chamber:_consensus_evaluator_node:958 - [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-11 08:00:14.518 | INFO     | services.debate_chamber:_state_cleaner_node:991 - [State Cleaner] Deterministic pruning (no LLM)
+2026-05-11 08:00:14.519 | INFO     | services.debate_chamber:_bullish_node:869 - [Bull] Round 2 for ACES
+2026-05-11 08:00:14.521 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 08:00:15.674 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 08:00:15.680 | INFO     | services.debate_chamber:_bearish_node:906 - [Bear] Round 3 for MAPI
+2026-05-11 08:00:15.682 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 08:00:23.866 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 08:00:23.872 | INFO     | services.debate_chamber:_consensus_evaluator_node:955 - [Consensus] Evaluating 5-agent votes
+2026-05-11 08:00:23.874 | INFO     | services.debate_chamber:_consensus_evaluator_node:958 - [Consensus] Result: reached=True method=voting winner={'agent': 'fundamental_scout', 'position': 'BUY', 'confidence': 0.85, 'round': 0} dissent=['sentiment_specialist', 'bear']
+2026-05-11 08:00:23.876 | INFO     | services.debate_chamber:_devils_advocate_node:1036 - [Devil's Advocate] Injecting adversarial scenario
+2026-05-11 08:00:23.877 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 08:00:31.553 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 08:00:31.558 | INFO     | services.debate_chamber:_bearish_node:906 - [Bear] Round 2 for ACES
+2026-05-11 08:00:31.560 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 08:00:34.500 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 08:00:34.505 | INFO     | services.debate_chamber:_cio_judge_node:1394 - [CIO] Deliberating on ULTJ (current price: 1,600)
+2026-05-11 08:00:34.507 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 08:00:36.984 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 08:00:36.989 | INFO     | services.debate_chamber:_consensus_evaluator_node:955 - [Consensus] Evaluating 5-agent votes
+2026-05-11 08:00:36.990 | INFO     | services.debate_chamber:_consensus_evaluator_node:958 - [Consensus] Result: reached=False method=confidence_winner winner={'agent': 'bull', 'position': 'BUY', 'confidence': 0.88, 'round': 3} dissent=['chartist', 'sentiment_specialist', 'bear']
+2026-05-11 08:00:36.992 | INFO     | services.debate_chamber:_devils_advocate_node:1036 - [Devil's Advocate] Injecting adversarial scenario
+2026-05-11 08:00:36.994 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 08:00:48.160 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 08:00:48.167 | INFO     | services.debate_chamber:_cio_judge_node:1394 - [CIO] Deliberating on MAPI (current price: 1,455)
+2026-05-11 08:00:48.169 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 08:00:52.284 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 08:00:52.291 | INFO     | services.debate_chamber:_consensus_evaluator_node:955 - [Consensus] Evaluating 5-agent votes
+2026-05-11 08:00:52.293 | INFO     | services.debate_chamber:_consensus_evaluator_node:958 - [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-11 08:00:52.295 | INFO     | services.debate_chamber:_state_cleaner_node:991 - [State Cleaner] Deterministic pruning (no LLM)
+2026-05-11 08:00:52.297 | INFO     | services.debate_chamber:_bullish_node:869 - [Bull] Round 3 for ACES
+2026-05-11 08:00:52.299 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 08:01:02.329 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-11 08:01:02.335 | INFO     | services.debate_chamber:_cio_judge_node:1559 - [CIO] JSON parsed successfully for ULTJ
+2026-05-11 08:01:02.335 | INFO     | services.debate_chamber:_cio_judge_node:1577 - [CIO] Verdict delivered for ULTJ
+2026-05-11 08:01:02.336 | INFO     | services.debate_chamber:run:1673 - [DebateChamber] ✅ Pipeline complete for ULTJ
+2026-05-11 08:01:02.337 | INFO     | core.orchestrator.legacy:_run_single_debate:542 - [Debate] ✅ Selesai: ULTJ
+2026-05-11 08:01:02.869 | INFO     | core.orchestrator.legacy:_guarded:760 - [AKRA] Budget terpakai: 10/200
+2026-05-11 08:01:02.869 | INFO     | core.orchestrator.legacy:_run_single_debate:523 - [Debate] Mulai: AKRA
+2026-05-11 08:01:03.625 | INFO     | services.debate_chamber:run:1671 - [DebateChamber] ▶ Starting swing-trade pipeline for AKRA @ Rp 1,500
+2026-05-11 08:01:03.628 | INFO     | services.debate_chamber:_chartist_node:667 - [Chartist] Fetching OHLCV + orderbook for AKRA
+2026-05-11 08:01:03.628 | INFO     | services.debate_chamber:_fundamental_node:637 - [Fundamental] Fetching for AKRA
+2026-05-11 08:01:03.629 | INFO     | services.debate_chamber:_sentiment_node:759 - [Sentiment] Fetching for AKRA
+2026-05-11 08:01:03.721 | INFO     | services.fair_value_calculator:extract_keystats:295 - [FairValue] AKRA: DPS derived from yield (6.67%) × price (2) = 0.16
+2026-05-11 08:01:03.721 | INFO     | services.fair_value_calculator:extract_keystats:323 - [FairValue] AKRA: all key stats parsed OK: {'eps_ttm': 127.73, 'bvps': 638.85, 'dps': 0.16, 'roe': '20.0%', 'pe': 11.74, 'pb': 2.35}
+2026-05-11 08:01:03.721 | INFO     | services.debate_chamber:_fundamental_node:646 - [Fundamental] Fair value for AKRA: 1637.0
+2026-05-11 08:01:03.724 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 08:01:04.149 | INFO     | services.debate_chamber:_chartist_node:727 - [Chartist] Technicals computed: MA50=1344.0, RSI=59.0
+2026-05-11 08:01:04.217 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 08:01:04.772 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 08:01:06.998 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 08:01:12.797 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 08:01:12.803 | INFO     | services.debate_chamber:_bearish_node:906 - [Bear] Round 3 for ACES
+2026-05-11 08:01:12.805 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 08:01:18.511 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 08:01:21.266 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-11 08:01:21.272 | INFO     | services.debate_chamber:_cio_judge_node:1559 - [CIO] JSON parsed successfully for MAPI
+2026-05-11 08:01:21.272 | INFO     | services.debate_chamber:_cio_judge_node:1577 - [CIO] Verdict delivered for MAPI
+2026-05-11 08:01:21.273 | INFO     | services.debate_chamber:run:1673 - [DebateChamber] ✅ Pipeline complete for MAPI
+2026-05-11 08:01:21.273 | INFO     | core.orchestrator.legacy:_run_single_debate:542 - [Debate] ✅ Selesai: MAPI
+2026-05-11 08:01:21.273 | INFO     | core.orchestrator.legacy:_run_single_debate:545 - [Debate] MAPI disagreement_type=direction
+2026-05-11 08:01:23.476 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 08:01:23.478 | INFO     | services.debate_chamber:_synthesizer_node:784 - [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-11 08:01:23.479 | INFO     | services.debate_chamber:_bullish_node:869 - [Bull] Round 1 for AKRA
+2026-05-11 08:01:23.480 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 08:01:26.733 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 08:01:26.741 | INFO     | services.debate_chamber:_consensus_evaluator_node:955 - [Consensus] Evaluating 5-agent votes
+2026-05-11 08:01:26.742 | INFO     | services.debate_chamber:_consensus_evaluator_node:958 - [Consensus] Result: reached=False method=confidence_winner winner={'agent': 'bear', 'position': 'AVOID', 'confidence': 0.92, 'round': 3} dissent=['fundamental_scout', 'sentiment_specialist', 'bull']
+2026-05-11 08:01:26.745 | INFO     | services.debate_chamber:_devils_advocate_node:1036 - [Devil's Advocate] Injecting adversarial scenario
+2026-05-11 08:01:26.746 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 08:01:36.856 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 08:01:36.871 | INFO     | services.debate_chamber:_cio_judge_node:1394 - [CIO] Deliberating on ACES (current price: 380)
+2026-05-11 08:01:36.873 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 08:01:44.125 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 08:01:44.131 | INFO     | services.debate_chamber:_bearish_node:906 - [Bear] Round 1 for AKRA
+2026-05-11 08:01:44.133 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 08:01:59.871 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 08:01:59.879 | INFO     | services.debate_chamber:_consensus_evaluator_node:955 - [Consensus] Evaluating 5-agent votes
+2026-05-11 08:01:59.880 | INFO     | services.debate_chamber:_consensus_evaluator_node:958 - [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-11 08:01:59.882 | INFO     | services.debate_chamber:_state_cleaner_node:991 - [State Cleaner] Deterministic pruning (no LLM)
+2026-05-11 08:01:59.883 | INFO     | services.debate_chamber:_bullish_node:869 - [Bull] Round 2 for AKRA
+2026-05-11 08:01:59.885 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 08:02:00.924 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-11 08:02:00.929 | INFO     | services.debate_chamber:_cio_judge_node:1559 - [CIO] JSON parsed successfully for ACES
+2026-05-11 08:02:00.929 | INFO     | services.debate_chamber:_cio_judge_node:1577 - [CIO] Verdict delivered for ACES
+2026-05-11 08:02:00.930 | INFO     | services.debate_chamber:run:1673 - [DebateChamber] ✅ Pipeline complete for ACES
+2026-05-11 08:02:00.930 | INFO     | core.orchestrator.legacy:_run_single_debate:542 - [Debate] ✅ Selesai: ACES
+2026-05-11 08:02:00.931 | INFO     | core.orchestrator.legacy:_run_single_debate:545 - [Debate] ACES disagreement_type=direction
+2026-05-11 08:02:15.158 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 08:02:15.163 | INFO     | services.debate_chamber:_bearish_node:906 - [Bear] Round 2 for AKRA
+2026-05-11 08:02:15.165 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 08:02:37.933 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 08:02:37.938 | INFO     | services.debate_chamber:_consensus_evaluator_node:955 - [Consensus] Evaluating 5-agent votes
+2026-05-11 08:02:37.939 | INFO     | services.debate_chamber:_consensus_evaluator_node:958 - [Consensus] Result: reached=True method=soft_hold winner={'agent': 'soft_hold_rule', 'position': 'HOLD', 'confidence': 0.7} dissent=['fundamental_scout', 'chartist', 'bull', 'bear']
+2026-05-11 08:02:37.941 | INFO     | services.debate_chamber:_devils_advocate_node:1036 - [Devil's Advocate] Injecting adversarial scenario
+2026-05-11 08:02:37.943 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 08:02:52.168 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-11 08:02:52.175 | INFO     | services.debate_chamber:_cio_judge_node:1394 - [CIO] Deliberating on AKRA (current price: 1,500)
+2026-05-11 08:02:52.177 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-11 08:03:16.786 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-11 08:03:16.791 | INFO     | services.debate_chamber:_cio_judge_node:1559 - [CIO] JSON parsed successfully for AKRA
+2026-05-11 08:03:16.791 | INFO     | services.debate_chamber:_cio_judge_node:1577 - [CIO] Verdict delivered for AKRA
+2026-05-11 08:03:16.792 | INFO     | services.debate_chamber:run:1673 - [DebateChamber] ✅ Pipeline complete for AKRA
+2026-05-11 08:03:16.793 | INFO     | core.orchestrator.legacy:_run_single_debate:542 - [Debate] ✅ Selesai: AKRA
+2026-05-11 08:03:16.793 | INFO     | core.orchestrator.legacy:_run_single_debate:545 - [Debate] AKRA disagreement_type=timing
