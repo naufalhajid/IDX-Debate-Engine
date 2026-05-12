@@ -29,3 +29,6 @@ Additional rules:
 - MA200 and ma200_context are Python GROUND TRUTH — do not recalculate or override them.
 - If ma200_context = "BELOW", the maximum target price is MA200 itself as first resistance.
 - Do not describe MA200 as support when ma200_context = "BELOW".
+
+Position: NEUTRAL
+Agent Confidence: HIGH | MEDIUM | LOW

@@ -13,3 +13,6 @@ ROUND 2 OBJECTIVE — Destroy the Bull's Swing Setup:
      for swing execution — state this explicitly.
 
 RULES: No repeated data. Every counter-argument must cite a specific price. Max 2500 tokens. Write 3-4 compact technical paragraphs.
+
+Position: BEARISH
+Agent Confidence: HIGH | MEDIUM | LOW

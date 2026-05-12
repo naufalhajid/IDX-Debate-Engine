@@ -4,6 +4,9 @@ from requests import Session
 from requests_cache import CacheMixin, SQLiteCache
 from requests_ratelimiter import LimiterMixin
 
+from core.failure_taxonomy import classify_exception
+from utils.logger_config import logger
+
 
 class CachedLimiterSession(CacheMixin, LimiterMixin, Session):
     pass
@@ -22,6 +25,11 @@ class YFinance:
         self.session.headers["User-agent"] = "my-program/1.0"
 
     def close_price(self, stock):
-        ticker = self.yf.Ticker(stock.ticker, session=self.session)
-        hist = ticker.history(period="1d")
-        return hist["Close"].iloc[-1]  # Get the last close price
+        try:
+            ticker = self.yf.Ticker(stock.ticker, session=self.session)
+            hist = ticker.history(period="1d")
+            return hist["Close"].iloc[-1]  # Get the last close price
+        except Exception as exc:
+            failure = classify_exception(exc, source="yfinance")
+            logger.error(f"[YFinance] close_price failed: {failure.model_dump()}")
+            raise

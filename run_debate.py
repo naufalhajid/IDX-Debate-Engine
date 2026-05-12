@@ -1,14 +1,20 @@
 import argparse
 import asyncio
 import json
+from datetime import datetime
 from pathlib import Path
+from typing import Any
+from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 
-from services.debate_chamber import DebateChamber
+from core.prompt_pack_linter import lint_prompt_pack
+from core.settings import settings
 from utils.logger_config import logger
 
 load_dotenv()
+
+PROMPT_MANIFEST_PATH = Path(__file__).resolve().parent / "services" / "debate_prompts" / "manifest.json"
 
 
 def parse_args() -> argparse.Namespace:
@@ -25,12 +31,82 @@ def parse_args() -> argparse.Namespace:
         "--output-dir",
         type=str,
         default="output/debates",
-        help="Directory to save debate reports (default: output/debates)",
+        help=(
+            "Directory to save debate reports. Each run writes timestamped "
+            "snapshots plus latest and legacy flat files (default: output/debates)"
+        ),
     )
     return parser.parse_args()
 
 
-async def _debate_one(ticker: str, chamber: DebateChamber, output_dir: Path) -> bool:
+def _get_run_time() -> datetime:
+    """Return the run timestamp in the configured local timezone."""
+    try:
+        return datetime.now(ZoneInfo(settings.DATETIME_TIMEZONE))
+    except Exception as exc:
+        logger.warning(
+            f"[run_debate] Invalid DATETIME_TIMEZONE={settings.DATETIME_TIMEZONE!r}; "
+            f"falling back to system local timezone: {exc}"
+        )
+        return datetime.now().astimezone()
+
+
+def _as_debate_message(m):
+    from schemas.debate import DebateMessage
+    if isinstance(m, dict):
+        return DebateMessage(**m)
+    return m
+
+
+def _save_timestamped_report(
+    report: dict,
+    output_dir: Path,
+    ticker: str,
+    run_timestamp: str,
+    generated_at: str,
+) -> Path:
+    """
+    Save a debate report with timestamped history and backward-compatible aliases.
+
+    Layout:
+      output/debates/{TICKER}/v{run_timestamp}/{TICKER}_debate.json
+      output/debates/{TICKER}/latest_debate.json
+      output/debates/{TICKER}_debate.json
+    """
+    payload = dict(report)
+    metadata = payload.get("metadata")
+    if not isinstance(metadata, dict):
+        metadata = {}
+    payload["metadata"] = {
+        **metadata,
+        "batch_timestamp": run_timestamp,
+        "run_timestamp": run_timestamp,
+        "generated_at": generated_at,
+        "versioned_output": True,
+    }
+
+    ticker_dir = output_dir / ticker
+    version_dir = ticker_dir / f"v{run_timestamp}"
+    version_dir.mkdir(parents=True, exist_ok=True)
+
+    version_file = version_dir / f"{ticker}_debate.json"
+    latest_file = ticker_dir / "latest_debate.json"
+    legacy_file = output_dir / f"{ticker}_debate.json"
+
+    serialized = json.dumps(payload, indent=2, ensure_ascii=False)
+    for path in (version_file, latest_file, legacy_file):
+        path.write_text(serialized, encoding="utf-8")
+
+    return version_file
+
+
+async def _debate_one(
+    ticker: str,
+    chamber: Any,
+    output_dir: Path,
+    run_timestamp: str,
+    generated_at: str,
+) -> bool:
     """
     Run the full debate pipeline for a single ticker and save the result.
 
@@ -46,11 +122,22 @@ async def _debate_one(ticker: str, chamber: DebateChamber, output_dir: Path) -> 
     logger.info(f"{'=' * 60}")
 
     try:
+        # TODO: migrate DebateChamber provider internals to DEFAULT_REGISTRY once
+        # graph node contracts are split enough for a clean typed-tool swap.
         result = await chamber.run(ticker)
 
         if result.get("error") is not None:
             logger.error(f"Debate aborted for {ticker}: {result['error']}")
             return False
+
+        if result.get("error") is not None:
+            logger.error(f"Debate aborted for {ticker}: {result['error']}")
+            return False
+
+        debate_history = [
+            _as_debate_message(m)
+            for m in result.get("debate_history", [])
+        ]
 
         # Build report dict
         report = {
@@ -58,18 +145,26 @@ async def _debate_one(ticker: str, chamber: DebateChamber, output_dir: Path) -> 
             "verdict": json.loads(result["final_verdict"]) if result["final_verdict"] else {},
             "debate_rounds": result["round_count"],
             "debate_history": [
-                {"role": m.role, "content": m.content, "round": m.round_num}
-                for m in result["debate_history"]
+                {
+                    "role": m.role,
+                    "content": m.content,
+                    "round": m.round_num,
+                }
+                for m in debate_history
             ],
             "raw_data_summary": result["raw_data"],
             "metadata": result.get("metadata", {}),
         }
 
-        report_path = output_dir / f"{ticker}_debate.json"
-        report_path.write_text(
-            json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8"
+        report_path = _save_timestamped_report(
+            report=report,
+            output_dir=output_dir,
+            ticker=ticker,
+            run_timestamp=run_timestamp,
+            generated_at=generated_at,
         )
-        logger.info(f"Report saved to {report_path}")
+        logger.info(f"Timestamped report saved to {report_path}")
+        logger.info(f"Latest report updated at {output_dir / ticker / 'latest_debate.json'}")
         return True
 
     except asyncio.CancelledError:
@@ -88,15 +183,28 @@ async def _debate_one(ticker: str, chamber: DebateChamber, output_dir: Path) -> 
 
 async def main() -> None:
     args = parse_args()
+    lint_report = lint_prompt_pack(str(PROMPT_MANIFEST_PATH))
+    for warning in lint_report.warnings:
+        logger.warning(f"[PromptPackLinter] {warning}")
+    if lint_report.errors:
+        logger.error(f"[PromptPackLinter] Prompt pack invalid: {lint_report.errors}")
+        raise SystemExit(1)
+
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    run_time = _get_run_time()
+    run_timestamp = run_time.strftime("%Y%m%d_%H%M%S")
+    generated_at = run_time.isoformat()
+    logger.info(f"[run_debate] Run timestamp: {run_timestamp} ({generated_at})")
 
     # LLM instances created once and reused for all tickers
+    from services.debate_chamber import DebateChamber
+
     chamber = DebateChamber()
 
     succeeded, failed = 0, 0
     for ticker in args.tickers:
-        ok = await _debate_one(ticker, chamber, output_dir)
+        ok = await _debate_one(ticker, chamber, output_dir, run_timestamp, generated_at)
         if ok:
             succeeded += 1
         else:

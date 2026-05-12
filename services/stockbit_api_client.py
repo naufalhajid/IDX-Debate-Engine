@@ -5,6 +5,7 @@ import threading
 
 import requests
 
+from core.failure_taxonomy import classify_exception
 from utils.logger_config import logger
 from services.stockbit_token_fetcher import StockbitTokenFetcher
 
@@ -96,6 +97,8 @@ class StockbitApiClient:
                         break
 
             except requests.exceptions.RequestException as e:
+                failure = classify_exception(e, source="stockbit")
+                logger.error(f"Stockbit failure classified: {failure.model_dump()}")
                 logger.error(f"Request failed: {e} retry: {retry}")
                 break
 
@@ -168,6 +171,8 @@ class StockbitApiClient:
             fetcher = StockbitTokenFetcher()
             token, user_agent = fetcher.fetch_tokens()
         except Exception as e:
+            failure = classify_exception(e, source="stockbit")
+            logger.error(f"Stockbit auth failure classified: {failure.model_dump()}")
             logger.error(f"Failed to fetch tokens via StockbitTokenFetcher: {e}")
         finally:
             if fetcher is not None:
@@ -224,6 +229,8 @@ class StockbitApiClient:
                 time.sleep(1)
 
             except requests.exceptions.RequestException as e:
+                failure = classify_exception(e, source="stockbit")
+                logger.error(f"Stockbit refresh failure classified: {failure.model_dump()}")
                 logger.error(f"Request failed: {e}")
 
     def _write_token(self, token, refresh_token, user_agent=None):
@@ -308,4 +315,6 @@ class StockbitApiClient:
                 logger.info("Logged in successfully with existing token!")
 
         except requests.exceptions.RequestException as e:
+            failure = classify_exception(e, source="stockbit")
+            logger.error(f"Stockbit challenge failure classified: {failure.model_dump()}")
             logger.error(f"Request failed: {e}")

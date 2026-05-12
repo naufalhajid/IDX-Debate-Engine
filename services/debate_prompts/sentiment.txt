@@ -30,3 +30,6 @@ Analyze the raw stream/social JSON and extract:
   • Red flags: Any coordinated pump signals, insider-leak language, or panic patterns?
 
 RULES: Max 2500 tokens. Write 3-4 compact technical paragraphs. Be specific — note if sentiment is diverging from price action.
+
+Position: NEUTRAL
+Agent Confidence: HIGH | MEDIUM | LOW

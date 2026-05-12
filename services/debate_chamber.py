@@ -44,8 +44,10 @@ from core.budget import (
 from providers.gemini import get_flash_llm, get_pro_llm
 from schemas.debate import CIOVerdict, DebateChamberState, DebateMessage, validate_swing_targets
 from services.stockbit_api_client import StockbitApiClient
+from services.context_pack_builder import build_context_pack, pack_to_prompt_string
 from services.fair_value_calculator import build_fair_value_report
 from services.debate_prompt_registry import PROMPT_REGISTRY, PROMPT_VERSION
+from services.debate_run_guard import run_with_guard
 from utils.logger_config import logger
 from utils.market_data_cache import (
     derive_current_price,
@@ -103,6 +105,13 @@ def _is_transient_error(exc: BaseException) -> bool:
     if any(p in s for p in _PERMANENT_ERROR_PATTERNS):
         return False
     return any(t in s for t in _TRANSIENT_ERROR_PATTERNS)
+
+
+def _as_debate_message(m):
+    from schemas.debate import DebateMessage
+    if isinstance(m, dict):
+        return DebateMessage(**m)
+    return m
 
 
 # ---------------------------------------------------------------------------
@@ -368,7 +377,11 @@ class DebateChamber:
 
     @staticmethod
     def _latest_message(state: DebateChamberState, role: str) -> DebateMessage | None:
-        messages = [m for m in state.get("debate_history", []) if m.role == role]
+        messages = []
+        for raw in state.get("debate_history", []):
+            message = _as_debate_message(raw)
+            if message.role == role:
+                messages.append(message)
         return messages[-1] if messages else None
 
     def _collect_agent_votes(self, state: DebateChamberState) -> list[dict[str, object]]:
@@ -843,17 +856,40 @@ Current Date (Asia/Jakarta): {current_date}
                 "Analysts must caveat conclusions accordingly.]\n\n" + raw
             )
 
-        decision_brief = (
-            f"Ticker: {ticker}\n"
-            f"Current Price: Rp {current_price:,.0f}\n"
-            f"Fair Value Estimate: "
-            f"{f'Rp {fair_value_estimate:,.0f}' if fair_value_estimate else 'INSUFFICIENT_DATA'}\n"
-            f"Technical Indicators: {json.dumps(tech, ensure_ascii=False) if tech else '{}'}\n\n"
-            f"Fundamental Brief: {self._compact_text(f, 1_000)}\n\n"
-            f"Technical Brief: {self._compact_text(t, 1_000)}\n\n"
-            f"Sentiment Brief: {self._compact_text(s, 800)}\n\n"
-            f"{exdate_block}"
+        sources = ["stockbit", "gemini"]
+        market_source = (state.get("market_data") or {}).get("source")
+        if market_source:
+            sources.append(str(market_source))
+        if tech:
+            sources.append("yfinance")
+
+        context_pack = build_context_pack(
+            ticker,
+            {
+                "current_price": current_price,
+                "fair_value_estimate": fair_value_estimate,
+                "fundamentals": {
+                    "brief": self._compact_text(f, 1_000),
+                    "exdate": exdate_block,
+                },
+                "technicals": {
+                    "brief": self._compact_text(t, 1_000),
+                    **(tech or {}),
+                },
+                "sentiment_summary": self._compact_text(s, 800),
+                "data_sources": sources,
+            },
         )
+        if context_pack.missing_fields:
+            logger.warning(
+                f"[ContextPack] {ticker} missing fields: {context_pack.missing_fields}"
+            )
+        if context_pack.token_estimate > 2800:
+            logger.warning(
+                f"[ContextPack] {ticker} token_estimate={context_pack.token_estimate}"
+            )
+        decision_brief = pack_to_prompt_string(context_pack)
+        raw = decision_brief
 
         return {
             "raw_data": raw,
@@ -874,9 +910,13 @@ Current Date (Asia/Jakarta): {current_date}
 
         if rc > 0:
             # Send pruned history — prevents state bloat
+            debate_history = [
+                _as_debate_message(m)
+                for m in state["debate_history"]
+            ]
             hist = "\n".join(
                 f"[{m.role.upper()} R{m.round_num}]: {m.content}"
-                for m in state["debate_history"]
+                for m in debate_history
             )
             content_parts.append(f"\n\nDebate History (may be pruned summary):\n{hist}")
 
@@ -908,7 +948,11 @@ Current Date (Asia/Jakarta): {current_date}
         prompt = BEAR_SYSTEM_PROMPT_R1 if rc == 0 else BEAR_SYSTEM_PROMPT_R2
 
         # Always surface the latest Bull argument for the Bear to attack
-        bull_args = [m.content for m in state["debate_history"] if m.role == "bull"]
+        debate_history = [
+            _as_debate_message(m)
+            for m in state["debate_history"]
+        ]
+        bull_args = [m.content for m in debate_history if m.role == "bull"]
         last_bull = bull_args[-1] if bull_args else "(no bull argument yet)"
 
         content_parts = [
@@ -917,7 +961,7 @@ Current Date (Asia/Jakarta): {current_date}
         ]
 
         if rc > 0:
-            bear_args = [m.content for m in state["debate_history"] if m.role == "bear"]
+            bear_args = [m.content for m in debate_history if m.role == "bear"]
             if bear_args:
                 content_parts.append(
                     f"\n\nYour own Round 1 argument (DO NOT repeat this):\n{bear_args[-1]}"
@@ -995,7 +1039,8 @@ Current Date (Asia/Jakarta): {current_date}
         seen: set[str] = set()
         compressed_msgs: list[DebateMessage] = []
 
-        for m in state["debate_history"]:
+        for raw in state["debate_history"]:
+            m = _as_debate_message(raw)
             # Capture every distinct price mentioned in this message
             for match in self._PRICE_RE.findall(m.content):
                 normalised = match.strip().rstrip(".,")
@@ -1034,9 +1079,13 @@ Current Date (Asia/Jakarta): {current_date}
         Keeps the CIO from rubber-stamping the winning side.
         """
         logger.info("[Devil's Advocate] Injecting adversarial scenario")
+        debate_history = [
+            _as_debate_message(m)
+            for m in state["debate_history"]
+        ]
         hist = "\n".join(
             f"[{m.role.upper()} R{m.round_num}]: {m.content}"
-            for m in state["debate_history"]
+            for m in debate_history
         )
         decision_context = state.get("decision_brief") or state.get("raw_data", "")
         messages = [
@@ -1453,9 +1502,13 @@ Current Date (Asia/Jakarta): {current_date}
 
         # ── Build CIO prompt ─────────────────────────────────────────────────
         consensus_directive = self._format_consensus_directive(state)
+        debate_history = [
+            _as_debate_message(m)
+            for m in state["debate_history"]
+        ]
         hist = "\n".join(
             f"[{m.role.upper()} R{m.round_num}]: {self._redact_debate_prices(m.content)}"
-            for m in state["debate_history"]
+            for m in debate_history
         )
         decision_context = state.get("decision_brief") or self._compact_text(
             state.get("raw_data", ""),
@@ -1669,6 +1722,21 @@ Start your response with '{' and end with '}'. Nothing else."""
             "error": None,
         }
         logger.info(f"[DebateChamber] ▶ Starting swing-trade pipeline for {ticker} @ Rp {current_price:,.0f}")
-        result = await self.app.ainvoke(initial_state)
+        guarded = await run_with_guard(
+            ticker=ticker,
+            coro=self.app.ainvoke(initial_state),
+            timeout_seconds=300,
+        )
+        if guarded["status"] != "ok":
+            logger.error(f"[DebateChamber] Guard failed for {ticker}: {guarded}")
+            return {
+                **initial_state,
+                "error": guarded["error"],
+                "metadata": {
+                    **initial_state["metadata"],
+                    "guard_status": guarded["status"],
+                },
+            }
+        result = guarded["result"]
         logger.info(f"[DebateChamber] ✅ Pipeline complete for {ticker}")
         return result

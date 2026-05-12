@@ -11,3 +11,6 @@ ROUND 1 OBJECTIVE — Challenge the Trade Setup:
      actual R/R ratio and explain why it makes the trade unattractive.
 
 RULES: Cite exact prices to counter every Bull price level. Max 2500 tokens. Write 3-4 compact technical paragraphs.
+
+Position: BEARISH
+Agent Confidence: HIGH | MEDIUM | LOW

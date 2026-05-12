@@ -1,0 +1,50 @@
+"""Guarded execution for per-ticker debate runs."""
+
+from __future__ import annotations
+
+import asyncio
+from typing import Any, Awaitable, Literal
+
+from pydantic import BaseModel, ConfigDict
+
+
+class GuardResult(BaseModel):
+    """Structured outcome from a guarded debate coroutine."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ticker: str
+    status: Literal["ok", "timeout", "failed"]
+    error: str | None
+    result: Any | None
+
+
+async def run_with_guard(
+    ticker: str,
+    coro: Awaitable[Any],
+    timeout_seconds: int = 300,
+) -> dict[str, Any]:
+    """Run a per-ticker coroutine with timeout and normalized failure output."""
+    try:
+        result = await asyncio.wait_for(coro, timeout=timeout_seconds)
+    except asyncio.TimeoutError:
+        return GuardResult(
+            ticker=ticker,
+            status="timeout",
+            error="TIMEOUT",
+            result=None,
+        ).model_dump()
+    except Exception as exc:
+        return GuardResult(
+            ticker=ticker,
+            status="failed",
+            error=str(exc),
+            result=None,
+        ).model_dump()
+
+    return GuardResult(
+        ticker=ticker,
+        status="ok",
+        error=None,
+        result=result,
+    ).model_dump()

@@ -2,7 +2,9 @@ import os
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 
+from core.failure_taxonomy import classify_exception
 from core.settings import settings
+from utils.logger_config import logger
 
 
 def _get_api_key() -> str:
@@ -32,13 +34,18 @@ def get_flash_llm() -> ChatGoogleGenerativeAI:
       tenacity to catch the error and retry cleanly instead.
     """
 
-    return ChatGoogleGenerativeAI(
-        model=settings.GEMINI_FLASH_MODEL,
-        google_api_key=_get_api_key(),
-        temperature=0.1,
-        max_tokens=4000,
-        request_timeout=60,
-    )
+    try:
+        return ChatGoogleGenerativeAI(
+            model=settings.GEMINI_FLASH_MODEL,
+            google_api_key=_get_api_key(),
+            temperature=0.1,
+            max_tokens=4000,
+            request_timeout=60,
+        )
+    except Exception as exc:
+        failure = classify_exception(exc, source="gemini")
+        logger.error(f"[Gemini] Flash init failed: {failure.model_dump()}")
+        raise
 
 
 def get_pro_llm() -> ChatGoogleGenerativeAI:
@@ -58,10 +65,15 @@ def get_pro_llm() -> ChatGoogleGenerativeAI:
       to complete complex synthesis before tenacity triggers a retry.
     """
 
-    return ChatGoogleGenerativeAI(
-        model=settings.GEMINI_PRO_MODEL,
-        google_api_key=_get_api_key(),
-        temperature=0.3,
-        max_tokens=10000,
-        request_timeout=90,
-    )
+    try:
+        return ChatGoogleGenerativeAI(
+            model=settings.GEMINI_PRO_MODEL,
+            google_api_key=_get_api_key(),
+            temperature=0.3,
+            max_tokens=10000,
+            request_timeout=90,
+        )
+    except Exception as exc:
+        failure = classify_exception(exc, source="gemini")
+        logger.error(f"[Gemini] Pro init failed: {failure.model_dump()}")
+        raise

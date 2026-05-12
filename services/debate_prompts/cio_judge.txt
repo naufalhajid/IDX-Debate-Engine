@@ -150,3 +150,6 @@ CRITICAL OUTPUT FORMAT:
 Respond ONLY with a valid JSON object. Do NOT include any text, explanation,
 or markdown fences (``` or ```json) before or after the JSON object.
 Your entire response must be parseable by json.loads() with no preprocessing.
+
+Position: NEUTRAL
+Agent Confidence: HIGH | MEDIUM | LOW

@@ -33,3 +33,6 @@ Format:
 - Question 2: satu paragraf kalkulasi biaya eksplisit dengan verdict akhir
   (INSUFFICIENT NET RETURN / MARGINAL / VIABLE). Tidak ada batasan kata untuk question 2.
   Setiap harga yang dipakai dalam kalkulasi harus disebutkan eksplisit.
+
+Position: BEARISH
+Agent Confidence: HIGH | MEDIUM | LOW
