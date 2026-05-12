@@ -41,10 +41,13 @@ from core.budget import (
     check_and_increment_flash_budget,
     check_and_increment_pro_budget,
 )
+from core.handoff_envelope import make_envelope
+from core.observation_store import AgentObservation, DEFAULT_STORE
 from providers.gemini import get_flash_llm, get_pro_llm
 from schemas.debate import CIOVerdict, DebateChamberState, DebateMessage, validate_swing_targets
 from services.stockbit_api_client import StockbitApiClient
 from services.context_pack_builder import build_context_pack, pack_to_prompt_string
+from services.rag_evidence_store import DEFAULT_STORE as rag_store
 from services.fair_value_calculator import build_fair_value_report
 from services.debate_prompt_registry import PROMPT_REGISTRY, PROMPT_VERSION
 from services.debate_run_guard import run_with_guard
@@ -376,6 +379,47 @@ class DebateChamber:
         return text, signal
 
     @staticmethod
+    def _record_observation(
+        state: DebateChamberState,
+        agent: str,
+        content: str,
+        signal: dict[str, object] | None = None,
+    ) -> None:
+        try:
+            metadata = state.get("metadata") or {}
+            run_id = str(metadata.get("run_id", "unknown"))
+            ticker = str(state.get("ticker", "unknown"))
+            confidence = signal.get("confidence") if signal else None
+            summary = str(content or "")[:300]
+            envelope = make_envelope(
+                producer=agent,
+                consumer="observation_store",
+                ticker=ticker,
+                run_id=run_id,
+                payload={"summary": summary},
+                confidence=confidence if isinstance(confidence, (int, float)) else None,
+            )
+            DEFAULT_STORE.append(
+                AgentObservation(
+                    run_id=run_id,
+                    ticker=ticker,
+                    agent=agent,
+                    position=str(signal.get("position", "UNKNOWN")) if signal else "NEUTRAL",
+                    confidence=confidence if isinstance(confidence, (int, float)) else None,
+                    summary=summary,
+                    round_num=int(state.get("round_count", 0) or 0),
+                    prompt_version=str(metadata.get("prompt_version", "unknown")),
+                    timestamp=envelope.created_at,
+                    evidence=[],
+                )
+            )
+        except Exception as exc:
+            logger.warning(
+                f"[ObservationStore] Failed to append {agent} observation "
+                f"for {state.get('ticker', 'unknown')}: {exc}"
+            )
+
+    @staticmethod
     def _latest_message(state: DebateChamberState, role: str) -> DebateMessage | None:
         messages = []
         for raw in state.get("debate_history", []):
@@ -653,7 +697,9 @@ Current Date (Asia/Jakarta): {current_date}
                 f"{BASE_URL}/keystats/ratio/v1/{ticker}?year_limit=10"
             )
             if not raw:
-                return {"fundamental_data": "Data Unavailable"}
+                content = "Data Unavailable"
+                self._record_observation(state, "fundamental_scout", content)
+                return {"fundamental_data": content}
 
             report_str, fv_price = build_fair_value_report(raw, ticker, current_price)
             logger.info(f"[Fundamental] Fair value for {ticker}: {fv_price}")
@@ -665,14 +711,17 @@ Current Date (Asia/Jakarta): {current_date}
                 HumanMessage(content=f"{report_str}\n\n=== RAW API JSON ===\n{json.dumps(raw)[:10_000]}"),
             ]
             resp = await self._invoke_llm(self.flash_llm, messages)
-            content, _signal = self._ensure_signal_footer(resp.content, "fundamental_scout")
+            content, signal = self._ensure_signal_footer(resp.content, "fundamental_scout")
+            self._record_observation(state, "fundamental_scout", content, signal)
             return {
                 "fundamental_data": content,
                 "fair_value_estimate": fv_price,
             }
         except Exception as e:
             logger.error(f"[Fundamental] Error: {e}")
-            return {"fundamental_data": "Data Unavailable (Error)"}
+            content = "Data Unavailable (Error)"
+            self._record_observation(state, "fundamental_scout", content)
+            return {"fundamental_data": content}
 
     async def _chartist_node(self, state: DebateChamberState) -> dict:
         """Chartist with real OHLCV from yfinance — pre-computes all technicals in Python."""
@@ -761,7 +810,8 @@ Current Date (Asia/Jakarta): {current_date}
             )),
         ]
         resp = await self._invoke_llm(self.flash_llm, messages)
-        content, _signal = self._ensure_signal_footer(resp.content, "chartist")
+        content, signal = self._ensure_signal_footer(resp.content, "chartist")
+        self._record_observation(state, "chartist", content, signal)
         return {
             "technical_data": content,
             "technical_indicators": tech_indicators,
@@ -776,17 +826,22 @@ Current Date (Asia/Jakarta): {current_date}
                 f"{BASE_URL}/stream/v3/symbol/{ticker}/pinned"
             )
             if not raw:
-                return {"sentiment_data": "Data Unavailable"}
+                content = "Data Unavailable"
+                self._record_observation(state, "sentiment_specialist", content)
+                return {"sentiment_data": content}
             messages = [
                 SystemMessage(content=SENTIMENT_PROMPT + AGENT_SIGNAL_PROMPT),
                 HumanMessage(content=json.dumps(raw)[:10_000]),
             ]
             resp = await self._invoke_llm(self.flash_llm, messages)
-            content, _signal = self._ensure_signal_footer(resp.content, "sentiment_specialist")
+            content, signal = self._ensure_signal_footer(resp.content, "sentiment_specialist")
+            self._record_observation(state, "sentiment_specialist", content, signal)
             return {"sentiment_data": content}
         except Exception as e:
             logger.error(f"[Sentiment] Error: {e}")
-            return {"sentiment_data": "Data Unavailable (Error)"}
+            content = "Data Unavailable (Error)"
+            self._record_observation(state, "sentiment_specialist", content)
+            return {"sentiment_data": content}
 
     async def _synthesizer_node(self, state: DebateChamberState) -> dict:
         """
@@ -888,7 +943,31 @@ Current Date (Asia/Jakarta): {current_date}
             logger.warning(
                 f"[ContextPack] {ticker} token_estimate={context_pack.token_estimate}"
             )
-        decision_brief = pack_to_prompt_string(context_pack)
+        try:
+            run_id = state.get("metadata", {}).get("run_id", "unknown")
+            bundle = rag_store.build_bundle(
+                pack=context_pack,
+                run_id=run_id,
+                query_context="swing trade analysis",
+            )
+            if bundle.has_stale_data:
+                logger.warning(
+                    f"[RAG] {ticker} has stale evidence: "
+                    f"{bundle.staleness_warning}"
+                )
+            logger.info(
+                f"[RAG] {ticker} evidence: "
+                f"{bundle.total_chunks_selected}/"
+                f"{bundle.total_chunks_considered} chunks, "
+                f"~{bundle.token_estimate} tokens"
+            )
+            decision_brief = rag_store.bundle_to_prompt_string(bundle)
+        except Exception as exc:
+            logger.warning(
+                f"[RAG] {ticker} evidence selection failed; "
+                f"falling back to ContextPack brief: {exc}"
+            )
+            decision_brief = pack_to_prompt_string(context_pack)
         raw = decision_brief
 
         return {
@@ -938,6 +1017,7 @@ Current Date (Asia/Jakarta): {current_date}
             position=str(signal.get("position", "UNKNOWN")),
             confidence=signal.get("confidence"),
         )
+        self._record_observation(state, "bull", content, signal)
         return {"debate_history": [msg]}
 
     async def _bearish_node(self, state: DebateChamberState) -> dict:
@@ -986,6 +1066,7 @@ Current Date (Asia/Jakarta): {current_date}
             position=str(signal.get("position", "UNKNOWN")),
             confidence=signal.get("confidence"),
         )
+        self._record_observation(state, "bear", content, signal)
         return {"debate_history": [msg], "round_count": new_rc}
 
     # ── Phase 3 — Adaptive Logic ─────────────────────────────────────────────
@@ -1101,6 +1182,7 @@ Current Date (Asia/Jakarta): {current_date}
             position=str(signal.get("position", "UNKNOWN")),
             confidence=signal.get("confidence"),
         )
+        self._record_observation(state, "devils_advocate", content, signal)
         return {
             "debate_history": [msg],
             "devils_advocate_question": content,
@@ -1716,6 +1798,7 @@ Start your response with '{' and end with '}'. Nothing else."""
             "final_verdict": "",
             "metadata": {
                 "prompt_version": getattr(self, "prompt_version", PROMPT_VERSION),
+                "run_id": getattr(self, "run_id", "unknown"),
                 "market_data_source": market_data.get("source", "unknown"),
                 "market_data_cached": True,
             },

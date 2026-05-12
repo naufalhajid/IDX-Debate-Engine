@@ -8,7 +8,9 @@ from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 
+from core.backtest_memory import DEFAULT_MEMORY, TradeOutcome
 from core.prompt_pack_linter import lint_prompt_pack
+from core.report_consistency import check_consistency
 from core.settings import settings
 from utils.logger_config import logger
 
@@ -56,6 +58,84 @@ def _as_debate_message(m):
     if isinstance(m, dict):
         return DebateMessage(**m)
     return m
+
+
+def _parse_price(value: Any) -> float:
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value or "").strip()
+    if not text:
+        raise ValueError("missing price")
+    cleaned = (
+        text.replace("Rp", "")
+        .replace("rp", "")
+        .replace(",", "")
+        .replace(".", "")
+        .strip()
+    )
+    return float(cleaned)
+
+
+def _parse_entry_low(entry_price_range: Any) -> float:
+    entry_low = str(entry_price_range or "").split("-", maxsplit=1)[0].strip()
+    return _parse_price(entry_low)
+
+
+def _record_open_trade_outcome(
+    *,
+    ticker: str,
+    final_verdict: str,
+    run_timestamp: str,
+    generated_at: str,
+) -> None:
+    try:
+        verdict = json.loads(final_verdict) if final_verdict else {}
+        entry_price = _parse_entry_low(verdict.get("entry_price_range"))
+        target_price = _parse_price(verdict.get("target_price"))
+        stop_loss = _parse_price(verdict.get("stop_loss"))
+        confidence = verdict.get("confidence")
+        DEFAULT_MEMORY.record(
+            TradeOutcome(
+                run_id=run_timestamp,
+                ticker=ticker,
+                verdict_rating=str(verdict.get("rating", "UNKNOWN")),
+                entry_price=entry_price,
+                exit_price=None,
+                target_price=target_price,
+                stop_loss=stop_loss,
+                entry_date=generated_at.split("T", maxsplit=1)[0],
+                exit_date=None,
+                outcome="open",
+                pnl_pct=None,
+                hit_target=None,
+                hit_stop=None,
+                confidence_at_entry=float(confidence) if confidence is not None else None,
+                notes="auto-recorded at debate completion",
+            )
+        )
+    except Exception as exc:
+        logger.warning(f"[BacktestMemory] Failed to record {ticker} outcome: {exc}")
+
+
+def _artifact_root(output_dir: Path) -> Path:
+    return output_dir.parent if output_dir.name.lower() == "debates" else output_dir
+
+
+def _check_report_consistency_if_available(output_dir: Path) -> None:
+    artifact_root = _artifact_root(output_dir)
+    batch_json_path = artifact_root / "full_batch_results.json"
+    top3_md_path = artifact_root / "TOP_3_SWING_TRADES.md"
+    if not top3_md_path.exists():
+        return
+    try:
+        report = check_consistency(batch_json_path, top3_md_path)
+        if report.consistent:
+            logger.info("Report consistency check passed")
+            return
+        for inconsistency in report.inconsistencies:
+            logger.warning(f"[ReportConsistency] {inconsistency.model_dump()}")
+    except Exception as exc:
+        logger.warning(f"[ReportConsistency] Consistency check failed: {exc}")
 
 
 def _save_timestamped_report(
@@ -124,6 +204,7 @@ async def _debate_one(
     try:
         # TODO: migrate DebateChamber provider internals to DEFAULT_REGISTRY once
         # graph node contracts are split enough for a clean typed-tool swap.
+        setattr(chamber, "run_id", run_timestamp)
         result = await chamber.run(ticker)
 
         if result.get("error") is not None:
@@ -165,6 +246,13 @@ async def _debate_one(
         )
         logger.info(f"Timestamped report saved to {report_path}")
         logger.info(f"Latest report updated at {output_dir / ticker / 'latest_debate.json'}")
+        _record_open_trade_outcome(
+            ticker=ticker,
+            final_verdict=result.get("final_verdict", ""),
+            run_timestamp=run_timestamp,
+            generated_at=generated_at,
+        )
+        _check_report_consistency_if_available(output_dir)
         return True
 
     except asyncio.CancelledError:
