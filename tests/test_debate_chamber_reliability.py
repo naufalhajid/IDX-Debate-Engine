@@ -315,6 +315,65 @@ async def test_cio_invalid_current_price_fallback_has_no_trade_levels():
     assert verdict["stop_loss"] is None
 
 
+def test_trade_envelope_keeps_target_above_entry_after_low_fair_value_blend():
+    chamber = _chamber()
+
+    envelope = chamber._compute_trade_envelope(
+        current_price=1000.0,
+        fair_value=800.0,
+        tech={"ma50": 980.0, "sma20": 1000.0, "atr14": 10.0},
+    )
+
+    assert envelope["stop_loss"] < envelope["entry_low"]
+    assert envelope["entry_low"] <= envelope["entry_high"]
+    assert envelope["entry_high"] < envelope["target_price"]
+
+    CIOVerdict(
+        ticker="BRPT",
+        rating="HOLD",
+        confidence=0.0,
+        entry_price_range=f"{int(envelope['entry_low'])} - {int(envelope['entry_high'])}",
+        target_price=envelope["target_price"],
+        stop_loss=envelope["stop_loss"],
+        current_price=1000.0,
+        fair_value=envelope["fair_value"],
+    )
+
+
+@pytest.mark.asyncio
+async def test_cio_parse_fallback_survives_low_fair_value_blend(monkeypatch):
+    chamber = _chamber()
+    chamber.pro_llm = FakeLLM(model="gemini-2.5-pro")
+
+    async def fake_invoke(llm, messages, inject_rules=True):
+        return SimpleNamespace(content="not json")
+
+    monkeypatch.setattr(chamber, "_invoke_llm", fake_invoke)
+
+    result = await chamber._cio_judge_node(
+        {
+            "ticker": "BRPT",
+            "current_price": 1000.0,
+            "technical_indicators": {"ma50": 980.0, "sma20": 1000.0, "atr14": 10.0},
+            "fair_value_estimate": 800.0,
+            "debate_history": [],
+            "raw_data": "",
+            "devils_advocate_question": "",
+            "consensus_reached": False,
+            "consensus_method": None,
+            "dissenting_agents": [],
+            "agent_votes": [],
+        }
+    )
+    verdict = json.loads(result["final_verdict"])
+    entry_low, entry_high = [
+        float(part.strip()) for part in verdict["entry_price_range"].split("-", maxsplit=1)
+    ]
+
+    assert verdict["rating"] == "HOLD"
+    assert verdict["stop_loss"] < entry_low <= entry_high < verdict["target_price"]
+
+
 @pytest.mark.asyncio
 async def test_market_data_cache_prefetches_one_yfinance_bundle(monkeypatch):
     calls: list[str] = []

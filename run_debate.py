@@ -3,15 +3,18 @@ import asyncio
 import json
 from datetime import datetime
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 
 from core.backtest_memory import DEFAULT_MEMORY, TradeOutcome
+from core.ops_telemetry import DEFAULT_TELEMETRY, TickerMetric
 from core.prompt_pack_linter import lint_prompt_pack
 from core.report_consistency import check_consistency
 from core.settings import settings
+from services.explainability_auditor import DEFAULT_AUDITOR
 from utils.logger_config import logger
 
 load_dotenv()
@@ -26,8 +29,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--tickers",
         nargs="+",
-        required=True,
+        required=False,
         help="List of stock tickers to debate (e.g., BBRI BBCA TLKM)",
+    )
+    parser.add_argument(
+        "--ticker",
+        nargs="+",
+        dest="ticker_alias",
+        help="Alias for --tickers.",
     )
     parser.add_argument(
         "--output-dir",
@@ -38,7 +47,12 @@ def parse_args() -> argparse.Namespace:
             "snapshots plus latest and legacy flat files (default: output/debates)"
         ),
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.ticker_alias:
+        args.tickers = (args.tickers or []) + args.ticker_alias
+    if not args.tickers:
+        parser.error("one of --tickers or --ticker is required")
+    return args
 
 
 def _get_run_time() -> datetime:
@@ -138,6 +152,128 @@ def _check_report_consistency_if_available(output_dir: Path) -> None:
         logger.warning(f"[ReportConsistency] Consistency check failed: {exc}")
 
 
+def _write_audit_report(
+    *,
+    output_dir: Path,
+    ticker: str,
+    run_timestamp: str,
+) -> None:
+    try:
+        ticker_dir = output_dir / ticker
+        version_dir = ticker_dir / f"v{run_timestamp}"
+        latest_file = ticker_dir / "latest_debate.json"
+        debate_json = json.loads(latest_file.read_text(encoding="utf-8"))
+        packet = DEFAULT_AUDITOR.build_audit_packet(debate_json)
+        DEFAULT_AUDITOR.log_packet(packet)
+
+        audit_report = DEFAULT_AUDITOR.format_report(packet)
+        (ticker_dir / "latest_audit.txt").write_text(audit_report, encoding="utf-8")
+        (version_dir / "audit.txt").write_text(audit_report, encoding="utf-8")
+        logger.info(f"[Audit] {ticker}: {packet.one_line_summary}")
+    except Exception as exc:
+        logger.warning(f"[Audit] Failed to build audit report for {ticker}: {exc}")
+
+
+def _status_from_error(error: str | None) -> str:
+    if str(error or "").upper() == "TIMEOUT":
+        return "timeout"
+    if "timeout" in str(error or "").lower():
+        return "timeout"
+    return "failed"
+
+
+def _record_ticker_telemetry(
+    *,
+    ticker: str,
+    run_id: str,
+    status: str,
+    duration_seconds: float,
+    report: dict | None = None,
+    error: str | None = None,
+) -> None:
+    try:
+        report = report or {}
+        verdict = report.get("verdict") if isinstance(report.get("verdict"), dict) else {}
+        metadata = report.get("metadata") if isinstance(report.get("metadata"), dict) else {}
+
+        if status == "success":
+            metric = TickerMetric(
+                ticker=ticker,
+                run_id=str(metadata.get("run_id") or run_id),
+                status="success",
+                verdict_rating=verdict.get("rating"),
+                confidence=verdict.get("confidence"),
+                debate_rounds=int(report.get("debate_rounds") or 0),
+                duration_seconds=duration_seconds,
+                flash_calls=int(metadata.get("flash_calls", 0) or 0),
+                pro_calls=int(metadata.get("pro_calls", 0) or 0),
+                rag_chunks_selected=int(metadata.get("rag_chunks_selected", 0) or 0),
+                rag_chunks_considered=int(metadata.get("rag_chunks_considered", 0) or 0),
+                rag_token_estimate=int(metadata.get("rag_token_estimate", 0) or 0),
+                provider_errors=[],
+                has_stale_data=False,
+                timestamp=_get_run_time().isoformat(),
+            )
+        else:
+            metric = TickerMetric(
+                ticker=ticker,
+                run_id=run_id,
+                status="timeout" if status == "timeout" else "failed",
+                verdict_rating=None,
+                confidence=None,
+                debate_rounds=0,
+                duration_seconds=duration_seconds,
+                flash_calls=0,
+                pro_calls=0,
+                rag_chunks_selected=0,
+                rag_chunks_considered=0,
+                rag_token_estimate=0,
+                provider_errors=[str(error or status)],
+                has_stale_data=False,
+                timestamp=_get_run_time().isoformat(),
+            )
+        DEFAULT_TELEMETRY.record_ticker(metric)
+    except Exception as exc:
+        logger.warning(f"[Telemetry] Failed to record ticker metric for {ticker}: {exc}")
+
+
+def _print_report(report_text: str) -> None:
+    try:
+        print(report_text)
+    except UnicodeEncodeError:
+        print(report_text.encode("ascii", errors="replace").decode("ascii"))
+
+
+def _write_batch_telemetry_report(
+    *,
+    output_dir: Path,
+    run_id: str,
+    run_timestamp: str,
+) -> None:
+    try:
+        report = DEFAULT_TELEMETRY.build_batch_report(
+            run_id=run_id,
+            batch_timestamp=run_timestamp,
+        )
+        DEFAULT_TELEMETRY.log_report(report)
+
+        report_text = DEFAULT_TELEMETRY.format_report(report)
+        telemetry_dir = _artifact_root(output_dir) / "telemetry"
+        telemetry_dir.mkdir(parents=True, exist_ok=True)
+        (telemetry_dir / "latest_batch_report.txt").write_text(
+            report_text,
+            encoding="utf-8",
+        )
+        (telemetry_dir / f"{run_id}_report.txt").write_text(
+            report_text,
+            encoding="utf-8",
+        )
+        _print_report(report_text)
+        logger.info(f"[Telemetry] Batch report saved for {run_id}")
+    except Exception as exc:
+        logger.warning(f"[Telemetry] Failed to build batch report for {run_id}: {exc}")
+
+
 def _save_timestamped_report(
     report: dict,
     output_dir: Path,
@@ -201,6 +337,7 @@ async def _debate_one(
     logger.info(f"Starting debate for: {ticker}")
     logger.info(f"{'=' * 60}")
 
+    started_at = perf_counter()
     try:
         # TODO: migrate DebateChamber provider internals to DEFAULT_REGISTRY once
         # graph node contracts are split enough for a clean typed-tool swap.
@@ -209,10 +346,24 @@ async def _debate_one(
 
         if result.get("error") is not None:
             logger.error(f"Debate aborted for {ticker}: {result['error']}")
+            _record_ticker_telemetry(
+                ticker=ticker,
+                run_id=run_timestamp,
+                status=_status_from_error(result.get("error")),
+                duration_seconds=perf_counter() - started_at,
+                error=str(result.get("error")),
+            )
             return False
 
         if result.get("error") is not None:
             logger.error(f"Debate aborted for {ticker}: {result['error']}")
+            _record_ticker_telemetry(
+                ticker=ticker,
+                run_id=run_timestamp,
+                status=_status_from_error(result.get("error")),
+                duration_seconds=perf_counter() - started_at,
+                error=str(result.get("error")),
+            )
             return False
 
         debate_history = [
@@ -246,6 +397,18 @@ async def _debate_one(
         )
         logger.info(f"Timestamped report saved to {report_path}")
         logger.info(f"Latest report updated at {output_dir / ticker / 'latest_debate.json'}")
+        _write_audit_report(
+            output_dir=output_dir,
+            ticker=ticker,
+            run_timestamp=run_timestamp,
+        )
+        _record_ticker_telemetry(
+            ticker=ticker,
+            run_id=run_timestamp,
+            status="success",
+            duration_seconds=perf_counter() - started_at,
+            report=report,
+        )
         _record_open_trade_outcome(
             ticker=ticker,
             final_verdict=result.get("final_verdict", ""),
@@ -263,9 +426,23 @@ async def _debate_one(
             f"[run_debate] ⚠️  {ticker}: CancelledError — connection dropped or timed out. "
             "Skipping to next ticker."
         )
+        _record_ticker_telemetry(
+            ticker=ticker,
+            run_id=run_timestamp,
+            status="timeout",
+            duration_seconds=perf_counter() - started_at,
+            error="CancelledError",
+        )
         return False
     except Exception as e:
         logger.error(f"[run_debate] 🚨 {ticker} failed unexpectedly: {e}")
+        _record_ticker_telemetry(
+            ticker=ticker,
+            run_id=run_timestamp,
+            status="failed",
+            duration_seconds=perf_counter() - started_at,
+            error=str(e),
+        )
         return False
 
 
@@ -301,6 +478,11 @@ async def main() -> None:
     logger.info(
         f"All debates complete. ✅ {succeeded} succeeded / ❌ {failed} failed "
         f"out of {len(args.tickers)} tickers."
+    )
+    _write_batch_telemetry_report(
+        output_dir=output_dir,
+        run_id=run_timestamp,
+        run_timestamp=run_timestamp,
     )
 
 

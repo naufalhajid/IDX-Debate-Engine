@@ -1,0 +1,40 @@
+╔══════════════════════════════════════════╗
+║  AUDIT REPORT: WIIM — HOLD       ║
+╚══════════════════════════════════════════╝
+
+Summary : WIIM→HOLD: soft_hold_rule applied (0.55) after 3 round(s). 3 agent(s) dissented. Technical Breakdown: Price is currently below short-term moving averages (EMA20, MA50), signaling potential for further downside before finding support.
+Run ID  : 20260513_194137
+Generated: 2026-05-13T12:44:48.166536+00:00
+
+VERDICT
+───────
+Rating     : HOLD (confidence: 55%)
+Method     : soft_hold
+Consensus  : yes
+Rounds     : 3
+Dissent    : 60% (3 of 5 agents)
+
+AGENT VOTES
+───────────
+  bull                   BUY      conf= 0.60  ❌
+  bear                   AVOID    conf= 0.60  ❌
+  bull                   BUY      conf= 0.85  ❌
+  bear                   AVOID    conf= 0.60  ❌
+  bull                   BUY      conf= 0.88  ❌
+  bear                   AVOID    conf= 0.85  ❌
+  devils_advocate        UNKNOWN  conf= 1.00  ❌
+
+KEY ARGUMENTS
+─────────────
+Bull  : The Bear's assertion of a technical breakdown due to the current price dipping below short-term moving averages misinterprets consolidation within a robust structural uptrend. The price remains substantially above the MA200 at Rp 1,480, which is the definitive indicator of long-term trend strength. 
+Bear  : The Bull's argument for a swing long entry is fundamentally flawed, misinterpreting short-term technical breaches as mere consolidation and relying on long-term value metrics for a swing horizon. The claimed entry zone between Rp 1,883 and Rp 1,886, based on EMA20 and MA50, is already compromised, w
+Devil : Agent Confidence: HIGH
+
+**Question 1: MACRO/COMPANY RISK & FOREIGN FLOW**
+Given the current price is already below short-term MAs, if a broader IHSG correction materializes, coupled with accelerated net foreign selling pressure on Indonesian equities, could WIIM's MA200 support at Rp 1,480 break, po
+
+DATA QUALITY
+────────────
+Freshness OK : False
+Stale sources: sentiment
+Missing      : none

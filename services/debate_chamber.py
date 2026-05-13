@@ -230,6 +230,7 @@ class DebateChamber:
         self.stockbit_client = stockbit_client or StockbitApiClient()
         self.app = self._build_graph()
         self.prompt_version = PROMPT_VERSION
+        self._llm_call_counts: dict[tuple[str, str], dict[str, int]] = {}
 
     # -- Agent signal helpers -------------------------------------------------
 
@@ -588,6 +589,46 @@ class DebateChamber:
             return "flash"
         raise RuntimeError("Unable to classify LLM tier for budget accounting")
 
+    def _reset_llm_counters(self, state: DebateChamberState) -> None:
+        try:
+            metadata = state.get("metadata") or {}
+            metadata["flash_calls"] = 0
+            metadata["pro_calls"] = 0
+            state["metadata"] = metadata
+            key = (str(metadata.get("run_id", "unknown")), str(state.get("ticker", "unknown")))
+            self._llm_call_counts[key] = {"flash_calls": 0, "pro_calls": 0}
+        except Exception as exc:
+            logger.warning(f"[Telemetry] Failed to initialize LLM counters: {exc}")
+
+    def _record_llm_call(self, state: DebateChamberState | None, tier: str) -> None:
+        try:
+            if state is None:
+                return
+            counter_key = "pro_calls" if tier == "pro" else "flash_calls"
+            metadata = state.get("metadata") or {}
+            metadata[counter_key] = int(metadata.get(counter_key, 0) or 0) + 1
+            state["metadata"] = metadata
+            key = (str(metadata.get("run_id", "unknown")), str(state.get("ticker", "unknown")))
+            counts = self._llm_call_counts.setdefault(
+                key,
+                {"flash_calls": 0, "pro_calls": 0},
+            )
+            counts[counter_key] = int(counts.get(counter_key, 0) or 0) + 1
+        except Exception as exc:
+            logger.warning(f"[Telemetry] Failed to record LLM call: {exc}")
+
+    def _merge_llm_counters(self, result: dict, run_id: str, ticker: str) -> dict:
+        try:
+            metadata = result.get("metadata") or {}
+            key = (run_id, ticker)
+            counts = self._llm_call_counts.get(key, {})
+            metadata["flash_calls"] = int(counts.get("flash_calls", 0) or 0)
+            metadata["pro_calls"] = int(counts.get("pro_calls", 0) or 0)
+            result["metadata"] = metadata
+        except Exception as exc:
+            logger.warning(f"[Telemetry] Failed to merge LLM counters: {exc}")
+        return result
+
     async def _invoke_llm(self, llm, messages, inject_rules: bool = True):
         """
         Invoke LLM dengan budget guard dan global rules injection.
@@ -632,6 +673,18 @@ Current Date (Asia/Jakarta): {current_date}
 
         tier = self._classify_llm_tier(llm)
         resp = await self._invoke_llm_with_retry(llm, msgs, tier)
+        return resp
+
+    async def _invoke_llm_for_state(
+        self,
+        state: DebateChamberState,
+        llm,
+        messages,
+        inject_rules: bool = True,
+    ):
+        tier = self._classify_llm_tier(llm)
+        resp = await self._invoke_llm(llm, messages, inject_rules=inject_rules)
+        self._record_llm_call(state, tier)
         return resp
 
     @retry(
@@ -710,7 +763,7 @@ Current Date (Asia/Jakarta): {current_date}
                 SystemMessage(content=FUNDAMENTAL_SCOUT_PROMPT + AGENT_SIGNAL_PROMPT),
                 HumanMessage(content=f"{report_str}\n\n=== RAW API JSON ===\n{json.dumps(raw)[:10_000]}"),
             ]
-            resp = await self._invoke_llm(self.flash_llm, messages)
+            resp = await self._invoke_llm_for_state(state, self.flash_llm, messages)
             content, signal = self._ensure_signal_footer(resp.content, "fundamental_scout")
             self._record_observation(state, "fundamental_scout", content, signal)
             return {
@@ -809,7 +862,7 @@ Current Date (Asia/Jakarta): {current_date}
                 f"=== ORDERBOOK ===\n{json.dumps(orderbook_data)[:5_000]}"
             )),
         ]
-        resp = await self._invoke_llm(self.flash_llm, messages)
+        resp = await self._invoke_llm_for_state(state, self.flash_llm, messages)
         content, signal = self._ensure_signal_footer(resp.content, "chartist")
         self._record_observation(state, "chartist", content, signal)
         return {
@@ -833,7 +886,7 @@ Current Date (Asia/Jakarta): {current_date}
                 SystemMessage(content=SENTIMENT_PROMPT + AGENT_SIGNAL_PROMPT),
                 HumanMessage(content=json.dumps(raw)[:10_000]),
             ]
-            resp = await self._invoke_llm(self.flash_llm, messages)
+            resp = await self._invoke_llm_for_state(state, self.flash_llm, messages)
             content, signal = self._ensure_signal_footer(resp.content, "sentiment_specialist")
             self._record_observation(state, "sentiment_specialist", content, signal)
             return {"sentiment_data": content}
@@ -950,6 +1003,14 @@ Current Date (Asia/Jakarta): {current_date}
                 run_id=run_id,
                 query_context="swing trade analysis",
             )
+            try:
+                metadata = state.get("metadata") or {}
+                metadata["rag_chunks_selected"] = bundle.total_chunks_selected
+                metadata["rag_chunks_considered"] = bundle.total_chunks_considered
+                metadata["rag_token_estimate"] = bundle.token_estimate
+                state["metadata"] = metadata
+            except Exception as exc:
+                logger.warning(f"[RAG] Failed to store telemetry metrics: {exc}")
             if bundle.has_stale_data:
                 logger.warning(
                     f"[RAG] {ticker} has stale evidence: "
@@ -974,6 +1035,7 @@ Current Date (Asia/Jakarta): {current_date}
             "raw_data": raw,
             "decision_brief": decision_brief,
             "fair_value_estimate": fair_value_estimate,
+            "metadata": state.get("metadata", {}),
         }
 
     # ── Phase 2 — Debate Nodes (Bull/Bear on Flash; Pro reserved for CIO) ─────────────────────────────────
@@ -1003,7 +1065,7 @@ Current Date (Asia/Jakarta): {current_date}
             SystemMessage(content=prompt + AGENT_SIGNAL_PROMPT),
             HumanMessage(content="\n".join(content_parts)),
         ]
-        resp = await self._invoke_llm(self.flash_llm, messages)
+        resp = await self._invoke_llm_for_state(state, self.flash_llm, messages)
         content, signal = self._ensure_signal_footer(str(resp.content), "bull")
         if len(content) < 50:
             logger.warning(
@@ -1051,7 +1113,7 @@ Current Date (Asia/Jakarta): {current_date}
             SystemMessage(content=prompt + AGENT_SIGNAL_PROMPT),
             HumanMessage(content="\n".join(content_parts)),
         ]
-        resp = await self._invoke_llm(self.flash_llm, messages)  # Use Flash for Bear opening/rebuttal rounds
+        resp = await self._invoke_llm_for_state(state, self.flash_llm, messages)  # Use Flash for Bear opening/rebuttal rounds
         new_rc = rc + 1
         content, signal = self._ensure_signal_footer(str(resp.content), "bear")
         if len(content) < 50:
@@ -1173,7 +1235,7 @@ Current Date (Asia/Jakarta): {current_date}
             SystemMessage(content=DEVILS_ADVOCATE_PROMPT),
             HumanMessage(content=f"Decision Brief:\n{decision_context}\n\nDebate:\n{hist}"),
         ]
-        resp = await self._invoke_llm(self.flash_llm, messages)
+        resp = await self._invoke_llm_for_state(state, self.flash_llm, messages)
         content, signal = self._ensure_signal_footer(str(resp.content), "devils_advocate")
         msg = DebateMessage(
             role="devils_advocate",
@@ -1279,6 +1341,59 @@ Current Date (Asia/Jakarta): {current_date}
 
     # ── Trade Envelope Helpers (pure Python — deterministic) ─────────────────
 
+    @staticmethod
+    def _tick_size_for_price(price: float) -> float:
+        """Return the IHSG tick size for a price level."""
+        try:
+            price = float(price)
+        except (TypeError, ValueError):
+            return 1.0
+        if price < 200:
+            return 1.0
+        if price < 500:
+            return 2.0
+        if price < 2000:
+            return 5.0
+        if price < 5000:
+            return 10.0
+        return 25.0
+
+    @classmethod
+    def _next_tick_above(cls, price: float) -> float:
+        """Smallest snapped IHSG price strictly above the provided level."""
+        try:
+            base = float(price)
+        except (TypeError, ValueError):
+            base = 0.0
+        if base <= 0:
+            return 1.0
+
+        candidate = base
+        for _ in range(10):
+            candidate = snap_to_tick(candidate + cls._tick_size_for_price(candidate))
+            if candidate > base:
+                return candidate
+        return base + max(cls._tick_size_for_price(base), 1.0)
+
+    @classmethod
+    def _previous_tick_below(cls, price: float) -> float:
+        """Largest snapped IHSG price strictly below the provided level."""
+        try:
+            base = float(price)
+        except (TypeError, ValueError):
+            return 0.0
+        if base <= 0:
+            return 0.0
+
+        candidate = base
+        for _ in range(10):
+            candidate = snap_to_tick(candidate - cls._tick_size_for_price(candidate))
+            if 0 < candidate < base:
+                return candidate
+            if candidate <= 0:
+                break
+        return max(base - max(cls._tick_size_for_price(base), 1.0), 0.0)
+
     def _compute_trade_envelope(
         self,
         current_price: float,
@@ -1304,6 +1419,8 @@ Current Date (Asia/Jakarta): {current_date}
             entry_high = snap_to_tick(current_price)
         if entry_low >= entry_high:
             entry_high = entry_low + max(snap_to_tick(entry_low * 0.02), 10)
+        if entry_low >= entry_high:
+            entry_high = self._next_tick_above(entry_low)
 
         entry_mid = (entry_low + entry_high) / 2
 
@@ -1323,8 +1440,7 @@ Current Date (Asia/Jakarta): {current_date}
         if stop >= entry_low:
             stop = snap_to_tick(entry_low * 0.96)
         if stop >= entry_low:  # double-check post snap
-            stop = entry_low - snap_to_tick(entry_low * 0.01)
-            stop = max(stop, entry_mid * 0.90)  # absolute safety net
+            stop = self._previous_tick_below(entry_low)
 
         # Target calculation (ATR-based with floor and ceiling)
         risk_per_share = entry_mid - stop
@@ -1338,6 +1454,8 @@ Current Date (Asia/Jakarta): {current_date}
         # Ceiling: blend with Fair Value if target > FV
         if fair_value > 0 and target > fair_value:
             target = snap_to_tick((target + fair_value) / 2)
+        if target <= entry_high:
+            target = self._next_tick_above(entry_high)
 
         # Compute R/R ratio
         gain_pct = ((target - entry_mid) / entry_mid) * 100 if entry_mid > 0 else 0
@@ -1686,7 +1804,12 @@ Start your response with '{' and end with '}'. Nothing else."""
             return p
 
         try:
-            resp = await self._invoke_llm(self.pro_llm, messages, inject_rules=False)
+            resp = await self._invoke_llm_for_state(
+                state,
+                self.pro_llm,
+                messages,
+                inject_rules=False,
+            )
             parsed = json.loads(self._sanitize_json(resp.content))
             parsed = _apply_envelope(parsed)
             parsed = self._apply_consensus_override(parsed, state)
@@ -1801,9 +1924,12 @@ Start your response with '{' and end with '}'. Nothing else."""
                 "run_id": getattr(self, "run_id", "unknown"),
                 "market_data_source": market_data.get("source", "unknown"),
                 "market_data_cached": True,
+                "flash_calls": 0,
+                "pro_calls": 0,
             },
             "error": None,
         }
+        self._reset_llm_counters(initial_state)
         logger.info(f"[DebateChamber] ▶ Starting swing-trade pipeline for {ticker} @ Rp {current_price:,.0f}")
         guarded = await run_with_guard(
             ticker=ticker,
@@ -1821,5 +1947,10 @@ Start your response with '{' and end with '}'. Nothing else."""
                 },
             }
         result = guarded["result"]
+        result = self._merge_llm_counters(
+            result,
+            str(initial_state["metadata"].get("run_id", "unknown")),
+            ticker,
+        )
         logger.info(f"[DebateChamber] ✅ Pipeline complete for {ticker}")
         return result
