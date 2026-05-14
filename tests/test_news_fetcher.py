@@ -1,0 +1,380 @@
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
+
+from services.news_fetcher import (
+    BREAKING_NEWS_HOURS,
+    NEWS_LOOKBACK_DAYS,
+    STALE_NEWS_HOURS,
+    NewsEventTag,
+    NewsFetcher,
+    NewsSentiment,
+)
+
+
+def _ts(hours_ago: int = 1) -> int:
+    return int((datetime.now(timezone.utc) - timedelta(hours=hours_ago)).timestamp())
+
+
+def _slug(value: str) -> str:
+    return "".join(ch.lower() if ch.isalnum() else "-" for ch in value).strip("-")
+
+
+def _raw(
+    title: str,
+    *,
+    hours_ago: int = 1,
+    include_date: bool = True,
+    url: str | None = None,
+    summary: str | None = None,
+    description: str | None = None,
+    content: dict | None = None,
+) -> dict:
+    raw = {
+        "title": title,
+        "publisher": "UnitTest News",
+        "link": url or f"https://example.test/news/{_slug(title)}",
+    }
+    if include_date:
+        raw["providerPublishTime"] = _ts(hours_ago)
+    if summary is not None:
+        raw["summary"] = summary
+    if description is not None:
+        raw["description"] = description
+    if content is not None:
+        raw["content"] = content
+    return raw
+
+
+def _mock_ticker(news: list[dict] | Exception):
+    patcher = patch("services.news_fetcher.yf.Ticker")
+    mocked_ticker = patcher.start()
+    if isinstance(news, Exception):
+        mocked_ticker.side_effect = news
+    else:
+        mocked_ticker.return_value.news = news
+    return patcher, mocked_ticker
+
+
+def test_classify_item_positive_title() -> None:
+    item = NewsFetcher().classify_item(_raw("BBCA laba naik strong growth"), "BBCA")
+
+    assert item.sentiment is NewsSentiment.POSITIVE
+    assert item.sentiment_score > 0
+
+
+def test_classify_item_negative_title() -> None:
+    item = NewsFetcher().classify_item(_raw("BBCA rugi turun below estimate"), "BBCA")
+
+    assert item.sentiment is NewsSentiment.NEGATIVE
+    assert item.sentiment_score < 0
+
+
+def test_classify_item_uses_summary_and_description() -> None:
+    item = NewsFetcher().classify_item(
+        _raw(
+            "BBCA update emiten",
+            summary="Laba turun dan penurunan kinerja below estimate",
+            description="Manajemen menjelaskan pelemahan margin",
+        ),
+        "BBCA",
+    )
+
+    assert item.sentiment is NewsSentiment.NEGATIVE
+    assert item.sentiment_score < 0
+
+
+def test_classify_item_corporate_action() -> None:
+    item = NewsFetcher().classify_item(_raw("BBCA umumkan stock split"), "BBCA")
+
+    assert item.is_corporate_action is True
+    assert NewsEventTag.CORPORATE_ACTION in item.event_tags
+    assert item.sentiment is NewsSentiment.NEUTRAL
+
+
+def test_classify_item_macro_event() -> None:
+    item = NewsFetcher().classify_item(_raw("IHSG bergerak karena BI rate"), "BBCA")
+
+    assert item.is_macro is True
+    assert NewsEventTag.MACRO_EVENT in item.event_tags
+    assert item.sentiment is NewsSentiment.NEUTRAL
+
+
+def test_classify_item_recent_is_breaking() -> None:
+    item = NewsFetcher().classify_item(_raw("BBCA profit growth", hours_ago=2), "BBCA")
+
+    assert item.is_breaking is True
+    assert NewsEventTag.BREAKING in item.event_tags
+
+
+def test_classify_item_old_is_not_breaking() -> None:
+    item = NewsFetcher().classify_item(
+        _raw("BBCA profit growth", hours_ago=BREAKING_NEWS_HOURS + 1),
+        "BBCA",
+    )
+
+    assert item.is_breaking is False
+    assert NewsEventTag.BREAKING not in item.event_tags
+
+
+def test_invalid_ticker_returns_empty_bundle_without_fetch() -> None:
+    patcher, mocked_ticker = _mock_ticker([_raw("BBCA profit growth")])
+    try:
+        bundle = NewsFetcher().build_bundle(".JK")
+    finally:
+        patcher.stop()
+
+    assert mocked_ticker.call_count == 0
+    assert bundle.data_available is False
+    assert bundle.overall_sentiment is NewsSentiment.UNKNOWN
+    assert bundle.confidence_adjustment < 0
+    assert "Invalid IDX ticker" in bundle.confidence_adjustment_reason
+
+
+def test_lowercase_and_jk_suffix_ticker_normalization() -> None:
+    patcher, mocked_ticker = _mock_ticker([_raw("BBCA profit growth", hours_ago=2)])
+    try:
+        bundle = NewsFetcher().build_bundle("bbca.jk")
+    finally:
+        patcher.stop()
+
+    assert bundle.ticker == "BBCA"
+    mocked_ticker.assert_called_once_with("BBCA.JK")
+
+
+def test_build_bundle_empty_response_marks_unavailable() -> None:
+    patcher, _ = _mock_ticker([])
+    try:
+        bundle = NewsFetcher().build_bundle("BBCA")
+    finally:
+        patcher.stop()
+
+    assert bundle.data_available is False
+    assert bundle.confidence_adjustment < 0
+
+
+def test_build_bundle_negative_news_sets_negative_sentiment() -> None:
+    news = [
+        _raw("BBCA rugi turun"),
+        _raw("BBCA melemah below support"),
+        _raw("BBCA downgrade setelah miss target"),
+    ]
+    patcher, _ = _mock_ticker(news)
+    try:
+        bundle = NewsFetcher().build_bundle("BBCA")
+    finally:
+        patcher.stop()
+
+    assert bundle.overall_sentiment is NewsSentiment.NEGATIVE
+    assert bundle.confidence_adjustment <= -0.10
+
+
+def test_build_bundle_breaking_negative_news_penalizes_more() -> None:
+    patcher, _ = _mock_ticker([_raw("BBCA rugi turun below", hours_ago=2)])
+    try:
+        bundle = NewsFetcher().build_bundle("BBCA")
+    finally:
+        patcher.stop()
+
+    assert bundle.has_breaking_news is True
+    assert bundle.confidence_adjustment <= -0.20
+
+
+def test_breaking_negative_corporate_action_gets_negative_adjustment() -> None:
+    patcher, _ = _mock_ticker(
+        [_raw("BBCA rights issue rugi turun below", hours_ago=2)]
+    )
+    try:
+        bundle = NewsFetcher().build_bundle("BBCA")
+    finally:
+        patcher.stop()
+
+    assert bundle.items[0].sentiment is NewsSentiment.NEGATIVE
+    assert bundle.items[0].is_breaking is True
+    assert bundle.items[0].is_corporate_action is True
+    assert bundle.confidence_adjustment == -0.20
+    assert f"{BREAKING_NEWS_HOURS}h" in bundle.confidence_adjustment_reason
+
+
+def test_corporate_action_does_not_override_negative_sentiment() -> None:
+    item = NewsFetcher().classify_item(
+        _raw("BBCA rights issue rugi turun below"),
+        "BBCA",
+    )
+
+    assert item.is_corporate_action is True
+    assert NewsEventTag.CORPORATE_ACTION in item.event_tags
+    assert item.sentiment is NewsSentiment.NEGATIVE
+
+
+def test_macro_event_does_not_override_negative_sentiment() -> None:
+    item = NewsFetcher().classify_item(
+        _raw("BBCA turun dan IHSG melemah karena BI rate"),
+        "BBCA",
+    )
+
+    assert item.is_macro is True
+    assert NewsEventTag.MACRO_EVENT in item.event_tags
+    assert item.sentiment is NewsSentiment.NEGATIVE
+
+
+def test_unknown_publish_date_gets_warning_or_penalty() -> None:
+    fetcher = NewsFetcher()
+    unknown_date_item = fetcher.classify_item(
+        _raw("BBCA laba naik", include_date=False),
+        "BBCA",
+    )
+    dated_item = fetcher.classify_item(_raw("BBCA laba naik", hours_ago=2), "BBCA")
+
+    assert unknown_date_item.published_at is None
+    assert unknown_date_item.relevance_score < dated_item.relevance_score
+
+    patcher, _ = _mock_ticker(
+        [
+            _raw("BBCA laba naik tanpa tanggal", include_date=False),
+            _raw("BBCA profit growth stale", hours_ago=STALE_NEWS_HOURS + 2),
+        ]
+    )
+    try:
+        bundle = NewsFetcher().build_bundle("BBCA")
+    finally:
+        patcher.stop()
+
+    assert bundle.staleness_warning is not None
+    assert "unknown publish dates" in bundle.staleness_warning
+    assert "Most recent news is" in bundle.staleness_warning
+
+
+def test_duplicate_news_items_are_removed() -> None:
+    news = [
+        _raw("BBCA profit growth", url="https://example.test/news/duplicate"),
+        _raw("BBCA profit growth", url="https://example.test/news/duplicate"),
+    ]
+    patcher, _ = _mock_ticker(news)
+    try:
+        bundle = NewsFetcher().build_bundle("BBCA")
+    finally:
+        patcher.stop()
+
+    assert bundle.total_fetched == 2
+    assert bundle.total_relevant == 1
+    assert len(bundle.items) == 1
+
+
+def test_dividend_or_buyback_not_automatically_negative() -> None:
+    patcher, _ = _mock_ticker(
+        [_raw("BBCA umumkan dividen dan buyback setelah laba naik", hours_ago=4)]
+    )
+    try:
+        bundle = NewsFetcher().build_bundle("BBCA")
+        prompt = NewsFetcher().bundle_to_prompt_string(bundle)
+    finally:
+        patcher.stop()
+
+    assert bundle.has_corporate_action is True
+    assert bundle.overall_sentiment is NewsSentiment.POSITIVE
+    assert bundle.confidence_adjustment >= 0
+    assert "Corporate action detected" in bundle.confidence_adjustment_reason
+    assert "Reason: Corporate action detected" in prompt
+
+
+def test_confidence_reason_matches_configured_constants() -> None:
+    patcher, _ = _mock_ticker(
+        [_raw("BBCA rugi turun below", hours_ago=BREAKING_NEWS_HOURS + 3)]
+    )
+    try:
+        bundle = NewsFetcher().build_bundle("BBCA")
+    finally:
+        patcher.stop()
+
+    assert (
+        bundle.confidence_adjustment_reason
+        == f"Negative news sentiment in last {NEWS_LOOKBACK_DAYS} days"
+    )
+
+
+def test_bundle_to_prompt_string_includes_event_flags_without_mislabeling_sentiment() -> None:
+    patcher, _ = _mock_ticker(
+        [_raw("BBCA rights issue rugi turun below", hours_ago=2)]
+    )
+    try:
+        fetcher = NewsFetcher()
+        bundle = fetcher.build_bundle("BBCA")
+        prompt = fetcher.bundle_to_prompt_string(bundle)
+    finally:
+        patcher.stop()
+
+    assert "[NEGATIVE] BBCA rights issue rugi turun below" in prompt
+    assert "Events: BREAKING | CORPORATE_ACTION" in prompt
+    assert "[CORPORATE_ACTION]" not in prompt
+
+
+def test_build_bundle_positive_news_has_non_negative_adjustment() -> None:
+    patcher, _ = _mock_ticker([_raw("BBCA laba naik record strong", hours_ago=2)])
+    try:
+        bundle = NewsFetcher().build_bundle("BBCA")
+    finally:
+        patcher.stop()
+
+    assert bundle.confidence_adjustment >= 0
+
+
+def test_bundle_to_prompt_string_contains_header_and_ticker() -> None:
+    patcher, _ = _mock_ticker([_raw("BBCA profit growth", hours_ago=2)])
+    try:
+        fetcher = NewsFetcher()
+        bundle = fetcher.build_bundle("BBCA")
+        prompt = fetcher.bundle_to_prompt_string(bundle)
+    finally:
+        patcher.stop()
+
+    assert "NEWS BRIEF" in prompt
+    assert "BBCA" in prompt
+
+
+def test_bundle_to_prompt_string_shows_breaking() -> None:
+    patcher, _ = _mock_ticker([_raw("BBCA profit growth", hours_ago=2)])
+    try:
+        fetcher = NewsFetcher()
+        bundle = fetcher.build_bundle("BBCA")
+        prompt = fetcher.bundle_to_prompt_string(bundle)
+    finally:
+        patcher.stop()
+
+    assert "BREAKING" in prompt
+
+
+def test_cache_hit_avoids_second_yfinance_call() -> None:
+    patcher, mocked_ticker = _mock_ticker([_raw("BBCA profit growth", hours_ago=2)])
+    try:
+        fetcher = NewsFetcher()
+        fetcher.build_bundle("BBCA")
+        fetcher.build_bundle("BBCA")
+    finally:
+        patcher.stop()
+
+    assert mocked_ticker.call_count == 1
+
+
+def test_as_evidence_chunk_returns_sentiment_chunk() -> None:
+    patcher, _ = _mock_ticker([_raw("BBCA profit growth", hours_ago=2)])
+    try:
+        fetcher = NewsFetcher()
+        bundle = fetcher.build_bundle("BBCA")
+        chunk = fetcher.as_evidence_chunk(bundle)
+    finally:
+        patcher.stop()
+
+    assert chunk["category"] == "sentiment"
+    assert chunk["content"]
+
+
+def test_fetch_yfinance_news_failure_returns_empty_list() -> None:
+    patcher, _ = _mock_ticker(RuntimeError("network failed"))
+    try:
+        news = NewsFetcher().fetch_yfinance_news("BBCA")
+    finally:
+        patcher.stop()
+
+    assert news == []

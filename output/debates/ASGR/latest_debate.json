@@ -2,156 +2,105 @@
   "ticker": "ASGR",
   "verdict": {
     "ticker": "ASGR",
-    "rating": "BUY",
-    "confidence": 0.76,
-    "fair_value": 3235.0,
-    "entry_price_range": "1495 - 1525",
-    "target_price": 1660.0,
-    "stop_loss": 1435.0,
-    "current_price": 1595.0,
+    "rating": "STRONG_BUY",
+    "confidence": 0.74,
+    "fair_value": 3052.0,
+    "entry_price_range": "2431 - 2533",
+    "target_price": 2669.0,
+    "stop_loss": 2342.0,
+    "current_price": 2500.0,
     "timeframe": "1-3 Months",
-    "weighted_reasoning": "The decision to approve this trade is primarily driven by two factors: a massive fundamental undervaluation (102.8% discount to Fair Value of Rp 3,235) and a technically sound trade structure (R/R 2.0). The entry zone of Rp 1,495 – Rp 1,525 is strategically placed at the MA50 support, a logical area for a pullback in an established uptrend (price > MA200). The conflict resolution signal (Fundamental ✅ + Technical ✅) supports a BUY rating. However, the rating is not a STRONG_BUY and confidence is capped due to significant mitigating factors. The primary weakness is the lack of an identifiable catalyst within the 1-3 month timeframe, making the trade heavily reliant on technical execution. Furthermore, the Devil's Advocate risk regarding a broader market correction and foreign outflows breaking the MA50 support remains a valid, unanswered concern. The absence of sentiment data also introduces uncertainty. These factors led to the application of a 'no catalyst' confidence cap (max 0.78), which was then adjusted down to 0.76 to reflect the combined risks.",
-    "critical_risk_factor": "",
+    "weighted_reasoning": "Dry-run mock verdict untuk validasi pipeline.",
+    "critical_risk_factor": "Dry-run: bukan rekomendasi investasi aktual.",
     "key_catalysts": [
-      "Significant undervaluation providing a 102.8% discount to Fair Value.",
-      "Favorable Risk/Reward ratio of 2.0.",
-      "Trade entry is aligned with strong technical support at the MA50 (Rp 1,497).",
-      "Stock is in a confirmed long-term uptrend (Price > MA200)."
+      "Template dry-run umum untuk validasi konfigurasi pipeline.",
+      "Risk/reward mock memenuhi ambang awal."
     ],
     "key_risks": [
-      "Lack of a specific, identifiable catalyst within the 1-3 month swing trading horizon.",
-      "The Devil's Advocate scenario of a broader market correction causing a break of the MA50 support is a key risk.",
-      "Current price (Rp 1,595) is above the target entry zone, requiring a pullback that may not materialize.",
-      "Sentiment data is insufficient, providing no insight into market perception."
+      "Data sintetis tidak merepresentasikan kondisi emiten aktual.",
+      "Dry-run memakai data sintetis."
     ],
-    "summary": "This trade plan for ASGR is approved with a BUY rating. The stock is significantly undervalued, offering a substantial margin of safety, and the technical setup presents an excellent 2.0 Risk/Reward ratio for an entry on a pullback to the MA50 support. However, conviction is tempered by the absence of a clear short-term catalyst and potential macro headwinds, making a disciplined entry within the specified zone crucial.",
-    "expected_return": "+9.9%",
-    "risk_reward_ratio": 2.0,
+    "summary": "Ini adalah hasil simulasi dry-run untuk menguji parsing, scoring, persistensi, dan report generation tanpa API call.",
+    "expected_return": "+7.5%",
+    "risk_reward_ratio": 1.34,
     "is_overvalued": false,
     "wait_and_see": false,
     "consensus_reached": true,
     "consensus_method": "voting",
     "dissenting_agents": [
-      "sentiment_specialist"
+      "bear"
     ]
   },
-  "debate_rounds": 1,
+  "debate_rounds": 3,
   "consensus_reached": true,
   "consensus_method": "voting",
   "dissenting_agents": [
-    "sentiment_specialist"
+    "bear"
   ],
   "agent_votes": [
     {
       "agent": "fundamental_scout",
       "position": "BUY",
-      "confidence": 0.8,
+      "confidence": 0.66,
       "round": 0
     },
     {
       "agent": "chartist",
       "position": "BUY",
-      "confidence": 0.85,
+      "confidence": 0.64,
       "round": 0
     },
     {
       "agent": "sentiment_specialist",
       "position": "HOLD",
-      "confidence": 0.0,
+      "confidence": 0.55,
       "round": 0
     },
     {
       "agent": "bull",
       "position": "BUY",
-      "confidence": 0.6,
+      "confidence": 0.7,
       "round": 1
     },
     {
       "agent": "bear",
-      "position": "BUY",
-      "confidence": 0.6,
+      "position": "AVOID",
+      "confidence": 0.58,
       "round": 1
     }
   ],
-  "disagreement_type": null,
   "debate_history": [
     {
       "role": "bull",
-      "content": "ASGR presents a compelling fundamental undervaluation, trading at Rp 1,595, a significant 102.8% discount to its fair value of Rp 3,235. This provides a robust fundamental floor, supported by strong solvency (Interest Coverage Ratio 69.06x, Total Liabilities/Equity 0.41) and decent profitability (TTM ROE 13.55%, TTM Net Profit Margin 9.14%). While the high dividend yield of 15.11% is attractive, its ex-date (24 Apr 26) is a past event and not a future catalyst for a 1-3 month swing trade.\n\nTechnically, ASGR is in a\n\nPosition: BUY\nAgent Confidence: 0.60",
+      "content": "Dry-run bull case: setup teknikal mock mendukung entry bertahap.\n\nPosition: BUY\nAgent Confidence: 0.70",
       "round": 1,
       "position": "BUY",
-      "confidence": 0.6
+      "confidence": 0.7
     },
     {
       "role": "bear",
-      "content": "While ASGR is fundamentally undervalued by 102.8% against its fair value of Rp 3,235, this long-term valuation does not inherently provide a margin of safety for a short-term swing trade given immediate technical and catalyst risks. The current price of Rp 1,595, while below fair value, is at the higher end of the Bull's proposed entry zone and presents an unfavorable risk profile for a swing trade.\n\nTechnically, the setup shows signs of weakness rather than a healthy pullback. The current price of Rp 1,595 is already trading below the EMA20 (Rp 1,598) and SMA20 (Rp 1,604), indicating a loss of short-term\n\nPosition: BUY\nAgent Confidence: 0.60",
+      "content": "Dry-run bear case: kualitas data sintetis tidak boleh dipakai untuk trading.\n\nPosition: AVOID\nAgent Confidence: 0.58",
       "round": 1,
-      "position": "BUY",
-      "confidence": 0.6
+      "position": "AVOID",
+      "confidence": 0.58
     },
     {
       "role": "devils_advocate",
-      "content": "1.  **MACRO/COMPANY RISK & FOREIGN FLOW:** If foreign funds continue their net selling trend on the IHSG, coupled with a broader market correction, could ASGR's MA50 support at Rp 1,497 fail, leading to a deeper decline towards its MA200 at Rp 1,172?\n\n2.  **EXECUTION RISK — Transaction Cost Stress Test:**\n    Menghitung total biaya transaksi untuk posisi ini dengan asumsi harga entry Rp 1,595 dan target jual Rp 1,695. Komponen biaya meliputi: biaya beli 0.15%, biaya jual 0.25%, PPh final 0.10% dari nilai jual, dan estimasi slippage 0.15% (karena harga Rp 1,595 >= Rp 500). Total biaya round-trip adalah 0.15% + 0.25% + 0.10% + 0.15% = 0.65%. Dengan target return gross sebesar 6.27% (dihitung dari (Rp 1,695 - Rp 1,595) / Rp 1,595), net return setelah biaya adalah 6.27% - 0.65% = 5.62%. Berdasarkan perhitungan ini, posisi tersebut dikategorikan sebagai **VIABLE after transaction costs**.",
+      "content": "Dry-run challenge: konfirmasi ulang semua level harga dengan data live.",
       "round": 2,
-      "position": "UNKNOWN",
-      "confidence": null
+      "position": "HOLD",
+      "confidence": 0.0
     }
   ],
-  "raw_data_summary": "=== FUNDAMENTALS ===\nFAIR VALUE: Rp 3,235\n\nASGR is currently trading at Rp 1,595, which is **UNDERVALUED** by 102.8% compared to its fair value of Rp 3,235. This significant discount provides a strong fundamental cushion for a swing trade setup.\n\nKey support metrics include a TTM Return on Equity (ROE) of 13.55% and a TTM Net Profit Margin of 9.14%. The company demonstrates strong solvency with an Interest Coverage Ratio of 69.06x. The Debt/Equity Ratio is not explicitly provided as a numeric value in the latest data, but Total Liabilities/Equity is 0.41. ASGR also offers a high Dividend Yield of 15.11%. Trend data for ROE and Net Margin over 3 years is not available in the provided information.\n\nThe latest dividend ex-date was 24 Apr 26, which is a past event relative to the current date (2026-05-07). No other immediate growth catalysts (e.g., upcoming earnings, new contracts) are identified within the 1-3 month swing trade horizon.\n\n**Quality Check:**\n*   ROE (13.55%) is not >15%, so no ROE-Margin Divergence flag.\n*   Debt/Equity Ratio is null, preventing a full check for \"Low DER tapi Interest Coverage lemah\". However, Interest Coverage (69.06x) is very strong.\n*   Operating Cash Flow data is not available, preventing a check for \"Revenue-CFO Divergence\". Revenue growth (Quarter YoY) is positive at 5.34%.\n*   Altman Z-Score (9.14) is not >10, so no Z-Score vs DER Inconsistency flag.\n✅ No red flags detected based on available data.\n\nPosition: BUY\nAgent Confidence: 0.80\n\n=== TECHNICALS ===\n**ANALISIS TEKNIKAL IHSG (1-3 Bulan)**\n\nSaham dalam uptrend struktural. Swing long searah tren. Harga saat ini sedikit di bawah EMA20, namun masih kokoh di atas MA50 dan MA200, mengindikasikan tren naik jangka panjang yang kuat dengan potensi pullback sehat. ENTRY ZONE: Rp 1,497 – Rp 1,598, memanfaatkan area support dinamis EMA20 dan MA50.\n\nTARGET: Rp 1,695 (approx. 9.53% from entry mid), menargetkan resistensi terdekat di bawah level tertinggi 52 minggu. STOP LOSS: Rp 1,507 (1.5× ATR below EMA20), menjaga risiko tetap terkontrol di bawah support EMA20.\n\nRSI(14) di 52.4 menunjukkan momentum netral cenderung positif, belum memasuki area overbought. Data volume saat ini tidak tersedia untuk konfirmasi pergerakan harga.\n\nPosition: BUY\nAgent Confidence: 0.85\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 1595.0,\n  \"sma20\": 1604.0,\n  \"ema20\": 1598.0,\n  \"ma50\": 1497.0,\n  \"ma200\": 1172.0,\n  \"ma200_context\": \"ABOVE\",\n  \"rsi14\": 52.4,\n  \"atr14\": 61.0,\n  \"avg_volume_20d\": 3180015.0,\n  \"52w_high\": 1719.0,\n  \"52w_low\": 724.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== DIVIDEND EX-DATE SCAN: ASGR ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
+  "raw_data_summary": "DRY_RUN mock data; no provider or Gemini call executed.",
   "error": null,
-  "conviction_score": 0.58,
+  "conviction_score": 0.504,
   "sector_key": "industrials",
-  "position_sizing": {
-    "ticker": "ASGR",
-    "rating": "BUY",
-    "confidence": 0.76,
-    "lot": 1,
-    "shares": 100,
-    "position_value": 159500.0,
-    "allocation_pct": 0.1595,
-    "target_allocation_pct": 0.2,
-    "max_loss_rp": 16000.0,
-    "max_drawdown_pct": 0.016,
-    "expected_return_pct": 9.9,
-    "expected_return_rp": 15790.5,
-    "total_cost_est": 797.5,
-    "entry_price": 1595.0,
-    "stop_loss": 1435.0,
-    "rr_ratio": 2.0
-  },
-  "allocation_reasoning": {
-    "target_deployment_pct": 65.0,
-    "actual_deployment_pct": 44.0,
-    "gap_explanation": "Actual deployment 44.0% masih 21.1 percentage points di bawah target 65.0% karena sizing menghormati lot IHSG, cap per posisi, dan budget risiko stop-loss.",
-    "risk_factors_limiting": [
-      "lot size 100 saham dan harga entry membatasi penambahan posisi tanpa oversizing",
-      "hanya 3 kandidat yang lolos rating dan risk/reward untuk sizing",
-      "cap per posisi 20.0% membuat feasible deployment maksimum sekitar 60.0%",
-      "max drawdown per posisi dibatasi 7.0% sehingga lot tidak dipaksa melewati stop-risk budget"
-    ],
-    "market_condition_score": 0.74,
-    "recommendation": "Deployment sudah cukup aktif untuk swing trade moderat; tambah exposure hanya jika sinyal teknikal menguat tanpa memperbesar drawdown per posisi."
-  },
-  "deployment_scenario_comparison": {
-    "deploy_60_now": {
-      "deployment_pct": 60.0,
-      "expected_return_on_deployed_pct": 8.03,
-      "expected_return_portfolio_pct": 4.82,
-      "expected_return_rp": 48181.0,
-      "max_drawdown_portfolio_pct": 4.2,
-      "max_drawdown_rp": 42000.0
-    },
-    "wait_for_confirmation": {
-      "deployment_pct": 0.0,
-      "expected_return_portfolio_pct": 0.0,
-      "expected_return_rp": 0.0,
-      "max_drawdown_portfolio_pct": 0.0,
-      "max_drawdown_rp": 0.0,
-      "tradeoff": "Cash protects capital while waiting for cleaner entry, but gives up roughly Rp 48,181 if the current 60% deployment scenario works."
-    }
-  },
   "metadata": {
-    "batch_timestamp": "20260507_035045",
+    "dry_run": true,
+    "mock_profile": "industrials",
+    "prompt_version": "2026-05-11-critical-audit-v1",
+    "batch_timestamp": "20260514_204302",
     "versioned_output": true
   }
 }

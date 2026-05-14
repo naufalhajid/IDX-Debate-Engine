@@ -2,86 +2,105 @@
   "ticker": "ULTJ",
   "verdict": {
     "ticker": "ULTJ",
-    "rating": "HOLD",
-    "confidence": 0.52,
-    "fair_value": 1938.0,
-    "entry_price_range": "1555 - 1605",
-    "target_price": 1690.0,
-    "stop_loss": 1525.0,
-    "current_price": 1605.0,
+    "rating": "BUY",
+    "confidence": 0.73,
+    "fair_value": 1742.0,
+    "entry_price_range": "1452 - 1509",
+    "target_price": 1618.0,
+    "stop_loss": 1401.0,
+    "current_price": 1500.0,
     "timeframe": "1-3 Months",
-    "weighted_reasoning": "The trade plan was evaluated based on strong conflicting signals. On one hand, the fundamental picture is excellent (20.7% undervalued against a fair value of Rp 1,938) and the technical setup is positive (price above MA200, entry at support, R/R = 2.0). This combination normally warrants a BUY rating. However, this was overridden by two key factors. First, the 'soft_hold' consensus method is a mandatory directive that forces a HOLD rating, reflecting significant unresolved debate points. Second, the core of this debate, raised by the Bear and Devil's Advocate, is the lack of any identifiable catalyst within the 1-3 month swing horizon. While undervalued, there is no specific trigger to unlock this value in the required timeframe. This catalyst risk makes the timing uncertain and justifies the HOLD rating despite the attractive price levels. Consensus override: Bull/Bear confidence gap was below 0.15, so the chamber treats this as soft consensus HOLD instead of forcing an entry.",
-    "critical_risk_factor": "",
+    "weighted_reasoning": "Dry-run mock verdict untuk validasi pipeline.",
+    "critical_risk_factor": "Dry-run: bukan rekomendasi investasi aktual.",
     "key_catalysts": [
-      "Potential market re-rating due to significant undervaluation (20.7% discount to Fair Value).",
-      "Continuation of the established technical uptrend with price holding above key moving averages (MA50/MA200)."
+      "Sektor defensif mock diasumsikan bergerak lebih moderat.",
+      "Risk/reward mock memenuhi ambang awal."
     ],
     "key_risks": [
-      "Absence of a specific, near-term catalyst to drive price towards fair value within the 1-3 month swing timeframe.",
-      "A general market downturn or foreign outflow could break the MA50 support, as the stock lacks a unique driver to insulate it.",
-      "The stock may continue to trade sideways or drift lower without a catalyst, trapping capital in an underperforming position."
+      "Margin dan daya beli masih menjadi risiko validasi utama.",
+      "Dry-run memakai data sintetis."
     ],
-    "summary": "ULTJ presents a compelling case based on significant undervaluation and a technically sound uptrend, supported by a strong 2.0 R/R ratio. However, a mandatory 'soft_hold' consensus directive overrides a BUY rating due to the critical absence of a specific, near-term catalyst. The risk that the stock remains range-bound without a trigger makes immediate entry suboptimal for a 1-3 month swing trade, warranting a HOLD until a clearer momentum driver emerges.",
-    "expected_return": "+7.0%",
-    "risk_reward_ratio": 2.0,
+    "summary": "Ini adalah hasil simulasi dry-run untuk menguji parsing, scoring, persistensi, dan report generation tanpa API call.",
+    "expected_return": "+9.3%",
+    "risk_reward_ratio": 1.73,
     "is_overvalued": false,
-    "wait_and_see": true,
+    "wait_and_see": false,
     "consensus_reached": true,
-    "consensus_method": "soft_hold",
+    "consensus_method": "voting",
     "dissenting_agents": [
-      "fundamental_scout",
-      "chartist",
-      "bull",
       "bear"
     ]
   },
-  "debate_rounds": 2,
-  "debate_history": [
+  "debate_rounds": 3,
+  "consensus_reached": true,
+  "consensus_method": "voting",
+  "dissenting_agents": [
+    "bear"
+  ],
+  "agent_votes": [
     {
-      "role": "system",
-      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 1,605, Rp 1,938, Rp 1,444, Rp 1,574, Rp 1,599, Rp 1,586.5, Rp 1,700, Rp 1,494",
+      "agent": "fundamental_scout",
+      "position": "BUY",
+      "confidence": 0.66,
       "round": 0
     },
     {
-      "role": "bull",
-      "content": "…ry driver for this swing trade thesis is the market's ongoing recognition of ULTJ's significant fundamental undervaluation. The strong financial profile and attractive discount to fair value, combined with the established technical uptrend, are expected to attract continued institutional interest and drive price appreciation towards its intrinsic value over the short to medium term.\n\n**RISK/REWARD:**\nEntry Rp 1,586.5 (midpoint of Rp 1,574 – Rp 1,599 entry zone)\nTarget Rp 1,700 (52-week high resistance)\nStop Rp 1,494 (1.5x ATR below EMA20)\nR/R ratio: 1.23:1\n\nPosition: BUY\nAgent Confidence: 0.75",
+      "agent": "chartist",
+      "position": "BUY",
+      "confidence": 0.64,
+      "round": 0
+    },
+    {
+      "agent": "sentiment_specialist",
+      "position": "HOLD",
+      "confidence": 0.55,
+      "round": 0
+    },
+    {
+      "agent": "bull",
+      "position": "BUY",
+      "confidence": 0.7,
       "round": 1
     },
     {
-      "role": "bear",
-      "content": "…stance, would signal a significant technical weakness and invalidate the uptrend for a swing trade.\n\n**CATALYST RISK:** The Bull's reliance on \"market's ongoing recognition of ULTJ's significant fundamental undervaluation\" as the primary catalyst for a 1-3 month swing trade is highly speculative and lacks a defined trigger. The evidence explicitly states, \"No immediate future growth catalyst within the 1-3 month horizon has been identified.\" Furthermore, the latest ex-dividend date (04 May 26) is a PAST_EVENT_NOT_CATALYST relative to the current date (20\n\nPosition: AVOID\nAgent Confidence: 0.60",
+      "agent": "bear",
+      "position": "AVOID",
+      "confidence": 0.58,
       "round": 1
-    },
+    }
+  ],
+  "debate_history": [
     {
       "role": "bull",
-      "content": "The Bear's assertion that a breach of the initial downside threshold would invalidate the uptrend for a swing trade overlooks a critical secondary support level. Should the price temporarily dip below the proposed stop, the longer-term moving average, positioned significantly lower, provides a robust structural floor. This level has historically demonstrated its capacity to halt declines and serves as a strong re-accumulation zone, suggesting that any initial weakness would likely be contained, preserving the broader uptrend for a swing horizon.\n\nThe challenge to the catalyst, labeling \"market's ongoing recognition of undervaluation\" as speculative, fails to acknowledge the quantitative corroboration of this undervaluation. The current earnings multiple is significantly below its historical average, and the price-to-book ratio also indicates a discount relative to past valuations. These are not speculative claims but verifiable financial metrics. Furthermore, the company's robust return on equity, healthy net profit margins, minimal leverage, and exceptional interest coverage provide compelling evidence of a fundamentally sound business. These enduring strengths act as a persistent, underlying driver for value recognition, making the market's eventual re-rating a high-probability outcome rather than a speculative event, even in the absence of a new, immediate growth catalyst.\n\nCrucially, the substantial discount to its intrinsic value offers significant potential appreciation, providing a wide buffer against the Bear's risk scenario. Even if the price were to retreat to the aforementioned longer-term moving average, the stock would still trade at a considerable discount to its calculated fair value. This wide price-to-fair-value gap ensures that the downside risk, even if the initial technical support fails, is fundamentally limited, while the upside potential remains substantial. This inherent undervaluation absorbs a significant portion of the short-term technical volatility, making the entry timing strategically sound for a swing trade focused on value realization.\n\nPosition: BUY\nAgent Confidence: 0.88",
-      "round": 2
+      "content": "Dry-run bull case: setup teknikal mock mendukung entry bertahap.\n\nPosition: BUY\nAgent Confidence: 0.70",
+      "round": 1,
+      "position": "BUY",
+      "confidence": 0.7
     },
     {
       "role": "bear",
-      "content": "The Bull's swing setup for ULTJ exhibits critical vulnerabilities, particularly in its technical risk assessment and the timing of its fundamental thesis. The proposed entry zone and stop loss are insufficient to withstand typical market volatility, and the reliance on long-term value recognition as a short-term catalyst is fundamentally flawed for a swing trade.\n\nThe Bull's claimed support around MA50 (Rp 1574) and EMA20 (Rp 1599) is highly susceptible to a breach. With an ATR(14) of Rp 70, a maximum 1-week adverse move (2 × ATR) could be Rp 140. Comparing this to the Bull's assumed maximum loss from the midpoint of their entry zone (Rp 1586.5) to their stop loss (Rp 1494), which is only Rp 92.5, reveals a significant margin of safety deficit. A single week of adverse volatility could easily push the price below the Bull's stop loss, making the trade unviable for swing execution as the assumed risk is significantly understated.\n\nFurthermore, if the initial support around Rp 1574 fails, the Bull's \"robust structural floor\" at the MA200, positioned at Rp 1444, becomes the next plausible technical support. A decline from the current price of Rp 1605 to this MA200 would represent a potential loss of Rp 161. This alternative price scenario demonstrates that the actual maximum loss, should the initial technical support break, is substantially higher than the Bull's calculated Rp 92.5, exposing swing traders to significantly greater downside risk.\n\nThe Bull's argument for \"market's ongoing recognition of undervaluation\" as a swing catalyst is speculative and lacks a defined trigger within the 1-3 month horizon. While ULTJ's TTM P/E of 11.2x is below its historical average of 15.0x, and P/B of 1.9x is below 2.0x, these are long-term value metrics. The absence of an immediate growth catalyst means there is no specific event to drive the \"re-rating\" the Bull anticipates in the short term. The \"substantial discount to intrinsic value\" (Fair Value: Rp 1938) does not guarantee a short-term price floor; a stock can remain undervalued or even decline further without a catalyst, rendering the \"wide buffer\" irrelevant for a swing trade that cannot endure prolonged drawdowns.\n\nPosition: AVOID\nAgent Confidence: 0.85",
-      "round": 2
+      "content": "Dry-run bear case: kualitas data sintetis tidak boleh dipakai untuk trading.\n\nPosition: AVOID\nAgent Confidence: 0.58",
+      "round": 1,
+      "position": "AVOID",
+      "confidence": 0.58
     },
     {
       "role": "devils_advocate",
-      "content": "**Agent Confidence:** HIGH\n\n---\n**Question 1: MACRO/COMPANY RISK & FOREIGN FLOW**\n\nGiven the absence of an immediate catalyst for ULTJ's re-rating and potential for broader market outflows, could sustained foreign selling pressure across the IHSG lead to a breach of ULTJ's MA50 support at Rp 1,574, triggering a decline towards the MA200 at Rp 1,444 within the next 1-3 months?\n\n---\n**Question 2: EXECUTION RISK — Transaction Cost Stress Test**\n\nTo assess the execution risk, we calculate the total transaction costs for the proposed trade. Using the Bull's entry midpoint of Rp 1,586.5 and target price of\n\nPosition: AVOID\nAgent Confidence: 0.55",
-      "round": 3
+      "content": "Dry-run challenge: konfirmasi ulang semua level harga dengan data live.",
+      "round": 2,
+      "position": "HOLD",
+      "confidence": 0.0
     }
   ],
-  "raw_data_summary": "=== EVIDENCE BRIEF: ULTJ ===\nQuery: swing trade analysis\n\n[FAIR_VALUE]\nEvidence ID: ULTJ_fair_value_0\nCurrent Price: 1605 | Fair Value: 1938 | Upside: 20.7%\nSource: stockbit | Score: 1.00\n\n[FUNDAMENTAL]\nEvidence ID: ULTJ_fundamental_0\n{\"brief\":\"FAIR VALUE: Rp 1,938 ULTJ is currently trading at Rp 1,605, which is UNDERVALUED by 20.7% compared to its calculated fair value of Rp 1,938. This valuation is supported by a TTM P/E of 11.2x against a historical average of 15.0x, and a P/B of 1.9x against a historical average of 2.0x. Key financial metrics indicate strong profitability and low leverage. The Return on Equity (TTM) stands\nSource: stockbit | Score: 0.90\n\n[FUNDAMENTAL]\nEvidence ID: ULTJ_fundamental_1\nat 17.02%, with a Net Profit Margin (Quarter) of 17.81%. The Debt/Equity ratio (using Total Liabilities/Equity) is very low at 0.14, complemented by an exceptionally high Interest Coverage Ratio (TTM) of 14,312.37. The stock offers a significant Dividend Yield of 8.10%. No immediate future growth catalyst within the 1-3 month horizon has been identified, as the latest ex-dividend date (04 May\nSource: stockbit | Score: 0.90\n\n[FUNDAMENTAL]\nEvidence ID: ULTJ_fundamental_2\n26) is a PAST_EVENT_NOT_CATALYST relative to the current date (2026-05-14). A quality check of the financial statements reveals no significant red flags. The high ROE (17.02%) is consistent with a healthy Net Margi...\",\"exdate\":\"=== DIVIDEND EX-DATE SCAN: ULTJ ===\\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\\n\"}\nSource: stockbit | Score: 0.90\n\n[TECHNICAL]\nEvidence ID: ULTJ_technical_0\n{\"52w_high\":1700.0,\"52w_low\":1265.0,\"atr14\":70.0,\"avg_volume_20d\":4182835.0,\"brief\":\"**Analisis Teknikal ULTJ (1-3 Bulan Swing)** Saham dalam uptrend struktural. Swing long searah tren. Harga ULTJ saat ini Rp 1605 berada di atas MA200 Rp 1444, mengindikasikan kekuatan tren jangka panjang dan potensi kelanjutan kenaikan. ENTRY ZONE: Rp 1574 – Rp 1599, yang merupakan area support kuat di sekitar\nSource: yfinance | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: ULTJ_technical_1\nEMA20 (Rp 1599) dan MA50 (Rp 1574). TARGET: Rp 1700 (approx. 7.15% dari titik tengah entry), yang merupakan level resistance 52-minggu tertinggi. STOP LOSS: Rp 1494 (1.5× ATR di bawah EMA20), untuk membatasi risiko jika tren berbalik. RSI(14) di 51.6 menunjukkan momentum netral cenderung positif, dengan ruang yang cukup untuk kenaikan sebelum mencapai kondisi overbought. Data volume harian saat\nSource: yfinance | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: ULTJ_technical_2\nini tidak tersedia, sehingga tidak dapat dikonfirmasi apakah pergerakan harga didukung oleh volume yang signifikan. Position: BUY Agent Confidence: 0.90\",\"current_price\":1605.0,\"ema20\":1599.0,\"ma200\":1444.0,\"ma200_context\":\"ABOVE\",\"ma50\":1574.0,\"rsi14\":51.6,\"sma20\":1595.0}\nSource: yfinance | Score: 0.85\n\n[EXDATE]\nEvidence ID: ULTJ_exdate_0\nDividend Ex-Date: === DIVIDEND EX-DATE SCAN: ULTJ ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\nSource: stockbit | Score: 0.70\n\n---\nTotal evidence: 8/10 chunks selected\nToken estimate: ~592",
+  "raw_data_summary": "DRY_RUN mock data; no provider or Gemini call executed.",
+  "error": null,
+  "conviction_score": 0.538,
+  "sector_key": "consumer_staples",
   "metadata": {
+    "dry_run": true,
+    "mock_profile": "consumer_staples",
     "prompt_version": "2026-05-11-critical-audit-v1",
-    "run_id": "20260514_174443",
-    "market_data_source": "yfinance",
-    "market_data_cached": true,
-    "flash_calls": 8,
-    "pro_calls": 1,
-    "rag_chunks_selected": 8,
-    "rag_chunks_considered": 10,
-    "rag_token_estimate": 592,
-    "batch_timestamp": "20260514_174443",
-    "run_timestamp": "20260514_174443",
-    "generated_at": "2026-05-14T17:44:43.105649+07:00",
+    "batch_timestamp": "20260514_204302",
     "versioned_output": true
   },
   "risk_governor": {
@@ -92,10 +111,59 @@
       "price_inside_entry_range"
     ],
     "message": "Harga sekarang berada di zona entry; kandidat boleh masuk sizing.",
-    "current_price": 1605.0,
-    "entry_low": 1555.0,
-    "entry_high": 1605.0,
-    "target_price": 1690.0,
-    "stop_loss": 1525.0
+    "current_price": 1500.0,
+    "entry_low": 1452.0,
+    "entry_high": 1509.0,
+    "target_price": 1618.0,
+    "stop_loss": 1401.0
+  },
+  "position_sizing": {
+    "ticker": "ULTJ",
+    "rating": "BUY",
+    "confidence": 0.73,
+    "lot": 13,
+    "shares": 1300,
+    "position_value": 1950000.0,
+    "allocation_pct": 0.195,
+    "target_allocation_pct": 0.2,
+    "max_loss_rp": 128700.0,
+    "max_drawdown_pct": 0.01287,
+    "expected_return_pct": 9.3,
+    "expected_return_rp": 181350.00000000003,
+    "total_cost_est": 9750.0,
+    "entry_price": 1500.0,
+    "stop_loss": 1401.0,
+    "rr_ratio": 1.73
+  },
+  "allocation_reasoning": {
+    "target_deployment_pct": 65.0,
+    "actual_deployment_pct": 57.5,
+    "gap_explanation": "Actual deployment 57.5% masih 7.5 percentage points di bawah target 65.0% karena sizing menghormati lot IHSG, cap per posisi, dan budget risiko stop-loss.",
+    "risk_factors_limiting": [
+      "lot size 100 saham dan harga entry membatasi penambahan posisi tanpa oversizing",
+      "hanya 3 kandidat yang lolos rating dan risk/reward untuk sizing",
+      "cap per posisi 20.0% membuat feasible deployment maksimum sekitar 60.0%",
+      "max drawdown per posisi dibatasi 2.0% sehingga lot tidak dipaksa melewati stop-risk budget"
+    ],
+    "market_condition_score": 0.66,
+    "recommendation": "Deployment sudah cukup aktif untuk swing trade moderat; tambah exposure hanya jika sinyal teknikal menguat tanpa memperbesar drawdown per posisi."
+  },
+  "deployment_scenario_comparison": {
+    "deploy_60_now": {
+      "deployment_pct": 60.0,
+      "expected_return_on_deployed_pct": 8.13,
+      "expected_return_portfolio_pct": 4.88,
+      "expected_return_rp": 487670.0,
+      "max_drawdown_portfolio_pct": 1.2,
+      "max_drawdown_rp": 120000.0
+    },
+    "wait_for_confirmation": {
+      "deployment_pct": 0.0,
+      "expected_return_portfolio_pct": 0.0,
+      "expected_return_rp": 0.0,
+      "max_drawdown_portfolio_pct": 0.0,
+      "max_drawdown_rp": 0.0,
+      "tradeoff": "Cash protects capital while waiting for cleaner entry, but gives up roughly Rp 487,670 if the current 60% deployment scenario works."
+    }
   }
 }

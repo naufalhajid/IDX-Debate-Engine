@@ -1,12 +1,66 @@
 # TOP 3 HIGH-CONVICTION IHSG SWING TRADES
 
-> **Generated**: 2026-05-11 08:03 WIB
+> **Generated**: 2026-05-14 20:43 WIB
 > **Pipeline**: Quant Scouting -> Multi-Agent Debate -> CIO Verdict
-> **Stocks Debated**: 10 | **Eligible (BUY/STRONG_BUY)**: 3 | **Selected**: 3
+> **Stocks Debated**: 10 | **Eligible (BUY/STRONG_BUY)**: 5 | **Selected**: 3
 
 ---
 
-## #1 - MAPI
+## #1 - BFIN
+
+### Final Rating & Confidence
+
+| Metric | Value |
+|---|---|
+| **Rating** | `STRONG_BUY` |
+| **CIO Confidence** | 74% |
+| **Conviction Score** | 54.60% |
+| **Debate Consensus** | Reached (voting) |
+| **Dissenting Agents** | bear |
+| **Timeframe** | 1-3 Months |
+| **Actionability** | Deployable |
+| **Sizing Allowed** | Yes |
+| **Actionability Note** | Harga sekarang berada di zona entry; kandidat boleh masuk sizing. |
+
+### Trade Box
+
+| Parameter | Level |
+|---|---|
+| **Buy Range** | Rp 5778 - 6050 |
+| **Target Price** | Rp 6,445 |
+| **Stop Loss** | Rp 5,494 |
+| **Fair Value** | Rp 6,996 |
+| **Expected Return** | +9.0% |
+| **Risk/Reward** | 1.26 |
+
+*Semua harga sudah di-round ke tick IHSG dan dihitung oleh Python.*
+
+### Winning Argument
+
+> Dry-run bull case: setup teknikal mock mendukung entry bertahap.
+
+Position: BUY
+Agent Confidence: 0.70
+
+### Devil's Advocate Warning
+
+> Dry-run challenge: konfirmasi ulang semua level harga dengan data live.
+
+### CIO Summary
+
+Ini adalah hasil simulasi dry-run untuk menguji parsing, scoring, persistensi, dan report generation tanpa API call.
+
+**Key Catalysts:**
+- Sektor finansial mock diberi confidence lebih stabil.
+- Risk/reward mock memenuhi ambang awal.
+
+**Key Risks:**
+- Sensitivity terhadap yield dan kualitas kredit tetap perlu dicek.
+- Dry-run memakai data sintetis.
+
+---
+
+## #2 - LPPF
 
 ### Final Rating & Confidence
 
@@ -14,105 +68,49 @@
 |---|---|
 | **Rating** | `BUY` |
 | **CIO Confidence** | 88% |
-| **Conviction Score** | 63.60% |
-| **Debate Consensus** | No (confidence_winner; direction) |
-| **Dissenting Agents** | chartist, sentiment_specialist, bear |
-| **Timeframe** | 1-3 Months |
-
-### Trade Box
-
-| Parameter | Level |
-|---|---|
-| **Buy Range** | Rp 1245 - 1270 |
-| **Target Price** | Rp 1,380 |
-| **Stop Loss** | Rp 1,195 |
-| **Fair Value** | Rp 1,986 |
-| **Expected Return** | +9.7% |
-| **Risk/Reward** | 1.96 |
-
-*Semua harga sudah di-round ke tick IHSG dan dihitung oleh Python.*
-
-### Winning Argument
-
-> The Bear's dismissal of fundamental valuation as a swing trade factor is a critical oversight. While a calculated intrinsic value estimate is a long-term anchor, the substantial fundamental discount at the present market valuation provides a robust margin of safety for any position. This significant undervaluation implies a strong gravitational pull towards a higher price, making even modest short-term technical targets more probable and less susceptible to minor market fluctuations. The wide...
-
-### Devil's Advocate Warning
-
-> **Question 1: MACRO/COMPANY RISK & FOREIGN FLOW**
-If foreign funds accelerate net selling in the broader market or MAPI faces unexpected negative retail sector news, could the MA50 support at Rp 1,244 break, triggering a deeper correction towards the MA200 at Rp 1,226 within the next 1-3 months?
-
-**Question 2: EXECUTION RISK — Transaction Cost Stress Test**
-Untuk menguji risiko eksekusi, mari h...
-
-### CIO Summary
-
-This is a conditional BUY, contingent on a significant price pullback to the Rp 1,245 - Rp 1,270 entry zone. While fundamentally undervalued with a fair value of Rp 1,986, the current price of Rp 1,455 is technically extended and far from the ideal entry point. The trade plan offers a decent R/R of 1.96, but entry at the current price is strongly discouraged; this rating approves the plan's structure, not an immediate call to action.
-
-**Key Catalysts:**
-- Significant fundamental undervaluation (36.5% discount to Fair Value) creating a margin of safety.
-- Potential for price to revert to technical support (MA50) which would activate the trade plan.
-
-**Key Risks:**
-- Extreme execution risk: Current price (Rp 1,455) is far above the specified entry zone (Rp 1,245 - Rp 1,270), making the plan currently inactive.
-- Price is at a 52-week high, making it vulnerable to profit-taking and sharp pullbacks.
-- The Devil's Advocate risk of MA50 support breaking during a market sell-off remains high, which would invalidate the entire trade thesis.
-
----
-
-## #2 - MARK
-
-### Final Rating & Confidence
-
-| Metric | Value |
-|---|---|
-| **Rating** | `BUY` |
-| **CIO Confidence** | 74% |
-| **Conviction Score** | 63.00% |
+| **Conviction Score** | 54.40% |
 | **Debate Consensus** | Reached (voting) |
-| **Dissenting Agents** | sentiment_specialist |
+| **Dissenting Agents** | bear |
 | **Timeframe** | 1-3 Months |
+| **Actionability** | Deployable |
+| **Sizing Allowed** | Yes |
+| **Actionability Note** | Harga sekarang berada di zona entry; kandidat boleh masuk sizing. |
 
 ### Trade Box
 
 | Parameter | Level |
 |---|---|
-| **Buy Range** | Rp 795 - 810 |
-| **Target Price** | Rp 835 |
-| **Stop Loss** | Rp 790 |
-| **Fair Value** | Rp 886 |
-| **Expected Return** | +4.0% |
-| **Risk/Reward** | 2.6 |
+| **Buy Range** | Rp 3917 - 4073 |
+| **Target Price** | Rp 4,243 |
+| **Stop Loss** | Rp 3,757 |
+| **Fair Value** | Rp 4,474 |
+| **Expected Return** | +6.2% |
+| **Risk/Reward** | 1.04 |
 
 *Semua harga sudah di-round ke tick IHSG dan dihitung oleh Python.*
 
 ### Winning Argument
 
-> MARK presents a compelling swing trade BUY opportunity (1-3 month horizon) driven by its fundamental undervaluation and robust technical uptrend, despite the absence of a specific event-driven catalyst.
+> Dry-run bull case: setup teknikal mock mendukung entry bertahap.
 
-**FUNDAMENTAL FLOOR:**
-MARK is currently undervalued, trading at Rp 840 against a fair value estimate of Rp 886, representing a 5.5% discount. The company exhibits exceptionally strong fundamentals, with a Return on Equity (TTM) of 30.26% and a Net Margin (TTM) of 33.26%, indicating high prof...
+Position: BUY
+Agent Confidence: 0.70
 
 ### Devil's Advocate Warning
 
-> **1. MACRO/COMPANY RISK & FOREIGN FLOW:**
-If a broader market correction triggers significant net foreign *selling* pressure on MARK, or if the fundamental valuation issues highlighted by the Bear R1 lead to a re-rating, could the Rp 796 MA50 support level break, triggering a deeper correction?
-
-**2. EXECUTION RISK — Transaction Cost Stress Test:**
-Menggunakan harga entry tengah dari Trade Enve...
+> Dry-run challenge: konfirmasi ulang semua level harga dengan data live.
 
 ### CIO Summary
 
-This is a valid BUY plan contingent on a price pullback. The trade offers an excellent 2.60 R/R ratio, supported by strong fundamentals and a bullish technical trend. However, execution is strictly conditional on the price entering the Rp 795-810 zone. The current price of Rp 840 is above the target; do not chase the price.
+Ini adalah hasil simulasi dry-run untuk menguji parsing, scoring, persistensi, dan report generation tanpa API call.
 
 **Key Catalysts:**
-- Strong fundamental metrics (ROE 30%, Net Margin 33%, D/E 0.01)
-- Bullish technical structure with price above key moving averages (MA50, MA200)
-- High R/R entry opportunity on a potential pullback to the MA50 support level.
+- Sektor defensif mock diasumsikan bergerak lebih moderat.
+- Risk/reward mock memenuhi ambang awal.
 
 **Key Risks:**
-- Execution Risk: The current price (Rp 840) is already above the target (Rp 835), requiring significant patience for a pullback to the entry zone.
-- Valuation Uncertainty: A dissenting agent noted a potential inconsistency in the DDM model used for the fair value calculation.
-- Lack of a specific short-term catalyst could lead to prolonged sideways movement before the target is reached.
+- Margin dan daya beli masih menjadi risiko validasi utama.
+- Dry-run memakai data sintetis.
 
 ---
 
@@ -123,49 +121,50 @@ This is a valid BUY plan contingent on a price pullback. The trade offers an exc
 | Metric | Value |
 |---|---|
 | **Rating** | `BUY` |
-| **CIO Confidence** | 74% |
-| **Conviction Score** | 62.00% |
+| **CIO Confidence** | 73% |
+| **Conviction Score** | 53.80% |
 | **Debate Consensus** | Reached (voting) |
-| **Dissenting Agents** | sentiment_specialist, bear |
+| **Dissenting Agents** | bear |
 | **Timeframe** | 1-3 Months |
+| **Actionability** | Deployable |
+| **Sizing Allowed** | Yes |
+| **Actionability Note** | Harga sekarang berada di zona entry; kandidat boleh masuk sizing. |
 
 ### Trade Box
 
 | Parameter | Level |
 |---|---|
-| **Buy Range** | Rp 1550 - 1600 |
-| **Target Price** | Rp 1,705 |
-| **Stop Loss** | Rp 1,510 |
-| **Fair Value** | Rp 1,938 |
-| **Expected Return** | +8.3% |
-| **Risk/Reward** | 2.0 |
+| **Buy Range** | Rp 1452 - 1509 |
+| **Target Price** | Rp 1,618 |
+| **Stop Loss** | Rp 1,401 |
+| **Fair Value** | Rp 1,742 |
+| **Expected Return** | +9.3% |
+| **Risk/Reward** | 1.73 |
 
 *Semua harga sudah di-round ke tick IHSG dan dihitung oleh Python.*
 
 ### Winning Argument
 
-> The Bear's assertion that undervaluation alone is insufficient for a swing trade misinterprets the nature of market re-ratings. For a company exhibiting robust financial health, characterized by high profitability and negligible leverage, the persistent gap between its intrinsic worth and market price *is* a potent short-term catalyst. The market, over a 1-3 month horizon, frequently corrects such discrepancies, especially when the stock is already in a structural uptrend, as evidenced by its...
+> Dry-run bull case: setup teknikal mock mendukung entry bertahap.
+
+Position: BUY
+Agent Confidence: 0.70
 
 ### Devil's Advocate Warning
 
-> **Question 1: MACRO/COMPANY RISK & FOREIGN FLOW**
-If a broader IHSG correction, driven by rising global interest rates, triggers accelerated foreign fund outflows from liquid stocks like ULTJ, could the Rp 1,574-Rp 1,596 entry zone and the Rp 1,490 stop loss be breached, pushing the price towards Rp 1,440?
-
-**Question 2: EXECUTION RISK — Transaction Cost Stress Test**
-Untuk posisi ini dengan ha...
+> Dry-run challenge: konfirmasi ulang semua level harga dengan data live.
 
 ### CIO Summary
 
-This trade plan for ULTJ is approved based on a compelling combination of significant fundamental undervaluation and a confirmed technical uptrend. The stock trades at a 21% discount to its fair value, providing a strong margin of safety. With a favorable Risk/Reward ratio of 2.0, the plan is attractive, though confidence is moderated by the absence of a specific near-term catalyst.
+Ini adalah hasil simulasi dry-run untuk menguji parsing, scoring, persistensi, dan report generation tanpa API call.
 
 **Key Catalysts:**
-- Market re-rating towards its fair value of Rp 1,938, driven by strong fundamentals (high ROE, low debt).
-- Continuation of the technical uptrend with price holding above key moving averages (MA50, MA200), attracting momentum traders.
+- Sektor defensif mock diasumsikan bergerak lebih moderat.
+- Risk/reward mock memenuhi ambang awal.
 
 **Key Risks:**
-- Absence of a specific short-term catalyst could lead to price stagnation, failing to reach the target within the 1-3 month timeframe.
-- A broader market correction or significant foreign outflow could breach technical support and trigger the stop loss.
-- Lack of recent volume confirmation suggests waiting for buying interest to appear before entering.
+- Margin dan daya beli masih menjadi risiko validasi utama.
+- Dry-run memakai data sintetis.
 
 ---
 
@@ -173,8 +172,9 @@ This trade plan for ULTJ is approved based on a compelling combination of signif
 
 | # | Ticker | Rating | Lot | Saham | Nilai Posisi | Alokasi | Max Loss | Est. Biaya |
 |---|--------|--------|-----|-------|-------------|---------|----------|------------|
-| 1 | MAPI | BUY | 1 | 100 | Rp 145.500 | 18.2% | Rp 26.000 | Rp 728 |
-| 2 | MARK | BUY | 4 | 400 | Rp 336.000 | 42.0% | Rp 20.000 | Rp 1.680 |
+| 1 | BFIN | STRONG_BUY | 3 | 300 | Rp 1.800.000 | 18.0% | Rp 151.800 | Rp 9.000 |
+| 2 | LPPF | BUY | 5 | 500 | Rp 2.000.000 | 20.0% | Rp 121.500 | Rp 10.000 |
+| 3 | ULTJ | BUY | 13 | 1.300 | Rp 1.950.000 | 19.5% | Rp 128.700 | Rp 9.750 |
 
 ---
 
@@ -182,50 +182,52 @@ This trade plan for ULTJ is approved based on a compelling combination of signif
 
 | Item | Nilai |
 |------|-------|
-| Total Modal | Rp 800.000 |
-| Total Deployed | Rp 481.500 |
-| Sisa Cash | Rp 318.500 |
-| % Deployed | 60.2% |
-| Jumlah Posisi | 2 |
-| Est. Total Biaya Transaksi | Rp 2.408 |
+| Total Modal | Rp 10.000.000 |
+| Total Deployed | Rp 5.750.000 |
+| Sisa Cash | Rp 4.250.000 |
+| % Deployed | 57.5% |
+| Jumlah Posisi | 3 |
+| Est. Total Biaya Transaksi | Rp 28.750 |
 
 ### Allocation Reasoning
 
 | Item | Nilai |
 |------|-------|
 | Target Deployment | 65.0% |
-| Actual Deployment | 60.2% |
-| Market Condition Score | 0.88 |
-| Gap Explanation | Actual deployment 60.2% masih 4.8 percentage points di bawah target 65.0% karena sizing menghormati lot IHSG, cap per posisi, dan budget risiko stop-loss. |
+| Actual Deployment | 57.5% |
+| Market Condition Score | 0.66 |
+| Gap Explanation | Actual deployment 57.5% masih 7.5 percentage points di bawah target 65.0% karena sizing menghormati lot IHSG, cap per posisi, dan budget risiko stop-loss. |
 | Recommendation | Deployment sudah cukup aktif untuk swing trade moderat; tambah exposure hanya jika sinyal teknikal menguat tanpa memperbesar drawdown per posisi. |
 
 **Risk Factors Limiting Deployment:**
 - lot size 100 saham dan harga entry membatasi penambahan posisi tanpa oversizing
-- max drawdown per posisi dibatasi 4.0% sehingga lot tidak dipaksa melewati stop-risk budget
+- hanya 3 kandidat yang lolos rating dan risk/reward untuk sizing
+- cap per posisi 20.0% membuat feasible deployment maksimum sekitar 60.0%
+- max drawdown per posisi dibatasi 2.0% sehingga lot tidak dipaksa melewati stop-risk budget
 
 ### Deploy 60% Now vs Wait
 
 | Scenario | Expected Return | Max Drawdown | Catatan |
 |---|---:|---:|---|
-| Deploy 60% sekarang | 3.43% (Rp 27.468) | 2.40% (Rp 19.200) | Return on deployed 5.72% |
-| Tunggu konfirmasi | 0.00% (Rp 0) | 0.00% (Rp 0) | Cash protects capital while waiting for cleaner entry, but gives up roughly Rp 27,468 if the current 60% deployment scenario works. |
+| Deploy 60% sekarang | 4.88% (Rp 487.670) | 1.20% (Rp 120.000) | Return on deployed 8.13% |
+| Tunggu konfirmasi | 0.00% (Rp 0) | 0.00% (Rp 0) | Cash protects capital while waiting for cleaner entry, but gives up roughly Rp 487,670 if the current 60% deployment scenario works. |
 
 ---
 
 ## Full Batch Summary
 
-| Ticker | Rating | Confidence | R/R Ratio | Conviction Score | Consensus | Method | Dissenting Agents | Disagreement | Status |
-|---|---|---|---|---|---|---|---|---|---|
-| MAPI | BUY | 88% | 1.96 | 63.60% | NO | confidence_winner | chartist, sentiment_specialist, bear | direction | Selected |
-| MARK | BUY | 74% | 2.60 | 63.00% | YES | voting | sentiment_specialist | - | Selected |
-| ULTJ | BUY | 74% | 2.00 | 62.00% | YES | voting | sentiment_specialist, bear | - | Selected |
-| OMED | ERROR | 0% | N/A | 0.00% | NO | - | - | - | Error |
-| MIDI | HOLD | 54% | 2.07 | 0.00% | YES | soft_hold | chartist, bull, bear | timing | Excluded |
-| AUTO | HOLD | 52% | 2.33 | 0.00% | YES | soft_hold | fundamental_scout, bull, bear | timing | Excluded |
-| GJTL | HOLD | 54% | 2.00 | 0.00% | YES | soft_hold | fundamental_scout, chartist, bull, bear | timing | Excluded |
-| ERAA | HOLD | 46% | 2.00 | 0.00% | YES | soft_hold | fundamental_scout, bull, bear | timing | Excluded |
-| ACES | AVOID | 92% | 2.00 | 0.00% | NO | confidence_winner | fundamental_scout, sentiment_specialist, bull | direction | Excluded |
-| AKRA | HOLD | 47% | 1.96 | 0.00% | YES | soft_hold | fundamental_scout, chartist, bull, bear | timing | Excluded |
+| Ticker | Rating | Confidence | R/R Ratio | Conviction Score | Actionability | Consensus | Method | Dissenting Agents | Disagreement | Status |
+|---|---|---|---|---|---|---|---|---|---|---|
+| BFIN | STRONG_BUY | 74% | 1.26 | 54.60% | deployable | YES | voting | bear | - | Selected |
+| LPPF | BUY | 88% | 1.04 | 54.40% | deployable | YES | voting | bear | - | Selected |
+| ULTJ | BUY | 73% | 1.73 | 53.80% | deployable | YES | voting | bear | - | Selected |
+| ASGR | STRONG_BUY | 74% | 1.34 | 50.40% | - | YES | voting | bear | - | - |
+| MAPI | BUY | 79% | 1.15 | 46.00% | - | YES | voting | bear | - | - |
+| GJTL | HOLD | 77% | 0.82 | 0.00% | - | YES | voting | - | - | Excluded |
+| JPFA | HOLD | 80% | 0.92 | 0.00% | - | YES | voting | - | - | Excluded |
+| AUTO | HOLD | 78% | 0.84 | 0.00% | - | YES | voting | - | - | Excluded |
+| DMAS | HOLD | 86% | 0.97 | 0.00% | - | YES | voting | - | - | Excluded |
+| KAQI | HOLD | 83% | 1.18 | 0.00% | - | YES | voting | - | - | Excluded |
 
 ---
-*Laporan dibuat oleh `orchestrator.py` pada 2026-05-11 08:03 WIB*
+*Laporan dibuat oleh `orchestrator.py` pada 2026-05-14 20:43 WIB*

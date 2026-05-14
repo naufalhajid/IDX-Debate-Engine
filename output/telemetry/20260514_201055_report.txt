@@ -1,38 +1,38 @@
 ╔══════════════════════════════════════════╗
-║  OPS TELEMETRY: 20260514_205045         ║
+║  OPS TELEMETRY: 20260514_201055         ║
 ╚══════════════════════════════════════════╝
 
 BATCH SUMMARY
 ─────────────
-Tickers   : 1 (0 ok / 0 fail / 1 timeout / 0 skip)
-Success   : 0%
-Timestamp : 20260514_205045
+Tickers   : 1 (1 ok / 0 fail / 0 timeout / 0 skip)
+Success   : 100%
+Timestamp : 20260514_201055
 
 VERDICTS
 ────────
-  none
-Avg confidence : -
-Avg rounds     : 0.0
-Avg duration   : 23s
-Longest run    : XASD (23s)
+  HOLD     1
+Avg confidence : 41%
+Avg rounds     : 2.0
+Avg duration   : 151s
+Longest run    : BBCA (151s)
 
 TOKEN SPEND (estimated)
 ───────────────────────
-Flash calls : 0 (~0 tokens)
-Pro calls   : 0 (~0 tokens)
-Total est.  : ~0 tokens
+Flash calls : 6 (~4,800 tokens)
+Pro calls   : 1 (~2,000 tokens)
+Total est.  : ~6,800 tokens
 
 RAG EFFICIENCY
 ──────────────
-Avg chunks     : 0.0 selected / 0.0 considered
-Avg RAG tokens : ~0 tokens
-Context saving : no RAG data
+Avg chunks     : 8.0 selected / 8.0 considered
+Avg RAG tokens : ~303 tokens
+Context saving : all chunks relevant — no filtering needed
 
 PROVIDER HEALTH
 ───────────────
-Errors : {'CancelledError': 1}
+Errors : none
 Stale  : none
 
 PER-TICKER
 ──────────
-  XASD   timeout  -     conf=0%  23s R0  RAG:0/0
+  BBCA   success  HOLD  conf=41%  151s R2  RAG:8/8

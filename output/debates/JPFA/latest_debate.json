@@ -2,72 +2,103 @@
   "ticker": "JPFA",
   "verdict": {
     "ticker": "JPFA",
-    "rating": "AVOID",
-    "confidence": 0.1,
-    "fair_value": 4274.0,
-    "entry_price_range": "2470 - 2520",
-    "target_price": 2740.0,
-    "stop_loss": 2370.0,
-    "current_price": 2620.0,
+    "rating": "HOLD",
+    "confidence": 0.8,
+    "fair_value": 2699.0,
+    "entry_price_range": "2431 - 2502",
+    "target_price": 2611.0,
+    "stop_loss": 2309.0,
+    "current_price": 2500.0,
     "timeframe": "1-3 Months",
-    "weighted_reasoning": "AUTO-DISQUALIFIED: Ex-dividend date dalam 5 hari (ExDate: 2026-05-11). Entry baru tidak disarankan — risiko price drop dividen langsung mengancam stop loss sebelum trade sempat berkembang. The expected price drop of ~Rp 70 would push a trade entered at the zone midpoint (Rp 2,495) down to Rp 2,425, which is dangerously close to the stop loss at Rp 2,370. This imminent, guaranteed price adjustment fundamentally invalidates the technical setup and the calculated 1.96 R/R ratio for the specified timeframe. All other fundamental and technical factors, while potentially positive in a different context, are overridden by this immediate disqualifying event.",
-    "critical_risk_factor": "",
+    "weighted_reasoning": "Dry-run mock verdict untuk validasi pipeline.",
+    "critical_risk_factor": "Dry-run: bukan rekomendasi investasi aktual.",
     "key_catalysts": [
-      "Strong underlying fundamentals (high ROE, undervalued) could be a long-term catalyst, but are insufficient to overcome the immediate ex-dividend risk.",
-      "Lack of identifiable short-term positive catalysts to drive price towards target within the 1-3 month timeframe."
+      "Sektor defensif mock diasumsikan bergerak lebih moderat.",
+      "Risk/reward mock memenuhi ambang awal."
     ],
     "key_risks": [
-      "CRITICAL: Ex-dividend date in 5 days (2026-05-11) will cause a guaranteed price drop of ~Rp 70, directly threatening the stop-loss.",
-      "Current price (Rp 2,620) is significantly above the recommended entry zone (Rp 2,470 – Rp 2,520), requiring a deep pullback to even consider entry.",
-      "Lack of a clear, near-term positive catalyst within the 1-3 month swing trading horizon."
+      "Margin dan daya beli masih menjadi risiko validasi utama.",
+      "Dry-run memakai data sintetis."
     ],
-    "summary": "This trade plan is rejected due to a critical timing conflict. The ex-dividend date is only 5 days away, introducing a guaranteed price drop of ~Rp 70. This event directly threatens the proposed stop-loss level, making the risk/reward profile untenable for a new swing trade entry at this time.",
-    "expected_return": "+9.8%",
-    "risk_reward_ratio": 1.96,
+    "summary": "Ini adalah hasil simulasi dry-run untuk menguji parsing, scoring, persistensi, dan report generation tanpa API call.",
+    "expected_return": "+5.9%",
+    "risk_reward_ratio": 0.92,
     "is_overvalued": false,
-    "wait_and_see": true
+    "wait_and_see": true,
+    "consensus_reached": true,
+    "consensus_method": "voting",
+    "dissenting_agents": [
+      "bear"
+    ]
   },
-  "debate_rounds": 2,
-  "consensus_reached": false,
-  "disagreement_type": "catalyst",
-  "debate_history": [
+  "debate_rounds": 3,
+  "consensus_reached": true,
+  "consensus_method": "voting",
+  "dissenting_agents": [],
+  "agent_votes": [
     {
-      "role": "system",
-      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 4,274, Rp 2,620, Rp 2,285, Rp 2,466, Rp 2,557, Rp 70, Rp 2,510, Rp 2,700, Rp 2,389",
+      "agent": "fundamental_scout",
+      "position": "BUY",
+      "confidence": 0.66,
       "round": 0
     },
     {
-      "role": "bull",
-      "content": "…identifikasi dalam 1-3 bulan ke depan yang akan mendorong harga ke target. Sebaliknya, peristiwa spesifik yang akan datang adalah tanggal ex-dividend pada 2026-05-11 (5 hari dari sekarang), yang diperkirakan akan menyebabkan penurunan harga sekitar Rp 70. Peristiwa ini merupakan hambatan jangka pendek untuk apresiasi harga.\n\n**Risk/Reward**: Mengingat harga saat ini (Rp 2,620) berada di atas zona entri yang direkomendasikan, entri akan memerlukan pullback. Jika diasumsikan entri pada titik tengah zona support (misalnya Rp 2,510), target harga Rp 2,700 harus disesuaikan ke bawah sebesar dividen",
+      "agent": "chartist",
+      "position": "BUY",
+      "confidence": 0.64,
+      "round": 0
+    },
+    {
+      "agent": "sentiment_specialist",
+      "position": "HOLD",
+      "confidence": 0.55,
+      "round": 0
+    },
+    {
+      "agent": "bull",
+      "position": "BUY",
+      "confidence": 0.7,
       "round": 1
     },
     {
-      "role": "bear",
-      "content": "…ga menghambat konfirmasi kekuatan tren atau potensi divergensi bearish, meninggalkan celah penting dalam analisis teknis.\n\n**3. RISIKO KATALIS NEGATIF YANG AKAN DATANG:**\nKatalis positif yang jelas untuk mendorong harga ke target dalam 1-3 bulan ke depan tidak teridentifikasi. Sebaliknya, terdapat katalis negatif yang akan datang dan pasti terjadi: tanggal ex-dividend pada 2026-05-11, hanya 5 hari dari sekarang. Peristiwa ini diperkirakan akan menyebabkan penurunan harga sekitar Rp 70. Penurunan harga ini secara langsung akan menghambat apresiasi harga jangka pendek dan membuat target harga Rp",
+      "agent": "bear",
+      "position": "AVOID",
+      "confidence": 0.58,
       "round": 1
-    },
+    }
+  ],
+  "debate_history": [
     {
       "role": "bull",
-      "content": "The Bear's focus on the impending ex-dividend event as a significant impediment to price appreciation overlooks the broader fundamental context and the robust undervaluation present. While acknowledging the temporary price adjustment associated with the dividend distribution, its impact is negligible when weighed against the substantial discount at which the stock currently trades relative to its calculated intrinsic value. This wide valuation gap provides a considerable buffer, absorbing the dividend-related dip without compromising the long-term upside potential. The market's eventual re-rating towards fair value is a more powerful driver than a transient technical adjustment.\n\nFurthermore, the assertion of a lack of positive catalysts fails to recognize the inherent strength of the company's ongoing operational performance. The consistently high Return on Equity and healthy Net Profit Margin are not merely static figures but represent a continuous, structural catalyst for value creation. These metrics, coupled with a prudent Debt-to-Equity Ratio, demonstrate a financially sound and efficiently managed enterprise. This sustained fundamental strength acts as a persistent tailwind, gradually pushing the stock towards its true valuation, irrespective of specific, discrete news events. The market's recognition of this underlying quality serves as the primary, enduring catalyst for appreciation.\n\nRegarding downside protection, even if the immediate support levels were to be tested by short-term volatility or the ex-dividend effect, a robust secondary floor exists. The long-term trend, as indicated by the 200-day Moving Average, stands significantly below the current market price. This key technical level represents a strong structural support, reinforcing the stock's overall bullish posture and limiting potential downside. The substantial distance between the current price and this long-term average provides ample cushion, suggesting that any significant breach of immediate support would likely find strong buying interest at this deeper, more fundamental technical level.",
-      "round": 2
+      "content": "Dry-run bull case: setup teknikal mock mendukung entry bertahap.\n\nPosition: BUY\nAgent Confidence: 0.70",
+      "round": 1,
+      "position": "BUY",
+      "confidence": 0.7
     },
     {
       "role": "bear",
-      "content": "Sebagai Auditor Forensik, saya akan membongkar asumsi Bull mengenai JPFA untuk swing trade 1-3 bulan.\n\nPertama, klaim Bull tentang \"undervaluation yang kuat\" dan \"kekuatan fundamental berkelanjutan\" sebagai katalis utama untuk apresiasi harga jangka pendek adalah menyesatkan. Meskipun nilai wajar Rp 4,274 menunjukkan diskon signifikan dari harga saat ini Rp 2,620, tingkat kepercayaan kalkulasi nilai wajar hanya \"MEDIUM\" (2 dari 3 metode valid). Untuk swing trade, yang berfokus pada pergerakan harga dalam hitungan minggu, nilai intrinsik jangka panjang ini kurang relevan tanpa katalis pemicu yang jelas. Data yang tersedia secara eksplisit menyatakan \"Tidak ada peristiwa spesifik mendatang seperti pengumuman pendapatan, ex-dividend, atau kontrak baru dalam 1-3 bulan ke depan yang teridentifikasi sebagai katalis pertumbuhan.\" Ini secara langsung meniadakan argumen Bull bahwa metrik historis seperti ROE 21.45% atau Net Profit Margin 9.04% akan secara otomatis mendorong harga naik dalam kerangka waktu swing. Pasar membutuhkan pemicu *baru* untuk re-rating, bukan hanya kinerja masa lalu yang sudah tercermin.\n\nKedua, analisis Bull terhadap zona masuk dan stop loss menunjukkan kerentanan yang signifikan terhadap volatilitas pasar. Bull mengusulkan zona masuk antara MA50 (Rp 2,466) dan EMA20 (Rp 2,557), dengan stop loss di Rp 2,389. Mari kita uji margin keamanan ini. Average True Range (ATR) 14 hari adalah Rp 112.0. Pergerakan harga adverse maksimum dalam satu minggu (2 × ATR) adalah 2 × Rp 112.0 = Rp 224. Jika kita mengambil batas bawah zona masuk Bull di Rp 2,466, stop loss mereka di Rp 2,389 hanya memberikan margin keamanan sebesar Rp 77 (Rp 2,466 - Rp 2,389). Pergerakan adverse sebesar Rp 224 jauh melampaui margin keamanan Rp 77 yang diklaim Bull. Ini berarti bahwa volatilitas mingguan yang normal dapat dengan mudah memicu stop loss Bull, membuat setup swing ini tidak layak karena risiko yang tidak terukur dengan benar.\n\nTerakhir, argumen Bull mengenai MA200 (Rp 2,285) sebagai \"lantai sekunder yang kuat\" mengabaikan potensi kerugian yang jauh lebih besar jika support terdekat gagal. Jika harga menembus MA50 di Rp 2,466, yang merupakan batas bawah zona masuk Bull, dan bergerak menuju MA200 di Rp 2,285, ini akan menghasilkan penurunan sebesar Rp 181 dari MA50. Jika seorang trader masuk pada harga saat ini Rp 2,620 dan support MA50 gagal, potensi kerugian hingga MA200 adalah Rp 335 (Rp 2,620 - Rp 2,285). Ini jauh lebih besar daripada asumsi kerugian Bull dari titik tengah entri (misalnya Rp 2,511) ke stop loss mereka di Rp 2,389, yang hanya Rp 122. Dengan demikian, jika support terdekat (MA50) pecah, support struktural berikutnya di Rp 2,285 akan membuat kerugian aktual dari harga saat ini menjadi Rp 335, bukan Rp 122 seperti yang diasumsikan Bull, secara drastis mengubah rasio risiko-imbalan.",
-      "round": 2
+      "content": "Dry-run bear case: kualitas data sintetis tidak boleh dipakai untuk trading.\n\nPosition: AVOID\nAgent Confidence: 0.58",
+      "round": 1,
+      "position": "AVOID",
+      "confidence": 0.58
     },
     {
       "role": "devils_advocate",
-      "content": "Berikut adalah tantangan Devil's Advocate untuk setup trade JPFA:\n\n1.  **MACRO/COMPANY RISK & FOREIGN FLOW:**\n    Given the impending Rp 70 ex-dividend price drop on May 11, 2026, if this combines with accelerated net foreign selling pressure, could the MA50 support at Rp 2,466 break, potentially triggering stops and a deeper correction towards Rp 2,285?\n\n2.  **EXECUTION RISK — Transaction Cost Stress Test:**\n    Menggunakan harga entry Rp 2,510 (titik tengah zona entri yang disarankan) dan target harga Rp 2,700, estimasi gross return adalah 7.57% ((Rp 2,700 - Rp 2,510) / Rp 2,510). Biaya transaksi meliputi beli 0.15% dari nilai posisi, jual 0.25% dari nilai posisi, PPh final 0.10% dari nilai jual, dan estimasi slippage 0.15% (karena harga Rp 2,510 >= Rp 500). Total biaya round-trip adalah 0.15% + 0.25% + 0.10% + 0.15% = 0.65%. Dengan demikian, net return setelah biaya adalah 7.57% - 0.65% = 6.92%. Ini dikategorikan sebagai **VIABLE after transaction costs**.",
-      "round": 3
+      "content": "Dry-run challenge: konfirmasi ulang semua level harga dengan data live.",
+      "round": 2,
+      "position": "HOLD",
+      "confidence": 0.0
     }
   ],
-  "raw_data_summary": "=== FUNDAMENTALS ===\nFAIR VALUE: Rp 4,274. Dengan harga pasar saat ini Rp 2,620, JPFA dinilai UNDERVALUED, diperdagangkan pada diskon 63.1% terhadap nilai wajar yang dihitung. Tingkat kepercayaan kalkulasi nilai wajar adalah MEDIUM (2 dari 3 metode valid).\n\nMetrik pendukung utama meliputi Return on Equity (ROE) sebesar 21.45% (TTM) dan Net Profit Margin 9.04% (Quarter). Rasio Debt to Equity (DER) tercatat 0.63 (Quarter), menunjukkan tingkat leverage yang moderat. Saham ini menawarkan Dividend Yield sebesar 5.34%. (Catatan: Tren 3 tahun untuk ROE dan Net Margin tidak tersedia dalam data yang diberikan).\n\nBerdasarkan data yang tersedia, tanggal ex-dividend terakhir adalah 22 April 2025, yang merupakan peristiwa masa lalu. Tidak ada peristiwa spesifik mendatang seperti pengumuman pendapatan, ex-dividend, atau kontrak baru dalam 1-3 bulan ke depan yang teridentifikasi sebagai katalis pertumbuhan.\n\nPemeriksaan kualitas laporan keuangan tidak menemukan inkonsistensi yang signifikan. ROE 21.45% tinggi, namun Net Margin 9.04% berada di atas ambang batas 5%, sehingga tidak ada divergensi ROE-Margin yang terdeteksi. Rasio Debt/Equity 0.63 tidak cukup rendah (<0.3) untuk memicu pemeriksaan terhadap Interest Coverage Ratio (7.68). Altman Z-Score 4.10 berada di bawah 10, sehingga tidak ada inkonsistensi dengan DER yang ditandai. Data Arus Kas Operasi tidak tersedia secara eksplisit untuk diverifikasi terhadap pertumbuhan pendapatan. ✅ No red flags detected based on available data.\n\n=== TECHNICALS ===\n**Analisis Teknis IHSG (1-3 Bulan)**\n\n**TREND CONTEXT:**\nSaham dalam uptrend struktural. Swing long searah tren. Harga saat ini (Rp 2,620) diperdagangkan di atas MA200 (Rp 2,285), MA50 (Rp 2,466), dan EMA20 (Rp 2,557), mengindikasikan kekuatan tren naik yang berkelanjutan.\n\n**ENTRY ZONE:**\nENTRY ZONE: Rp 2,466 – Rp 2,557 (antara MA50 dan EMA20).\n\n**TARGET PRICE:**\nTARGET: Rp 2,700 (approx. 7.5% from entry mid). Level Rp 2,700 menunjukkan akumulasi volume penawaran yang signifikan pada orderbook, menjadikannya resistensi kuat berikutnya.\n\n**STOP LOSS:**\nSTOP LOSS: Rp 2,389 (1.5× ATR below EMA20).\n\n**RSI INTERPRETATION:**\nRSI(14) berada di 54.2, menunjukkan momentum yang netral hingga sedikit bullish. Ini mengindikasikan bahwa saham tidak dalam kondisi overbought atau oversold, memberikan ruang untuk pergerakan harga lebih lanjut.\n\n**VOLUME SIGNAL:**\nData volume perdagangan harian saat ini tidak tersedia untuk perbandingan langsung dengan rata-rata volume 20 hari. Oleh karena itu, konfirmasi volume terhadap pergerakan harga tidak dapat dinilai secara definitif.\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 2620.0,\n  \"sma20\": 2600.0,\n  \"ema20\": 2557.0,\n  \"ma50\": 2466.0,\n  \"ma200\": 2285.0,\n  \"ma200_context\": \"ABOVE\",\n  \"rsi14\": 54.2,\n  \"atr14\": 112.0,\n  \"avg_volume_20d\": 13747150.0,\n  \"52w_high\": 2930.0,\n  \"52w_low\": 1425.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\n=== DIVIDEND EX-DATE SCAN: JPFA ===\nRisk Tier         : 🔴 CRITICAL — Ex-date dalam 7 hari\nEx-Dividend Date  : 2026-05-11 (5 hari lagi)\nDividend/Share    : Rp 70\nEstimated Yield   : 2.67%\nExpected Price Drop on Ex-Date: ~Rp 70\n\n⚠️  CIO NOTE: Saham ini akan mengalami price drop sebesar ~~Rp 70 pada 2026-05-11. Jika swing trade horizon mencakup tanggal ini, target price harus di-adjust downward sebesar dividend amount, dan R/R ratio efektif lebih buruk dari yang terkalkulasi.\n",
+  "raw_data_summary": "DRY_RUN mock data; no provider or Gemini call executed.",
   "error": null,
   "conviction_score": 0.0,
   "sector_key": "consumer_staples",
   "metadata": {
-    "batch_timestamp": "20260506_212948",
+    "dry_run": true,
+    "mock_profile": "consumer_staples",
+    "prompt_version": "2026-05-11-critical-audit-v1",
+    "batch_timestamp": "20260514_204302",
     "versioned_output": true
   }
 }

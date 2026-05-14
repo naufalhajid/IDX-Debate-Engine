@@ -485,6 +485,8 @@ class DebateChamberState(TypedDict):
     fundamental_data: str
     technical_data: str
     sentiment_data: str
+    news_brief: str
+    news_confidence_adjustment: float
 
     # Merged string fed into the debate (includes margin-of-safety warnings)
     raw_data: str

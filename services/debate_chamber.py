@@ -60,6 +60,7 @@ from services.rag_evidence_store import DEFAULT_STORE as rag_store
 from services.fair_value_calculator import build_fair_value_report
 from services.debate_prompt_registry import PROMPT_REGISTRY, PROMPT_VERSION
 from services.debate_run_guard import run_with_guard
+from services.news_fetcher import DEFAULT_FETCHER
 from utils.logger_config import logger
 from utils.market_data_cache import (
     derive_current_price,
@@ -226,6 +227,59 @@ def _ledger_stage_partial(
         reason=reason,
         confidence_penalty=confidence_penalty,
     )
+
+
+def _news_context_for_state(state: DebateChamberState, ticker: str) -> dict[str, object]:
+    try:
+        news_bundle = DEFAULT_FETCHER.build_bundle(ticker)
+        news_str = DEFAULT_FETCHER.bundle_to_prompt_string(news_bundle)
+        if news_bundle.confidence_adjustment != 0:
+            logger.info(
+                f"[News] {ticker}: "
+                f"adjustment={news_bundle.confidence_adjustment:+.2f} "
+                f"({news_bundle.confidence_adjustment_reason})"
+            )
+        if news_bundle.has_breaking_news:
+            logger.warning(f"[News] {ticker}: BREAKING NEWS DETECTED")
+
+        metadata = dict(state.get("metadata") or {})
+        metadata["has_breaking_news"] = news_bundle.has_breaking_news
+        metadata["news_confidence_adjustment"] = news_bundle.confidence_adjustment
+        metadata["news_overall_sentiment"] = news_bundle.overall_sentiment.value
+        metadata["news_brief"] = news_str
+        state["news_brief"] = news_str
+        state["news_confidence_adjustment"] = news_bundle.confidence_adjustment
+        state["metadata"] = metadata
+        return {
+            "news_brief": news_str,
+            "news_confidence_adjustment": news_bundle.confidence_adjustment,
+            "metadata": metadata,
+        }
+    except Exception as exc:
+        logger.warning(f"[News] {ticker}: fetch failed: {exc}")
+        metadata = dict(state.get("metadata") or {})
+        metadata["has_breaking_news"] = False
+        metadata["news_confidence_adjustment"] = 0.0
+        metadata["news_brief"] = ""
+        state["news_brief"] = ""
+        state["news_confidence_adjustment"] = 0.0
+        state["metadata"] = metadata
+        return {
+            "news_brief": "",
+            "news_confidence_adjustment": 0.0,
+            "metadata": metadata,
+        }
+
+
+def _news_adjustment_from_state(state: DebateChamberState) -> float:
+    metadata = state.get("metadata") or {}
+    raw_adjustment = state.get("news_confidence_adjustment")
+    if raw_adjustment in (None, ""):
+        raw_adjustment = metadata.get("news_confidence_adjustment", 0.0)
+    try:
+        return float(raw_adjustment or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _planner_decision_for_state(
@@ -1205,7 +1259,8 @@ Current Date (Asia/Jakarta): {current_date}
                     started_at=started_at,
                     detail={"source": "stockbit", "available": False},
                 )
-                return {"sentiment_data": content}
+                news_update = _news_context_for_state(state, ticker)
+                return {"sentiment_data": content, **news_update}
             messages = [
                 SystemMessage(content=SENTIMENT_PROMPT + AGENT_SIGNAL_PROMPT),
                 HumanMessage(content=json.dumps(raw)[:10_000]),
@@ -1219,7 +1274,8 @@ Current Date (Asia/Jakarta): {current_date}
                 started_at=started_at,
                 detail={"source": "stockbit"},
             )
-            return {"sentiment_data": content}
+            news_update = _news_context_for_state(state, ticker)
+            return {"sentiment_data": content, **news_update}
         except Exception as e:
             logger.error(f"[Sentiment] Error: {e}")
             failure_record = classify_exception(e, "stockbit").model_dump(mode="json")
@@ -1240,6 +1296,7 @@ Current Date (Asia/Jakarta): {current_date}
             content = "Data Unavailable (Error)"
             self._record_observation(state, "sentiment_specialist", content)
             metadata = _metadata_with_planner_note(state, decision)
+            state["metadata"] = metadata
             if decision is not None and decision.action is PlanAction.PROCEED_PARTIAL:
                 _ledger_stage_partial(
                     state,
@@ -1247,9 +1304,10 @@ Current Date (Asia/Jakarta): {current_date}
                     reason=decision.context_note or decision.reason,
                     confidence_penalty=decision.confidence_penalty,
                 )
+            news_update = _news_context_for_state(state, ticker)
             return {
                 "sentiment_data": content,
-                "metadata": metadata,
+                **news_update,
             }
 
     async def _synthesizer_node(self, state: DebateChamberState) -> dict:
@@ -1271,6 +1329,8 @@ Current Date (Asia/Jakarta): {current_date}
         f = state.get("fundamental_data", "Missing")
         t = state.get("technical_data", "Missing")
         s = state.get("sentiment_data", "Missing")
+        metadata = state.get("metadata") or {}
+        news_brief = str(state.get("news_brief") or metadata.get("news_brief") or "")
         current_price = state.get("current_price", 0.0)
         tech = state.get("technical_indicators", {})
 
@@ -1451,6 +1511,8 @@ Current Date (Asia/Jakarta): {current_date}
                         )
                     decision_brief = raw
                     state["metadata"] = metadata
+        if news_brief:
+            decision_brief = f"{decision_brief}\n\n{news_brief}"
         raw = decision_brief
 
         rag_metadata = state.get("metadata") or {}
@@ -2252,6 +2314,26 @@ Start your response with '{' and end with '}'. Nothing else."""
                 p["fair_value"] = p.get("fair_value") or None
             return p
 
+        def _apply_news_adjustment(parsed: dict) -> dict:
+            news_adj = _news_adjustment_from_state(state)
+            if news_adj == 0:
+                return parsed
+            logger.info(
+                f"[News] Applying confidence adjustment {news_adj:+.2f} "
+                f"to CIO verdict for {ticker}"
+            )
+            p = dict(parsed)
+            try:
+                confidence = float(p.get("confidence") or 0.0)
+            except (TypeError, ValueError):
+                confidence = 0.0
+            p["confidence"] = max(0.0, min(1.0, confidence + news_adj))
+            p["weighted_reasoning"] = self._append_reason(
+                p.get("weighted_reasoning"),
+                f"News sentiment confidence adjustment applied: {news_adj:+.2f}.",
+            )
+            return p
+
         try:
             resp = await self._invoke_llm_for_state(
                 state,
@@ -2262,6 +2344,7 @@ Start your response with '{' and end with '}'. Nothing else."""
             parsed = json.loads(self._sanitize_json(resp.content))
             parsed = _apply_envelope(parsed)
             parsed = self._apply_consensus_override(parsed, state)
+            parsed = _apply_news_adjustment(parsed)
             verdict_json = CIOVerdict(**parsed).model_dump_json()
             logger.info(f"[CIO] JSON parsed successfully for {ticker}")
         except Exception as e:
@@ -2367,6 +2450,8 @@ Start your response with '{' and end with '}'. Nothing else."""
             "fundamental_data": "",
             "technical_data": "",
             "sentiment_data": "",
+            "news_brief": "",
+            "news_confidence_adjustment": 0.0,
             "raw_data": "",
             "decision_brief": "",
             "technical_indicators": {},

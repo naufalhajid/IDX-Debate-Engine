@@ -3,153 +3,102 @@
   "verdict": {
     "ticker": "AUTO",
     "rating": "HOLD",
-    "confidence": 0.52,
-    "fair_value": 6896.0,
-    "entry_price_range": "2530 - 2580",
-    "target_price": 2660.0,
-    "stop_loss": 2510.0,
-    "current_price": 2640.0,
+    "confidence": 0.78,
+    "fair_value": 1124.0,
+    "entry_price_range": "964 - 1028",
+    "target_price": 1077.0,
+    "stop_loss": 900.0,
+    "current_price": 1000.0,
     "timeframe": "1-3 Months",
-    "weighted_reasoning": "The final rating is HOLD, mandated by the 'soft_hold' consensus rule, which is appropriate given the current market conditions. The primary reason is that the current price (Rp 2,640) is above the calculated entry zone (Rp 2,530-2,580), making the trade plan invalid for immediate execution. While the stock is extremely undervalued (Current Price << Fair Value Rp 6,896) and the technical setup has a strong R/R of 2.33, entry timing is critical. The Devil's Advocate's point about the low net return (1.61% after costs) further weakens the case for an immediate BUY. We will hold and wait for a potential pullback into the designated entry zone to re-evaluate. Consensus override: Bull/Bear confidence gap was below 0.15, so the chamber treats this as soft consensus HOLD instead of forcing an entry.",
-    "critical_risk_factor": "",
+    "weighted_reasoning": "Dry-run mock verdict untuk validasi pipeline.",
+    "critical_risk_factor": "Dry-run: bukan rekomendasi investasi aktual.",
     "key_catalysts": [
-      "Extreme undervaluation (161% discount to Fair Value) provides a significant margin of safety.",
-      "Positive technical structure with price above key moving averages (MA50, MA200)."
+      "Sektor defensif mock diasumsikan bergerak lebih moderat.",
+      "Risk/reward mock memenuhi ambang awal."
     ],
     "key_risks": [
-      "Execution Risk: Current price is above the entry zone and near the target, invalidating the immediate trade.",
-      "Low Net Return: The target gain of +4.1% is significantly eroded by transaction costs, resulting in a net return of ~1.6%, which is insufficient for a swing trade.",
-      "Lack of a specific, near-term catalyst to unlock the deep value.",
-      "Broader market correction could break key technical support levels (MA50)."
+      "Margin dan daya beli masih menjadi risiko validasi utama.",
+      "Dry-run memakai data sintetis."
     ],
-    "summary": "The trade plan is rated HOLD. While AUTO is fundamentally and significantly undervalued with a good R/R setup on paper, the current market price of Rp 2,640 has already surpassed the target entry zone (Rp 2,530-2,580) and is nearly at the target price (Rp 2,660). The trade is not actionable at this level. Furthermore, the Devil's Advocate correctly highlights that the net return after transaction costs is marginal, making the risk unattractive for immediate entry.",
-    "expected_return": "+4.1%",
-    "risk_reward_ratio": 2.33,
+    "summary": "Ini adalah hasil simulasi dry-run untuk menguji parsing, scoring, persistensi, dan report generation tanpa API call.",
+    "expected_return": "+8.1%",
+    "risk_reward_ratio": 0.84,
     "is_overvalued": false,
     "wait_and_see": true,
     "consensus_reached": true,
-    "consensus_method": "soft_hold",
+    "consensus_method": "voting",
     "dissenting_agents": [
-      "fundamental_scout",
-      "bull",
       "bear"
     ]
   },
   "debate_rounds": 3,
   "consensus_reached": true,
-  "consensus_method": "soft_hold",
-  "dissenting_agents": [
-    "fundamental_scout",
-    "bull",
-    "bear"
-  ],
+  "consensus_method": "voting",
+  "dissenting_agents": [],
   "agent_votes": [
     {
       "agent": "fundamental_scout",
       "position": "BUY",
-      "confidence": 0.85,
+      "confidence": 0.66,
       "round": 0
     },
     {
       "agent": "chartist",
-      "position": "HOLD",
-      "confidence": 0.0,
+      "position": "BUY",
+      "confidence": 0.64,
       "round": 0
     },
     {
       "agent": "sentiment_specialist",
       "position": "HOLD",
-      "confidence": 0.0,
+      "confidence": 0.55,
       "round": 0
     },
     {
       "agent": "bull",
       "position": "BUY",
-      "confidence": 0.6,
-      "round": 3
+      "confidence": 0.7,
+      "round": 1
     },
     {
       "agent": "bear",
       "position": "AVOID",
-      "confidence": 0.6,
-      "round": 3
+      "confidence": 0.58,
+      "round": 1
     }
   ],
-  "disagreement_type": "timing",
   "debate_history": [
     {
-      "role": "system",
-      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 2,640, Rp 6,896, Rp 469, Rp 3,363, Rp 2,531, Rp 2,356, Rp 2,700, Rp 284, Rp 136, Rp 2,504, Rp 2,578",
-      "round": 0,
-      "position": "UNKNOWN",
-      "confidence": null
-    },
-    {
-      "role": "system",
-      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 2,640, Rp 6,896, Rp 469, Rp 3,363",
-      "round": 0,
-      "position": "UNKNOWN",
-      "confidence": null
-    },
-    {
       "role": "bull",
-      "content": "…undervalued with a current market price of Rp 2,640 against a fair value of Rp 6,896. This represents a substantial discount, supported by robust financials including a TTM EPS of Rp 469, BVPS of Rp 3,363, healthy ROE of 13.94%, and a strong Net Profit Margin of 10.63%. The company's financial stability is further underscored by a very low Debt/Equity Ratio of 0.04 and an excellent Interest Coverage Ratio of 30.36. These metrics suggest a fundamentally sound company trading at a deep discount.\n\nTechnically, AUTO is in a structural uptrend, with the current\n\nPosition: BUY\nAgent Confidence: 0.60",
+      "content": "Dry-run bull case: setup teknikal mock mendukung entry bertahap.\n\nPosition: BUY\nAgent Confidence: 0.70",
       "round": 1,
       "position": "BUY",
-      "confidence": 0.6
+      "confidence": 0.7
     },
     {
       "role": "bear",
-      "content": "…e Bull's assertion that AUTO is significantly undervalued is accurate. With a current market price of Rp 2,640 against a fair value of Rp 6,896, the stock trades at a substantial discount of approximately 61.7%. This implies a strong fundamental margin of safety, contradicting an overvaluation-based AVOID case. However, fundamental undervaluation alone does not guarantee short-term price appreciation, especially in the absence of immediate catalysts.\n\nSecondly, the **TECHNICAL BREAKDOWN RISK** is elevated. While AUTO is in a structural uptrend, confirmed\n\nPosition: AVOID\nAgent Confidence: 0.60",
+      "content": "Dry-run bear case: kualitas data sintetis tidak boleh dipakai untuk trading.\n\nPosition: AVOID\nAgent Confidence: 0.58",
       "round": 1,
       "position": "AVOID",
-      "confidence": 0.6
-    },
-    {
-      "role": "bull",
-      "content": "…ied technical risks. Even if the price were to retrace to the MA200 at Rp 2,356, as suggested by the Bear's downside scenario, the stock would still trade at a profound discount to its intrinsic worth. This fundamental cushion ensures that any short-term technical volatility, including a temporary dip, merely presents an even more compelling entry point within a fundamentally sound and deeply undervalued asset. The risk-reward profile remains overwhelmingly skewed to the upside, making the current entry timing justifiable despite potential minor pullbacks.\n\nPosition: BUY\nAgent Confidence: 0.75",
-      "round": 2,
-      "position": "BUY",
-      "confidence": 0.75
-    },
-    {
-      "role": "bear",
-      "content": "… extreme imbalance renders the trade unviable for swing execution, as typical weekly volatility alone can wipe out the entire projected profit and breach key support levels.\n\nFurthermore, the claim that \"extreme undervaluation itself\" acts as an inherent catalyst for a swing trade is fundamentally flawed. Without a specific, near-term trigger (e.g., earnings beat, new contract, analyst upgrade), undervaluation can persist indefinitely, making it a long-term investment thesis, not a swing play. The dividend yield, while attractive, is not a swing catalyst\n\nPosition: AVOID\nAgent Confidence: 0.60",
-      "round": 2,
-      "position": "AVOID",
-      "confidence": 0.6
-    },
-    {
-      "role": "bull",
-      "content": "The Bear's concern regarding volatility wiping out projected profits and breaching support levels overlooks the profound fundamental safety net inherent in this asset. The current market valuation represents a substantial discount to its intrinsic worth, providing an exceptional buffer against typical weekly price fluctuations. This significant undervaluation ensures that even if the stock experiences short-term retracements, the downside risk is fundamentally contained, making the initial target a conservative step within a much larger potential upside. The wide gap between the current price and its true value is more than sufficient to absorb the Bear's risk scenario, transforming any dip into an even more attractive entry.\n\nWhile acknowledging the potential for immediate support levels (such as the short-term moving averages) to be tested, the stock's robust structural uptrend, confirmed by its position\n\nPosition: BUY\nAgent Confidence: 0.60",
-      "round": 3,
-      "position": "BUY",
-      "confidence": 0.6
-    },
-    {
-      "role": "bear",
-      "content": "The Bull's swing setup for AUTO exhibits critical flaws when subjected to a forensic audit, particularly concerning its risk-reward profile and the misapplication of fundamental valuation in a short-term trading context.\n\nThe Bull's target of Rp 2,700 from the current market price of Rp 2,640 offers a negligible upside of only Rp 60. This projected profit is immediately dwarfed by the stock's inherent volatility. With an Average True Range (ATR14) of Rp 68, a maximum 1-week adverse move (calculated as 2 × ATR) is Rp 136. This potential adverse fluctuation of Rp 136 is more than double the entire projected profit of Rp 60, rendering the trade unviable for swing execution. The Bull's implied \"exceptional buffer\" against weekly price fluctuations is demonstrably insufficient to absorb typical market movements relative to the proposed profit.\n\nFurthermore, the Bull's recommended entry zone of Rp 2,531 – Rp 2,578, based on EMA20 and MA50 as support, is already below the current market price of Rp 2,640. If the stock retraces to the lower bound of this zone, specifically MA50 at Rp 2,531, it represents a decline of Rp 109 from the current price. Should this MA50 support fail, the next significant structural support is the MA200 at Rp 2,356. A breakdown to this level would imply a potential maximum loss of Rp 284 from the current price of Rp 2,640, significantly exceeding the Bull's assumed \"contained\" downside and dwarfing the meager Rp 60 target profit.\n\nThe argument that a \"profound fundamental safety net\" from undervaluation (Fair Value Rp 6,896 vs. Current Rp 2,640) provides an \"exceptional buffer\" for a swing trade is a misapplication of investment principles. While undervaluation can be a long-term thesis, it does not inherently prevent short-term price volatility or drawdowns within a 1-3 month swing timeframe. The absence of any identified near-term catalyst (e.g., earnings, contract, ex-dividend is PAST_EVENT_NOT_CATALYST) means there is\n\nPosition: AVOID\nAgent Confidence: 0.60",
-      "round": 3,
-      "position": "AVOID",
-      "confidence": 0.6
+      "confidence": 0.58
     },
     {
       "role": "devils_advocate",
-      "content": "**1. MACRO/COMPANY RISK & FOREIGN FLOW:**\nIf a broader market correction or sustained foreign fund selling pressure targets the automotive sector, could the MA50 support at Rp 2,531 break, potentially leading to a retest of the MA200 at Rp 2,356?\n\n**2. EXECUTION RISK — Transaction Cost Stress Test:**\nMenggunakan harga entry Rp 2,640 dan target Rp 2,700, proyeksi keuntungan kotor adalah 2.27%. Biaya transaksi dihitung sebagai berikut: biaya beli 0.15% (Rp 3.96), biaya jual 0.25% (Rp 6.75), PPh final 0.10% (Rp 2.70), dan estimasi slippage 0.15% (Rp 3.96). Total biaya transaksi round-trip adalah Rp 17.37, atau 0.66% dari nilai entry. Setelah dikurangi biaya, net return yang diharapkan adalah 2.27% - 0.66% = 1.61%. Karena net return ini kurang dari 2.0%, maka trade ini dikategorikan sebagai INSUFFICIENT NET RETURN — biaya transaksi menggerus terlalu besar dari projected gain.\n\nPosition: AVOID\nAgent Confidence: 0.55",
-      "round": 4,
-      "position": "AVOID",
-      "confidence": 0.55
+      "content": "Dry-run challenge: konfirmasi ulang semua level harga dengan data live.",
+      "round": 2,
+      "position": "HOLD",
+      "confidence": 0.0
     }
   ],
-  "raw_data_summary": "=== FUNDAMENTALS ===\nFAIR VALUE: Rp 6,896\n\nAUTO is significantly UNDERVALUED, with the current market price of Rp 2,640 representing a 161.2% discount to its calculated fair value of Rp 6,896. This valuation is supported by a strong TTM EPS of Rp 469 and a BVPS of Rp 3,363, indicating robust underlying fundamentals relative to its market price.\n\nKey support metrics include a healthy Return on Equity (ROE) of 13.94% and a Net Profit Margin of 10.63%. The company maintains a very low Debt/Equity Ratio of 0.04, indicating minimal leverage and strong financial stability. Furthermore, AUTO offers an attractive Dividend Yield of 8.67%. Trend data for ROE and Net Margin over 3 years is not available in the provided information.\n\nNo specific upcoming growth catalyst (earnings, ex-dividend, contract) within the next 1-3 months has been identified; the latest dividend ex-date of 28 Apr 26 is a past event. Quality checks reveal no major red flags: ROE (13.94%) is not excessively high while Net Margin (10.63%) is not low. The very low DER (0.04) is coupled with a strong Interest Coverage Ratio (30.36), indicating robust debt servicing capacity. The Altman Z-Score (6.50) is not inflated. Operating Cash Flow data is not explicitly available to perform the Revenue-CFO divergence check.\n\nPosition: BUY\nAgent Confidence: 0.85\n\n=== TECHNICALS ===\n**ANALISIS TEKNIKAL IHSG (1-3 Bulan)**\n\nSaham dalam uptrend struktural. Swing long searah tren. Harga saat ini berada di atas MA200 (Rp 2,356), mengkonfirmasi kekuatan tren jangka panjang.\n\nENTRY ZONE: Rp 2,531 – Rp 2,578 (berdasarkan EMA20 dan MA50 sebagai support). Harga saat ini (Rp 2,640) berada di atas zona entri yang direkomendasikan. Idealnya, entri dilakukan saat harga mendekati atau berada dalam zona support ini untuk meminimalkan risiko.\n\nTARGET: Rp 2,700 (approx. 5.7% from entry mid).\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 2640.0,\n  \"sma20\": 2577.0,\n  \"ema20\": 2578.0,\n  \"ma50\": 2531.0,\n  \"ma200\": 2356.0,\n  \"ma200_context\": \"ABOVE\",\n  \"rsi14\": 59.4,\n  \"atr14\": 68.0,\n  \"avg_volume_20d\": 2674970.0,\n  \"52w_high\": 2721.0,\n  \"52w_low\": 1799.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== DIVIDEND EX-DATE SCAN: AUTO ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
-  "metadata": {
-    "prompt_version": "2026-05-11-critical-audit-v1",
-    "market_data_source": "yfinance",
-    "market_data_cached": true,
-    "batch_timestamp": "20260511_080316",
-    "versioned_output": true
-  },
+  "raw_data_summary": "DRY_RUN mock data; no provider or Gemini call executed.",
   "error": null,
   "conviction_score": 0.0,
-  "sector_key": "consumer_disc"
+  "sector_key": "consumer_disc",
+  "metadata": {
+    "dry_run": true,
+    "mock_profile": "consumer_disc",
+    "prompt_version": "2026-05-11-critical-audit-v1",
+    "batch_timestamp": "20260514_204302",
+    "versioned_output": true
+  }
 }

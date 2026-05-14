@@ -2,71 +2,103 @@
   "ticker": "DMAS",
   "verdict": {
     "ticker": "DMAS",
-    "rating": "BUY",
-    "confidence": 0.75,
-    "fair_value": 288.0,
-    "entry_price_range": "135 - 138",
-    "target_price": 150.0,
-    "stop_loss": 130.0,
-    "current_price": 141.0,
+    "rating": "HOLD",
+    "confidence": 0.86,
+    "fair_value": 7214.0,
+    "entry_price_range": "5825 - 6034",
+    "target_price": 6296.0,
+    "stop_loss": 5551.0,
+    "current_price": 6000.0,
     "timeframe": "1-3 Months",
-    "weighted_reasoning": "The decision is primarily driven by the compelling fundamental undervaluation (Current Price Rp 141 vs. Fair Value Rp 288), creating a significant margin of safety. This is strongly supported by the Python-calculated trade envelope which offers an attractive Risk/Reward ratio of 2.08. The conflict resolution signal (Fundamental ✅ + Technical ✅) mandates a BUY rating. The primary risk, as highlighted by the Devil's Advocate, is the lack of a specific, near-term catalyst, which could lead to stalled momentum. However, the deep value and constructive technicals are deemed sufficient to outweigh this risk for a swing trade horizon.",
-    "critical_risk_factor": "",
+    "weighted_reasoning": "Dry-run mock verdict untuk validasi pipeline.",
+    "critical_risk_factor": "Dry-run: bukan rekomendasi investasi aktual.",
     "key_catalysts": [
-      "Significant undervaluation attracting value investors and potential for market re-rating.",
-      "Price holding above key moving averages (MA50, MA200), indicating underlying technical strength.",
-      "Strong profitability metrics (ROE 17.0%, Net Margin 77.7%) and a debt-free balance sheet."
+      "Template dry-run umum untuk validasi konfigurasi pipeline.",
+      "Risk/reward mock memenuhi ambang awal."
     ],
     "key_risks": [
-      "Absence of a specific, near-term catalyst could lead to price stagnation or a failed breakout.",
-      "A broad market sell-off, as noted by the Devil's Advocate, could breach the support zone and trigger the stop loss regardless of company fundamentals.",
-      "RSI at 66.4 is approaching overbought levels, which could signal a short-term pullback before a potential move higher."
+      "Data sintetis tidak merepresentasikan kondisi emiten aktual.",
+      "Dry-run memakai data sintetis."
     ],
-    "summary": "The trade plan for DMAS is approved with a BUY rating. The stock is trading at a significant discount to its fair value, providing a substantial margin of safety. The technical setup is constructive with an excellent risk/reward ratio, making it a compelling value proposition despite the lack of an immediate catalyst.",
-    "expected_return": "+9.9%",
-    "risk_reward_ratio": 2.08,
+    "summary": "Ini adalah hasil simulasi dry-run untuk menguji parsing, scoring, persistensi, dan report generation tanpa API call.",
+    "expected_return": "+6.2%",
+    "risk_reward_ratio": 0.97,
     "is_overvalued": false,
-    "wait_and_see": false
+    "wait_and_see": true,
+    "consensus_reached": true,
+    "consensus_method": "voting",
+    "dissenting_agents": [
+      "bear"
+    ]
   },
-  "debate_rounds": 2,
-  "debate_history": [
+  "debate_rounds": 3,
+  "consensus_reached": true,
+  "consensus_method": "voting",
+  "dissenting_agents": [],
+  "agent_votes": [
     {
-      "role": "system",
-      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 141, Rp 288, Rp 135.0, Rp 136.0, Rp 135, Rp 136, Rp 135.5, Rp 147, Rp 150, Rp 132, Rp 11.5, Rp 3.5, Rp 19, Rp 393",
+      "agent": "fundamental_scout",
+      "position": "BUY",
+      "confidence": 0.66,
       "round": 0
     },
     {
-      "role": "bull",
-      "content": "…at **Rp 132**, calculated as 1.5 times the ATR(14) below the SMA20. This yields a **Risk/Reward ratio of approximately 3.8:1** (Target gain: Rp 11.5; Stop loss: Rp 3.5). While the R/R is favorable, the lack of a clear catalyst within the 1-3 month window means this trade carries higher uncertainty regarding timing and momentum.\n\n**Verdict:** WAIT_AND_SEE. While fundamentally undervalued and technically bullish, the absence of a specific, near-term catalyst within the 1-3 month swing trade horizon prevents a high-confidence actionable BUY call. Investors should monitor for an emerging catalyst.",
+      "agent": "chartist",
+      "position": "BUY",
+      "confidence": 0.64,
+      "round": 0
+    },
+    {
+      "agent": "sentiment_specialist",
+      "position": "HOLD",
+      "confidence": 0.55,
+      "round": 0
+    },
+    {
+      "agent": "bull",
+      "position": "BUY",
+      "confidence": 0.7,
       "round": 1
     },
     {
-      "role": "bear",
-      "content": "…rranting an **AVOID** verdict. Despite the stated fundamental undervaluation, several critical factors undermine the viability and safety of this trade within a 1-3 month horizon.\n\n1.  **OVERVALUATION CHECK (Reliability of Fair Value):** While DMAS is presented as significantly undervalued at Rp 141 compared to its fair value of Rp 288, this undervaluation is not a robust basis for a swing trade BUY. The fair value calculation exhibits a wide discrepancy across its components, notably a Dividend Discount Model (DDM) valuation of only Rp 19, contrasting sharply with the P/E Band (Rp 393) and P/",
+      "agent": "bear",
+      "position": "AVOID",
+      "confidence": 0.58,
       "round": 1
-    },
+    }
+  ],
+  "debate_history": [
     {
       "role": "bull",
-      "content": "The Bear's challenge regarding the reliability of the fair value, particularly the discrepancy with the Dividend Discount Model (DDM), overlooks the company's exceptional financial health. While DDM can be sensitive to growth assumptions, the robust Return on Equity and impressive Net Margin, combined with an effectively debt-free balance sheet, provide strong corroboration for the higher intrinsic value derived from other methodologies. These fundamental strengths suggest the market is currently underpricing a highly profitable and financially sound entity, implying that the substantial gap between the current market price and its intrinsic worth is a genuine opportunity, not a valuation anomaly.\n\nRegarding the stop-loss, while an initial risk management point is established based on short-term price action, a more significant downside limit exists at the yearly low. This level represents a strong secondary support, providing a deeper safety net should immediate technical supports be breached. The market's tendency to respect such historical lows offers a more robust floor for price action, mitigating the Bear's concern about inadequate protection.\n\nThe absence of a specific, near-term news catalyst is indeed a factor, but the confluence of deep fundamental undervaluation, strong profitability, and a high dividend yield acts as its own powerful, ongoing catalyst. The market often re-rates fundamentally sound companies that are trading at a significant discount, especially when technical indicators show underlying strength, such as the price maintaining above key moving averages. This intrinsic value proposition, coupled with the attractive income stream, provides a continuous draw for capital, driving potential re-evaluation over the swing trade horizon.\n\nFinally, the substantial disparity between the current market price and the company's calculated intrinsic value provides a wide margin of safety, more than sufficient to absorb the Bear's risk scenario. This significant undervaluation means that even if short-term volatility triggers an initial stop, the fundamental upside potential remains considerable. Any temporary price weakness would merely present an enhanced opportunity for accumulation, as the market has ample room to adjust upwards to reflect the company's true underlying worth.",
-      "round": 2
+      "content": "Dry-run bull case: setup teknikal mock mendukung entry bertahap.\n\nPosition: BUY\nAgent Confidence: 0.70",
+      "round": 1,
+      "position": "BUY",
+      "confidence": 0.7
     },
     {
       "role": "bear",
-      "content": "The Bull's swing setup for DMAS is built on precarious assumptions regarding support, risk management, and the nature of its catalysts, making it highly vulnerable to adverse price action.\n\nThe proposed entry zone of Rp 135 – Rp 136, anchored by the MA50 and SMA20, offers a dangerously thin margin of safety. With an ATR(14) of 3.0, a typical 1-week adverse move (2 × ATR) could be Rp 6.0. Comparing this to the Bull's claimed margin of safety from the entry midpoint (Rp 135.5) to the stop loss (Rp 132), which is only Rp 3.5, reveals a critical flaw. A standard weekly fluctuation could easily trigger the stop loss at Rp 132, wiping out the entire assumed protection and rendering the trade unviable for swing execution.\n\nFurthermore, the assertion that the 52-week low of Rp 128 provides a \"robust floor\" is misleading. Should the current technical supports at Rp 135.0 and Rp 136.0 fail, a breach of the 52-week low at Rp 128 would plunge the stock into uncharted territory for the past year. Without clear historical support levels below Rp 128, the actual maximum loss from the Bull's entry midpoint of Rp 135.5 could extend significantly beyond the assumed Rp 3.5, potentially reaching Rp 7.5 if it merely retests the 52-week low, or far greater if that level breaks. This exposes traders to a much larger downside than the Bull acknowledges.\n\nFinally, the Bull's reliance on \"deep fundamental undervaluation\" and a \"high dividend yield\" as \"powerful, ongoing catalysts\" for a 1-3 month swing trade is misplaced. The dividend ex-date of 2025-05-08 is a PAST_EVENT_NOT_CATALYST, meaning the attractive yield is historical, not a forward-looking driver for imminent price appreciation. Without specific, near-term market-moving events like earnings announcements or new dividend declarations, the theoretical fair value of Rp 288 remains unvalidated by market action. The current price of Rp 141.0, trading at a substantial discount to this calculated value, suggests the market is not currently pricing in the Bull's optimistic intrinsic worth, undermining the \"undervaluation\" as an active swing catalyst.",
-      "round": 2
+      "content": "Dry-run bear case: kualitas data sintetis tidak boleh dipakai untuk trading.\n\nPosition: AVOID\nAgent Confidence: 0.58",
+      "round": 1,
+      "position": "AVOID",
+      "confidence": 0.58
     },
     {
       "role": "devils_advocate",
-      "content": "Here are two challenges to the DMAS swing trade setup:\n\n1.  **MACRO/COMPANY RISK & FOREIGN FLOW:** Given the lack of specific catalysts, if foreign funds accelerate selling in the broader market, could the Rp 135-136 support zone fail, triggering the Rp 132 stop loss and potentially pushing DMAS towards its Rp 128 52-week low?\n\n2.  **EXECUTION RISK:** Can the projected 8.48% gain to Rp 147 truly survive execution, or if DMAS only reaches Rp 138, would the resulting 1.44% net return after 0.40% transaction costs be insufficient, making the trade unprofitable relative to its Rp 132 stop loss?",
-      "round": 3
+      "content": "Dry-run challenge: konfirmasi ulang semua level harga dengan data live.",
+      "round": 2,
+      "position": "HOLD",
+      "confidence": 0.0
     }
   ],
-  "raw_data_summary": "=== FUNDAMENTALS ===\nFAIR VALUE: Rp 288\n\nDMAS is currently trading at Rp 141, making it significantly UNDERVALUED by 104.3% compared to its calculated fair value of Rp 288. This valuation is derived from a weighted average of P/E Band (Rp 393), P/B Band (Rp 308), and DDM (Rp 19) methods, with high calculation confidence. The current market price presents a substantial upside potential based on fundamental valuation.\n\nKey fundamental metrics support this valuation. The company exhibits a strong Return on Equity (ROE) of 17.0% and an impressive Net Margin of 77.7%. (Note: 3-year trend data for ROE and Net Margin is not available in the provided information). The Debt/Equity ratio is null (indicated as '-', suggesting effectively zero debt, further supported by a low Total Liabilities/Equity of 0.09). DMAS also offers a high Dividend Yield of 20.57%.\n\nRegarding growth catalysts for a 1-3 month swing trade horizon, the latest identified dividend ex-date was 2025-05-08, which is a PAST_EVENT_NOT_CATALYST relative to the current date of 2026-05-03. No other specific upcoming earnings announcements, ex-dividend dates, or contract awards within the 1-3 month window are identified from the provided data.\n\n=== TECHNICALS ===\n**Technical Chart Analysis: IHSG Swing Trade**\n\nThe current price of Rp 141.0 is trading above both the MA50 (Rp 135.0) and MA200 (Rp 136.0), indicating a bullish trend in the short to medium term. The price maintaining above these key moving averages suggests underlying strength and potential for further upward movement.\n\nThe nearest confirmed support levels, derived from the SMA20 and MA50, establish an **ENTRY ZONE: Rp 135 – Rp 136**. This range represents a potential area for accumulation on pullbacks. The RSI(14) at 66.4 indicates strong bullish momentum, though it is approaching the overbought threshold, suggesting the current upward move is extended.\n\nA strong resistance level is identified at Rp 147 based on orderbook depth, which would yield an approximate 8.5% gain from the entry midpoint of Rp 135.5. The **TARGET: Rp 147** is a reasonable objective before encountering the significant resistance at the 52-week high of Rp 150. To manage risk, a **STOP LOSS: Rp 132** is set, calculated as 1.5 times the ATR(14) below the SMA20.\n\nRegarding volume, the provided data does not include the current day's trading volume, making it impossible to assess if the current price move is being confirmed or denied by volume.\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 141.0,\n  \"sma20\": 136.0,\n  \"ma50\": 135.0,\n  \"ma200\": 136.0,\n  \"rsi14\": 66.4,\n  \"atr14\": 3.0,\n  \"avg_volume_20d\": 45855140.0,\n  \"52w_high\": 150.0,\n  \"52w_low\": 128.0\n}\n\n=== SENTIMENT ===\n**Sentiment Analysis: INSUFFICIENT_DATA**\n\nThe provided JSON indicates `data: null`, meaning no social signal data was retrieved for analysis. Therefore, it is impossible to assess overall mood, identify dominant discussion themes, detect volume anomalies, determine swing-trade timing signals, or identify any red flags.\n\n**Confidence:** 0% (INSUFFICIENT_DATA)\n\n=== DIVIDEND EX-DATE SCAN: DMAS ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
+  "raw_data_summary": "DRY_RUN mock data; no provider or Gemini call executed.",
   "error": null,
-  "conviction_score": 0.583,
+  "conviction_score": 0.0,
   "sector_key": "property",
   "metadata": {
-    "batch_timestamp": "20260503_141917",
+    "dry_run": true,
+    "mock_profile": "property",
+    "prompt_version": "2026-05-11-critical-audit-v1",
+    "batch_timestamp": "20260514_204302",
     "versioned_output": true
   }
 }
