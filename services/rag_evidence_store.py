@@ -73,6 +73,31 @@ class EvidenceBundle(BaseModel):
     staleness_warning: str | None
     token_estimate: int
     created_at: str
+    citation_ids: list[str] = Field(default_factory=list)
+
+
+class EvidenceCitation(BaseModel):
+    """Prompt-safe reference to a selected evidence chunk."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    chunk_id: str
+    category: CategoryName
+    source: str
+    relevance_score: float
+    is_stale: bool
+
+
+class CitationGuardReport(BaseModel):
+    """Validation report for citations claimed against an evidence bundle."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    valid: bool
+    cited_chunks: list[EvidenceCitation]
+    missing_citation_ids: list[str]
+    stale_citation_ids: list[str]
+    errors: list[str] = Field(default_factory=list)
 
 
 class RAGEvidenceStore:
@@ -219,6 +244,7 @@ class RAGEvidenceStore:
             ),
             token_estimate=token_estimate,
             created_at=datetime.now(timezone.utc).isoformat(),
+            citation_ids=[chunk.chunk_id for chunk in selected],
         )
         self.log_bundle(bundle)
         return bundle
@@ -237,6 +263,7 @@ class RAGEvidenceStore:
             lines.extend(
                 [
                     f"[{chunk.category.upper()}]",
+                    f"Evidence ID: {chunk.chunk_id}",
                     chunk.content,
                     f"Source: {chunk.source} | Score: {chunk.relevance_score:.2f}",
                 ]
@@ -265,6 +292,7 @@ class RAGEvidenceStore:
             "run_id": bundle.run_id,
             "total_considered": bundle.total_chunks_considered,
             "total_selected": bundle.total_chunks_selected,
+            "selected_chunk_ids": bundle.citation_ids,
             "has_stale_data": bundle.has_stale_data,
             "created_at": bundle.created_at,
         }
@@ -273,6 +301,54 @@ class RAGEvidenceStore:
                 handle.write(json.dumps(record, ensure_ascii=False) + "\n")
         except OSError:
             logger.exception("Failed to write RAG evidence bundle log.")
+
+
+def citations_for_bundle(bundle: EvidenceBundle) -> list[EvidenceCitation]:
+    """Return compact citations for every selected evidence chunk."""
+    return [
+        EvidenceCitation(
+            chunk_id=chunk.chunk_id,
+            category=chunk.category,
+            source=chunk.source,
+            relevance_score=chunk.relevance_score,
+            is_stale=chunk.is_stale,
+        )
+        for chunk in bundle.chunks
+    ]
+
+
+def guard_evidence_citations(
+    bundle: EvidenceBundle,
+    cited_chunk_ids: list[str],
+    *,
+    min_citations: int = 1,
+) -> CitationGuardReport:
+    """Validate claimed evidence IDs against a selected evidence bundle."""
+    citation_map = {citation.chunk_id: citation for citation in citations_for_bundle(bundle)}
+    cited_unique = [chunk_id for chunk_id in dict.fromkeys(cited_chunk_ids) if chunk_id]
+    cited_chunks = [
+        citation_map[chunk_id]
+        for chunk_id in cited_unique
+        if chunk_id in citation_map
+    ]
+    missing = [chunk_id for chunk_id in cited_unique if chunk_id not in citation_map]
+    stale = [citation.chunk_id for citation in cited_chunks if citation.is_stale]
+
+    errors: list[str] = []
+    if len(cited_chunks) < min_citations:
+        errors.append(
+            f"expected at least {min_citations} citation(s), got {len(cited_chunks)}"
+        )
+    for chunk_id in missing:
+        errors.append(f"citation id not found in evidence bundle: {chunk_id}")
+
+    return CitationGuardReport(
+        valid=not errors,
+        cited_chunks=cited_chunks,
+        missing_citation_ids=missing,
+        stale_citation_ids=stale,
+        errors=errors,
+    )
 
 
 def _resolve_pack_timestamp(pack: ContextPack) -> datetime:

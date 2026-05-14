@@ -4,6 +4,26 @@ from pathlib import Path
 from core.report_consistency import InconsistencyType, check_consistency
 
 
+def _risk_governor(
+    *,
+    status: str = "deployable",
+    sizing_allowed: bool = True,
+    reason_codes: list[str] | None = None,
+) -> dict:
+    return {
+        "ticker": "BBCA",
+        "status": status,
+        "sizing_allowed": sizing_allowed,
+        "reason_codes": reason_codes or ["price_inside_entry_range"],
+        "message": "Harga sekarang berada di zona entry.",
+        "current_price": 1000,
+        "entry_low": 950,
+        "entry_high": 1050,
+        "target_price": 1150,
+        "stop_loss": 930,
+    }
+
+
 def _write_reports(
     tmp_path: Path,
     *,
@@ -25,6 +45,7 @@ def test_check_consistency_fully_consistent_report(tmp_path: Path) -> None:
                 "ticker": "BBCA",
                 "status": "ok",
                 "verdict": {"rating": "BUY", "current_price": 1000},
+                "risk_governor": _risk_governor(),
             }
         ],
         markdown="# TOP 3\n\n## BBCA\nCurrent Price: Rp 1,020\nSignal: BUY\n",
@@ -89,6 +110,7 @@ def test_check_consistency_flags_avoid_rating_presented_positively(
                 "ticker": "BBRI",
                 "status": "ok",
                 "verdict": {"rating": "AVOID"},
+                "risk_governor": {**_risk_governor(), "ticker": "BBRI"},
             }
         ],
         markdown="# TOP 3\n\nRecommended pick: **BBRI**\nSignal: BUY\n",
@@ -126,3 +148,123 @@ def test_check_consistency_ignores_false_positive_section_headers(
     assert report.consistent is True
     assert report.checked_tickers == []
     assert report.inconsistencies == []
+
+
+def test_check_consistency_warns_for_missing_risk_governor(
+    tmp_path: Path,
+) -> None:
+    batch_path, top3_path = _write_reports(
+        tmp_path,
+        batch=[
+            {
+                "ticker": "BBCA",
+                "status": "ok",
+                "verdict": {"rating": "BUY", "current_price": 1000},
+            }
+        ],
+        markdown="# TOP 3\n\n## BBCA\nSignal: BUY\n",
+    )
+
+    report = check_consistency(batch_path, top3_path)
+
+    assert report.consistent is False
+    assert any(
+        item.type == InconsistencyType.MISSING_RISK_GOVERNOR
+        and item.severity == "warning"
+        for item in report.inconsistencies
+    )
+
+
+def test_check_consistency_flags_non_deployable_that_looks_executable(
+    tmp_path: Path,
+) -> None:
+    batch_path, top3_path = _write_reports(
+        tmp_path,
+        batch=[
+            {
+                "ticker": "BBCA",
+                "status": "ok",
+                "verdict": {"rating": "BUY", "current_price": 1100},
+                "risk_governor": _risk_governor(
+                    status="wait_for_pullback",
+                    sizing_allowed=False,
+                    reason_codes=["price_above_entry_range"],
+                ),
+            }
+        ],
+        markdown=(
+            "# TOP 3\n\n"
+            "## BBCA\n"
+            "| **Actionability** | Wait For Pullback |\n"
+            "| **Sizing Allowed** | Yes |\n"
+        ),
+    )
+
+    report = check_consistency(batch_path, top3_path)
+
+    assert report.consistent is False
+    assert any(
+        item.type == InconsistencyType.NON_DEPLOYABLE_PROMOTED
+        for item in report.inconsistencies
+    )
+
+
+def test_check_consistency_flags_sized_non_deployable(
+    tmp_path: Path,
+) -> None:
+    batch_path, top3_path = _write_reports(
+        tmp_path,
+        batch=[
+            {
+                "ticker": "BBCA",
+                "status": "ok",
+                "verdict": {"rating": "BUY", "current_price": 1100},
+                "risk_governor": _risk_governor(
+                    status="wait_for_pullback",
+                    sizing_allowed=False,
+                    reason_codes=["price_above_entry_range"],
+                ),
+                "position_sizing": {"lot": 1, "entry_price": 1100},
+            }
+        ],
+        markdown="# TOP 3\n\n## BBCA\n| **Sizing Allowed** | No |\n",
+    )
+
+    report = check_consistency(batch_path, top3_path)
+
+    assert report.consistent is False
+    assert any(
+        item.type == InconsistencyType.SIZED_NON_DEPLOYABLE
+        and item.severity == "error"
+        for item in report.inconsistencies
+    )
+
+
+def test_check_consistency_flags_upside_exhausted_promoted(
+    tmp_path: Path,
+) -> None:
+    batch_path, top3_path = _write_reports(
+        tmp_path,
+        batch=[
+            {
+                "ticker": "BBCA",
+                "status": "ok",
+                "verdict": {"rating": "BUY", "current_price": 1100},
+                "risk_governor": _risk_governor(
+                    status="reject",
+                    sizing_allowed=False,
+                    reason_codes=["upside_exhausted"],
+                ),
+            }
+        ],
+        markdown="# TOP 3\n\n## BBCA\n| **Sizing Allowed** | No |\n",
+    )
+
+    report = check_consistency(batch_path, top3_path)
+
+    assert report.consistent is False
+    assert any(
+        item.type == InconsistencyType.UPSIDE_EXHAUSTED
+        and item.severity == "error"
+        for item in report.inconsistencies
+    )

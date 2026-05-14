@@ -13,8 +13,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from core.artifact_validator import validate_artifacts
-from core.prompt_pack_linter import lint_prompt_pack
+from core.artifact_validator import reconcile_artifacts
+from core.prompt_pack_linter import guard_prompt_pack
 
 
 class DomainScope(str, Enum):
@@ -39,6 +39,7 @@ class VerificationResult(BaseModel):
     artifact_valid: bool | None = None
     lint_valid: bool | None = None
     errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
     duration_seconds: float
 
 
@@ -115,6 +116,7 @@ async def run_verification(
     started = time.perf_counter()
     domain = _coerce_scope(scope)
     errors: list[str] = []
+    warnings: list[str] = []
     artifact_valid: bool | None = None
     lint_valid: bool | None = None
 
@@ -126,22 +128,31 @@ async def run_verification(
 
     if domain in {DomainScope.ARTIFACTS, DomainScope.ALL} and artifact_paths:
         try:
-            artifact_report = validate_artifacts(
+            artifact_report = reconcile_artifacts(
                 _artifact_path(artifact_paths, "batch", "batch_json_path"),
                 _artifact_path(artifact_paths, "top3", "top3_md_path"),
                 _artifact_path(artifact_paths, "latest", "latest_json_path"),
+                audit_log_path=artifact_paths.get("audit")
+                or artifact_paths.get("audit_log_path"),
+                telemetry_log_path=artifact_paths.get("telemetry")
+                or artifact_paths.get("telemetry_log_path"),
+                rag_evidence_log_path=artifact_paths.get("rag")
+                or artifact_paths.get("rag_log_path")
+                or artifact_paths.get("rag_evidence_log_path"),
             )
             artifact_valid = artifact_report.valid
             errors.extend(artifact_report.errors)
+            warnings.extend(artifact_report.warnings)
         except Exception as exc:
             artifact_valid = False
             errors.append(f"artifact validation failed: {exc}")
 
     if domain in {DomainScope.PROMPTS, DomainScope.ALL}:
         try:
-            lint_report = lint_prompt_pack(str(_PROMPT_MANIFEST_PATH))
+            lint_report = guard_prompt_pack(str(_PROMPT_MANIFEST_PATH))
             lint_valid = lint_report.valid
             errors.extend(lint_report.errors)
+            warnings.extend(lint_report.warnings)
         except Exception as exc:
             lint_valid = False
             errors.append(f"prompt lint failed: {exc}")
@@ -153,6 +164,7 @@ async def run_verification(
         artifact_valid=artifact_valid,
         lint_valid=lint_valid,
         errors=errors,
+        warnings=warnings,
         duration_seconds=time.perf_counter() - started,
     )
 
@@ -168,6 +180,9 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--batch", help="Path to full_batch_results.json")
     parser.add_argument("--top3", help="Path to TOP_3_SWING_TRADES.md")
     parser.add_argument("--latest", help="Path to latest_debate.json")
+    parser.add_argument("--audit", help="Path to audit_log.jsonl")
+    parser.add_argument("--telemetry", help="Path to telemetry_log.jsonl")
+    parser.add_argument("--rag", help="Path to evidence_log.jsonl")
     return parser.parse_args(argv)
 
 
@@ -176,6 +191,9 @@ def _artifact_paths_from_args(args: argparse.Namespace) -> dict[str, str] | None
         "batch": args.batch,
         "top3": args.top3,
         "latest": args.latest,
+        "audit": args.audit,
+        "telemetry": args.telemetry,
+        "rag": args.rag,
     }
     return {key: value for key, value in paths.items() if value} or None
 

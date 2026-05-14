@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 from services.context_pack_builder import ContextPack
@@ -9,6 +9,8 @@ from services.rag_evidence_store import (
     EvidenceBundle,
     EvidenceChunk,
     RAGEvidenceStore,
+    citations_for_bundle,
+    guard_evidence_citations,
 )
 
 
@@ -146,6 +148,7 @@ def test_build_bundle_returns_consistent_counts(tmp_path: Path) -> None:
 
     assert isinstance(bundle, EvidenceBundle)
     assert bundle.total_chunks_selected <= bundle.total_chunks_considered
+    assert bundle.citation_ids == [chunk.chunk_id for chunk in bundle.chunks]
     assert (tmp_path / "evidence.jsonl").exists()
 
 
@@ -157,3 +160,38 @@ def test_bundle_to_prompt_string_contains_ticker_and_header(tmp_path: Path) -> N
 
     assert "BBCA" in prompt
     assert "EVIDENCE BRIEF" in prompt
+    assert "Evidence ID:" in prompt
+
+
+def test_citations_for_bundle_returns_prompt_safe_references(tmp_path: Path) -> None:
+    store = RAGEvidenceStore(tmp_path / "evidence.jsonl")
+    bundle = store.build_bundle(_pack(), run_id="run-1")
+
+    citations = citations_for_bundle(bundle)
+
+    assert [citation.chunk_id for citation in citations] == bundle.citation_ids
+    assert all(citation.source for citation in citations)
+
+
+def test_guard_evidence_citations_accepts_known_ids(tmp_path: Path) -> None:
+    store = RAGEvidenceStore(tmp_path / "evidence.jsonl")
+    bundle = store.build_bundle(_pack(), run_id="run-1")
+
+    report = guard_evidence_citations(bundle, [bundle.citation_ids[0]])
+
+    assert report.valid is True
+    assert report.errors == []
+    assert report.cited_chunks[0].chunk_id == bundle.citation_ids[0]
+
+
+def test_guard_evidence_citations_reports_missing_or_insufficient_ids(
+    tmp_path: Path,
+) -> None:
+    store = RAGEvidenceStore(tmp_path / "evidence.jsonl")
+    bundle = store.build_bundle(_pack(), run_id="run-1")
+
+    report = guard_evidence_citations(bundle, ["missing-id"], min_citations=2)
+
+    assert report.valid is False
+    assert report.missing_citation_ids == ["missing-id"]
+    assert any("expected at least 2 citation" in error for error in report.errors)

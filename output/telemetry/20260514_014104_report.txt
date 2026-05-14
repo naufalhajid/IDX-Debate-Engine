@@ -1,38 +1,38 @@
 ╔══════════════════════════════════════════╗
-║  OPS TELEMETRY: 20260514_014526         ║
+║  OPS TELEMETRY: 20260514_014104         ║
 ╚══════════════════════════════════════════╝
 
 BATCH SUMMARY
 ─────────────
-Tickers   : 1 (1 ok / 0 fail / 0 timeout / 0 skip)
-Success   : 100%
-Timestamp : 20260514_014526
+Tickers   : 1 (0 ok / 0 fail / 1 timeout / 0 skip)
+Success   : 0%
+Timestamp : 20260514_014104
 
 VERDICTS
 ────────
-  HOLD     1
-Avg confidence : 54%
-Avg rounds     : 3.0
-Avg duration   : 169s
-Longest run    : ADRO (169s)
+  none
+Avg confidence : -
+Avg rounds     : 0.0
+Avg duration   : 30s
+Longest run    : ADRO (30s)
 
 TOKEN SPEND (estimated)
 ───────────────────────
-Flash calls : 10 (~8,000 tokens)
-Pro calls   : 1 (~2,000 tokens)
-Total est.  : ~10,000 tokens
+Flash calls : 0 (~0 tokens)
+Pro calls   : 0 (~0 tokens)
+Total est.  : ~0 tokens
 
 RAG EFFICIENCY
 ──────────────
-Avg chunks     : 9.0 selected / 10.0 considered
-Avg RAG tokens : ~588 tokens
-Context saving : 10% chunks filtered out
+Avg chunks     : 0.0 selected / 0.0 considered
+Avg RAG tokens : ~0 tokens
+Context saving : no RAG data
 
 PROVIDER HEALTH
 ───────────────
-Errors : none
+Errors : {'CancelledError': 1}
 Stale  : none
 
 PER-TICKER
 ──────────
-  ADRO   success  HOLD  conf=54%  169s R3  RAG:9/10
+  ADRO   timeout  -     conf=0%  30s R0  RAG:0/0

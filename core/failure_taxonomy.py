@@ -20,6 +20,13 @@ class ErrorCode(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
+class FailureAction(str, Enum):
+    RETRY = "retry"
+    SKIP = "skip"
+    ABORT = "abort"
+    FAIL = "fail"
+
+
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -35,6 +42,19 @@ class FailureRecord(BaseModel):
     message: str
     timestamp: datetime = Field(default_factory=_utc_now)
     retryable: bool
+
+
+class FailureDecision(BaseModel):
+    """Routing decision for a normalized pipeline failure."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    failure: FailureRecord
+    action: FailureAction
+    attempt: int
+    max_attempts: int
+    retry_after_seconds: float | None = None
+    reason: str
 
 
 _AUTH_STATUS_PATTERN = re.compile(r"\b(?:401|403)\b")
@@ -80,6 +100,62 @@ def classify_exception(e: Exception, source: str) -> FailureRecord:
         message=message,
         retryable=_RETRYABLE_BY_CODE[code],
     )
+
+
+def route_failure(
+    failure: FailureRecord | Exception,
+    source: str = "unknown",
+    *,
+    attempt: int = 1,
+    max_attempts: int = 3,
+) -> FailureDecision:
+    """Choose a consistent retry/skip/abort/fail action for a failure."""
+    record = failure if isinstance(failure, FailureRecord) else classify_exception(failure, source)
+    safe_attempt = max(1, attempt)
+    safe_max_attempts = max(1, max_attempts)
+
+    action: FailureAction
+    retry_after_seconds: float | None = None
+    reason: str
+
+    if record.code is ErrorCode.AUTH:
+        action = FailureAction.ABORT
+        reason = "authentication failures require operator intervention"
+    elif record.code is ErrorCode.QUOTA and _is_budget_exhaustion(record.message.lower()):
+        action = FailureAction.ABORT
+        reason = "budget exhaustion should stop remaining agent work"
+    elif record.retryable and safe_attempt < safe_max_attempts:
+        action = FailureAction.RETRY
+        retry_after_seconds = _retry_delay_seconds(record.code, safe_attempt)
+        reason = f"{record.code.value} is retryable and attempts remain"
+    elif record.code in {ErrorCode.DNS, ErrorCode.TIMEOUT, ErrorCode.EMPTY_LLM, ErrorCode.QUOTA}:
+        action = FailureAction.SKIP
+        reason = f"{record.code.value} exhausted retries; skip this unit of work"
+    elif record.code is ErrorCode.NO_PRICE:
+        action = FailureAction.SKIP
+        reason = "price is unavailable for this ticker"
+    else:
+        action = FailureAction.FAIL
+        reason = f"{record.code.value} is not recoverable by retry"
+
+    return FailureDecision(
+        failure=record,
+        action=action,
+        attempt=safe_attempt,
+        max_attempts=safe_max_attempts,
+        retry_after_seconds=retry_after_seconds,
+        reason=reason,
+    )
+
+
+def _retry_delay_seconds(code: ErrorCode, attempt: int) -> float:
+    if code is ErrorCode.QUOTA:
+        return 60.0
+    return float(min(2 ** max(attempt - 1, 0), 30))
+
+
+def _is_budget_exhaustion(lower_message: str) -> bool:
+    return "budget exhausted" in lower_message or "daily pro-call budget" in lower_message
 
 
 def _extract_ticker(e: Exception) -> str:

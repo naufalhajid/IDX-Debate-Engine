@@ -7,6 +7,7 @@ from core.handoff_envelope import (
     envelope_to_dict,
     make_envelope,
     validate_envelope,
+    validate_handoff,
 )
 
 
@@ -81,3 +82,27 @@ def test_envelope_round_trips_through_dict() -> None:
 
     assert hydrated == envelope
     assert hydrated.provenance[0].source == "stockbit"
+
+
+def test_validate_handoff_hydrates_dict_and_reports_valid() -> None:
+    envelope = make_envelope(
+        producer="rag_evidence",
+        consumer="cio_judge",
+        ticker="ADRO",
+        run_id="run-3",
+        payload={"evidence_ids": ["ADRO_fair_value_0"]},
+    )
+
+    report = validate_handoff(envelope_to_dict(envelope), expected_consumer="cio_judge")
+
+    assert report.valid is True
+    assert report.errors == []
+    assert report.envelope == envelope
+
+
+def test_validate_handoff_reports_invalid_payload() -> None:
+    report = validate_handoff({"producer": "bull"}, expected_consumer="cio_judge")
+
+    assert report.valid is False
+    assert report.envelope is None
+    assert any("invalid envelope" in error for error in report.errors)

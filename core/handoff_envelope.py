@@ -38,6 +38,17 @@ class HandoffEnvelope(BaseModel):
     schema_version: str = "1.0"
 
 
+class HandoffValidationReport(BaseModel):
+    """Validation result for a handoff payload at a stage boundary."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    valid: bool
+    expected_consumer: str
+    errors: list[str] = Field(default_factory=list)
+    envelope: HandoffEnvelope | None = None
+
+
 def make_envelope(
     producer: str,
     consumer: str,
@@ -80,6 +91,30 @@ def validate_envelope(
     if not _is_parseable_iso8601(envelope.created_at):
         errors.append(f"created_at is not parseable ISO-8601: {envelope.created_at}")
     return errors
+
+
+def validate_handoff(
+    data: HandoffEnvelope | dict[str, Any],
+    expected_consumer: str,
+) -> HandoffValidationReport:
+    """Hydrate and validate a handoff envelope for a consumer boundary."""
+    try:
+        envelope = data if isinstance(data, HandoffEnvelope) else envelope_from_dict(data)
+    except Exception as exc:
+        return HandoffValidationReport(
+            valid=False,
+            expected_consumer=expected_consumer,
+            errors=[f"invalid envelope: {exc}"],
+            envelope=None,
+        )
+
+    errors = validate_envelope(envelope, expected_consumer=expected_consumer)
+    return HandoffValidationReport(
+        valid=not errors,
+        expected_consumer=expected_consumer,
+        errors=errors,
+        envelope=envelope,
+    )
 
 
 def envelope_to_dict(envelope: HandoffEnvelope) -> dict:

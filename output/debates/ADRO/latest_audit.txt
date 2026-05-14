@@ -1,0 +1,40 @@
+╔══════════════════════════════════════════╗
+║  AUDIT REPORT: ADRO — HOLD       ║
+╚══════════════════════════════════════════╝
+
+Summary : ADRO→HOLD: soft_hold_rule applied (0.54) after 3 round(s). 3 agent(s) dissented. Execution Risk: Current price is above the entry zone; entering now would invalidate the calculated 2.04 R/R ratio.
+Run ID  : 20260514_014526
+Generated: 2026-05-13T18:48:18.559355+00:00
+
+VERDICT
+───────
+Rating     : HOLD (confidence: 54%)
+Method     : soft_hold
+Consensus  : yes
+Rounds     : 3
+Dissent    : 60% (3 of 5 agents)
+
+AGENT VOTES
+───────────
+  bull                   BUY      conf= 0.60  ❌
+  bear                   AVOID    conf= 0.60  ❌
+  bull                   BUY      conf= 0.88  ❌
+  bear                   AVOID    conf= 0.60  ❌
+  bull                   BUY      conf= 0.92  ❌
+  bear                   AVOID    conf= 0.88  ❌
+  devils_advocate        UNKNOWN  conf= 1.00  ❌
+
+KEY ARGUMENTS
+─────────────
+Bull  : The Bear's assertion regarding the entry zone mischaracterizes the current market dynamic for ADRO. While the EMA20 and MA50 indeed define a strong support area for a *pullback* entry, the stock's current trading near its 52-week high, coupled with robust bullish sentiment, signals a *momentum-drive
+Bear  : The Bull's "momentum-driven entry" at Rp 2,520, targeting the 52-week high of Rp 2,600, presents an unviable risk-reward profile for a swing trade. The claimed upside of merely Rp 80 from the entry price is dwarfed by the stock's inherent volatility. With an ATR(14) of Rp 70, a typical 1-week advers
+Devil : Agent Confidence: HIGH
+
+**1. MACRO/COMPANY RISK & FOREIGN FLOW:**
+Given the "Revenue-CFO Divergence" flag (Revenue YoY Growth +27.16% vs. FCF Per Share TTM -54.97%), if foreign funds begin to aggressively divest from ADRO due to concerns over non-cash-backed earnings or a broader downturn in global 
+
+DATA QUALITY
+────────────
+Freshness OK : False
+Stale sources: sentiment
+Missing      : none

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime, timezone
-from typing import Any
+import time
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -26,6 +27,21 @@ class ToolSpec(BaseModel):
     input_model: type[BaseModel]
     output_model: type[BaseModel]
     callable: Callable[..., Any]
+
+
+class ToolExecutionRecord(BaseModel):
+    """Validated execution metadata for one agent-callable tool run."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tool_name: str
+    status: Literal["success", "failed"]
+    run_id: str | None = None
+    started_at: datetime = Field(default_factory=_utc_now)
+    duration_seconds: float
+    input_payload: dict[str, Any] | None = None
+    output_payload: dict[str, Any] | None = None
+    error: str | None = None
 
 
 class FetchPriceInput(BaseModel):
@@ -85,6 +101,72 @@ class ToolRegistry:
 
     def list_tools(self) -> list[str]:
         return list(self._tools)
+
+
+def execute_tool(
+    registry: ToolRegistry,
+    tool_name: str,
+    input_data: BaseModel | dict[str, Any],
+    *,
+    run_id: str | None = None,
+    ledger: list[ToolExecutionRecord] | None = None,
+) -> ToolExecutionRecord:
+    """Execute a registered tool with deterministic I/O validation."""
+    started_at = _utc_now()
+    started = time.perf_counter()
+    input_payload: dict[str, Any] | None = None
+
+    def build_record(
+        *,
+        status: Literal["success", "failed"],
+        output_payload: dict[str, Any] | None = None,
+        error: str | None = None,
+    ) -> ToolExecutionRecord:
+        record = ToolExecutionRecord(
+            tool_name=tool_name,
+            status=status,
+            run_id=run_id,
+            started_at=started_at,
+            duration_seconds=time.perf_counter() - started,
+            input_payload=input_payload,
+            output_payload=output_payload,
+            error=error,
+        )
+        if ledger is not None:
+            ledger.append(record)
+        return record
+
+    try:
+        spec = registry.get(tool_name)
+    except KeyError:
+        return build_record(status="failed", error=f"Unknown tool: {tool_name}")
+
+    try:
+        payload = _coerce_input(spec.input_model, input_data)
+        input_payload = payload.model_dump(mode="json")
+    except Exception as exc:
+        return build_record(
+            status="failed",
+            error=f"Input validation failed for {tool_name}: {exc}",
+        )
+
+    try:
+        raw_output = spec.callable(payload)
+    except Exception as exc:
+        return build_record(status="failed", error=f"Tool execution failed: {exc}")
+
+    try:
+        output = spec.output_model.model_validate(raw_output)
+    except Exception as exc:
+        return build_record(
+            status="failed",
+            error=f"Output validation failed for {tool_name}: {exc}",
+        )
+
+    return build_record(
+        status="success",
+        output_payload=output.model_dump(mode="json"),
+    )
 
 
 def fetch_price_tool(input_data: FetchPriceInput | dict[str, Any]) -> FetchPriceOutput:

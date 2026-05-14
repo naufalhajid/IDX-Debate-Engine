@@ -1,20 +1,20 @@
 ╔══════════════════════════════════════════╗
-║  OPS TELEMETRY: 20260514_014526         ║
+║  OPS TELEMETRY: 20260514_010155         ║
 ╚══════════════════════════════════════════╝
 
 BATCH SUMMARY
 ─────────────
 Tickers   : 1 (1 ok / 0 fail / 0 timeout / 0 skip)
 Success   : 100%
-Timestamp : 20260514_014526
+Timestamp : 20260514_010155
 
 VERDICTS
 ────────
   HOLD     1
-Avg confidence : 54%
+Avg confidence : 55%
 Avg rounds     : 3.0
-Avg duration   : 169s
-Longest run    : ADRO (169s)
+Avg duration   : 194s
+Longest run    : ADRO (194s)
 
 TOKEN SPEND (estimated)
 ───────────────────────
@@ -24,9 +24,9 @@ Total est.  : ~10,000 tokens
 
 RAG EFFICIENCY
 ──────────────
-Avg chunks     : 9.0 selected / 10.0 considered
-Avg RAG tokens : ~588 tokens
-Context saving : 10% chunks filtered out
+Avg chunks     : 9.0 selected / 9.0 considered
+Avg RAG tokens : ~586 tokens
+Context saving : all chunks relevant — no filtering needed
 
 PROVIDER HEALTH
 ───────────────
@@ -35,4 +35,4 @@ Stale  : none
 
 PER-TICKER
 ──────────
-  ADRO   success  HOLD  conf=54%  169s R3  RAG:9/10
+  ADRO   success  HOLD  conf=55%  194s R3  RAG:9/9

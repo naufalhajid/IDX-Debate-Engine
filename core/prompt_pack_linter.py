@@ -54,6 +54,49 @@ def lint_prompt_pack(manifest_path: str) -> LintReport:
     )
 
 
+def guard_prompt_pack(
+    manifest_path: str,
+    *,
+    required_prompts: dict[str, str] | None = None,
+    expected_prompt_version: str | None = None,
+) -> LintReport:
+    """Run release-grade prompt checks while preserving the lint report shape."""
+    lint_report = lint_prompt_pack(manifest_path)
+    errors = list(lint_report.errors)
+    warnings = list(lint_report.warnings)
+
+    manifest = Path(manifest_path)
+    manifest_data, _duplicate_names = _load_manifest(manifest, [])
+    prompts = _extract_prompts(manifest_data, [])
+
+    prompt_version = ""
+    if isinstance(manifest_data, dict):
+        prompt_version = str(manifest_data.get("prompt_version") or "").strip()
+    if not prompt_version:
+        errors.append("Manifest requires a non-empty prompt_version.")
+
+    expected_version = expected_prompt_version
+    if expected_version is None:
+        expected_version = _current_registry_version(manifest)
+    if expected_version and prompt_version and prompt_version != expected_version:
+        errors.append(
+            "Manifest prompt_version mismatch: "
+            f"expected {expected_version}, got {prompt_version}."
+        )
+
+    required = required_prompts if required_prompts is not None else _required_prompts()
+    missing_required = sorted(set(required) - set(prompts))
+    for prompt_name in missing_required:
+        errors.append(f"Manifest missing required prompt: {prompt_name}")
+
+    return LintReport(
+        valid=not errors,
+        total_prompts=lint_report.total_prompts,
+        errors=errors,
+        warnings=warnings,
+    )
+
+
 def _load_manifest(
     manifest_path: Path,
     errors: list[str],
@@ -141,6 +184,23 @@ def _lint_prompt_file(
             errors.append(
                 f"Prompt file for {prompt_name} is missing required marker: Agent Confidence:"
             )
+
+
+def _required_prompts() -> dict[str, str]:
+    from services.debate_prompt_registry import REQUIRED_PROMPTS
+
+    return REQUIRED_PROMPTS
+
+
+def _current_registry_version(manifest_path: Path) -> str | None:
+    from services.debate_prompt_registry import MANIFEST_PATH, PROMPT_VERSION
+
+    try:
+        if manifest_path.resolve() == MANIFEST_PATH.resolve():
+            return PROMPT_VERSION
+    except OSError:
+        return None
+    return None
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:

@@ -95,6 +95,7 @@ from core.quant_filter.reporting import _build_position_summary
 from core.portfolio_optimizer import diversify_portfolio
 from core.provider_health import check_all_providers
 from core.regime import RegimeType, classify_regime, fetch_ihsg_volatility, get_regime_params
+from core.risk_governor import annotate_risk
 from core.settings import settings
 from services.debate_prompt_registry import PROMPT_VERSION
 from utils.logger_config import logger
@@ -1156,6 +1157,9 @@ def _build_sizing_candidates(top_n: list[dict]) -> list[dict]:
     """Flatten selected orchestrator entries into position-sizer input records."""
     candidates: list[dict] = []
     for entry in top_n:
+        risk = entry.get("risk_governor")
+        if isinstance(risk, dict) and risk.get("sizing_allowed") is False:
+            continue
         verdict = entry.get("verdict") or {}
         candidates.append({
             "ticker": entry.get("ticker") or verdict.get("ticker"),
@@ -1168,6 +1172,45 @@ def _build_sizing_candidates(top_n: list[dict]) -> list[dict]:
             "expected_return": verdict.get("expected_return"),
         })
     return candidates
+
+
+def _annotate_risk_governor(top_n: list[dict]) -> None:
+    """Attach deterministic actionability metadata before sizing/reporting."""
+    for entry in top_n:
+        decision = annotate_risk(entry)
+        if not decision.sizing_allowed:
+            logger.info(
+                f"[RiskGovernor] {decision.ticker}: {decision.status} "
+                f"({', '.join(decision.reason_codes)})"
+            )
+
+
+def _risk_holds(top_n: list[dict]) -> list[dict]:
+    holds: list[dict] = []
+    for entry in top_n:
+        risk = entry.get("risk_governor")
+        if not isinstance(risk, dict) or risk.get("sizing_allowed") is not False:
+            continue
+        holds.append({
+            "ticker": entry.get("ticker") or risk.get("ticker"),
+            "status": risk.get("status"),
+            "message": risk.get("message"),
+        })
+    return holds
+
+
+def _enrich_sizing_with_risk_holds(sizing_result: dict, top_n: list[dict]) -> None:
+    """Expose withheld candidates in allocation reasoning without changing sizing API."""
+    holds = _risk_holds(top_n)
+    if not holds:
+        return
+    sizing_result["actionability_holds"] = holds
+    reasoning = sizing_result.setdefault("allocation_reasoning", {})
+    risk_factors = reasoning.setdefault("risk_factors_limiting", [])
+    tickers = ", ".join(str(item["ticker"]) for item in holds if item.get("ticker"))
+    risk_factors.append(
+        f"{len(holds)} kandidat ({tickers}) ditahan dari sizing karena belum executable pada harga sekarang"
+    )
 
 
 def _attach_sizing_to_results(results: list[dict], sizing_result: dict | None) -> None:
@@ -1419,6 +1462,13 @@ def generate_top3_report(
     for rank, entry in enumerate(top_n, 1):
         v = entry["verdict"]
         ticker = entry["ticker"]
+        risk = entry.get("risk_governor") if isinstance(entry.get("risk_governor"), dict) else {}
+        action_status = str(risk.get("status") or "unknown").replace("_", " ").title()
+        if "sizing_allowed" in risk:
+            sizing_label = "Yes" if risk.get("sizing_allowed") else "No"
+        else:
+            sizing_label = "Unknown"
+        action_message = risk.get("message") or "Risk governor metadata missing."
         # [FIX-7] Reuse skor dari select_top3, bukan hitung ulang
         score = entry.get("conviction_score", 0.0)
         disagreement = entry.get("disagreement_type")
@@ -1443,6 +1493,9 @@ def generate_top3_report(
             f"| **Debate Consensus** | {consensus_label} |",
             f"| **Dissenting Agents** | {', '.join(dissenting_agents) if dissenting_agents else '-'} |",
             f"| **Timeframe** | {v.get('timeframe', '1-3 Months')} |",
+            f"| **Actionability** | {action_status} |",
+            f"| **Sizing Allowed** | {sizing_label} |",
+            f"| **Actionability Note** | {action_message} |",
             "",
             "### Trade Box",
             "",
@@ -1493,12 +1546,27 @@ def generate_top3_report(
     if position_summary:
         lines += [position_summary, "", "---", ""]
 
+    actionability_holds = _risk_holds(top_n)
+    if actionability_holds:
+        lines += [
+            "## Actionability Holds",
+            "",
+            "| Ticker | Status | Reason |",
+            "|---|---|---|",
+        ]
+        for item in actionability_holds:
+            status = str(item.get("status") or "-").replace("_", " ")
+            lines.append(
+                f"| {item.get('ticker', '-')} | {status} | {item.get('message', '-')} |"
+            )
+        lines += ["", "---", ""]
+
     # Footer: tabel ringkasan semua ticker
     lines += [
         "## Full Batch Summary",
         "",
-        "| Ticker | Rating | Confidence | R/R Ratio | Conviction Score | Consensus | Method | Dissenting Agents | Disagreement | Status |",
-        "|---|---|---|---|---|---|---|---|---|---|",
+        "| Ticker | Rating | Confidence | R/R Ratio | Conviction Score | Actionability | Consensus | Method | Dissenting Agents | Disagreement | Status |",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
 
     # [FIX-7] Untuk ticker yang sudah masuk select_top3, skor sudah ada di entry.
@@ -1518,6 +1586,8 @@ def generate_top3_report(
         method = entry.get("consensus_method") or "-"
         dissent = ", ".join(entry.get("dissenting_agents") or []) or "-"
         disagreement = entry.get("disagreement_type") or "-"
+        risk = entry.get("risk_governor") if isinstance(entry.get("risk_governor"), dict) else {}
+        actionability = str(risk.get("status") or "-").replace("_", " ")
 
         if entry.get("error"):
             status = "Error"
@@ -1531,7 +1601,7 @@ def generate_top3_report(
         rr_str = f"{rr:.2f}" if isinstance(rr, (int, float)) and rr else "N/A"
         lines.append(
             f"| {ticker} | {rating} | {conf:.0%} | {rr_str} | {cscore:.2%} "
-            f"| {consensus} | {method} | {dissent} | {disagreement} | {status} |"
+            f"| {actionability} | {consensus} | {method} | {dissent} | {disagreement} | {status} |"
         )
 
     lines += [
@@ -1652,6 +1722,7 @@ async def main(
     # Step 3: Score + Rank + Diversify
     debate_records = load_debate_history(OUTPUT_DIR)
     top_n = select_top_n(results, debate_records=debate_records)
+    _annotate_risk_governor(top_n)
     sizing_candidates = _build_sizing_candidates(top_n)
     logger.debug(f"[Sizing DEBUG] user_config masuk: {user_config}")
     logger.debug(f"[Sizing DEBUG] jumlah candidates: {len(sizing_candidates)}")
@@ -1664,6 +1735,7 @@ async def main(
             f"confidence={c.get('confidence')}"
         )
     sizing_result = calculate_positions(sizing_candidates, user_config)
+    _enrich_sizing_with_risk_holds(sizing_result, top_n)
     logger.info(
         f"[Sizing] {sizing_result['summary']['total_positions']} posisi | "
         f"Deployed: Rp {sizing_result['summary']['total_deployed']:,.0f} "
@@ -1805,6 +1877,7 @@ def _print_top3_summary(top_n: list[dict]) -> None:
     table.add_column("Entry Range")
     table.add_column("Target")
     table.add_column("SL")
+    table.add_column("Action")
 
     for i, entry in enumerate(top_n, 1):
         v = entry.get("verdict", {})
@@ -1813,6 +1886,8 @@ def _print_top3_summary(top_n: list[dict]) -> None:
         score = entry.get("conviction_score", 0.0)
         entry_range = v.get("entry_price_range") or "N/A"
         style = _RATING_STYLE.get(rating, "white")
+        risk = entry.get("risk_governor") if isinstance(entry.get("risk_governor"), dict) else {}
+        action = str(risk.get("status") or "-").replace("_", " ")
 
         table.add_row(
             str(i),
@@ -1823,6 +1898,7 @@ def _print_top3_summary(top_n: list[dict]) -> None:
             str(entry_range),
             _price(v.get("target_price")),
             _price(v.get("stop_loss")),
+            action,
         )
 
     console.print()

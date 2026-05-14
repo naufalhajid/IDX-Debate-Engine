@@ -14,7 +14,7 @@ async def test_all_scope_returns_result_with_duration(monkeypatch) -> None:
     monkeypatch.setattr(vr, "_run_pytest", fake_run_pytest)
     monkeypatch.setattr(
         vr,
-        "lint_prompt_pack",
+        "guard_prompt_pack",
         lambda _manifest: SimpleNamespace(valid=True, errors=[], warnings=[]),
     )
 
@@ -59,3 +59,41 @@ async def test_invalid_scope_raises_value_error(monkeypatch) -> None:
 
     with pytest.raises(ValueError):
         await vr.run_verification("not-a-scope")
+
+
+@pytest.mark.asyncio
+async def test_artifact_scope_uses_reconciler_when_paths_provided(monkeypatch) -> None:
+    async def fake_run_pytest(targets: list[str]) -> SimpleNamespace:
+        assert targets == ["tests/test_artifact_validator.py"]
+        return SimpleNamespace(returncode=0, stdout="passed", stderr="")
+
+    captured_paths: dict[str, object] = {}
+
+    def fake_reconcile(*args, **kwargs) -> SimpleNamespace:
+        captured_paths["args"] = args
+        captured_paths["kwargs"] = kwargs
+        return SimpleNamespace(valid=True, errors=[], warnings=["optional warning"])
+
+    monkeypatch.setattr(vr, "_run_pytest", fake_run_pytest)
+    monkeypatch.setattr(vr, "reconcile_artifacts", fake_reconcile)
+
+    result = await vr.run_verification(
+        vr.DomainScope.ARTIFACTS,
+        artifact_paths={
+            "batch": "batch.json",
+            "top3": "top3.md",
+            "latest": "latest.json",
+            "audit": "audit.jsonl",
+            "telemetry": "telemetry.jsonl",
+            "rag": "rag.jsonl",
+        },
+    )
+
+    assert result.artifact_valid is True
+    assert result.warnings == ["optional warning"]
+    assert captured_paths["args"] == ("batch.json", "top3.md", "latest.json")
+    assert captured_paths["kwargs"] == {
+        "audit_log_path": "audit.jsonl",
+        "telemetry_log_path": "telemetry.jsonl",
+        "rag_evidence_log_path": "rag.jsonl",
+    }

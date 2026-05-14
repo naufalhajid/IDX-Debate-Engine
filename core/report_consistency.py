@@ -22,6 +22,10 @@ class InconsistencyType(str, Enum):
     FAILED_TICKER_PROMOTED = "failed_ticker_promoted"
     PRICE_MISMATCH = "price_mismatch"
     MISSING_VERDICT = "missing_verdict"
+    MISSING_RISK_GOVERNOR = "missing_risk_governor"
+    SIZED_NON_DEPLOYABLE = "sized_non_deployable"
+    NON_DEPLOYABLE_PROMOTED = "non_deployable_promoted"
+    UPSIDE_EXHAUSTED = "upside_exhausted"
 
 
 class Inconsistency(BaseModel):
@@ -151,6 +155,13 @@ def check_consistency(
                 )
             )
 
+        _append_actionability_inconsistencies(
+            inconsistencies,
+            ticker=ticker,
+            batch_entry=batch_entry,
+            markdown_context=markdown_context,
+        )
+
     return ConsistencyReport(
         consistent=not inconsistencies,
         inconsistencies=inconsistencies,
@@ -255,6 +266,73 @@ def _extract_json_price(entry: dict[str, Any]) -> float | None:
     return None
 
 
+def _append_actionability_inconsistencies(
+    inconsistencies: list[Inconsistency],
+    *,
+    ticker: str,
+    batch_entry: dict[str, Any],
+    markdown_context: str,
+) -> None:
+    risk = batch_entry.get("risk_governor")
+    if not isinstance(risk, dict):
+        inconsistencies.append(
+            Inconsistency(
+                ticker=ticker,
+                type=InconsistencyType.MISSING_RISK_GOVERNOR,
+                markdown_value="present",
+                json_value=None,
+                severity="warning",
+            )
+        )
+        return
+
+    sizing_allowed = risk.get("sizing_allowed")
+    reason_codes = {
+        str(code)
+        for code in risk.get("reason_codes", [])
+        if code is not None
+    }
+    status = str(risk.get("status") or "")
+
+    if sizing_allowed is False and _has_position_sizing(batch_entry):
+        inconsistencies.append(
+            Inconsistency(
+                ticker=ticker,
+                type=InconsistencyType.SIZED_NON_DEPLOYABLE,
+                markdown_value="present",
+                json_value=status or "sizing_allowed=False",
+                severity="error",
+            )
+        )
+
+    if "upside_exhausted" in reason_codes:
+        inconsistencies.append(
+            Inconsistency(
+                ticker=ticker,
+                type=InconsistencyType.UPSIDE_EXHAUSTED,
+                markdown_value="promoted",
+                json_value="target_price <= current_price",
+                severity="error",
+            )
+        )
+
+    if sizing_allowed is False and _markdown_presents_executable_buy(markdown_context):
+        inconsistencies.append(
+            Inconsistency(
+                ticker=ticker,
+                type=InconsistencyType.NON_DEPLOYABLE_PROMOTED,
+                markdown_value="executable",
+                json_value=status or "sizing_allowed=False",
+                severity="warning",
+            )
+        )
+
+
+def _has_position_sizing(entry: dict[str, Any]) -> bool:
+    value = entry.get("position_sizing")
+    return isinstance(value, dict) and bool(value)
+
+
 def _ticker_context(markdown_text: str, ticker: str) -> str:
     lines = markdown_text.splitlines()
     for index, line in enumerate(lines):
@@ -282,6 +360,20 @@ def _markdown_presents_positive(markdown_context: str) -> bool:
     if any(term in lowered for term in positive_terms):
         return True
     return not any(term in lowered for term in negative_terms)
+
+
+def _markdown_presents_executable_buy(markdown_context: str) -> bool:
+    lowered = markdown_context.lower()
+    executable_markers = (
+        "sizing allowed** | yes",
+        "sizing allowed | yes",
+        "market buy",
+        "buy now",
+        "beli sekarang",
+        "deploy 60% sekarang",
+        "masuk sizing",
+    )
+    return any(marker in lowered for marker in executable_markers)
 
 
 def _extract_markdown_price(markdown_context: str) -> float | None:
