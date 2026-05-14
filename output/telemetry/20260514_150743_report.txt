@@ -1,20 +1,20 @@
 ╔══════════════════════════════════════════╗
-║  OPS TELEMETRY: 20260514_161822         ║
+║  OPS TELEMETRY: 20260514_150743         ║
 ╚══════════════════════════════════════════╝
 
 BATCH SUMMARY
 ─────────────
 Tickers   : 1 (1 ok / 0 fail / 0 timeout / 0 skip)
 Success   : 100%
-Timestamp : 20260514_161822
+Timestamp : 20260514_150743
 
 VERDICTS
 ────────
-  HOLD     1
-Avg confidence : 54%
+  BUY      1
+Avg confidence : 74%
 Avg rounds     : 2.0
-Avg duration   : 136s
-Longest run    : WIIM (136s)
+Avg duration   : 139s
+Longest run    : WIIM (139s)
 
 TOKEN SPEND (estimated)
 ───────────────────────
@@ -24,9 +24,9 @@ Total est.  : ~8,400 tokens
 
 RAG EFFICIENCY
 ──────────────
-Avg chunks     : 9.0 selected / 10.0 considered
-Avg RAG tokens : ~586 tokens
-Context saving : 10% chunks filtered out
+Avg chunks     : 8.0 selected / 11.0 considered
+Avg RAG tokens : ~597 tokens
+Context saving : 27% chunks filtered out
 
 PROVIDER HEALTH
 ───────────────
@@ -35,4 +35,4 @@ Stale  : none
 
 PER-TICKER
 ──────────
-  WIIM   success  HOLD  conf=54%  136s R2  RAG:9/10
+  WIIM   success  BUY   conf=74%  139s R2  RAG:8/11

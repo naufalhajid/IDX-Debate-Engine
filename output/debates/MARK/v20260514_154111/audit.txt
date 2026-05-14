@@ -1,0 +1,40 @@
+╔══════════════════════════════════════════╗
+║  AUDIT REPORT: MARK — HOLD       ║
+╚══════════════════════════════════════════╝
+
+Summary : MARK→HOLD: soft_hold_rule applied (0.10) after 3 round(s). 3 agent(s) dissented. Imminent ex-dividend date (6 days) causing a guaranteed price drop of ~Rp 20.
+Run ID  : 20260514_154111
+Generated: 2026-05-14T08:46:23.021776+00:00
+
+VERDICT
+───────
+Rating     : HOLD (confidence: 10%)
+Method     : soft_hold
+Consensus  : yes
+Rounds     : 3
+Dissent    : 60% (3 of 5 agents)
+
+AGENT VOTES
+───────────
+  bull                   BUY      conf= 0.60  ❌
+  bear                   AVOID    conf= 0.60  ❌
+  bull                   BUY      conf= 0.85  ❌
+  bear                   AVOID    conf= 0.60  ❌
+  bull                   BUY      conf= 0.85  ❌
+  bear                   AVOID    conf= 0.88  ❌
+  devils_advocate        UNKNOWN  conf= 1.00  ❌
+
+KEY ARGUMENTS
+─────────────
+Bull  : The Bear's assertion of an immediate capital loss from the dividend event misinterprets the proposed entry strategy. The Bull's recommendation is not to enter at the current market price, but rather to accumulate positions within the identified technical entry zone of Rp 800 – Rp 824. This zone is s
+Bear  : The Bull's proposed entry zone of Rp 800 – Rp 824, with a stop loss at Rp 776, presents an inadequate margin of safety for a swing trade. Taking the mid-point entry of Rp 812, the assumed maximum loss to the stop is Rp 36. However, the stock's 14-day Average True Range (ATR) is Rp 32. A typical 1-we
+Devil : Agent Confidence: HIGH
+
+1.  **MACRO/COMPANY RISK & FOREIGN FLOW:**
+    If foreign funds, anticipating the ex-dividend price drop and perceiving MARK as fairly valued near its 52-week high, initiate significant net selling pressure, could the effective entry price (e.g., Rp 812 - Rp 20 = Rp 792) comb
+
+DATA QUALITY
+────────────
+Freshness OK : True
+Stale sources: none
+Missing      : none

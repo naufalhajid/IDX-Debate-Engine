@@ -44,6 +44,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 
 # [FIX-8] Import ZoneInfo di top-level, satu kali, dengan fallback untuk Python < 3.9.
@@ -77,6 +78,12 @@ from rich.theme import Theme
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from core.budget import BudgetExhaustedError, get_usage, reset_budget
+from core.adaptive_planner import (
+    DEFAULT_PLANNER,
+    PlannerContext,
+    PipelineStage,
+    PlanAction,
+)
 from core.artifact_validator import validate_artifacts
 from core.candidate_intake import normalize_batch
 from core.dependency_validator import (
@@ -85,6 +92,7 @@ from core.dependency_validator import (
     check_candidates_file,
     maybe_rerun_quant_filter,
 )
+from core.execution_ledger import DEFAULT_LEDGER, EventSeverity, EventType, LedgerEvent
 from core.historical_scorer import (
     apply_historical_adjustment,
     compute_historical_win_rate,
@@ -197,6 +205,122 @@ EXCLUDED_RATINGS: set[str] = ORCHESTRATOR_CONFIG["excluded_ratings"]
 # IDX saham biasa: tepat 4 huruf kapital, opsional suffix .JK
 # Catatan: warrant/right issue (5 huruf) sengaja dikecualikan dari scope ini.
 TICKER_PATTERN = re.compile(r"^[A-Z]{4}(?:\.JK)?$")
+
+
+def _ledger_call(action: str, func, *args, **kwargs) -> None:
+    try:
+        func(*args, **kwargs)
+    except Exception as exc:
+        logger.warning(f"[ExecutionLedger] {action} failed: {exc}")
+
+
+def _ledger_emit_event(event: LedgerEvent) -> None:
+    _ledger_call("ledger event emit", DEFAULT_LEDGER.emit, event)
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _ledger_provider_check(run_id: str, provider_health) -> None:
+    can_proceed = bool(getattr(provider_health, "can_proceed", False))
+    failures = list(getattr(provider_health, "failures", []) or [])
+    severity = EventSeverity.INFO
+    if not can_proceed:
+        severity = EventSeverity.CRITICAL
+    elif failures:
+        severity = EventSeverity.WARNING
+    _ledger_emit_event(
+        LedgerEvent(
+            event_id=uuid4().hex[:8],
+            run_id=run_id,
+            ticker=None,
+            stage="PROVIDER_HEALTH",
+            event_type=EventType.PROVIDER_CHECK,
+            severity=severity,
+            message="Provider health checked",
+            detail={
+                "can_proceed": can_proceed,
+                "stockbit_ok": bool(getattr(provider_health, "stockbit_ok", False)),
+                "yfinance_ok": bool(getattr(provider_health, "yfinance_ok", False)),
+                "failures": failures,
+            },
+            duration_ms=None,
+            attempt=0,
+            timestamp=_now_iso(),
+        )
+    )
+
+
+def _ledger_artifact_write(
+    *,
+    run_id: str,
+    artifact: str,
+    path: Path,
+    ticker_count: int,
+) -> None:
+    _ledger_emit_event(
+        LedgerEvent(
+            event_id=uuid4().hex[:8],
+            run_id=run_id,
+            ticker=None,
+            stage="ARTIFACT_WRITE",
+            event_type=EventType.ARTIFACT_WRITE,
+            severity=EventSeverity.INFO,
+            message=f"Artifact written: {artifact}",
+            detail={
+                "artifact": artifact,
+                "path": str(path),
+                "ticker_count": ticker_count,
+            },
+            duration_ms=None,
+            attempt=0,
+            timestamp=_now_iso(),
+        )
+    )
+
+
+def _plan_orchestrator_decision(
+    *,
+    ticker: str | None,
+    run_id: str,
+    stage: PipelineStage,
+    attempt: int = 0,
+    failure_record: dict[str, Any] | None = None,
+    provider_health: dict[str, Any] | None = None,
+):
+    """Run adaptive planner safely from orchestrator boundary code."""
+    try:
+        ctx = PlannerContext(
+            ticker=ticker,
+            run_id=run_id,
+            stage=stage,
+            attempt=attempt,
+            failure_record=failure_record,
+            provider_health=provider_health,
+            observations_count=0,
+            batch_failed_count=0,
+        )
+        decision = DEFAULT_PLANNER.plan(ctx)
+        DEFAULT_PLANNER.log_decision(decision)
+        logger.info(f"[Planner] {DEFAULT_PLANNER.format_decision(decision)}")
+        _ledger_call(
+            "planner decision",
+            DEFAULT_LEDGER.planner_decision,
+            run_id=run_id,
+            ticker=ticker,
+            stage=ctx.stage.name,
+            action=decision.action.name,
+            reason=decision.reason,
+            attempt=attempt,
+        )
+        return decision
+    except Exception as exc:
+        logger.warning(
+            f"[Planner] Failed during {stage.value} planning for "
+            f"{ticker or 'BATCH'}; using original behavior: {exc}"
+        )
+        return None
 
 
 def configure_output_dir(output_dir: Path) -> None:
@@ -378,6 +502,13 @@ def _apply_candidate_intake(candidates: list[dict]) -> list[dict]:
     for item in rejected:
         rejected_candidate = item.get("candidate", {})
         ticker = rejected_candidate.get("ticker") or rejected_candidate.get("Ticker") or "UNKNOWN"
+        decision = _plan_orchestrator_decision(
+            ticker=str(ticker),
+            run_id="candidate_intake",
+            stage=PipelineStage.CANDIDATE_INTAKE,
+        )
+        if decision is not None and decision.action is PlanAction.SKIP_TICKER:
+            logger.info(f"[CandidateIntake] Planner confirmed skip for {ticker}")
         logger.warning(f"[CandidateIntake] Rejected {ticker}: {item.get('error')}")
 
     if not normalized:
@@ -1640,6 +1771,9 @@ async def main(
     logger.info("=" * 60)
     logger.info("[Orchestrator] Memulai IHSG Swing Trade Pipeline")
     logger.info("=" * 60)
+    ledger_run_id = datetime.now(ZoneInfo(settings.DATETIME_TIMEZONE)).strftime(
+        "%Y%m%d_%H%M%S"
+    )
 
     reset_budget()
     if user_config is None:
@@ -1703,11 +1837,23 @@ async def main(
     if not dry_run:
         provider_health = await check_all_providers(tickers)
         logger.info(f"[ProviderHealth] {provider_health.model_dump()}")
+        _ledger_provider_check(ledger_run_id, provider_health)
         for failure in provider_health.failures:
             logger.warning(f"[ProviderHealth] {failure}")
         if not provider_health.can_proceed:
-            logger.error("[ProviderHealth] No price provider available. Pipeline dihentikan.")
-            return
+            decision = _plan_orchestrator_decision(
+                ticker=None,
+                run_id="provider_health",
+                stage=PipelineStage.PROVIDER_HEALTH,
+                provider_health=provider_health.model_dump(mode="json"),
+            )
+            if decision is None or decision.action is PlanAction.ABORT_BATCH:
+                logger.error("[ProviderHealth] No price provider available. Pipeline dihentikan.")
+                return
+            logger.warning(
+                "[ProviderHealth] Planner allowed degraded mode despite provider "
+                "health failure; continuing."
+            )
 
     # Step 2: Batch Debates
     # abort_event dibuat di sini agar signal handler bisa mengaksesnya sebelum gather.
@@ -1746,6 +1892,12 @@ async def main(
     # Step 4: Persist
     batch_timestamp = datetime.now(ZoneInfo(settings.DATETIME_TIMEZONE)).strftime("%Y%m%d_%H%M%S")
     save_full_results(results, FULL_RESULTS_PATH)
+    _ledger_artifact_write(
+        run_id=ledger_run_id,
+        artifact="full_batch_results.json",
+        path=FULL_RESULTS_PATH,
+        ticker_count=len(results),
+    )
     save_individual_debates_versioned(results, timestamp=batch_timestamp, output_dir=OUTPUT_DIR)
     generate_top3_report(top_n, results, TOP3_REPORT_PATH, sizing_result=sizing_result)
     _log_artifact_validation(results)

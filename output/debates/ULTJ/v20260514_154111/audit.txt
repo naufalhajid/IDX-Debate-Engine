@@ -1,0 +1,38 @@
+╔══════════════════════════════════════════╗
+║  AUDIT REPORT: ULTJ — HOLD       ║
+╚══════════════════════════════════════════╝
+
+Summary : ULTJ→HOLD: soft_hold_rule applied (0.55) after 2 round(s). 4 agent(s) dissented. Lack of a specific, time-bound catalyst within the 1-3 month timeframe, leading to price stagnation or drift.
+Run ID  : 20260514_154111
+Generated: 2026-05-14T08:48:28.369534+00:00
+
+VERDICT
+───────
+Rating     : HOLD (confidence: 55%)
+Method     : soft_hold
+Consensus  : yes
+Rounds     : 2
+Dissent    : 80% (4 of 5 agents)
+
+AGENT VOTES
+───────────
+  bull                   BUY      conf= 0.70  ❌
+  bear                   UNKNOWN  conf=    ?  ❌
+  bull                   BUY      conf= 0.85  ❌
+  bear                   AVOID    conf= 0.90  ❌
+  devils_advocate        BEARISH  conf=    ?  ❌
+
+KEY ARGUMENTS
+─────────────
+Bull  : The Bear's challenge regarding the absence of a specific, time-bound catalyst for price discovery overlooks the power of sustained fundamental strength as an ongoing market re-rating driver. While no immediate event-driven catalyst is identified, ULTJ's robust Return on Equity, healthy Net Margin, a
+Bear  : The Bull's assertion of "sustained fundamental strength" as a persistent catalyst for a swing trade is fundamentally flawed. Swing trades demand time-bound catalysts for price discovery within a 1-3 month horizon, which the evidence explicitly states are absent. The dividend ex-date of 04 May 2026 i
+Devil : Agent Confidence: HIGH
+Position: BEARISH
+
+1.  **MACRO/COMPANY RISK & FOREIGN FLOW:** Given the absence of immediate catalysts and the current neutral RSI, if foreign funds continue to reduce exposure to Indonesian consumer staples or a broader market correction occurs, could the Rp 1,494 stop loss b
+
+DATA QUALITY
+────────────
+Freshness OK : True
+Stale sources: none
+Missing      : none

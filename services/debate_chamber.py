@@ -21,6 +21,7 @@ import asyncio
 from collections import Counter
 import json
 import re
+from time import perf_counter
 from typing import Literal
 
 import pandas as pd
@@ -41,6 +42,14 @@ from core.budget import (
     check_and_increment_flash_budget,
     check_and_increment_pro_budget,
 )
+from core.adaptive_planner import (
+    DEFAULT_PLANNER,
+    PlannerContext,
+    PipelineStage,
+    PlanAction,
+)
+from core.execution_ledger import DEFAULT_LEDGER
+from core.failure_taxonomy import classify_exception
 from core.handoff_envelope import make_envelope
 from core.observation_store import AgentObservation, DEFAULT_STORE
 from providers.gemini import get_flash_llm, get_pro_llm
@@ -115,6 +124,189 @@ def _as_debate_message(m):
     if isinstance(m, dict):
         return DebateMessage(**m)
     return m
+
+
+def _ledger_call(action: str, func, *args, **kwargs) -> None:
+    try:
+        func(*args, **kwargs)
+    except Exception as exc:
+        logger.warning(f"[ExecutionLedger] {action} failed: {exc}")
+
+
+def _state_metadata(state: DebateChamberState) -> dict:
+    metadata = state.get("metadata") or {}
+    return metadata if isinstance(metadata, dict) else {}
+
+
+def _state_run_id(state: DebateChamberState) -> str:
+    return str(_state_metadata(state).get("run_id", "unknown"))
+
+
+def _state_ticker(state: DebateChamberState) -> str:
+    return str(state.get("ticker", "unknown"))
+
+
+def _state_attempt(state: DebateChamberState, attempt_key: str) -> int:
+    try:
+        return int(_state_metadata(state).get(attempt_key, 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _ledger_stage_start(
+    state: DebateChamberState,
+    *,
+    stage: str,
+    attempt_key: str,
+) -> None:
+    _ledger_call(
+        f"{stage} stage start",
+        DEFAULT_LEDGER.stage_start,
+        run_id=_state_run_id(state),
+        ticker=_state_ticker(state),
+        stage=stage,
+        attempt=_state_attempt(state, attempt_key),
+    )
+
+
+def _ledger_stage_success(
+    state: DebateChamberState,
+    *,
+    stage: str,
+    started_at: float,
+    detail: dict | None = None,
+) -> None:
+    _ledger_call(
+        f"{stage} stage success",
+        DEFAULT_LEDGER.stage_success,
+        run_id=_state_run_id(state),
+        ticker=_state_ticker(state),
+        stage=stage,
+        duration_ms=int((perf_counter() - started_at) * 1000),
+        detail=detail or {},
+    )
+
+
+def _ledger_stage_failure(
+    state: DebateChamberState,
+    *,
+    stage: str,
+    started_at: float,
+    failure_record: dict | None,
+    message: str,
+    attempt_key: str,
+) -> None:
+    record = failure_record or {}
+    _ledger_call(
+        f"{stage} stage failure",
+        DEFAULT_LEDGER.stage_failure,
+        run_id=_state_run_id(state),
+        ticker=_state_ticker(state),
+        stage=stage,
+        error_code=str(record.get("error_code") or "UNKNOWN"),
+        message=message,
+        attempt=_state_attempt(state, attempt_key),
+        duration_ms=int((perf_counter() - started_at) * 1000),
+    )
+
+
+def _ledger_stage_partial(
+    state: DebateChamberState,
+    *,
+    stage: str,
+    reason: str,
+    confidence_penalty: float,
+) -> None:
+    _ledger_call(
+        f"{stage} stage partial",
+        DEFAULT_LEDGER.stage_partial,
+        run_id=_state_run_id(state),
+        ticker=_state_ticker(state),
+        stage=stage,
+        reason=reason,
+        confidence_penalty=confidence_penalty,
+    )
+
+
+def _planner_decision_for_state(
+    state: DebateChamberState,
+    *,
+    stage: PipelineStage,
+    attempt_key: str,
+    failure_record: dict | None = None,
+):
+    """Run adaptive planner safely for a graph node failure."""
+    try:
+        metadata = state.get("metadata") or {}
+        ctx = PlannerContext(
+            ticker=str(state.get("ticker", "unknown")),
+            run_id=str(metadata.get("run_id", "unknown")),
+            stage=stage,
+            attempt=int(metadata.get(attempt_key, 0) or 0),
+            failure_record=failure_record,
+            provider_health=None,
+            observations_count=0,
+            batch_failed_count=0,
+        )
+        decision = DEFAULT_PLANNER.plan(ctx)
+        DEFAULT_PLANNER.log_decision(decision)
+        logger.info(f"[Planner] {DEFAULT_PLANNER.format_decision(decision)}")
+        _ledger_call(
+            "planner decision",
+            DEFAULT_LEDGER.planner_decision,
+            run_id=ctx.run_id,
+            ticker=ctx.ticker,
+            stage=ctx.stage.name,
+            action=decision.action.name,
+            reason=decision.reason,
+            attempt=ctx.attempt,
+        )
+        return decision
+    except Exception as exc:
+        logger.warning(
+            f"[Planner] Failed during {stage.value} planning for "
+            f"{state.get('ticker', 'unknown')}; using original behavior: {exc}"
+        )
+        return None
+
+
+def _metadata_with_planner_note(
+    state: DebateChamberState,
+    decision,
+) -> dict:
+    metadata = dict(state.get("metadata") or {})
+    if decision is None:
+        return metadata
+
+    if decision.context_note:
+        notes = list(metadata.get("planner_context_notes") or [])
+        notes.append(decision.context_note)
+        metadata["planner_context_notes"] = notes
+
+    if decision.confidence_penalty:
+        existing_penalty = float(metadata.get("planner_confidence_penalty", 0.0) or 0.0)
+        metadata["planner_confidence_penalty"] = round(
+            existing_penalty + decision.confidence_penalty,
+            4,
+        )
+        if "confidence" in metadata:
+            try:
+                metadata["confidence"] = max(
+                    0.0,
+                    float(metadata["confidence"]) - decision.confidence_penalty,
+                )
+            except (TypeError, ValueError):
+                pass
+    return metadata
+
+
+def _increment_planner_attempt(
+    state: DebateChamberState,
+    attempt_key: str,
+) -> None:
+    metadata = dict(state.get("metadata") or {})
+    metadata[attempt_key] = int(metadata.get(attempt_key, 0) or 0) + 1
+    state["metadata"] = metadata
 
 
 # ---------------------------------------------------------------------------
@@ -745,6 +937,12 @@ Current Date (Asia/Jakarta): {current_date}
         ticker = state["ticker"]
         current_price = state.get("current_price", 0.0)
         logger.info(f"[Fundamental] Fetching for {ticker}")
+        started_at = perf_counter()
+        _ledger_stage_start(
+            state,
+            stage="FUNDAMENTAL_FETCH",
+            attempt_key="fundamental_attempt",
+        )
         try:
             raw = await self._fetch_url(
                 f"{BASE_URL}/keystats/ratio/v1/{ticker}?year_limit=10"
@@ -752,6 +950,12 @@ Current Date (Asia/Jakarta): {current_date}
             if not raw:
                 content = "Data Unavailable"
                 self._record_observation(state, "fundamental_scout", content)
+                _ledger_stage_success(
+                    state,
+                    stage="FUNDAMENTAL_FETCH",
+                    started_at=started_at,
+                    detail={"source": "stockbit", "available": False},
+                )
                 return {"fundamental_data": content}
 
             report_str, fv_price = build_fair_value_report(raw, ticker, current_price)
@@ -766,20 +970,67 @@ Current Date (Asia/Jakarta): {current_date}
             resp = await self._invoke_llm_for_state(state, self.flash_llm, messages)
             content, signal = self._ensure_signal_footer(resp.content, "fundamental_scout")
             self._record_observation(state, "fundamental_scout", content, signal)
+            _ledger_stage_success(
+                state,
+                stage="FUNDAMENTAL_FETCH",
+                started_at=started_at,
+                detail={"source": "stockbit", "fair_value": fv_price},
+            )
             return {
                 "fundamental_data": content,
                 "fair_value_estimate": fv_price,
             }
         except Exception as e:
             logger.error(f"[Fundamental] Error: {e}")
+            failure_record = classify_exception(e, "stockbit").model_dump(mode="json")
+            decision = _planner_decision_for_state(
+                state,
+                stage=PipelineStage.FUNDAMENTAL_FETCH,
+                attempt_key="fundamental_attempt",
+                failure_record=failure_record,
+            )
+            _ledger_stage_failure(
+                state,
+                stage="FUNDAMENTAL_FETCH",
+                started_at=started_at,
+                failure_record=failure_record,
+                message=str(e),
+                attempt_key="fundamental_attempt",
+            )
+            if decision is not None and decision.action is PlanAction.RETRY:
+                _increment_planner_attempt(state, "fundamental_attempt")
+                raise
             content = "Data Unavailable (Error)"
             self._record_observation(state, "fundamental_scout", content)
+            if decision is not None and decision.action is PlanAction.PROCEED_PARTIAL:
+                _ledger_stage_partial(
+                    state,
+                    stage="FUNDAMENTAL_FETCH",
+                    reason=decision.context_note or decision.reason,
+                    confidence_penalty=decision.confidence_penalty,
+                )
+                return {
+                    "fundamental_data": content,
+                    "metadata": _metadata_with_planner_note(state, decision),
+                }
+            if decision is not None and decision.action is PlanAction.SKIP_TICKER:
+                return {
+                    "fundamental_data": "",
+                    "metadata": _metadata_with_planner_note(state, decision),
+                }
             return {"fundamental_data": content}
 
     async def _chartist_node(self, state: DebateChamberState) -> dict:
         """Chartist with real OHLCV from yfinance — pre-computes all technicals in Python."""
         ticker = state["ticker"]
         logger.info(f"[Chartist] Fetching OHLCV + orderbook for {ticker}")
+        started_at = perf_counter()
+        technical_partial = False
+        _ledger_stage_start(
+            state,
+            stage="TECHNICAL_FETCH",
+            attempt_key="technical_attempt",
+        )
         await asyncio.sleep(0.5)  # stagger to avoid burst rate-limit
 
         # ── 1. Download real price history from yfinance ─────────────────────
@@ -842,6 +1093,33 @@ Current Date (Asia/Jakarta): {current_date}
                 logger.info(f"[Chartist] Technicals computed: MA50={tech_indicators.get('ma50')}, RSI={tech_indicators.get('rsi14')}")
         except Exception as e:
             logger.warning(f"[Chartist] yfinance download failed for {ticker}: {e}")
+            failure_record = classify_exception(e, "yfinance").model_dump(mode="json")
+            decision = _planner_decision_for_state(
+                state,
+                stage=PipelineStage.TECHNICAL_FETCH,
+                attempt_key="technical_attempt",
+                failure_record=failure_record,
+            )
+            _ledger_stage_failure(
+                state,
+                stage="TECHNICAL_FETCH",
+                started_at=started_at,
+                failure_record=failure_record,
+                message=str(e),
+                attempt_key="technical_attempt",
+            )
+            if decision is not None and decision.action is PlanAction.RETRY:
+                _increment_planner_attempt(state, "technical_attempt")
+                raise
+            if decision is not None and decision.action is PlanAction.PROCEED_PARTIAL:
+                technical_partial = True
+                _ledger_stage_partial(
+                    state,
+                    stage="TECHNICAL_FETCH",
+                    reason=decision.context_note or decision.reason,
+                    confidence_penalty=decision.confidence_penalty,
+                )
+                state["metadata"] = _metadata_with_planner_note(state, decision)
 
         # ── 2. Also fetch orderbook for near-term level context ──────────────
         orderbook_data: dict = {}
@@ -851,6 +1129,33 @@ Current Date (Asia/Jakarta): {current_date}
             ) or {}
         except Exception as e:
             logger.warning(f"[Chartist] Orderbook fetch failed: {e}")
+            failure_record = classify_exception(e, "stockbit").model_dump(mode="json")
+            decision = _planner_decision_for_state(
+                state,
+                stage=PipelineStage.TECHNICAL_FETCH,
+                attempt_key="technical_attempt",
+                failure_record=failure_record,
+            )
+            _ledger_stage_failure(
+                state,
+                stage="TECHNICAL_FETCH",
+                started_at=started_at,
+                failure_record=failure_record,
+                message=str(e),
+                attempt_key="technical_attempt",
+            )
+            if decision is not None and decision.action is PlanAction.RETRY:
+                _increment_planner_attempt(state, "technical_attempt")
+                raise
+            if decision is not None and decision.action is PlanAction.PROCEED_PARTIAL:
+                technical_partial = True
+                _ledger_stage_partial(
+                    state,
+                    stage="TECHNICAL_FETCH",
+                    reason=decision.context_note or decision.reason,
+                    confidence_penalty=decision.confidence_penalty,
+                )
+                state["metadata"] = _metadata_with_planner_note(state, decision)
 
         # ── 3. Build message with ground-truth technicals ────────────────────
         tech_summary = json.dumps(tech_indicators, indent=2) if tech_indicators else "{}"
@@ -865,6 +1170,13 @@ Current Date (Asia/Jakarta): {current_date}
         resp = await self._invoke_llm_for_state(state, self.flash_llm, messages)
         content, signal = self._ensure_signal_footer(resp.content, "chartist")
         self._record_observation(state, "chartist", content, signal)
+        if not technical_partial:
+            _ledger_stage_success(
+                state,
+                stage="TECHNICAL_FETCH",
+                started_at=started_at,
+                detail={"source": "yfinance", "has_technicals": bool(tech_indicators)},
+            )
         return {
             "technical_data": content,
             "technical_indicators": tech_indicators,
@@ -873,6 +1185,12 @@ Current Date (Asia/Jakarta): {current_date}
     async def _sentiment_node(self, state: DebateChamberState) -> dict:
         ticker = state["ticker"]
         logger.info(f"[Sentiment] Fetching for {ticker}")
+        started_at = perf_counter()
+        _ledger_stage_start(
+            state,
+            stage="SENTIMENT_FETCH",
+            attempt_key="sentiment_attempt",
+        )
         await asyncio.sleep(1.0)   # stagger to avoid burst rate-limit
         try:
             raw = await self._fetch_url(
@@ -881,6 +1199,12 @@ Current Date (Asia/Jakarta): {current_date}
             if not raw:
                 content = "Data Unavailable"
                 self._record_observation(state, "sentiment_specialist", content)
+                _ledger_stage_success(
+                    state,
+                    stage="SENTIMENT_FETCH",
+                    started_at=started_at,
+                    detail={"source": "stockbit", "available": False},
+                )
                 return {"sentiment_data": content}
             messages = [
                 SystemMessage(content=SENTIMENT_PROMPT + AGENT_SIGNAL_PROMPT),
@@ -889,12 +1213,44 @@ Current Date (Asia/Jakarta): {current_date}
             resp = await self._invoke_llm_for_state(state, self.flash_llm, messages)
             content, signal = self._ensure_signal_footer(resp.content, "sentiment_specialist")
             self._record_observation(state, "sentiment_specialist", content, signal)
+            _ledger_stage_success(
+                state,
+                stage="SENTIMENT_FETCH",
+                started_at=started_at,
+                detail={"source": "stockbit"},
+            )
             return {"sentiment_data": content}
         except Exception as e:
             logger.error(f"[Sentiment] Error: {e}")
+            failure_record = classify_exception(e, "stockbit").model_dump(mode="json")
+            decision = _planner_decision_for_state(
+                state,
+                stage=PipelineStage.SENTIMENT_FETCH,
+                attempt_key="sentiment_attempt",
+                failure_record=failure_record,
+            )
+            _ledger_stage_failure(
+                state,
+                stage="SENTIMENT_FETCH",
+                started_at=started_at,
+                failure_record=failure_record,
+                message=str(e),
+                attempt_key="sentiment_attempt",
+            )
             content = "Data Unavailable (Error)"
             self._record_observation(state, "sentiment_specialist", content)
-            return {"sentiment_data": content}
+            metadata = _metadata_with_planner_note(state, decision)
+            if decision is not None and decision.action is PlanAction.PROCEED_PARTIAL:
+                _ledger_stage_partial(
+                    state,
+                    stage="SENTIMENT_FETCH",
+                    reason=decision.context_note or decision.reason,
+                    confidence_penalty=decision.confidence_penalty,
+                )
+            return {
+                "sentiment_data": content,
+                "metadata": metadata,
+            }
 
     async def _synthesizer_node(self, state: DebateChamberState) -> dict:
         """
@@ -903,6 +1259,12 @@ Current Date (Asia/Jakarta): {current_date}
         so that debate agents are immediately aware of overvaluation risk.
         """
         logger.info("[Synthesizer] Merging parallel data + margin-of-safety check")
+        started_at = perf_counter()
+        _ledger_stage_start(
+            state,
+            stage="CONTEXT_BUILD",
+            attempt_key="context_build_attempt",
+        )
         from utils.exdate_scanner import format_exdate_block
 
         ticker = state["ticker"]
@@ -1028,8 +1390,79 @@ Current Date (Asia/Jakarta): {current_date}
                 f"[RAG] {ticker} evidence selection failed; "
                 f"falling back to ContextPack brief: {exc}"
             )
-            decision_brief = pack_to_prompt_string(context_pack)
+            failure_record = classify_exception(exc, "context_build").model_dump(mode="json")
+            decision = _planner_decision_for_state(
+                state,
+                stage=PipelineStage.CONTEXT_BUILD,
+                attempt_key="context_build_attempt",
+                failure_record=failure_record,
+            )
+            _ledger_stage_failure(
+                state,
+                stage="CONTEXT_BUILD",
+                started_at=started_at,
+                failure_record=failure_record,
+                message=str(exc),
+                attempt_key="context_build_attempt",
+            )
+            metadata = _metadata_with_planner_note(state, decision)
+            if decision is not None and decision.action is PlanAction.PROCEED_PARTIAL:
+                _ledger_stage_partial(
+                    state,
+                    stage="CONTEXT_BUILD",
+                    reason=decision.context_note or decision.reason,
+                    confidence_penalty=decision.confidence_penalty,
+                )
+                decision_brief = raw
+                state["metadata"] = metadata
+            else:
+                try:
+                    decision_brief = pack_to_prompt_string(context_pack)
+                except Exception as pack_exc:
+                    logger.warning(
+                        f"[ContextPack] {ticker} fallback brief failed; "
+                        f"using raw data: {pack_exc}"
+                    )
+                    failure_record = classify_exception(
+                        pack_exc,
+                        "context_pack",
+                    ).model_dump(mode="json")
+                    decision = _planner_decision_for_state(
+                        state,
+                        stage=PipelineStage.CONTEXT_BUILD,
+                        attempt_key="context_build_attempt",
+                        failure_record=failure_record,
+                    )
+                    _ledger_stage_failure(
+                        state,
+                        stage="CONTEXT_BUILD",
+                        started_at=started_at,
+                        failure_record=failure_record,
+                        message=str(pack_exc),
+                        attempt_key="context_build_attempt",
+                    )
+                    metadata = _metadata_with_planner_note(state, decision)
+                    if decision is not None and decision.action is PlanAction.PROCEED_PARTIAL:
+                        _ledger_stage_partial(
+                            state,
+                            stage="CONTEXT_BUILD",
+                            reason=decision.context_note or decision.reason,
+                            confidence_penalty=decision.confidence_penalty,
+                        )
+                    decision_brief = raw
+                    state["metadata"] = metadata
         raw = decision_brief
+
+        rag_metadata = state.get("metadata") or {}
+        _ledger_stage_success(
+            state,
+            stage="CONTEXT_BUILD",
+            started_at=started_at,
+            detail={
+                "rag_chunks": rag_metadata.get("rag_chunks_selected", 0),
+                "token_estimate": rag_metadata.get("rag_token_estimate", 0),
+            },
+        )
 
         return {
             "raw_data": raw,
@@ -1641,10 +2074,16 @@ Current Date (Asia/Jakarta): {current_date}
         tech = state.get("technical_indicators", {})
         fair_value = state.get("fair_value_estimate", 0.0)
         logger.info(f"[CIO] Deliberating on {ticker} (current price: {current_price:,.0f})")
+        started_at = perf_counter()
+        _ledger_stage_start(
+            state,
+            stage="CIO_VERDICT",
+            attempt_key="cio_verdict_attempt",
+        )
 
         if current_price <= 0:
             logger.warning(f"[CIO] Invalid current price for {ticker}; returning HOLD fallback")
-            verdict_json = CIOVerdict(
+            fallback_verdict = CIOVerdict(
                 ticker=ticker,
                 rating="HOLD",
                 confidence=0.0,
@@ -1657,7 +2096,17 @@ Current Date (Asia/Jakarta): {current_date}
                 consensus_reached=bool(state.get("consensus_reached", False)),
                 consensus_method=state.get("consensus_method"),
                 dissenting_agents=list(state.get("dissenting_agents") or []),
-            ).model_dump_json()
+            )
+            verdict_json = fallback_verdict.model_dump_json()
+            _ledger_stage_success(
+                state,
+                stage="CIO_VERDICT",
+                started_at=started_at,
+                detail={
+                    "rating": fallback_verdict.rating,
+                    "confidence": fallback_verdict.confidence,
+                },
+            )
             return {"final_verdict": verdict_json}
 
         # ── Compute Trade Envelope (deterministic, Python-only) ──────────────
@@ -1833,6 +2282,19 @@ Start your response with '{' and end with '}'. Nothing else."""
             ).model_dump_json()
 
         logger.info(f"[CIO] Verdict delivered for {ticker}")
+        try:
+            verdict_detail = json.loads(verdict_json)
+        except Exception:
+            verdict_detail = {}
+        _ledger_stage_success(
+            state,
+            stage="CIO_VERDICT",
+            started_at=started_at,
+            detail={
+                "rating": verdict_detail.get("rating"),
+                "confidence": verdict_detail.get("confidence"),
+            },
+        )
         return {"final_verdict": verdict_json}
 
     # ── Graph Assembly ───────────────────────────────────────────────────────

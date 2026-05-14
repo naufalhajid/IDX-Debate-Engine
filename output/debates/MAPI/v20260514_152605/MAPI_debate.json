@@ -1,0 +1,88 @@
+{
+  "ticker": "MAPI",
+  "verdict": {
+    "ticker": "MAPI",
+    "rating": "HOLD",
+    "confidence": 0.55,
+    "fair_value": 1986.0,
+    "entry_price_range": "1255 - 1280",
+    "target_price": 1390.0,
+    "stop_loss": 1205.0,
+    "current_price": 1475.0,
+    "timeframe": "1-3 Months",
+    "weighted_reasoning": "The HOLD rating is mandated by the 'soft_hold' consensus rule, reflecting significant disagreement between bullish fundamentals and bearish technical timing. The primary positive factor is the substantial 34.6% discount to its fair value of Rp 1,986. However, this is completely overshadowed by the current price of Rp 1,475 being severely extended and well outside the actionable entry zone of Rp 1,255-1,280. The proposed trade plan, with its R/R of 1.96, is only valid upon a deep pullback. The Devil's Advocate risk of a sell-off near the 52-week high remains unaddressed, reinforcing the need for caution. Entering now would present an extremely poor risk/reward profile. Consensus override: Bull/Bear confidence gap was below 0.15, so the chamber treats this as soft consensus HOLD instead of forcing an entry.",
+    "critical_risk_factor": "",
+    "key_catalysts": [
+      "Significant undervaluation (34.6% discount to Fair Value of Rp 1,986).",
+      "Strong structural uptrend with price above key moving averages (MA50, MA200)."
+    ],
+    "key_risks": [
+      "Price is currently overextended and far above the valid entry zone, invalidating the trade plan.",
+      "Lack of a specific near-term catalyst beyond general valuation.",
+      "Risk of profit-taking and foreign fund outflow as the price nears its 52-week high.",
+      "The proposed stop-loss is tight relative to the stock's ATR, making it vulnerable to normal volatility."
+    ],
+    "summary": "The trade plan is rated HOLD. While MAPI is fundamentally undervalued with a significant margin of safety, the current market price of Rp 1,475 is far above the designated entry zone (Rp 1,255-1,280) and even exceeds the target price (Rp 1,390). The technical setup is overextended, making the proposed swing trade invalid at current levels. We must wait for a substantial pullback to reconsider this opportunity.",
+    "expected_return": "+9.7%",
+    "risk_reward_ratio": 1.96,
+    "is_overvalued": false,
+    "wait_and_see": true,
+    "consensus_reached": true,
+    "consensus_method": "soft_hold",
+    "dissenting_agents": [
+      "fundamental_scout",
+      "chartist",
+      "bull",
+      "bear"
+    ]
+  },
+  "debate_rounds": 2,
+  "debate_history": [
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 1,475, Rp 1,986, Rp 1,505, Rp 1,254, Rp 1,338, Rp 30, Rp 1,245, Rp 230",
+      "round": 0
+    },
+    {
+      "role": "bull",
+      "content": "…g fundamental floor for a swing trade, currently priced at Rp 1,475, which is significantly undervalued by 34.6% compared to its fair value estimate of Rp 1,986. This substantial discount provides a robust cushion, supported by healthy fundamentals including a Return on Equity (TTM) of 16.29% and a low Debt to Equity Ratio of 0.24.\n\nTechnically, MAPI is in a strong structural uptrend, trading well above its MA200, MA50, and EMA20, indicating significant buying pressure and momentum. The current price of Rp 1,475 is approaching its 52-week high of Rp 1,505.\n\nPosition: BUY\nAgent Confidence: 0.60",
+      "round": 1
+    },
+    {
+      "role": "bear",
+      "content": "…at the current price of Rp 1,475 presents an extremely unfavorable risk-reward ratio. The potential reward to the 52-week high target of Rp 1,505 is only Rp 30. In stark contrast, the potential risk to the Bull's suggested stop-loss of Rp 1,245 is Rp 230. This results in a dismal R/R ratio of approximately 0.13:1 (30/230), which is far below acceptable standards for a swing trade and indicates a high-risk, low-reward proposition. This makes the trade unattractive from a risk management perspective, especially when the Bull's own entry zone is much lower.\n\nPosition: AVOID\nAgent Confidence: 0.85",
+      "round": 1
+    },
+    {
+      "role": "bull",
+      "content": "The Bear's assessment of an unfavorable risk-reward ratio is predicated on an immediate entry at the current market price, which misrepresents the recommended swing trade strategy. Our technical analysis explicitly advises waiting for a pullback into a defined entry zone, situated between key dynamic support levels. Entering within this lower range, rather than at the current elevated level, fundamentally alters the risk-reward calculus. By adhering to the suggested entry, the potential upside to the recent high point becomes significantly more attractive relative to the tactical stop-loss, transforming the proposition into a favorable risk-adjusted opportunity.\n\nWhile the Bear highlights the risk to the initial tactical stop-loss, the underlying structural uptrend for MAPI remains robust. Should the immediate support levels fail, a more substantial long-term moving average provides a strong secondary floor, well below the initial tactical stop. This key long-term average acts as a significant structural support, limiting the overall downside risk and providing a deeper safety net for the position, reinforcing the bullish thesis against a complete trend reversal.\n\nThe primary catalyst for this swing trade is the market's eventual recognition of MAPI's substantial intrinsic value. The company is trading at a considerable discount to its calculated fair value, a fundamental gap that provides a significant buffer against short-term price fluctuations and the technical risks outlined by the Bear. This fundamental undervaluation, supported by healthy profitability and low leverage, serves as a persistent, underlying catalyst for price appreciation, independent of specific near-term news events. The current price-to-fair-value gap is wide enough to comfortably absorb the Bear's risk scenario, as even a dip to the suggested stop-loss would still leave the stock trading well below its intrinsic worth.\n\nPosition: BUY\nAgent Confidence: 0.85",
+      "round": 2
+    },
+    {
+      "role": "bear",
+      "content": "The Bull's swing setup for MAPI exhibits critical vulnerabilities, particularly concerning its risk management and the reliability of its claimed support and catalysts. The proposed entry zone of Rp 1,254 – Rp 1,338, coupled with a stop-loss at Rp 1,245, creates an unviable risk profile when subjected to volatility. Specifically, the margin of safety from the lowest entry point (Rp 1,254) to the stop-loss (Rp 1,245) is a mere Rp 9. In stark contrast, the stock's 14-day Average True Range (ATR) is Rp 62.0, meaning a typical 1-week adverse move (2 × ATR) could be Rp 124. This 2×ATR value is over thirteen times larger than the Bull's defined margin of safety, indicating that normal market fluctuations could easily trigger the stop-loss, rendering the trade unviable for swing execution.\n\nWhile historical instances of MA50 failure are not provided in the available data, the Bull's reliance on MA50 (Rp 1,254) as a robust support for the entry zone is questionable given the proposed stop-loss at Rp 1,245. This mere Rp 9 buffer below MA50 suggests an extremely fragile support, easily breached by normal market noise. Should this immediate support fail, the Bull's \"secondary floor\" at MA200 (Rp 1,231) offers only an additional Rp 23 buffer. The true next significant structural support lies much lower at the 52-week low of Rp 1,080. If the price were to break below the MA200 and test this 52-week low from the mid-point of the Bull's entry zone (e.g., Rp 1,296), the actual maximum loss would be Rp 216, not the assumed Rp 51 (from Rp 1,296 to the Bull's stop-loss of Rp 1,245). This significantly expands the potential downside risk beyond the Bull's calculation.\n\nThe Bull's assertion of a fundamental cushion at Rp 1,986 is undermined by the explicit lack of three-year trend data for key profitability metrics like Return on Equity and Net Profit Margin. Without this historical context, it is impossible to verify if the underlying earnings power supporting this fair value has been stable, improving, or, critically, *drifting lower*. A fair value derived from current snapshot data, without trend validation, offers a less reliable \"cushion\" against adverse price movements, especially if the company's profitability is in decline. The current Net Profit Margin (Quarter) of 5.11% is not exceptionally high, and its sustainability as a fundamental catalyst cannot be confirmed without historical performance trends.\n\nPosition: AVOID\nAgent Confidence: 0.90",
+      "round": 2
+    },
+    {
+      "role": "devils_advocate",
+      "content": "Agent Confidence: HIGH\n\n**Question 1: MACRO/COMPANY RISK & FOREIGN FLOW**\nIf foreign funds initiate a significant net sell-off in MAPI, perhaps triggered by broader market uncertainty or profit-taking near its 52-week high, could the MA50 support at Rp 1,254 break, potentially driving the price down towards the MA200 at Rp 1,231, or even further to the 52-week low of Rp 1,080?\n\n**Question 2: EXECUTION RISK — Transaction Cost Stress Test**\nUsing an entry price of Rp 1,296 (mid-point of the Bull's suggested entry zone) and a target price of Rp 1,505, the gross return is 16.13%. The total round-trip transaction costs are calculated as follows: Beli (0.15% of entry) = 0.15%; Jual (0.25% of target, expressed as % of entry) = (0.0025 * 1505) / 1296 = 0.29%; PPh final (0.10% of target, expressed as % of entry) = (0.0010 * 1505) / 1296 = 0.12%; Slippage (0.15% for price >= Rp 500) = 0.15%. Summing these, the total transaction cost is 0.15% + 0.29% + 0.12% + 0.15% = 0.71%. The net return after these costs is 16.13% - 0.71% = 15.42%. This is **VIABLE after transaction costs**.\n\nPosition: UNKNOWN\nAgent Confidence: 1.00",
+      "round": 3
+    }
+  ],
+  "raw_data_summary": "=== EVIDENCE BRIEF: MAPI ===\nQuery: swing trade analysis\n\n[FAIR_VALUE]\nEvidence ID: MAPI_fair_value_0\nCurrent Price: 1475 | Fair Value: 1986 | Upside: 34.6%\nSource: stockbit | Score: 1.00\n\n[FUNDAMENTAL]\nEvidence ID: MAPI_fundamental_0\n{\"brief\":\"FAIR VALUE: Rp 1,986 MAPI is currently priced at Rp 1,475, which is UNDERVALUED by 34.6% compared to its calculated fair value of Rp 1,986. This significant discount provides a strong fundamental cushion for a potential swing trade. The fair value calculation confidence is MEDIUM, based on two valid valuation methods. Key fundamental metrics include a Return on Equity (TTM) of 16.29%\nSource: stockbit | Score: 0.90\n\n[FUNDAMENTAL]\nEvidence ID: MAPI_fundamental_1\nand a Net Profit Margin (Quarter) of 5.11%. The Debt to Equity Ratio (Quarter) stands at a healthy 0.24, indicating low leverage. The current Dividend Yield is 0.68%. Three-year trend data for ROE and Net Margin are not explicitly provided in the available information. No specific upcoming growth catalyst (e.g., earnings release, new contract, ex-dividend date) within the 1-3 month horizon has\nSource: stockbit | Score: 0.90\n\n[FUNDAMENTAL]\nEvidence ID: MAPI_fundamental_2\nbeen identified. The latest dividend ex-date (09 Jul 25) is a PAST_EVENT_NOT_CATALYST relative to the current date. Quality checks reveal no major inconsistencies: ROE (16.29%) is high but Net Margin (5.11%) is not l...\",\"exdate\":\"=== DIVIDEND EX-DATE SCAN: MAPI ===\\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\\n\"}\nSource: stockbit | Score: 0.90\n\n[TECHNICAL]\nEvidence ID: MAPI_technical_0\n{\"52w_high\":1505.0,\"52w_low\":1080.0,\"atr14\":62.0,\"avg_volume_20d\":33709800.0,\"brief\":\"**Analisis Teknis IHSG (MAPI) untuk Swing Trade (1-3 Bulan)** Saham dalam uptrend struktural. Swing long searah tren. Harga saat ini (Rp 1475) diperdagangkan jauh di atas MA200, MA50, dan EMA20, menunjukkan kekuatan tren yang signifikan. Posisi harga mendekati 52-minggu tertinggi (Rp 1505) mengindikasikan\nSource: yfinance | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: MAPI_technical_1\ntekanan beli yang kuat. Untuk entri swing long, disarankan menunggu pullback ke area support dinamis. ENTRY ZONE: Rp 1,254 – Rp 1,338, yang merupakan area konsolidasi antara MA50 dan EMA20. TARGET: Rp 1,505 (approx. 16.1% from entry mid), yang bertepatan dengan level tertinggi 52 minggu dan merupakan resistensi psikologis yang kuat. STOP LOSS: Rp 1,245 (1.5× ATR below EMA20), untuk membatasi\nSource: yfinance | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: MAPI_technical_2\nrisiko jika tren berbalik. RSI(14) di 64.0 menunjukkan momentum bullish yang kuat namun belum memasuki zona overbought, memberikan ruang untuk kenaikan lebih lanjut. Data volume harian saat ini tidak tersedia untuk perbandingan langsung dengan rata-rata 20 hari. Namun, harga ditutup sedikit\nSource: yfinance | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: MAPI_technical_3\nlebih...\",\"current_price\":1475.0,\"ema20\":1338.0,\"ma200\":1231.0,\"ma200_context\":\"ABOVE\",\"ma50\":1254.0,\"rsi14\":64.0,\"sma20\":1322.0}\nSource: yfinance | Score: 0.85\n\n---\nTotal evidence: 8/11 chunks selected\nToken estimate: ~597",
+  "metadata": {
+    "prompt_version": "2026-05-11-critical-audit-v1",
+    "run_id": "20260514_152605",
+    "market_data_source": "yfinance",
+    "market_data_cached": true,
+    "flash_calls": 8,
+    "pro_calls": 1,
+    "rag_chunks_selected": 8,
+    "rag_chunks_considered": 11,
+    "rag_token_estimate": 597,
+    "batch_timestamp": "20260514_152605",
+    "run_timestamp": "20260514_152605",
+    "generated_at": "2026-05-14T15:26:05.384418+07:00",
+    "versioned_output": true
+  }
+}

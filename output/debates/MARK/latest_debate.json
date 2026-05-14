@@ -2,155 +2,114 @@
   "ticker": "MARK",
   "verdict": {
     "ticker": "MARK",
-    "rating": "BUY",
-    "confidence": 0.74,
-    "fair_value": 886.0,
-    "entry_price_range": "795 - 810",
-    "target_price": 835.0,
-    "stop_loss": 790.0,
-    "current_price": 840.0,
+    "rating": "HOLD",
+    "confidence": 0.1,
+    "fair_value": 887.0,
+    "entry_price_range": "800 - 815",
+    "target_price": 880.0,
+    "stop_loss": 770.0,
+    "current_price": 865.0,
     "timeframe": "1-3 Months",
-    "weighted_reasoning": "The BUY rating is based on the quality of the trade plan itself, which combines fundamental undervaluation (Current Price < FV Rp 886) with a strong technical setup for a pullback entry. The plan's R/R of 2.60 is highly favorable. The decision is supported by a consensus of Fundamental and Technical agents (✅Funda, ✅Tech). Confidence is calibrated to 0.74, reflecting a solid setup but tempered by the lack of a specific near-term catalyst and insufficient sentiment data. CRITICAL CAVEAT: This plan is ONLY valid if the price pulls back to the Rp 795-810 entry zone. The current price of Rp 840 makes the trade non-actionable at present.",
+    "weighted_reasoning": "AUTO-DISQUALIFIED: Ex-dividend date dalam 6 hari (ExDate: 2026-05-20). Entry baru tidak disarankan — risiko price drop dividen langsung mengancam stop loss sebelum trade sempat berkembang. The proposed entry midpoint is Rp 808 and the stop loss is Rp 770. The expected dividend drop of Rp 20 would adjust the effective entry to ~Rp 788, leaving only an Rp 18 buffer to the stop loss, which is less than one day's average volatility (ATR=Rp 32). This creates an unacceptable risk of being stopped out immediately. Further analysis is halted due to this overriding risk factor. Consensus override: Bull/Bear confidence gap was below 0.15, so the chamber treats this as soft consensus HOLD instead of forcing an entry.",
     "critical_risk_factor": "",
     "key_catalysts": [
-      "Strong fundamental metrics (ROE 30%, Net Margin 33%, D/E 0.01)",
-      "Bullish technical structure with price above key moving averages (MA50, MA200)",
-      "High R/R entry opportunity on a potential pullback to the MA50 support level."
+      "No specific growth catalysts identified within the 1-3 month timeframe."
     ],
     "key_risks": [
-      "Execution Risk: The current price (Rp 840) is already above the target (Rp 835), requiring significant patience for a pullback to the entry zone.",
-      "Valuation Uncertainty: A dissenting agent noted a potential inconsistency in the DDM model used for the fair value calculation.",
-      "Lack of a specific short-term catalyst could lead to prolonged sideways movement before the target is reached."
+      "Imminent ex-dividend date (6 days) causing a guaranteed price drop of ~Rp 20.",
+      "Dividend-adjusted entry price would be dangerously close to the stop-loss level.",
+      "Price is near its 52-week high, which acts as a strong technical resistance.",
+      "Stock is technically overextended, trading 8-10% above its 50-day moving average."
     ],
-    "summary": "This is a valid BUY plan contingent on a price pullback. The trade offers an excellent 2.60 R/R ratio, supported by strong fundamentals and a bullish technical trend. However, execution is strictly conditional on the price entering the Rp 795-810 zone. The current price of Rp 840 is above the target; do not chase the price.",
-    "expected_return": "+4.0%",
-    "risk_reward_ratio": 2.6,
+    "summary": "This trade is auto-disqualified due to a critical ex-dividend date risk. The ex-date is in 6 days, and the expected price drop of ~Rp 20 would place a new entry precariously close to the stop-loss, making the trade unviable from a risk management perspective.",
+    "expected_return": "+9.0%",
+    "risk_reward_ratio": 1.93,
     "is_overvalued": false,
-    "wait_and_see": false,
+    "wait_and_see": true,
     "consensus_reached": true,
-    "consensus_method": "voting",
+    "consensus_method": "soft_hold",
     "dissenting_agents": [
-      "sentiment_specialist"
+      "chartist",
+      "bull",
+      "bear"
     ]
   },
-  "debate_rounds": 1,
-  "consensus_reached": true,
-  "consensus_method": "voting",
-  "dissenting_agents": [
-    "sentiment_specialist"
-  ],
-  "agent_votes": [
-    {
-      "agent": "fundamental_scout",
-      "position": "BUY",
-      "confidence": 0.75,
-      "round": 0
-    },
-    {
-      "agent": "chartist",
-      "position": "BUY",
-      "confidence": 0.9,
-      "round": 0
-    },
-    {
-      "agent": "sentiment_specialist",
-      "position": "HOLD",
-      "confidence": 0.0,
-      "round": 0
-    },
-    {
-      "agent": "bull",
-      "position": "BUY",
-      "confidence": 0.6,
-      "round": 1
-    },
-    {
-      "agent": "bear",
-      "position": "BUY",
-      "confidence": 0.6,
-      "round": 1
-    }
-  ],
-  "disagreement_type": null,
+  "debate_rounds": 3,
   "debate_history": [
     {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 865, Rp 887, Rp 875, Rp 845",
+      "round": 0
+    },
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 865, Rp 887, Rp 875",
+      "round": 0
+    },
+    {
       "role": "bull",
-      "content": "MARK presents a compelling swing trade BUY opportunity (1-3 month horizon) driven by its fundamental undervaluation and robust technical uptrend, despite the absence of a specific event-driven catalyst.\n\n**FUNDAMENTAL FLOOR:**\nMARK is currently undervalued, trading at Rp 840 against a fair value estimate of Rp 886, representing a 5.5% discount. The company exhibits exceptionally strong fundamentals, with a Return on Equity (TTM) of 30.26% and a Net Margin (TTM) of 33.26%, indicating high profitability. The Debt/Equity ratio is remarkably low at 0.01, signifying a very healthy and unleveraged balance sheet. While there is an inconsistency in dividend data (API shows\n\nPosition: BUY\nAgent Confidence: 0.60",
-      "round": 1,
-      "position": "BUY",
-      "confidence": 0.6
+      "content": "…ry post-ex-dividend. While the current price of Rp 865 is slightly above the fair value estimate of Rp 887 (a 2.5% discount from fair value), the robust underlying fundamentals and a clear technical entry strategy, combined with an upcoming event, justify a BUY recommendation on a pullback.\n\n**FUNDAMENTAL FLOOR:**\nMARK is fundamentally strong, boasting a TTM Return on Equity (ROE) of 30.3% and a Net Margin of 33.3%, indicating high profitability. The Debt/Equity ratio is exceptionally low at 0.01, highlighting a very healthy capital structure. The stock is\n\nPosition: BUY\nAgent Confidence: 0.60",
+      "round": 1
     },
     {
       "role": "bear",
-      "content": "MARK presents a highly questionable swing trade opportunity, primarily due to an unreliable fundamental valuation, significant technical risks, and an unfavorable risk-reward profile from the current price.\n\n**1. OVERVALUATION CHECK:**\nThe Bull's claim of MARK being \"undervalued sebesar 5.5% terhadap nilai wajarnya Rp 886\" is fundamentally flawed and unreliable. The fundamental analysis explicitly notes a critical inconsistency: \"Dividend Yield tercatat 8.33% berdasarkan data API, meskipun laporan fair value menyatakan DPS Rp 0 dan metode DDM tidak valid.\" If the Dividend Discount Model (DDM) is invalid and the Dividend Per Share (DPS) is stated as Rp 0 in the fair value report, the methodology used to derive the Rp\n\nPosition: BUY\nAgent Confidence: 0.60",
-      "round": 1,
-      "position": "BUY",
-      "confidence": 0.6
+      "content": "…, immediate technical resistance, a negative short-term catalyst, and an unfavorable risk/reward profile.\n\n1.  **OVERVALUATION CHECK & Margin of Safety:** While the current price of Rp 865 is technically 2.5% below the stated fair value of Rp 887, this offers a negligible margin of safety for a swing trade. The Bull's target price of Rp 875 is still below the fair value, meaning even a successful trade would only bring the stock to a \"fairly valued\" state, not an undervalued one with substantial upside. Crucially, the upcoming ex-dividend date on 2026-05\n\nPosition: AVOID\nAgent Confidence: 0.60",
+      "round": 1
+    },
+    {
+      "role": "bull",
+      "content": "…oint into a structurally bullish asset. The company's consistent history of shareholder returns, evidenced by its attractive dividend yield, suggests that such price dips are often temporary and viewed as buying opportunities. The technical target, representing the prior 52-week peak, is a near-term resistance test, not an ultimate ceiling. A successful breach of this level, supported by the company's strong operational performance, would signal further upside potential, allowing the stock to trade at a premium to its current intrinsic valuation estimates.\n\nPosition: BUY\nAgent Confidence: 0.85",
+      "round": 2
+    },
+    {
+      "role": "bear",
+      "content": "…stablish a position at a more favorable basis\" is fundamentally flawed for a swing trade. An entry at the current price of Rp 865 means immediately incurring a guaranteed capital loss of Rp 20 per share within days, effectively lowering the *actual* entry point to Rp 845 *after* the event. This immediate depreciation negates any perceived \"superior margin of safety\" derived from the dividend adjustment, as the initial capital is already reduced. Furthermore, the Bull's target of Rp 875, representing the 52-week high, offers a minimal upside of only Rp 10\n\nPosition: AVOID\nAgent Confidence: 0.60",
+      "round": 2
+    },
+    {
+      "role": "bull",
+      "content": "The Bear's assertion of an immediate capital loss from the dividend event misinterprets the proposed entry strategy. The Bull's recommendation is not to enter at the current market price, but rather to accumulate positions within the identified technical entry zone of Rp 800 – Rp 824. This zone is specifically designed to capture pullbacks, including any price adjustment post-ex-dividend. By entering at these lower levels, the effective margin of safety against the fair value of Rp 887 is significantly enhanced, offering an intrinsic upside of 7.6% to 10.8% from the entry range, far exceeding the negligible 2.5% gap from the current market price. This strategic entry mitigates the dividend-related price drop and establishes a superior risk-adjusted basis.\n\nThe argument for minimal upside to the 52-week high of Rp 875 is also predicated on an unfavorable entry point. From the mid-point of the technical entry zone, the target represents a substantial 7.75% gain. Furthermore, the 52-week high should not be viewed as an absolute ceiling but rather a near-term resistance level. The company's exceptional profitability, evidenced by a TTM Net Margin of 33.3% and a Return on Equity of 30.3%, provides a strong fundamental basis for the stock to eventually trade above its historical peak and even its current fair value estimate. These robust operational metrics suggest that the market could re-rate the stock to a premium, driven by sustained earnings power rather than just a return to a prior high.\n\nRegarding downside risk, the technical stop-loss is set at Rp 776, providing a clear exit point. Should this level be breached, a robust secondary support exists at the 200-day Moving Average, currently positioned at Rp 733. This long-term average represents a significant structural floor, historically acting as a strong accumulation zone in healthy uptrends. The extremely low Debt/Equity ratio of 0.01 and an Interest Coverage Ratio of 339.23x further underpin the company's financial resilience, limiting the probability of a severe, fundamentally driven collapse below these technical supports.\n\nWhile the dividend event has been debated, the primary long-term catalyst for MARK remains its exceptional and sustained operational performance. The company's ability to consistently generate high returns on equity and maintain strong net margins, coupled with an almost debt-free balance sheet, serves as a powerful, ongoing catalyst. Future earnings reports that confirm this operational excellence, or an upward revision in analyst price targets based on these fundamentals, would provide a strong impetus for price appreciation, independent of short-term dividend cycles. This intrinsic strength offers a compelling reason for long-term value accretion, making any short-term volatility a buying opportunity.\n\nPosition: BUY\nAgent Confidence: 0.85",
+      "round": 3
+    },
+    {
+      "role": "bear",
+      "content": "The Bull's proposed entry zone of Rp 800 – Rp 824, with a stop loss at Rp 776, presents an inadequate margin of safety for a swing trade. Taking the mid-point entry of Rp 812, the assumed maximum loss to the stop is Rp 36. However, the stock's 14-day Average True Range (ATR) is Rp 32. A typical 1-week adverse move (2 × ATR) would be Rp 64. If the price moves adversely by this amount from the entry mid-point, it would reach Rp 748 (Rp 812 - Rp 64). This level is significantly below the Bull's stop loss of Rp 776, indicating that the claimed risk tolerance is insufficient to absorb normal market volatility, rendering the trade unviable for swing execution.\n\nThe target of Rp 875, which coincides with the 52-week high, represents a formidable resistance rather than a clear upside target for a swing trade. From the Bull's entry mid-point of Rp 812, this target offers a gain of Rp 63. However, the current market price of Rp 865 is already within Rp 10 of this resistance. The Bull provides no specific technical pattern or momentum indicator to suggest an imminent breakout above this established ceiling within the 1-3 month swing horizon. Relying on the stock to \"eventually trade above\" its historical peak based on long-term fundamentals is not a valid premise for a short-term swing strategy.\n\nThe Bull's downside risk assessment is understated. If the proposed stop loss at Rp 776 is breached, the next identified support is the 200-day Moving Average at Rp 733. Should the price fall to this level from the entry mid-point of Rp 812, the actual maximum loss would be Rp 79 (Rp 812 - Rp 733). This potential loss is more than double the Bull's assumed maximum loss of Rp 36 (Rp 812 - Rp 776), drastically worsening the effective risk-reward ratio. The assertion of the MA200 as a \"significant structural floor\" is not supported by specific historical performance data for MARK within the provided evidence.\n\nThe Bull's claim of \"exceptional and sustained operational performance\" as a \"powerful, ongoing catalyst\" for a swing trade is contradicted by the evidence. The \"FUNDAMENTAL\" brief explicitly states, \"Tidak ada katalis pertumbuhan spesifik yang teridentifikasi dalam 1-3 bulan ke depan.\" Furthermore, the imminent ex-dividend date of 2026-05-20, just 6 days away, introduces a guaranteed capital loss of Rp 20 per share for any position entered before this date. If a trader enters at the Bull's mid-point of Rp 812 and holds through the ex-dividend, the effective entry price becomes Rp 792 (Rp 812 - Rp 20). This immediate price adjustment significantly reduces the buffer to the stop loss of Rp 776, making the downside risk much more pronounced and immediate than the Bull acknowledges.\n\nPosition: AVOID\nAgent Confidence: 0.88",
+      "round": 3
     },
     {
       "role": "devils_advocate",
-      "content": "**1. MACRO/COMPANY RISK & FOREIGN FLOW:**\nIf a broader market correction triggers significant net foreign *selling* pressure on MARK, or if the fundamental valuation issues highlighted by the Bear R1 lead to a re-rating, could the Rp 796 MA50 support level break, triggering a deeper correction?\n\n**2. EXECUTION RISK — Transaction Cost Stress Test:**\nMenggunakan harga entry tengah dari Trade Envelope yaitu Rp 803, estimasi gross return ke target Rp 870 adalah 8.34%. Total biaya transaksi round-trip dihitung sebagai berikut: biaya beli 0.15%, biaya jual 0.25%, PPh final 0.10% dari nilai jual, dan slippage estimasi 0.15% (karena harga saham >= Rp 500). Jadi, total biaya transaksi adalah 0.15% + 0.25% + 0.10% + 0.15% = 0.65%. Setelah dikurangi biaya ini, net return yang diharapkan adalah 8.34% - 0.65% = 7.69%. Dengan net return sebesar 7.69%, posisi ini dianggap **VIABLE after transaction costs**.\n\nPosition: HOLD\nAgent Confidence: 0.00",
-      "round": 2,
-      "position": "HOLD",
-      "confidence": 0.0
+      "content": "Agent Confidence: HIGH\n\n1.  **MACRO/COMPANY RISK & FOREIGN FLOW:**\n    If foreign funds, anticipating the ex-dividend price drop and perceiving MARK as fairly valued near its 52-week high, initiate significant net selling pressure, could the effective entry price (e.g., Rp 812 - Rp 20 = Rp 792) combined with this selling break the Rp 776 stop loss, triggering a cascade towards the MA200 at Rp 733?\n\n2.  **EXECUTION RISK — Transaction Cost Stress Test:**\n    Menggunakan harga entry mid-point Bull sebesar Rp 812 dan target harga Rp 875, dengan memperhitungkan penyesuaian target ke bawah sebesar dividen Rp 20 (sesuai CIO Note), gross return yang diharapkan dari pergerakan harga adalah (Rp 875 - Rp 20\n\nPosition: UNKNOWN\nAgent Confidence: 1.00",
+      "round": 4
     }
   ],
-  "raw_data_summary": "=== FUNDAMENTALS ===\nBerdasarkan laporan fair value, saham MARK memiliki FAIR VALUE: Rp 886. Dengan harga pasar saat ini Rp 840, saham ini dinilai UNDERVALUED sebesar 5.5% terhadap nilai wajarnya.\n\nMetrik pendukung menunjukkan fundamental yang kuat: Return on Equity (TTM) sebesar 30.26% dan Net Margin (TTM) sebesar 33.26%, keduanya menunjukkan profitabilitas yang sangat baik. Data tren 3 tahun untuk ROE dan Net Margin tidak tersedia. Rasio Debt/Equity sangat rendah di 0.01, mengindikasikan struktur modal yang sangat sehat. Dividend Yield tercatat 8.33% berdasarkan data API, meskipun laporan fair value menyatakan DPS Rp 0 dan metode DDM tidak valid, yang merupakan inkonsistensi data yang perlu dicatat.\n\nTidak ada katalis pertumbuhan spesifik (seperti pengumuman laba atau ex-dividend) yang teridentifikasi dalam horizon 1-3 bulan ke depan. Tanggal ex-dividend terakhir (06 Nov 25) adalah peristiwa masa lalu. Dalam pemeriksaan kualitas, tidak ada red flags yang terdeteksi untuk divergensi ROE-Margin (ROE tinggi, Net Margin juga tinggi), divergensi DER-Interest Coverage (DER rendah, Interest Coverage sangat kuat di 339.23x), atau inkonsistensi Z-Score vs DER (Z-Score tinggi, DER sangat rendah). Namun, data Operating Cash Flow tidak tersedia secara eksplisit untuk memverifikasi potensi divergensi Revenue-CFO.\n\nSecara keseluruhan, MARK menunjukkan fundamental yang sangat kuat dengan profitabilitas tinggi dan leverage rendah, serta sedikit undervalued. Meskipun ada inkonsistensi data dividen dan tidak adanya katalis jangka pendek yang jelas, undervaluation dan kualitas fundamental yang solid mendukung potensi apresiasi.\n\nPosition: BUY\nAgent Confidence: 0.75\n\n=== TECHNICALS ===\nSaham dalam uptrend struktural. Swing long searah tren. Harga saat ini berada di atas semua moving averages utama (EMA20, MA50, MA200), menunjukkan momentum bullish yang kuat.\n\nENTRY ZONE: Rp 796 – Rp 810. Area ini didukung oleh EMA20 dan MA50, yang berfungsi sebagai level support dinamis.\nTARGET: Rp 870 (approx. 8.34% from entry mid). Target ini adalah level tertinggi 52 minggu yang berfungsi sebagai resistensi kuat.\nSTOP LOSS: Rp 771 (1.5× ATR below EMA20).\n\nRSI(14) di 60.3 menunjukkan momentum bullish yang sehat dan belum memasuki zona overbought, memberikan ruang untuk kenaikan lebih lanjut. Volume perdagangan yang aktif dengan net foreign buy yang signifikan mengkonfirmasi kekuatan pergerakan harga saat ini.\n\nPosition: BUY\nAgent Confidence: 0.90\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 840.0,\n  \"sma20\": 813.0,\n  \"ema20\": 810.0,\n  \"ma50\": 796.0,\n  \"ma200\": 729.0,\n  \"ma200_context\": \"ABOVE\",\n  \"rsi14\": 60.3,\n  \"atr14\": 26.0,\n  \"avg_volume_20d\": 9305445.0,\n  \"52w_high\": 870.0,\n  \"52w_low\": 597.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== DIVIDEND EX-DATE SCAN: MARK ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
+  "raw_data_summary": "=== EVIDENCE BRIEF: MARK ===\nQuery: swing trade analysis\n\n[FAIR_VALUE]\nEvidence ID: MARK_fair_value_0\nCurrent Price: 865 | Fair Value: 887 | Upside: 2.5%\nSource: stockbit | Score: 1.00\n\n[FUNDAMENTAL]\nEvidence ID: MARK_fundamental_0\n{\"brief\":\"Berdasarkan \\\"FAIR VALUE REPORT\\\", nilai wajar tertimbang untuk MARK adalah Rp 887. Dengan harga pasar saat ini Rp 865, saham ini dinilai FAIRLY VALUED, menawarkan potensi kenaikan (upside) sebesar 2.5% dari harga penutupan. Fundamental pendukung menunjukkan kualitas yang kuat: Return on Equity (ROE) TTM sebesar 30.3% dan Net Margin TTM sebesar 33.3%, menunjukkan profitabilitas yang\nSource: stockbit | Score: 0.90\n\n[FUNDAMENTAL]\nEvidence ID: MARK_fundamental_1\nsolid. Rasio Debt/Equity sangat rendah di 0.01, mengindikasikan struktur modal yang sangat sehat dan minim utang. Dividend Yield yang tinggi sebesar 10.40% juga menarik bagi investor yang mencari pendapatan. Tidak ada katalis pertumbuhan spesifik yang teridentifikasi dalam 1-3 bulan ke depan; tanggal ex-dividend terakhir (06 Nov 25) adalah PAST_EVENT_NOT_CATALYST. Pemeriksaan kualitas laporan\nSource: stockbit | Score: 0.90\n\n[FUNDAMENTAL]\nEvidence ID: MARK_fundamental_2\nkeuangan menunjukkan: * ROE tinggi (30.3%) tidak disertai Net Margin rendah (<5%), sehingga tidak ada indikasi ROE digelembungkan. * DER sangat rendah (0.01) dan Interest Coverage Ratio sangat tinggi (339.23x), menunjukk...\",\"exdate\":\"=== DIVIDEND EX-DATE SCAN: MARK ===\\nRisk Tier         : 🔴 CRITICAL — Ex-date dalam 7 hari\\nEx-Dividend Date  : 2026-05-20 (6 hari lagi)\\nDividend/Share    : Rp\nSource: stockbit | Score: 0.90\n\n[FUNDAMENTAL]\nEvidence ID: MARK_fundamental_3\n20\\nEstimated Yield   : 2.31%\\nExpected Price Drop on Ex-Date: ~Rp 20\\n\\n⚠️  CIO NOTE: Saham ini akan mengalami price drop sebesar ~~Rp 20 pada 2026-05-20. Jika swing trade horizon mencakup tanggal ini, target price harus di-adjust downward sebesar dividend amount, dan R/R ratio efektif lebih buruk dari yang terkalkulasi.\\n\"}\nSource: stockbit | Score: 0.90\n\n[TECHNICAL]\nEvidence ID: MARK_technical_0\n{\"52w_high\":875.0,\"52w_low\":597.0,\"atr14\":32.0,\"avg_volume_20d\":11372545.0,\"brief\":\"**Analisis Teknis IHSG (1-3 Bulan Swing Trade)** Saham dalam uptrend struktural. Swing long searah tren. Harga saat ini (Rp 865) berada jauh di atas MA200 (Rp 733), mengindikasikan kekuatan tren bullish yang solid. ENTRY ZONE: Rp 800 – Rp 824. Zona ini didasarkan pada support dinamis EMA20 (Rp 824) dan MA50 (Rp\nSource: yfinance | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: MARK_technical_1\n800), yang merupakan area ideal untuk akumulasi posisi saat terjadi pullback. TARGET: Rp 875 (approx. 7.75% dari entry mid). Target ini mengacu pada level tertinggi 52 minggu (52w_high) yang akan bertindak sebagai resistensi kuat. STOP LOSS: Rp 776 (1.5× ATR di bawah EMA20). Stop loss ini memberikan ruang gerak yang cukup namun tetap melindungi modal jika tren berbalik. RSI(14) di angka 64.0\nSource: yfinance | Score: 0.85\n\n---\nTotal evidence: 7/12 chunks selected\nToken estimate: ~588",
   "metadata": {
     "prompt_version": "2026-05-11-critical-audit-v1",
+    "run_id": "20260514_154111",
     "market_data_source": "yfinance",
     "market_data_cached": true,
-    "batch_timestamp": "20260511_080316",
+    "flash_calls": 10,
+    "pro_calls": 1,
+    "rag_chunks_selected": 7,
+    "rag_chunks_considered": 12,
+    "rag_token_estimate": 588,
+    "batch_timestamp": "20260514_154111",
+    "run_timestamp": "20260514_154111",
+    "generated_at": "2026-05-14T15:41:11.674316+07:00",
     "versioned_output": true
   },
-  "error": null,
-  "conviction_score": 0.63,
-  "sector_key": "healthcare",
-  "position_sizing": {
+  "risk_governor": {
     "ticker": "MARK",
-    "rating": "BUY",
-    "confidence": 0.74,
-    "lot": 4,
-    "shares": 400,
-    "position_value": 336000.0,
-    "allocation_pct": 0.42,
-    "target_allocation_pct": 0.24383871470909374,
-    "max_loss_rp": 20000.0,
-    "max_drawdown_pct": 0.025,
-    "expected_return_pct": 4.0,
-    "expected_return_rp": 13440.0,
-    "total_cost_est": 1680.0,
-    "entry_price": 840.0,
-    "stop_loss": 790.0,
-    "rr_ratio": 2.6
-  },
-  "allocation_reasoning": {
-    "target_deployment_pct": 65.0,
-    "actual_deployment_pct": 60.2,
-    "gap_explanation": "Actual deployment 60.2% masih 4.8 percentage points di bawah target 65.0% karena sizing menghormati lot IHSG, cap per posisi, dan budget risiko stop-loss.",
-    "risk_factors_limiting": [
-      "lot size 100 saham dan harga entry membatasi penambahan posisi tanpa oversizing",
-      "max drawdown per posisi dibatasi 4.0% sehingga lot tidak dipaksa melewati stop-risk budget"
+    "status": "wait_for_pullback",
+    "sizing_allowed": false,
+    "reason_codes": [
+      "price_above_entry_range"
     ],
-    "market_condition_score": 0.88,
-    "recommendation": "Deployment sudah cukup aktif untuk swing trade moderat; tambah exposure hanya jika sinyal teknikal menguat tanpa memperbesar drawdown per posisi."
-  },
-  "deployment_scenario_comparison": {
-    "deploy_60_now": {
-      "deployment_pct": 60.0,
-      "expected_return_on_deployed_pct": 5.72,
-      "expected_return_portfolio_pct": 3.43,
-      "expected_return_rp": 27468.0,
-      "max_drawdown_portfolio_pct": 2.4,
-      "max_drawdown_rp": 19200.0
-    },
-    "wait_for_confirmation": {
-      "deployment_pct": 0.0,
-      "expected_return_portfolio_pct": 0.0,
-      "expected_return_rp": 0.0,
-      "max_drawdown_portfolio_pct": 0.0,
-      "max_drawdown_rp": 0.0,
-      "tradeoff": "Cash protects capital while waiting for cleaner entry, but gives up roughly Rp 27,468 if the current 60% deployment scenario works."
-    }
+    "message": "Setup valid sebagai watchlist, tetapi tunggu pullback ke buy range.",
+    "current_price": 865.0,
+    "entry_low": 800.0,
+    "entry_high": 815.0,
+    "target_price": 880.0,
+    "stop_loss": 770.0
   }
 }
