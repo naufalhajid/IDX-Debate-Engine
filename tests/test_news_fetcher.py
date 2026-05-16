@@ -151,7 +151,8 @@ def test_build_bundle_empty_response_marks_unavailable() -> None:
         patcher.stop()
 
     assert bundle.data_available is False
-    assert bundle.confidence_adjustment < 0
+    assert bundle.confidence_adjustment == 0.0
+    assert "No news data available" in bundle.confidence_adjustment_reason
 
 
 def test_build_bundle_negative_news_sets_negative_sentiment() -> None:

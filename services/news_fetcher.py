@@ -650,7 +650,7 @@ def _confidence_adjustment(
     items: list[NewsItem],
 ) -> tuple[float, str]:
     if not data_available:
-        return -0.05, "No news data available - sentiment unverified"
+        return 0.0, "No news data available - sentiment unverified"
 
     has_breaking_negative_news = any(
         item.is_breaking and item.sentiment_score < -0.2
