@@ -1,32 +1,32 @@
 ╔══════════════════════════════════════════╗
-║  OPS TELEMETRY: 20260517_144239         ║
+║  OPS TELEMETRY: 20260517_143538         ║
 ╚══════════════════════════════════════════╝
 
 BATCH SUMMARY
 ─────────────
-Tickers   : 2 (2 ok / 0 fail / 0 timeout / 0 skip)
-Success   : 100%
-Timestamp : 20260517_144536
+Tickers   : 2 (0 ok / 2 fail / 0 timeout / 0 skip)
+Success   : 0%
+Timestamp : 20260517_143857
 
 VERDICTS
 ────────
-  HOLD     2
-Avg confidence : 46%
-Avg rounds     : 2.5
+  none
+Avg confidence : -
+Avg rounds     : 0.0
 Avg duration   : 145s
-Longest run    : BBCA (173s)
+Longest run    : BBCA (168s)
 
 TOKEN SPEND (estimated)
 ───────────────────────
-Flash calls : 18 (~14,400 tokens)
-Pro calls   : 2 (~4,000 tokens)
-Total est.  : ~18,400 tokens
+Flash calls : 0 (~0 tokens)
+Pro calls   : 0 (~0 tokens)
+Total est.  : ~0 tokens
 
 RAG EFFICIENCY
 ──────────────
-Avg chunks     : 9.0 selected / 10.0 considered
-Avg RAG tokens : ~590 tokens
-Context saving : 10% chunks filtered out
+Avg chunks     : 0.0 selected / 0.0 considered
+Avg RAG tokens : ~0 tokens
+Context saving : no RAG data
 
 PROVIDER HEALTH
 ───────────────
@@ -35,5 +35,5 @@ Stale  : none
 
 PER-TICKER
 ──────────
-  WIIM   success  HOLD  conf=41%  117s R2  RAG:9/10
-  BBCA   success  HOLD  conf=52%  173s R3  RAG:9/10
+  WIIM   failed   -     conf=0%  122s R0  RAG:0/0
+  BBCA   failed   -     conf=0%  168s R0  RAG:0/0

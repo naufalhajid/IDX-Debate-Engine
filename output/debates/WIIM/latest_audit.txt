@@ -2,37 +2,35 @@
 ║  AUDIT REPORT: WIIM — HOLD       ║
 ╚══════════════════════════════════════════╝
 
-Summary : WIIM→HOLD: soft_hold_rule applied (0.47) after 3 round(s). 3 agent(s) dissented. Price has broken below short-term supports (EMA20, MA50), which now act as resistance.
-Run ID  : 20260514_174443
-Generated: 2026-05-14T10:54:32.458080+00:00
+Summary : WIIM→HOLD: soft_hold_rule applied (0.41) after 2 round(s). 3 agent(s) dissented. Technical Weakness: Price is currently trading below key short-term moving averages (EMA20, MA50), increasing the risk of a breakdown towards the MA200 support at Rp 1,490.
+Run ID  : unknown
+Generated: 2026-05-17T07:45:36.039911+00:00
 
 VERDICT
 ───────
-Rating     : HOLD (confidence: 47%)
+Rating     : HOLD (confidence: 41%)
 Method     : soft_hold
 Consensus  : yes
-Rounds     : 3
+Rounds     : 2
 Dissent    : 60% (3 of 5 agents)
 
 AGENT VOTES
 ───────────
-  bull                   BUY      conf= 0.80  ❌
-  bear                   AVOID    conf= 0.60  ❌
+  bull                   BUY      conf= 0.60  ❌
+  bear                   AVOID    conf= 0.90  ❌
   bull                   BUY      conf= 0.85  ❌
-  bear                   AVOID    conf= 0.60  ❌
-  bull                   BUY      conf= 0.88  ❌
-  bear                   AVOID    conf= 0.75  ❌
-  devils_advocate        HOLD     conf= 0.00  ✅
+  bear                   AVOID    conf= 0.90  ❌
+  devils_advocate        BEARISH  conf=    ?  ❌
 
 KEY ARGUMENTS
 ─────────────
-Bull  : The Bear's volatility stress test, projecting a short-term decline, fails to account for the robust structural supports that define the true downside limits for this swing trade. While a temporary dip below the initial entry zone is plausible, the stock's long-term moving average, positioned signifi
-Bear  : The Bull's swing setup for WIIM is fundamentally flawed, relying on theoretical long-term value and distant support levels that are irrelevant for a 1-3 month swing horizon.
+Bull  : The Bear's concern regarding the absence of a near-term event catalyst overlooks the robust fundamental undervaluation as a potent, ongoing driver for price appreciation. WIIM's current market valuation is at a substantial discount to its calculated intrinsic worth, providing a significant margin of
+Bear  : The Bull's reliance on the EMA20 and MA50 as robust support for an entry zone between Rp 1,870 and Rp 1,881 is fundamentally flawed for a swing trade. The current price of Rp 1,870 is already trading below both the EMA20 at Rp 1,880 and the MA50 at Rp 1,881. This positioning suggests a potential bre
+Devil : Position: BEARISH
+Agent Confidence: HIGH
 
-The proposed entry zone of Rp 1,850 – Rp 1,886 is already compromised. The current price of Rp 1,870 is *below* the MA50 at R
-Devil : Here are two challenges to the proposed WIIM swing trade setup:
-
-1.  **MACRO/COMPANY RISK & FOREIGN FLOW:** If broader market sentiment deteriorates, leading to accelerated net foreign selling pressure on mid-cap stocks, could the MA200 support at Rp 1,480 fail to hold, triggering a deeper correctio
+1.  **MACRO/COMPANY RISK & FOREIGN FLOW:**
+    Given WIIM's current price of Rp 1,870 is already below EMA20 (Rp 1,880) and MA50 (Rp 1,881), if broader market sentiment deteriorates, leading to accelerated foreign fund outflows from the IHSG, could this trig
 
 DATA QUALITY
 ────────────

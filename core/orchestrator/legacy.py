@@ -77,6 +77,7 @@ from rich.text import Text
 from rich.theme import Theme
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from core.backtest_memory import BacktestMemory, DEFAULT_MEMORY, TradeOutcome
 from core.budget import BudgetExhaustedError, get_usage, reset_budget
 from core.adaptive_planner import (
     DEFAULT_PLANNER,
@@ -98,16 +99,28 @@ from core.historical_scorer import (
     compute_historical_win_rate,
     load_debate_history,
 )
+from core.ops_telemetry import DEFAULT_TELEMETRY, TickerMetric
 from core.quant_filter.position_sizer import calculate_positions
 from core.quant_filter.reporting import _build_position_summary
 from core.portfolio_optimizer import diversify_portfolio
+from core.prompt_pack_linter import lint_prompt_pack
 from core.provider_health import check_all_providers
 from core.regime import RegimeType, classify_regime, fetch_ihsg_volatility, get_regime_params
+from core.report_consistency import check_consistency
 from core.risk_governor import annotate_risk
 from core.settings import settings
 from services.debate_prompt_registry import PROMPT_VERSION
+from services.explainability_auditor import DEFAULT_AUDITOR
+from services.news_fetcher import DEFAULT_FETCHER
 from utils.logger_config import logger
 from utils.price_fetcher import fetch_current_price
+
+
+def _as_debate_message(m):
+    from schemas.debate import DebateMessage
+    if isinstance(m, dict):
+        return DebateMessage(**m)
+    return m
 
 
 # Tema warna konsisten â€” ubah di sini, berlaku di seluruh CLI.
@@ -205,6 +218,8 @@ EXCLUDED_RATINGS: set[str] = ORCHESTRATOR_CONFIG["excluded_ratings"]
 # IDX saham biasa: tepat 4 huruf kapital, opsional suffix .JK
 # Catatan: warrant/right issue (5 huruf) sengaja dikecualikan dari scope ini.
 TICKER_PATTERN = re.compile(r"^[A-Z]{4}(?:\.JK)?$")
+PROMPT_MANIFEST_PATH = "services/debate_prompts/manifest.json"
+CLI_TICKERS_OVERRIDE: list[str] | None = None
 
 
 def _ledger_call(action: str, func, *args, **kwargs) -> None:
@@ -220,6 +235,24 @@ def _ledger_emit_event(event: LedgerEvent) -> None:
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _run_prompt_pack_linter() -> None:
+    try:
+        lint = lint_prompt_pack(PROMPT_MANIFEST_PATH)
+        if not lint.valid:
+            for err in lint.errors:
+                logger.error(f"[PromptLinter] {err}")
+            raise SystemExit(
+                "Prompt pack validation failed. Fix errors before running."
+            )
+        for warning in lint.warnings:
+            logger.warning(f"[PromptLinter] {warning}")
+        logger.info("[PromptLinter] Prompt pack OK")
+    except SystemExit:
+        raise
+    except Exception as e:
+        logger.warning(f"[PromptLinter] Linter failed: {e}")
 
 
 def _ledger_provider_check(run_id: str, provider_health) -> None:
@@ -450,6 +483,20 @@ def validate_ticker(ticker: str) -> bool:
     if not ticker or not isinstance(ticker, str):
         return False
     return bool(TICKER_PATTERN.match(ticker.strip().upper()))
+
+
+def _normalize_cli_tickers(tickers: list[str]) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for raw in tickers:
+        ticker = str(raw or "").strip().upper()
+        if not validate_ticker(ticker):
+            raise ValueError(f"Ticker tidak valid: {raw}")
+        ticker = ticker.removesuffix(".JK")
+        if ticker not in seen:
+            seen.add(ticker)
+            normalized.append(ticker)
+    return normalized
 
 
 def _load_quant_candidates(json_path: Path = JSON_PATH) -> list[dict]:
@@ -687,9 +734,325 @@ def _empty_result(ticker: str, error: str, sector_key: str = "unknown") -> dict:
         "raw_data_summary": "",
         "metadata": {},
         "error": error,
+        "status": "failed",
         "conviction_score": 0.0,
         "sector_key": sector_key,
     }
+
+
+def _dict_or_empty(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _result_metadata(entry: dict[str, Any]) -> dict[str, Any]:
+    metadata = entry.get("metadata")
+    if not isinstance(metadata, dict):
+        metadata = {}
+        entry["metadata"] = metadata
+    return metadata
+
+
+def _parse_price_value(value: Any) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, int | float):
+        return float(value)
+    text = (
+        str(value)
+        .strip()
+        .replace("Rp", "")
+        .replace("rp", "")
+        .replace(" ", "")
+    )
+    if not text:
+        return None
+    if "," in text and "." in text:
+        text = text.replace(".", "").replace(",", ".")
+    else:
+        text = text.replace(",", "").replace(".", "")
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def _parse_entry_low(entry_price_range: Any) -> float | None:
+    entry_low = str(entry_price_range or "").split("-", maxsplit=1)[0].strip()
+    return _parse_price_value(entry_low)
+
+
+def _coerce_confidence(value: Any) -> float | None:
+    try:
+        confidence = float(value)
+    except (TypeError, ValueError):
+        return None
+    if confidence > 1.0:
+        confidence = confidence / 100.0
+    return max(0.0, min(confidence, 1.0))
+
+
+def _result_status(entry: dict[str, Any]) -> str:
+    status = str(entry.get("status") or "").strip().lower()
+    if status in {"success", "timeout", "failed", "skipped"}:
+        return status
+    error = str(entry.get("error") or "")
+    if error:
+        return "timeout" if "timeout" in error.lower() else "failed"
+    if entry.get("verdict"):
+        return "success"
+    return "failed"
+
+
+def _attach_news_signal(ticker: str, result: dict[str, Any]) -> None:
+    try:
+        news_bundle = DEFAULT_FETCHER.build_bundle(ticker)
+        logger.info(
+            f"[News] {ticker}: sentiment={news_bundle.overall_sentiment.value} "
+            f"adjustment={news_bundle.confidence_adjustment:+.2f}"
+        )
+        if news_bundle.confidence_adjustment != 0:
+            logger.info(
+                f"[News] {ticker}: "
+                f"adjustment={news_bundle.confidence_adjustment:+.2f} "
+                f"({news_bundle.confidence_adjustment_reason})"
+            )
+        if news_bundle.has_breaking_news:
+            logger.warning(f"[News] {ticker}: BREAKING NEWS DETECTED")
+        result["news_sentiment"] = news_bundle.overall_sentiment.value
+        result["news_confidence_adjustment"] = news_bundle.confidence_adjustment
+    except Exception as e:
+        logger.warning(f"[News] {ticker}: fetch failed: {e}")
+
+
+def _attach_risk_governor_to_result(
+    *,
+    ticker: str,
+    run_id: str,
+    result: dict[str, Any],
+) -> None:
+    try:
+        verdict = _dict_or_empty(result.get("verdict"))
+        metadata = _dict_or_empty(result.get("metadata"))
+        raw_data = _dict_or_empty(result.get("raw_data"))
+        technicals = _dict_or_empty(result.get("technical_indicators"))
+        atr14 = raw_data.get("atr14") or metadata.get("atr14") or technicals.get("atr14")
+        avg_volume = (
+            raw_data.get("avg_volume_20d")
+            or metadata.get("avg_volume_20d")
+            or technicals.get("avg_volume_20d")
+        )
+        risk_entry = {
+            "ticker": ticker,
+            "verdict": verdict,
+            "current_price": verdict.get("current_price"),
+            "risk_context": {
+                "atr14": atr14,
+                "avg_volume": avg_volume,
+                "exdate_days": None,
+                "sector": result.get("sector_key"),
+                "run_id": run_id,
+            },
+        }
+        decision = annotate_risk(risk_entry)
+        risk_payload = risk_entry.get("risk_governor", decision.model_dump())
+        result["risk_governor"] = risk_payload
+        logger.info(
+            f"[RiskGovernor] {decision.ticker}: {decision.status} "
+            f"({', '.join(decision.reason_codes)})"
+        )
+    except Exception as e:
+        logger.warning(f"[RiskGovernor] evaluation failed for {ticker}: {e}")
+        result["risk_governor"] = {"error": str(e)}
+
+
+def _metadata_int(metadata: dict[str, Any], key: str) -> int:
+    try:
+        return int(metadata.get(key, 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _record_ticker_telemetry(
+    *,
+    ticker: str,
+    run_id: str,
+    result: dict[str, Any],
+) -> None:
+    try:
+        metadata = _result_metadata(result)
+        verdict = _dict_or_empty(result.get("verdict"))
+        status = _result_status(result)
+        result["status"] = status
+        try:
+            elapsed = float(metadata.get("duration_seconds", 0) or 0)
+        except (TypeError, ValueError):
+            elapsed = 0.0
+        metric = TickerMetric(
+            ticker=ticker,
+            run_id=run_id,
+            status=status,
+            verdict_rating=verdict.get("rating"),
+            confidence=_coerce_confidence(verdict.get("confidence")),
+            debate_rounds=int(result.get("debate_rounds") or 0),
+            duration_seconds=elapsed,
+            flash_calls=_metadata_int(metadata, "flash_calls"),
+            pro_calls=_metadata_int(metadata, "pro_calls"),
+            rag_chunks_selected=_metadata_int(metadata, "rag_chunks_selected"),
+            rag_chunks_considered=_metadata_int(metadata, "rag_chunks_considered"),
+            rag_token_estimate=_metadata_int(metadata, "rag_token_estimate"),
+            provider_errors=[],
+            has_stale_data=False,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        )
+        DEFAULT_TELEMETRY.record_ticker(metric)
+    except Exception as e:
+        logger.warning(f"[Telemetry] {ticker}: failed: {e}")
+
+
+def _enhance_completed_results(
+    results: list[dict],
+    run_id: str,
+    *,
+    fetch_news: bool = True,
+) -> None:
+    for result in results:
+        try:
+            ticker = str(result.get("ticker") or "UNKNOWN").upper()
+            status = _result_status(result)
+            result["status"] = status
+            if fetch_news:
+                _attach_news_signal(ticker, result)
+            if status == "success" and result.get("verdict"):
+                _attach_risk_governor_to_result(
+                    ticker=ticker,
+                    run_id=run_id,
+                    result=result,
+                )
+            _record_ticker_telemetry(
+                ticker=ticker,
+                run_id=run_id,
+                result=result,
+            )
+        except Exception as e:
+            logger.warning(
+                f"[Orchestrator] {result.get('ticker', 'UNKNOWN')} "
+                f"postprocess failed: {e}"
+            )
+
+
+def _write_explainability_audit(
+    *,
+    output_dir: Path,
+    ticker: str,
+    result: dict[str, Any],
+) -> None:
+    try:
+        packet = DEFAULT_AUDITOR.build_audit_packet(result)
+        DEFAULT_AUDITOR.log_packet(packet)
+        audit_path = output_dir / "debates" / ticker / "latest_audit.txt"
+        audit_path.parent.mkdir(parents=True, exist_ok=True)
+        audit_path.write_text(
+            DEFAULT_AUDITOR.format_report(packet),
+            encoding="utf-8",
+        )
+        logger.info(f"[Audit] {ticker}: {packet.one_line_summary}")
+    except Exception as e:
+        logger.warning(f"[Audit] {ticker}: failed: {e}")
+
+
+def _record_backtest_memory(
+    *,
+    result: dict[str, Any],
+    run_id: str,
+    memory: BacktestMemory = DEFAULT_MEMORY,
+) -> None:
+    ticker = str(result.get("ticker") or "UNKNOWN").upper()
+    try:
+        if _result_status(result) != "success":
+            return
+        verdict = _dict_or_empty(result.get("verdict"))
+        verdict_rating = str(verdict.get("rating") or "").strip().upper()
+        if not verdict_rating:
+            return
+        if verdict_rating == "AVOID":
+            logger.info(f"[BacktestMemory] {ticker}: skipped AVOID verdict")
+            return
+
+        entry_price = _parse_entry_low(verdict.get("entry_price_range"))
+        target_price = _parse_price_value(verdict.get("target_price"))
+        stop_loss = _parse_price_value(verdict.get("stop_loss"))
+        if entry_price is None or target_price is None or stop_loss is None:
+            raise ValueError("missing trade price fields")
+        confidence = _coerce_confidence(verdict.get("confidence"))
+        today = datetime.now(timezone.utc).date().isoformat()
+        memory.record(
+            TradeOutcome(
+                run_id=run_id,
+                ticker=ticker,
+                verdict_rating=verdict_rating,
+                entry_price=entry_price,
+                exit_price=None,
+                target_price=target_price,
+                stop_loss=stop_loss,
+                entry_date=today,
+                exit_date=None,
+                outcome="open",
+                pnl_pct=None,
+                hit_target=None,
+                hit_stop=None,
+                confidence_at_entry=confidence,
+                notes="auto-recorded at orchestrator completion",
+            )
+        )
+    except Exception as e:
+        logger.warning(f"[BacktestMemory] {ticker}: failed: {e}")
+
+
+def _write_batch_telemetry_report(
+    *,
+    output_dir: Path,
+    run_id: str,
+    batch_timestamp: str,
+) -> None:
+    try:
+        report = DEFAULT_TELEMETRY.build_batch_report(
+            run_id=run_id,
+            batch_timestamp=batch_timestamp,
+        )
+        DEFAULT_TELEMETRY.log_report(report)
+        report_text = DEFAULT_TELEMETRY.format_report(report)
+        telemetry_dir = output_dir / "telemetry"
+        telemetry_dir.mkdir(parents=True, exist_ok=True)
+        (telemetry_dir / "latest_batch_report.txt").write_text(
+            report_text,
+            encoding="utf-8",
+        )
+        (telemetry_dir / f"{run_id}_report.txt").write_text(
+            report_text,
+            encoding="utf-8",
+        )
+        logger.info(f"[Telemetry] Batch report saved for {run_id}")
+    except Exception as e:
+        logger.warning(f"[Telemetry] Batch report failed: {e}")
+
+
+def _check_report_consistency(
+    *,
+    batch_json_path: Path,
+    top3_md_path: Path,
+) -> None:
+    try:
+        consistency = check_consistency(batch_json_path, top3_md_path)
+        if consistency.consistent:
+            logger.info("[ReportConsistency] passed")
+        else:
+            for issue in consistency.inconsistencies:
+                if issue.severity == "error":
+                    logger.error(f"[ReportConsistency] {issue}")
+                else:
+                    logger.warning(f"[ReportConsistency] {issue}")
+    except Exception as e:
+        logger.warning(f"[ReportConsistency] failed: {e}")
 
 
 async def _run_single_debate(ticker: str, chamber: Any) -> dict:
@@ -724,6 +1087,10 @@ async def _run_single_debate(ticker: str, chamber: Any) -> dict:
         disagreement_type = result.get("disagreement_type")
         if disagreement_type:
             logger.info(f"[Debate] {ticker} disagreement_type={disagreement_type}")
+        debate_history = [
+            _as_debate_message(m)
+            for m in result.get("debate_history", [])
+        ]
         return {
             "ticker": result["ticker"],
             "verdict": verdict_dict,
@@ -741,11 +1108,12 @@ async def _run_single_debate(ticker: str, chamber: Any) -> dict:
                     "position": getattr(m, "position", "UNKNOWN"),
                     "confidence": getattr(m, "confidence", None),
                 }
-                for m in result["debate_history"]
+                for m in debate_history
             ],
             "raw_data_summary": result["raw_data"],
             "metadata": result.get("metadata", {}),
             "error": None,
+            "status": "success",
             "conviction_score": 0.0,  # Diisi oleh select_top3
         }
 
@@ -761,6 +1129,7 @@ async def run_batch_debates(
     tickers: list[str],
     sector_map: dict[str, str] | None = None,
     abort_event: asyncio.Event | None = None,
+    run_id: str | None = None,
 ) -> list[dict]:
     # abort_event di-inject dari main() agar signal handler bisa mengaksesnya.
     """
@@ -901,13 +1270,28 @@ async def run_batch_debates(
         sector_key = (sector_map or {}).get(ticker, "unknown")
         budget_charged = False
         progress_recorded = False
+        started_at = asyncio.get_event_loop().time()
+
+        def _finish_result(result: dict) -> dict:
+            try:
+                metadata = _result_metadata(result)
+                if run_id:
+                    metadata.setdefault("run_id", run_id)
+                metadata["duration_seconds"] = (
+                    asyncio.get_event_loop().time() - started_at
+                )
+            except Exception as e:
+                logger.warning(f"[Telemetry] {ticker}: duration capture failed: {e}")
+            return result
 
         try:
             # 1. Cek abort sebelum mulai apapun
             if abort_event.is_set():
                 logger.info(f"[{ticker}] Dibatalkan sebelum start (budget habis)")
                 _set_status(ticker, "ABORTED")
-                return _empty_result(ticker, "Aborted: budget exhausted before start", sector_key)
+                return _finish_result(
+                    _empty_result(ticker, "Aborted: budget exhausted before start", sector_key)
+                )
 
             # 2. Tunggu slot rate limit
             await rate_limiter.acquire()
@@ -920,7 +1304,9 @@ async def run_batch_debates(
                 if abort_event.is_set():
                     logger.info(f"[{ticker}] Dibatalkan saat antre (budget habis)")
                     _set_status(ticker, "ABORTED")
-                    return _empty_result(ticker, "Aborted: budget exhausted in queue", sector_key)
+                    return _finish_result(
+                        _empty_result(ticker, "Aborted: budget exhausted in queue", sector_key)
+                    )
 
                 # Update status: sedang berdebat.
                 _set_status(ticker, "DEBATING")
@@ -932,7 +1318,9 @@ async def run_batch_debates(
                         abort_event.set()
                         logger.warning(f"[{ticker}] Budget habis saat charge -- abort ditetapkan")
                         _set_status(ticker, "ABORTED")
-                        return _empty_result(ticker, "Budget exhausted at charge point", sector_key)
+                        return _finish_result(
+                            _empty_result(ticker, "Budget exhausted at charge point", sector_key)
+                        )
 
                     budget_state["spent"] += 1
                     budget_charged = True  # Set di dalam lock, tepat setelah increment
@@ -955,18 +1343,20 @@ async def run_batch_debates(
                         "ERROR" if result.get("error") else "HOLD"
                     )
                     _set_status(ticker, final_rating, result)
-                    return result
+                    return _finish_result(result)
 
                 except BudgetExhaustedError as e:
                     abort_event.set()
                     logger.error(f"[{ticker}] Budget habis dari dalam chamber: {e}")
                     _set_status(ticker, "ERROR")
-                    return _empty_result(ticker, f"Budget exhausted: {e}", sector_key)
+                    return _finish_result(
+                        _empty_result(ticker, f"Budget exhausted: {e}", sector_key)
+                    )
 
                 except Exception as e:
                     logger.error(f"[{ticker}] Error saat eksekusi: {e}")
                     _set_status(ticker, "ERROR")
-                    return _empty_result(ticker, str(e), sector_key)
+                    return _finish_result(_empty_result(ticker, str(e), sector_key))
 
         except asyncio.CancelledError:
             # [FIX-6] INTENTIONAL: CancelledError ditelan secara eksplisit.
@@ -995,12 +1385,14 @@ async def run_batch_debates(
                         )
             logger.warning(f"[{ticker}] Task dibatalkan (CancelledError)")
             _set_status(ticker, "ABORTED")
-            return _empty_result(ticker, "Task cancelled by abort event", sector_key)
+            return _finish_result(
+                _empty_result(ticker, "Task cancelled by abort event", sector_key)
+            )
 
         except Exception as e:
             logger.exception(f"[{ticker}] Error tak terduga di _guarded: {e}")
             _set_status(ticker, "ERROR")
-            return _empty_result(ticker, f"Orchestrator error: {e}", sector_key)
+            return _finish_result(_empty_result(ticker, f"Orchestrator error: {e}", sector_key))
 
         finally:
             if not progress_recorded:
@@ -1251,6 +1643,15 @@ def save_individual_debates_versioned(
         legacy_file.write_text(
             json.dumps(payload, indent=2, ensure_ascii=False),
             encoding="utf-8",
+        )
+        _write_explainability_audit(
+            output_dir=output_dir,
+            ticker=ticker,
+            result=payload,
+        )
+        _record_backtest_memory(
+            result=payload,
+            run_id=timestamp,
         )
         count += 1
 
@@ -1524,9 +1925,14 @@ def get_local_timestamp() -> str:
 
 def _extract_winning_argument(entry: dict) -> str:
     """Ambil argumen Bull terakhir (paling refined) dari history debate."""
-    bull_args = [
-        h["content"] for h in entry.get("debate_history", []) if h.get("role") == "bull"
-    ]
+    bull_args = []
+    for raw in entry.get("debate_history", []):
+        try:
+            msg = _as_debate_message(raw)
+        except Exception:
+            continue
+        if msg.role == "bull":
+            bull_args.append(msg.content)
     if not bull_args:
         return "Tidak ada argumen bull yang tercatat."
     arg = bull_args[-1]
@@ -1535,11 +1941,14 @@ def _extract_winning_argument(entry: dict) -> str:
 
 def _extract_devils_warning(entry: dict) -> str:
     """Ambil challenge terakhir dari Devil's Advocate."""
-    da_args = [
-        h["content"]
-        for h in entry.get("debate_history", [])
-        if h.get("role") == "devils_advocate"
-    ]
+    da_args = []
+    for raw in entry.get("debate_history", []):
+        try:
+            msg = _as_debate_message(raw)
+        except Exception:
+            continue
+        if msg.role == "devils_advocate":
+            da_args.append(msg.content)
     if not da_args:
         return "Tidak ada challenge devil's advocate yang tercatat."
     arg = da_args[-1]
@@ -1774,10 +2183,19 @@ async def main(
     ledger_run_id = datetime.now(ZoneInfo(settings.DATETIME_TIMEZONE)).strftime(
         "%Y%m%d_%H%M%S"
     )
+    _run_prompt_pack_linter()
+    ticker_override = list(CLI_TICKERS_OVERRIDE or [])
 
     reset_budget()
     if user_config is None:
-        user_config = _prompt_user_config()
+        if ticker_override:
+            user_config = {
+                "total_capital": 1_000_000.0,
+                "max_loss_pct": 0.02,
+                "max_positions": 5,
+            }
+        else:
+            user_config = _prompt_user_config()
 
     deps = check_all_dependencies(
         output_dir,
@@ -1789,21 +2207,27 @@ async def main(
         return
 
     # Step 0a: Dependency Validation
-    validation = check_candidates_file(JSON_PATH, settings.CANDIDATES_MAX_AGE_HOURS)
-    if not validation.is_valid:
-        logger.warning(f"[Validator] {validation.message}")
-        if settings.CANDIDATES_AUTO_RERUN:
-            if not maybe_rerun_quant_filter():
-                logger.error("[Validator] Auto-rerun gagal. Pipeline dihentikan.")
+    if ticker_override:
+        logger.info(
+            "[CLI] Menggunakan --tickers override; "
+            "skip quant filter dan top10_candidates.json."
+        )
+    else:
+        validation = check_candidates_file(JSON_PATH, settings.CANDIDATES_MAX_AGE_HOURS)
+        if not validation.is_valid:
+            logger.warning(f"[Validator] {validation.message}")
+            if settings.CANDIDATES_AUTO_RERUN:
+                if not maybe_rerun_quant_filter():
+                    logger.error("[Validator] Auto-rerun gagal. Pipeline dihentikan.")
+                    return
+            else:
+                logger.error(
+                    "[Validator] Set CANDIDATES_AUTO_RERUN=true untuk auto-rerun, "
+                    "atau jalankan run_quant_filter.py secara manual."
+                )
                 return
         else:
-            logger.error(
-                "[Validator] Set CANDIDATES_AUTO_RERUN=true untuk auto-rerun, "
-                "atau jalankan run_quant_filter.py secara manual."
-            )
-            return
-    else:
-        logger.info(f"[Validator] {validation.message}")
+            logger.info(f"[Validator] {validation.message}")
 
     # Step 0b: Market Regime Detection
     vol = await fetch_ihsg_volatility(settings.REGIME_VOLATILITY_LOOKBACK_DAYS)
@@ -1825,11 +2249,18 @@ async def main(
 
     # Step 1: Parse
     try:
-        candidates = _load_quant_candidates(JSON_PATH)
-        candidates = _apply_candidate_intake(candidates)
-        candidates = _apply_pre_cio_filters(candidates, regime)
-        tickers = parse_report(candidates=candidates)
-        sector_map = parse_sector_map(candidates=candidates)
+        if ticker_override:
+            tickers = ticker_override
+            sector_map = {ticker: "unknown" for ticker in tickers}
+            logger.info(
+                f"[CLI] {len(tickers)} ticker dari --tickers: {tickers}"
+            )
+        else:
+            candidates = _load_quant_candidates(JSON_PATH)
+            candidates = _apply_candidate_intake(candidates)
+            candidates = _apply_pre_cio_filters(candidates, regime)
+            tickers = parse_report(candidates=candidates)
+            sector_map = parse_sector_map(candidates=candidates)
     except (FileNotFoundError, ValueError) as e:
         logger.error(f"[Orchestrator] {e}")
         return
@@ -1863,7 +2294,21 @@ async def main(
         logger.info("[DryRun] Melewati run_batch_debates(); memakai mock results.")
         results = _generate_mock_debate_results(tickers, sector_map=sector_map)
     else:
-        results = await run_batch_debates(tickers, sector_map=sector_map, abort_event=abort_event)
+        results = await run_batch_debates(
+            tickers,
+            sector_map=sector_map,
+            abort_event=abort_event,
+            run_id=ledger_run_id,
+        )
+    _enhance_completed_results(results, ledger_run_id, fetch_news=not dry_run)
+    try:
+        succeeded = sum(1 for result in results if _result_status(result) == "success")
+        failed = len(results) - succeeded
+        logger.info(
+            f"[Orchestrator] Debate summary: {succeeded} succeeded / {failed} failed"
+        )
+    except Exception as e:
+        logger.warning(f"[Orchestrator] Debate summary failed: {e}")
 
     # Step 3: Score + Rank + Diversify
     debate_records = load_debate_history(OUTPUT_DIR)
@@ -1901,6 +2346,15 @@ async def main(
     save_individual_debates_versioned(results, timestamp=batch_timestamp, output_dir=OUTPUT_DIR)
     generate_top3_report(top_n, results, TOP3_REPORT_PATH, sizing_result=sizing_result)
     _log_artifact_validation(results)
+    _write_batch_telemetry_report(
+        output_dir=OUTPUT_DIR,
+        run_id=ledger_run_id,
+        batch_timestamp=batch_timestamp,
+    )
+    _check_report_consistency(
+        batch_json_path=FULL_RESULTS_PATH,
+        top3_md_path=TOP3_REPORT_PATH,
+    )
 
     logger.info("=" * 60)
     logger.info("[Orchestrator] Pipeline selesai")
@@ -2244,6 +2698,8 @@ _cli = InteractiveCLI()
 
 def _parse_cli_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse orchestrator CLI options while preserving interactive defaults."""
+    global CLI_TICKERS_OVERRIDE
+
     parser = argparse.ArgumentParser(
         description="Run IDX swing-trade orchestration pipeline.",
     )
@@ -2272,7 +2728,22 @@ def _parse_cli_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=str(OUTPUT_DIR),
         help="Directory for candidates, full results, reports, and debate history.",
     )
-    return parser.parse_args(argv)
+    parser.add_argument(
+        "--tickers",
+        nargs="+",
+        help="Override candidate list with specific tickers e.g. --tickers BBCA ADRO TLKM",
+    )
+    args = parser.parse_args(argv)
+    CLI_TICKERS_OVERRIDE = None
+    if args.tickers:
+        try:
+            args.tickers = _normalize_cli_tickers(args.tickers)
+        except ValueError as exc:
+            parser.error(str(exc))
+        CLI_TICKERS_OVERRIDE = args.tickers
+        args.no_interactive = True
+        args.skip_scraping = True
+    return args
 
 
 if __name__ == "__main__":

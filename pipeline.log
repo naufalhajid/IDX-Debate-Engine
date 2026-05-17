@@ -2566,3 +2566,275 @@
 2026-05-14 16:38:08.205 | WARNING  | core.orchestrator.legacy:_guarded:996 - [JPFA] Task dibatalkan (CancelledError)
 2026-05-14 16:38:08.212 | INFO     | core.orchestrator.legacy:_guarded:992 - [MAPI] Budget di-refund (dibatalkan sebelum eksekusi). Total: 2
 2026-05-14 16:38:08.212 | WARNING  | core.orchestrator.legacy:_guarded:996 - [MAPI] Task dibatalkan (CancelledError)
+2026-05-16 19:05:25.870 | INFO     | core.orchestrator.legacy:run_batch_debates:1393 - [Orchestrator] Meluncurkan 10 debate (concurrency=3, RPM=10)
+2026-05-16 19:05:28.447 | INFO     | services.stockbit_api_client:_request_challenge:315 - Logged in successfully with existing token!
+2026-05-16 19:05:29.024 | INFO     | core.orchestrator.legacy:_guarded:1318 - [GJTL] Budget terpakai: 1/200
+2026-05-16 19:05:29.024 | INFO     | core.orchestrator.legacy:_run_single_debate:1060 - [Debate] Mulai: GJTL
+2026-05-16 19:05:29.028 | INFO     | core.orchestrator.legacy:_guarded:1318 - [JPFA] Budget terpakai: 2/200
+2026-05-16 19:05:29.028 | INFO     | core.orchestrator.legacy:_run_single_debate:1060 - [Debate] Mulai: JPFA
+2026-05-16 19:05:29.034 | INFO     | core.orchestrator.legacy:_guarded:1318 - [DMAS] Budget terpakai: 3/200
+2026-05-16 19:05:29.035 | INFO     | core.orchestrator.legacy:_run_single_debate:1060 - [Debate] Mulai: DMAS
+2026-05-16 19:05:29.470 | INFO     | services.debate_chamber:run:2480 - [DebateChamber] ▶ Starting swing-trade pipeline for JPFA @ Rp 2,540
+2026-05-16 19:05:29.499 | INFO     | services.debate_chamber:_chartist_node:1080 - [Chartist] Fetching OHLCV + orderbook for JPFA
+2026-05-16 19:05:29.502 | INFO     | services.debate_chamber:_fundamental_node:993 - [Fundamental] Fetching for JPFA
+2026-05-16 19:05:29.503 | INFO     | services.debate_chamber:_sentiment_node:1241 - [Sentiment] Fetching for JPFA
+2026-05-16 19:05:29.504 | INFO     | services.debate_chamber:run:2480 - [DebateChamber] ▶ Starting swing-trade pipeline for DMAS @ Rp 152
+2026-05-16 19:05:29.505 | INFO     | services.debate_chamber:_chartist_node:1080 - [Chartist] Fetching OHLCV + orderbook for DMAS
+2026-05-16 19:05:29.506 | INFO     | services.debate_chamber:_fundamental_node:993 - [Fundamental] Fetching for DMAS
+2026-05-16 19:05:29.506 | INFO     | services.debate_chamber:_sentiment_node:1241 - [Sentiment] Fetching for DMAS
+2026-05-16 19:05:29.670 | INFO     | services.debate_chamber:run:2480 - [DebateChamber] ▶ Starting swing-trade pipeline for GJTL @ Rp 1,230
+2026-05-16 19:05:29.671 | INFO     | services.debate_chamber:_chartist_node:1080 - [Chartist] Fetching OHLCV + orderbook for GJTL
+2026-05-16 19:05:29.672 | INFO     | services.debate_chamber:_fundamental_node:993 - [Fundamental] Fetching for GJTL
+2026-05-16 19:05:29.673 | INFO     | services.debate_chamber:_sentiment_node:1241 - [Sentiment] Fetching for GJTL
+2026-05-16 19:05:30.011 | INFO     | services.debate_chamber:_chartist_node:1147 - [Chartist] Technicals computed: MA50=2354.0, RSI=56.3
+2026-05-16 19:05:30.016 | INFO     | services.debate_chamber:_chartist_node:1147 - [Chartist] Technicals computed: MA50=137.0, RSI=71.9
+2026-05-16 19:05:30.146 | INFO     | services.fair_value_calculator:extract_keystats:295 - [FairValue] JPFA: DPS derived from yield (5.51%) × price (1) = 0.08
+2026-05-16 19:05:30.146 | INFO     | services.fair_value_calculator:extract_keystats:323 - [FairValue] JPFA: all key stats parsed OK: {'eps_ttm': 438.32, 'bvps': 1751.65, 'dps': 0.08, 'roe': '25.0%', 'pe': 5.79, 'pb': 1.45}
+2026-05-16 19:05:30.146 | INFO     | services.debate_chamber:_fundamental_node:1016 - [Fundamental] Fair value for JPFA: 5231.0
+2026-05-16 19:05:30.151 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-16 19:05:30.153 | INFO     | services.fair_value_calculator:extract_keystats:295 - [FairValue] DMAS: DPS derived from yield (19.08%) × price (1) = 0.19
+2026-05-16 19:05:30.153 | INFO     | services.fair_value_calculator:extract_keystats:323 - [FairValue] DMAS: all key stats parsed OK: {'eps_ttm': 26.21, 'bvps': 154.12, 'dps': 0.19, 'roe': '17.0%', 'pe': 5.8, 'pb': 0.99}
+2026-05-16 19:05:30.154 | INFO     | services.debate_chamber:_fundamental_node:1016 - [Fundamental] Fair value for DMAS: 356.0
+2026-05-16 19:05:30.155 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-16 19:05:30.192 | INFO     | services.debate_chamber:_chartist_node:1147 - [Chartist] Technicals computed: MA50=1132.0, RSI=60.3
+2026-05-16 19:05:30.249 | INFO     | services.fair_value_calculator:extract_keystats:295 - [FairValue] GJTL: DPS derived from yield (4.07%) × price (0) = 0.02
+2026-05-16 19:05:30.249 | INFO     | services.fair_value_calculator:extract_keystats:323 - [FairValue] GJTL: all key stats parsed OK: {'eps_ttm': 364.64, 'bvps': 3112.19, 'dps': 0.02, 'roe': '11.7%', 'pe': 3.37, 'pb': 0.4}
+2026-05-16 19:05:30.250 | INFO     | services.debate_chamber:_fundamental_node:1016 - [Fundamental] Fair value for GJTL: 5800.0
+2026-05-16 19:05:30.251 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-16 19:05:30.276 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-16 19:05:30.523 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-16 19:05:30.529 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-16 19:05:30.543 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-16 19:05:30.569 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-16 19:05:30.718 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-16 19:05:32.319 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-16 19:05:32.479 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-16 19:05:33.116 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-16 19:05:38.908 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-16 19:05:40.233 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-16 19:05:40.369 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-16 19:05:40.635 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-16 19:05:40.640 | INFO     | services.debate_chamber:_synthesizer_node:1319 - [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-16 19:05:40.642 | INFO     | services.debate_chamber:_synthesizer_node:1441 - [RAG] DMAS evidence: 9/10 chunks, ~586 tokens
+2026-05-16 19:05:40.644 | INFO     | services.debate_chamber:_bullish_node:1541 - [Bull] Round 1 for DMAS
+2026-05-16 19:05:40.645 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-16 19:05:44.383 | WARNING  | core.orchestrator.legacy:_guarded:1375 - [MARK] Task dibatalkan (CancelledError)
+2026-05-16 19:05:44.387 | WARNING  | core.orchestrator.legacy:_guarded:1375 - [ULTJ] Task dibatalkan (CancelledError)
+2026-05-16 19:05:44.393 | WARNING  | core.orchestrator.legacy:_guarded:1375 - [BFIN] Task dibatalkan (CancelledError)
+2026-05-16 19:05:44.399 | WARNING  | core.orchestrator.legacy:_guarded:1375 - [MAPI] Task dibatalkan (CancelledError)
+2026-05-16 19:05:44.404 | WARNING  | core.orchestrator.legacy:_guarded:1375 - [AUTO] Task dibatalkan (CancelledError)
+2026-05-16 19:05:44.409 | WARNING  | core.orchestrator.legacy:_guarded:1375 - [LPPF] Task dibatalkan (CancelledError)
+2026-05-16 19:05:44.414 | WARNING  | core.orchestrator.legacy:_guarded:1375 - [KETR] Task dibatalkan (CancelledError)
+2026-05-16 19:05:44.420 | INFO     | core.orchestrator.legacy:_guarded:1371 - [DMAS] Budget di-refund (dibatalkan sebelum eksekusi). Total: 2
+2026-05-16 19:05:44.420 | WARNING  | core.orchestrator.legacy:_guarded:1375 - [DMAS] Task dibatalkan (CancelledError)
+2026-05-16 19:05:44.423 | INFO     | core.orchestrator.legacy:_guarded:1371 - [JPFA] Budget di-refund (dibatalkan sebelum eksekusi). Total: 1
+2026-05-16 19:05:44.424 | WARNING  | core.orchestrator.legacy:_guarded:1375 - [JPFA] Task dibatalkan (CancelledError)
+2026-05-16 19:05:44.431 | INFO     | core.orchestrator.legacy:_guarded:1371 - [GJTL] Budget di-refund (dibatalkan sebelum eksekusi). Total: 0
+2026-05-16 19:05:44.431 | WARNING  | core.orchestrator.legacy:_guarded:1375 - [GJTL] Task dibatalkan (CancelledError)
+2026-05-17 14:36:06.511 | INFO     | core.orchestrator.legacy:run_batch_debates:1393 - [Orchestrator] Meluncurkan 2 debate (concurrency=3, RPM=10)
+2026-05-17 14:36:09.537 | INFO     | services.stockbit_api_client:_request_challenge:315 - Logged in successfully with existing token!
+2026-05-17 14:36:10.092 | INFO     | core.orchestrator.legacy:_guarded:1318 - [WIIM] Budget terpakai: 1/200
+2026-05-17 14:36:10.092 | INFO     | core.orchestrator.legacy:_run_single_debate:1060 - [Debate] Mulai: WIIM
+2026-05-17 14:36:10.094 | INFO     | core.orchestrator.legacy:_guarded:1318 - [BBCA] Budget terpakai: 2/200
+2026-05-17 14:36:10.094 | INFO     | core.orchestrator.legacy:_run_single_debate:1060 - [Debate] Mulai: BBCA
+2026-05-17 14:36:10.495 | INFO     | services.debate_chamber:run:2480 - [DebateChamber] ▶ Starting swing-trade pipeline for BBCA @ Rp 6,100
+2026-05-17 14:36:10.501 | INFO     | services.debate_chamber:_chartist_node:1080 - [Chartist] Fetching OHLCV + orderbook for BBCA
+2026-05-17 14:36:10.502 | INFO     | services.debate_chamber:_fundamental_node:993 - [Fundamental] Fetching for BBCA
+2026-05-17 14:36:10.502 | INFO     | services.debate_chamber:_sentiment_node:1241 - [Sentiment] Fetching for BBCA
+2026-05-17 14:36:10.541 | INFO     | services.debate_chamber:run:2480 - [DebateChamber] ▶ Starting swing-trade pipeline for WIIM @ Rp 1,870
+2026-05-17 14:36:10.542 | INFO     | services.debate_chamber:_chartist_node:1080 - [Chartist] Fetching OHLCV + orderbook for WIIM
+2026-05-17 14:36:10.543 | INFO     | services.debate_chamber:_fundamental_node:993 - [Fundamental] Fetching for WIIM
+2026-05-17 14:36:10.544 | INFO     | services.debate_chamber:_sentiment_node:1241 - [Sentiment] Fetching for WIIM
+2026-05-17 14:36:11.013 | INFO     | services.fair_value_calculator:extract_keystats:295 - [FairValue] BBCA: DPS derived from yield (5.51%) × price (3) = 0.16
+2026-05-17 14:36:11.013 | INFO     | services.fair_value_calculator:extract_keystats:323 - [FairValue] BBCA: all key stats parsed OK: {'eps_ttm': 471.1, 'bvps': 2102.07, 'dps': 0.16, 'roe': '22.4%', 'pe': 12.95, 'pb': 2.9}
+2026-05-17 14:36:11.017 | INFO     | services.debate_chamber:_fundamental_node:1016 - [Fundamental] Fair value for BBCA: 10474.0
+2026-05-17 14:36:11.032 | INFO     | services.debate_chamber:_chartist_node:1147 - [Chartist] Technicals computed: MA50=6425.0, RSI=42.8
+2026-05-17 14:36:11.034 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:36:11.038 | INFO     | services.fair_value_calculator:extract_keystats:295 - [FairValue] WIIM: DPS derived from yield (3.47%) × price (2) = 0.06
+2026-05-17 14:36:11.038 | INFO     | services.fair_value_calculator:extract_keystats:323 - [FairValue] WIIM: all key stats parsed OK: {'eps_ttm': 235.33, 'bvps': 1123.12, 'dps': 0.06, 'roe': '20.9%', 'pe': 7.95, 'pb': 1.67}
+2026-05-17 14:36:11.039 | INFO     | services.debate_chamber:_fundamental_node:1016 - [Fundamental] Fair value for WIIM: 2968.0
+2026-05-17 14:36:11.041 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:36:11.052 | INFO     | services.debate_chamber:_chartist_node:1147 - [Chartist] Technicals computed: MA50=1881.0, RSI=49.3
+2026-05-17 14:36:11.102 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:36:11.128 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:36:11.603 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:36:12.472 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:36:13.943 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:36:14.515 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:36:18.752 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:36:22.208 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:36:28.139 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:36:28.149 | INFO     | services.debate_chamber:_synthesizer_node:1319 - [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-17 14:36:28.155 | INFO     | services.debate_chamber:_synthesizer_node:1441 - [RAG] WIIM evidence: 8/11 chunks, ~597 tokens
+2026-05-17 14:36:28.159 | INFO     | services.debate_chamber:_bullish_node:1541 - [Bull] Round 1 for WIIM
+2026-05-17 14:36:28.161 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:36:30.833 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:36:30.840 | INFO     | services.debate_chamber:_synthesizer_node:1319 - [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-17 14:36:30.844 | INFO     | services.debate_chamber:_synthesizer_node:1441 - [RAG] BBCA evidence: 9/10 chunks, ~556 tokens
+2026-05-17 14:36:30.846 | INFO     | services.debate_chamber:_bullish_node:1541 - [Bull] Round 1 for BBCA
+2026-05-17 14:36:30.847 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:36:45.279 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:36:45.283 | INFO     | services.debate_chamber:_bearish_node:1583 - [Bear] Round 1 for WIIM
+2026-05-17 14:36:45.284 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:36:49.375 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:36:49.380 | INFO     | services.debate_chamber:_bearish_node:1583 - [Bear] Round 1 for BBCA
+2026-05-17 14:36:49.381 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:36:56.344 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:36:56.349 | INFO     | services.debate_chamber:_consensus_evaluator_node:1637 - [Consensus] Evaluating 5-agent votes
+2026-05-17 14:36:56.349 | INFO     | services.debate_chamber:_consensus_evaluator_node:1640 - [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-17 14:36:56.351 | INFO     | services.debate_chamber:_state_cleaner_node:1673 - [State Cleaner] Deterministic pruning (no LLM)
+2026-05-17 14:36:56.351 | INFO     | services.debate_chamber:_bullish_node:1541 - [Bull] Round 2 for WIIM
+2026-05-17 14:36:56.352 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:37:07.386 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:37:07.392 | INFO     | services.debate_chamber:_consensus_evaluator_node:1637 - [Consensus] Evaluating 5-agent votes
+2026-05-17 14:37:07.392 | INFO     | services.debate_chamber:_consensus_evaluator_node:1640 - [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-17 14:37:07.393 | INFO     | services.debate_chamber:_state_cleaner_node:1673 - [State Cleaner] Deterministic pruning (no LLM)
+2026-05-17 14:37:07.394 | INFO     | services.debate_chamber:_bullish_node:1541 - [Bull] Round 2 for BBCA
+2026-05-17 14:37:07.394 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:37:11.814 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:37:11.819 | INFO     | services.debate_chamber:_bearish_node:1583 - [Bear] Round 2 for WIIM
+2026-05-17 14:37:11.819 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:37:27.192 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:37:27.196 | INFO     | services.debate_chamber:_bearish_node:1583 - [Bear] Round 2 for BBCA
+2026-05-17 14:37:27.197 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:37:29.585 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:37:29.591 | INFO     | services.debate_chamber:_consensus_evaluator_node:1637 - [Consensus] Evaluating 5-agent votes
+2026-05-17 14:37:29.592 | INFO     | services.debate_chamber:_consensus_evaluator_node:1640 - [Consensus] Result: reached=True method=soft_hold winner={'agent': 'soft_hold_rule', 'position': 'HOLD', 'confidence': 0.9} dissent=['fundamental_scout', 'chartist', 'bull', 'bear']
+2026-05-17 14:37:29.594 | INFO     | services.debate_chamber:_devils_advocate_node:1719 - [Devil's Advocate] Injecting adversarial scenario
+2026-05-17 14:37:29.595 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:37:42.687 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:37:42.693 | INFO     | services.debate_chamber:_consensus_evaluator_node:1637 - [Consensus] Evaluating 5-agent votes
+2026-05-17 14:37:42.693 | INFO     | services.debate_chamber:_consensus_evaluator_node:1640 - [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-17 14:37:42.694 | INFO     | services.debate_chamber:_state_cleaner_node:1673 - [State Cleaner] Deterministic pruning (no LLM)
+2026-05-17 14:37:42.694 | INFO     | services.debate_chamber:_bullish_node:1541 - [Bull] Round 3 for BBCA
+2026-05-17 14:37:42.695 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:37:47.408 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:37:47.415 | INFO     | services.debate_chamber:_cio_judge_node:2138 - [CIO] Deliberating on WIIM (current price: 1,870)
+2026-05-17 14:37:47.419 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:38:02.433 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:38:02.436 | INFO     | services.debate_chamber:_bearish_node:1583 - [Bear] Round 3 for BBCA
+2026-05-17 14:38:02.437 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:38:11.106 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:38:11.122 | INFO     | services.debate_chamber:_cio_judge_node:2349 - [CIO] JSON parsed successfully for WIIM
+2026-05-17 14:38:11.123 | INFO     | services.debate_chamber:_cio_judge_node:2367 - [CIO] Verdict delivered for WIIM
+2026-05-17 14:38:11.131 | INFO     | services.debate_chamber:run:2502 - [DebateChamber] ✅ Pipeline complete for WIIM
+2026-05-17 14:38:11.131 | INFO     | core.orchestrator.legacy:_run_single_debate:1079 - [Debate] âœ… Selesai: WIIM
+2026-05-17 14:38:11.132 | INFO     | core.orchestrator.legacy:_run_single_debate:1082 - [Debate] WIIM disagreement_type=timing
+2026-05-17 14:38:11.132 | ERROR    | core.orchestrator.legacy:_run_single_debate:1113 - [Debate] ðŸš¨ WIIM gagal: 'dict' object has no attribute 'role'
+2026-05-17 14:38:22.519 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:38:22.524 | INFO     | services.debate_chamber:_consensus_evaluator_node:1637 - [Consensus] Evaluating 5-agent votes
+2026-05-17 14:38:22.526 | INFO     | services.debate_chamber:_consensus_evaluator_node:1640 - [Consensus] Result: reached=True method=soft_hold winner={'agent': 'soft_hold_rule', 'position': 'HOLD', 'confidence': 0.6} dissent=['fundamental_scout', 'bull']
+2026-05-17 14:38:22.527 | INFO     | services.debate_chamber:_devils_advocate_node:1719 - [Devil's Advocate] Injecting adversarial scenario
+2026-05-17 14:38:22.528 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:38:30.746 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:38:30.750 | INFO     | services.debate_chamber:_cio_judge_node:2138 - [CIO] Deliberating on BBCA (current price: 6,100)
+2026-05-17 14:38:30.752 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:38:57.303 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:38:57.307 | INFO     | services.debate_chamber:_cio_judge_node:2349 - [CIO] JSON parsed successfully for BBCA
+2026-05-17 14:38:57.308 | INFO     | services.debate_chamber:_cio_judge_node:2367 - [CIO] Verdict delivered for BBCA
+2026-05-17 14:38:57.313 | INFO     | services.debate_chamber:run:2502 - [DebateChamber] ✅ Pipeline complete for BBCA
+2026-05-17 14:38:57.314 | INFO     | core.orchestrator.legacy:_run_single_debate:1079 - [Debate] âœ… Selesai: BBCA
+2026-05-17 14:38:57.314 | INFO     | core.orchestrator.legacy:_run_single_debate:1082 - [Debate] BBCA disagreement_type=timing
+2026-05-17 14:38:57.314 | ERROR    | core.orchestrator.legacy:_run_single_debate:1113 - [Debate] ðŸš¨ BBCA gagal: 'dict' object has no attribute 'role'
+2026-05-17 14:42:40.910 | INFO     | core.orchestrator.legacy:run_batch_debates:1404 - [Orchestrator] Meluncurkan 2 debate (concurrency=3, RPM=10)
+2026-05-17 14:42:43.050 | INFO     | services.stockbit_api_client:_request_challenge:315 - Logged in successfully with existing token!
+2026-05-17 14:42:43.599 | INFO     | core.orchestrator.legacy:_guarded:1329 - [WIIM] Budget terpakai: 1/200
+2026-05-17 14:42:43.599 | INFO     | core.orchestrator.legacy:_run_single_debate:1067 - [Debate] Mulai: WIIM
+2026-05-17 14:42:43.600 | INFO     | core.orchestrator.legacy:_guarded:1329 - [BBCA] Budget terpakai: 2/200
+2026-05-17 14:42:43.600 | INFO     | core.orchestrator.legacy:_run_single_debate:1067 - [Debate] Mulai: BBCA
+2026-05-17 14:42:43.997 | INFO     | services.debate_chamber:run:2480 - [DebateChamber] ▶ Starting swing-trade pipeline for BBCA @ Rp 6,100
+2026-05-17 14:42:44.029 | INFO     | services.debate_chamber:_chartist_node:1080 - [Chartist] Fetching OHLCV + orderbook for BBCA
+2026-05-17 14:42:44.030 | INFO     | services.debate_chamber:_fundamental_node:993 - [Fundamental] Fetching for BBCA
+2026-05-17 14:42:44.031 | INFO     | services.debate_chamber:_sentiment_node:1241 - [Sentiment] Fetching for BBCA
+2026-05-17 14:42:44.033 | INFO     | services.debate_chamber:run:2480 - [DebateChamber] ▶ Starting swing-trade pipeline for WIIM @ Rp 1,870
+2026-05-17 14:42:44.034 | INFO     | services.debate_chamber:_chartist_node:1080 - [Chartist] Fetching OHLCV + orderbook for WIIM
+2026-05-17 14:42:44.035 | INFO     | services.debate_chamber:_fundamental_node:993 - [Fundamental] Fetching for WIIM
+2026-05-17 14:42:44.036 | INFO     | services.debate_chamber:_sentiment_node:1241 - [Sentiment] Fetching for WIIM
+2026-05-17 14:42:44.457 | INFO     | services.fair_value_calculator:extract_keystats:295 - [FairValue] WIIM: DPS derived from yield (3.47%) × price (2) = 0.06
+2026-05-17 14:42:44.457 | INFO     | services.fair_value_calculator:extract_keystats:323 - [FairValue] WIIM: all key stats parsed OK: {'eps_ttm': 235.33, 'bvps': 1123.12, 'dps': 0.06, 'roe': '20.9%', 'pe': 7.95, 'pb': 1.67}
+2026-05-17 14:42:44.458 | INFO     | services.debate_chamber:_fundamental_node:1016 - [Fundamental] Fair value for WIIM: 2968.0
+2026-05-17 14:42:44.462 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:42:44.473 | INFO     | services.fair_value_calculator:extract_keystats:295 - [FairValue] BBCA: DPS derived from yield (5.51%) × price (3) = 0.16
+2026-05-17 14:42:44.473 | INFO     | services.fair_value_calculator:extract_keystats:323 - [FairValue] BBCA: all key stats parsed OK: {'eps_ttm': 471.1, 'bvps': 2102.07, 'dps': 0.16, 'roe': '22.4%', 'pe': 12.95, 'pb': 2.9}
+2026-05-17 14:42:44.473 | INFO     | services.debate_chamber:_fundamental_node:1016 - [Fundamental] Fair value for BBCA: 10474.0
+2026-05-17 14:42:44.474 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:42:44.540 | INFO     | services.debate_chamber:_chartist_node:1147 - [Chartist] Technicals computed: MA50=6425.0, RSI=42.8
+2026-05-17 14:42:44.544 | INFO     | services.debate_chamber:_chartist_node:1147 - [Chartist] Technicals computed: MA50=1881.0, RSI=49.3
+2026-05-17 14:42:44.610 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:42:44.615 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:42:45.080 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:42:45.087 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:42:46.897 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:42:47.244 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:42:53.577 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:42:57.687 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:43:02.306 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:43:02.310 | INFO     | services.debate_chamber:_synthesizer_node:1319 - [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-17 14:43:02.312 | INFO     | services.debate_chamber:_synthesizer_node:1441 - [RAG] WIIM evidence: 9/10 chunks, ~587 tokens
+2026-05-17 14:43:02.313 | INFO     | services.debate_chamber:_bullish_node:1541 - [Bull] Round 1 for WIIM
+2026-05-17 14:43:02.314 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:43:02.421 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:43:02.425 | INFO     | services.debate_chamber:_synthesizer_node:1319 - [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-17 14:43:02.427 | INFO     | services.debate_chamber:_synthesizer_node:1441 - [RAG] BBCA evidence: 9/10 chunks, ~592 tokens
+2026-05-17 14:43:02.429 | INFO     | services.debate_chamber:_bullish_node:1541 - [Bull] Round 1 for BBCA
+2026-05-17 14:43:02.429 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:43:18.614 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:43:18.618 | INFO     | services.debate_chamber:_bearish_node:1583 - [Bear] Round 1 for BBCA
+2026-05-17 14:43:18.619 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:43:22.400 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:43:22.405 | INFO     | services.debate_chamber:_bearish_node:1583 - [Bear] Round 1 for WIIM
+2026-05-17 14:43:22.405 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:43:35.980 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:43:35.984 | INFO     | services.debate_chamber:_consensus_evaluator_node:1637 - [Consensus] Evaluating 5-agent votes
+2026-05-17 14:43:35.985 | INFO     | services.debate_chamber:_consensus_evaluator_node:1640 - [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-17 14:43:35.986 | INFO     | services.debate_chamber:_state_cleaner_node:1673 - [State Cleaner] Deterministic pruning (no LLM)
+2026-05-17 14:43:35.987 | INFO     | services.debate_chamber:_bullish_node:1541 - [Bull] Round 2 for BBCA
+2026-05-17 14:43:35.988 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:43:36.560 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:43:36.566 | INFO     | services.debate_chamber:_consensus_evaluator_node:1637 - [Consensus] Evaluating 5-agent votes
+2026-05-17 14:43:36.567 | INFO     | services.debate_chamber:_consensus_evaluator_node:1640 - [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-17 14:43:36.569 | INFO     | services.debate_chamber:_state_cleaner_node:1673 - [State Cleaner] Deterministic pruning (no LLM)
+2026-05-17 14:43:36.570 | INFO     | services.debate_chamber:_bullish_node:1541 - [Bull] Round 2 for WIIM
+2026-05-17 14:43:36.570 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:43:49.464 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:43:49.468 | INFO     | services.debate_chamber:_bearish_node:1583 - [Bear] Round 2 for WIIM
+2026-05-17 14:43:49.469 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:43:50.296 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:43:50.300 | INFO     | services.debate_chamber:_bearish_node:1583 - [Bear] Round 2 for BBCA
+2026-05-17 14:43:50.301 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:44:04.281 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:44:04.287 | INFO     | services.debate_chamber:_consensus_evaluator_node:1637 - [Consensus] Evaluating 5-agent votes
+2026-05-17 14:44:04.288 | INFO     | services.debate_chamber:_consensus_evaluator_node:1640 - [Consensus] Result: reached=True method=soft_hold winner={'agent': 'soft_hold_rule', 'position': 'HOLD', 'confidence': 0.9} dissent=['fundamental_scout', 'bull', 'bear']
+2026-05-17 14:44:04.289 | INFO     | services.debate_chamber:_devils_advocate_node:1719 - [Devil's Advocate] Injecting adversarial scenario
+2026-05-17 14:44:04.290 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:44:06.818 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:44:06.820 | INFO     | services.debate_chamber:_consensus_evaluator_node:1637 - [Consensus] Evaluating 5-agent votes
+2026-05-17 14:44:06.821 | INFO     | services.debate_chamber:_consensus_evaluator_node:1640 - [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-17 14:44:06.822 | INFO     | services.debate_chamber:_state_cleaner_node:1673 - [State Cleaner] Deterministic pruning (no LLM)
+2026-05-17 14:44:06.822 | INFO     | services.debate_chamber:_bullish_node:1541 - [Bull] Round 3 for BBCA
+2026-05-17 14:44:06.823 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:44:13.694 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:44:13.698 | INFO     | services.debate_chamber:_cio_judge_node:2138 - [CIO] Deliberating on WIIM (current price: 1,870)
+2026-05-17 14:44:13.702 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:44:25.162 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:44:25.168 | INFO     | services.debate_chamber:_bearish_node:1583 - [Bear] Round 3 for BBCA
+2026-05-17 14:44:25.169 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:44:40.426 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:44:40.449 | INFO     | services.debate_chamber:_cio_judge_node:2349 - [CIO] JSON parsed successfully for WIIM
+2026-05-17 14:44:40.449 | INFO     | services.debate_chamber:_cio_judge_node:2367 - [CIO] Verdict delivered for WIIM
+2026-05-17 14:44:40.455 | INFO     | services.debate_chamber:run:2502 - [DebateChamber] ✅ Pipeline complete for WIIM
+2026-05-17 14:44:40.455 | INFO     | core.orchestrator.legacy:_run_single_debate:1086 - [Debate] âœ… Selesai: WIIM
+2026-05-17 14:44:40.455 | INFO     | core.orchestrator.legacy:_run_single_debate:1089 - [Debate] WIIM disagreement_type=timing
+2026-05-17 14:44:43.839 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:44:43.846 | INFO     | services.debate_chamber:_consensus_evaluator_node:1637 - [Consensus] Evaluating 5-agent votes
+2026-05-17 14:44:43.847 | INFO     | services.debate_chamber:_consensus_evaluator_node:1640 - [Consensus] Result: reached=True method=voting winner={'agent': 'fundamental_scout', 'position': 'BUY', 'confidence': 0.85, 'round': 0} dissent=['chartist', 'sentiment_specialist']
+2026-05-17 14:44:43.848 | INFO     | services.debate_chamber:_devils_advocate_node:1719 - [Devil's Advocate] Injecting adversarial scenario
+2026-05-17 14:44:43.849 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:44:55.315 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:44:55.324 | INFO     | services.debate_chamber:_cio_judge_node:2138 - [CIO] Deliberating on BBCA (current price: 6,100)
+2026-05-17 14:44:55.327 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 14:45:35.922 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-17 14:45:35.926 | INFO     | services.debate_chamber:_cio_judge_node:2349 - [CIO] JSON parsed successfully for BBCA
+2026-05-17 14:45:35.927 | INFO     | services.debate_chamber:_cio_judge_node:2367 - [CIO] Verdict delivered for BBCA
+2026-05-17 14:45:35.929 | INFO     | services.debate_chamber:run:2502 - [DebateChamber] ✅ Pipeline complete for BBCA
+2026-05-17 14:45:35.929 | INFO     | core.orchestrator.legacy:_run_single_debate:1086 - [Debate] âœ… Selesai: BBCA
