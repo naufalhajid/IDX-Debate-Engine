@@ -3993,3 +3993,209 @@
 2026-05-19 17:33:38.601 INFO     legacy.py:4166 | [Orchestrator] Full results -> output\full_batch_results.json
 2026-05-19 17:33:38.601 INFO     legacy.py:4167 | [Orchestrator] Top 0 report -> output\TOP_3_SWING_TRADES.md
 2026-05-19 17:33:38.620 INFO     __init__.py:1737 | ensuring close
+2026-05-19 17:56:14.057 INFO     legacy.py:3866 | [Orchestrator] Memulai IHSG Swing Trade Pipeline
+2026-05-19 17:56:14.058 INFO     legacy.py:3867 | [Orchestrator] Mode: multi
+2026-05-19 17:56:14.060 INFO     legacy.py:1816 | [PromptLinter] Prompt pack OK
+2026-05-19 17:56:14.081 INFO     legacy.py:3901 | [CLI] Menggunakan --tickers override; skip quant filter dan top10_candidates.json.
+2026-05-19 17:56:15.350 INFO     regime.py:70 | [Regime] IHSG realized vol (20d): 0.0138 (1.38%)
+2026-05-19 17:56:15.350 INFO     regime.py:101 | [Regime] NORMAL volatility (1.38%)
+2026-05-19 17:56:15.351 INFO     legacy.py:3941 | [Regime] NORMAL -- no overrides applied.
+2026-05-19 17:56:15.351 INFO     legacy.py:3954 | [CLI] 4 ticker dari --tickers: ['BBCA', 'ADRO', 'TLKM', 'WIIM']
+2026-05-19 17:56:15.351 INFO     legacy.py:3974 | [SAPTA] Evaluating 4 candidates...
+2026-05-19 17:56:15.680 INFO     sapta_filter.py:321 | [SAPTA] BBCA: score=26.0 phase=WATCHLIST pass=False
+2026-05-19 17:56:15.917 INFO     sapta_filter.py:321 | [SAPTA] ADRO: score=77.0 phase=PRE_MARKUP pass=True
+2026-05-19 17:56:16.115 INFO     sapta_filter.py:321 | [SAPTA] TLKM: score=65.5 phase=PRE_MARKUP pass=True
+2026-05-19 17:56:16.320 INFO     sapta_filter.py:321 | [SAPTA] WIIM: score=41.0 phase=SIAP pass=True
+2026-05-19 17:56:16.322 INFO     legacy.py:3976 | === SAPTA PRE-FILTER REPORT ===
+Threshold: 30 (DEBATE_THRESHOLD)
+
+PASSES (3 tickers):
+Ticker  Score  Phase       Top Signal
+------------------------------------------
+ADRO    77.0  PRE_MARKUP ATR compressed 38% vs prior period
+TLKM    65.5  PRE_MARKUP ATR compressed 30% vs prior period
+WIIM    41.0  SIAP       RSI 36.5 - ideal accumulation
+
+FILTERED OUT (1 tickers):
+Ticker  Score  Phase       Top Signal
+------------------------------------------
+BBCA    26.0  WATCHLIST  RSI 37.0 - ideal accumulation
+2026-05-19 17:56:16.323 INFO     legacy.py:3979 | [SAPTA] Filtered out 1 tickers: ['BBCA']
+2026-05-19 17:56:17.701 INFO     stockbit_api_client.py:315 | Logged in successfully with existing token!
+2026-05-19 17:56:18.940 INFO     legacy.py:4052 | [ProviderHealth] stockbit_ok=True yfinance_ok=True can_proceed=True failures=0
+2026-05-19 17:56:18.975 INFO     legacy.py:2982 | [Orchestrator] Meluncurkan 3 debate (concurrency=3, RPM=10)
+2026-05-19 17:56:24.640 INFO     stockbit_api_client.py:315 | Logged in successfully with existing token!
+2026-05-19 17:56:25.219 INFO     legacy.py:2896 | [ADRO] Budget terpakai: 1/200
+2026-05-19 17:56:25.221 INFO     legacy.py:2661 | [Debate] Mulai: ADRO
+2026-05-19 17:56:25.221 INFO     legacy.py:2896 | [TLKM] Budget terpakai: 2/200
+2026-05-19 17:56:25.224 INFO     legacy.py:2661 | [Debate] Mulai: TLKM
+2026-05-19 17:56:25.224 INFO     legacy.py:2896 | [WIIM] Budget terpakai: 3/200
+2026-05-19 17:56:25.226 INFO     legacy.py:2661 | [Debate] Mulai: WIIM
+2026-05-19 17:56:25.821 INFO     debate_chamber.py:2480 | [DebateChamber] ▶ Starting swing-trade pipeline for ADRO @ Rp 2,330
+2026-05-19 17:56:25.836 INFO     debate_chamber.py:1080 | [Chartist] Fetching OHLCV + orderbook for ADRO
+2026-05-19 17:56:25.837 INFO     debate_chamber.py:993 | [Fundamental] Fetching for ADRO
+2026-05-19 17:56:25.839 INFO     debate_chamber.py:1241 | [Sentiment] Fetching for ADRO
+2026-05-19 17:56:25.841 INFO     debate_chamber.py:2480 | [DebateChamber] ▶ Starting swing-trade pipeline for WIIM @ Rp 1,700
+2026-05-19 17:56:25.843 INFO     debate_chamber.py:1080 | [Chartist] Fetching OHLCV + orderbook for WIIM
+2026-05-19 17:56:25.843 INFO     debate_chamber.py:993 | [Fundamental] Fetching for WIIM
+2026-05-19 17:56:25.844 INFO     debate_chamber.py:1241 | [Sentiment] Fetching for WIIM
+2026-05-19 17:56:25.942 INFO     debate_chamber.py:2480 | [DebateChamber] ▶ Starting swing-trade pipeline for TLKM @ Rp 3,080
+2026-05-19 17:56:25.943 INFO     debate_chamber.py:1080 | [Chartist] Fetching OHLCV + orderbook for TLKM
+2026-05-19 17:56:25.944 INFO     debate_chamber.py:993 | [Fundamental] Fetching for TLKM
+2026-05-19 17:56:25.945 INFO     debate_chamber.py:1241 | [Sentiment] Fetching for TLKM
+2026-05-19 17:56:26.345 INFO     debate_chamber.py:1147 | [Chartist] Technicals computed: MA50=2400.0, RSI=40.2
+2026-05-19 17:56:26.352 INFO     debate_chamber.py:1147 | [Chartist] Technicals computed: MA50=1872.0, RSI=36.5
+2026-05-19 17:56:26.454 INFO     debate_chamber.py:1147 | [Chartist] Technicals computed: MA50=3052.0, RSI=58.7
+2026-05-19 17:56:26.608 INFO     fair_value_calculator.py:295 | [FairValue] ADRO: DPS derived from yield (11.29%) × price (1) = 0.09
+2026-05-19 17:56:26.608 INFO     fair_value_calculator.py:323 | [FairValue] ADRO: all key stats parsed OK: {'eps_ttm': 281.86, 'bvps': 2831.8, 'dps': 0.09, 'roe': '9.9%', 'pe': 8.27, 'pb': 0.82}
+2026-05-19 17:56:26.608 INFO     debate_chamber.py:1016 | [Fundamental] Fair value for ADRO: 2919.0
+2026-05-19 17:56:26.614 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:56:26.618 INFO     fair_value_calculator.py:295 | [FairValue] WIIM: DPS derived from yield (3.82%) × price (2) = 0.06
+2026-05-19 17:56:26.618 INFO     fair_value_calculator.py:323 | [FairValue] WIIM: all key stats parsed OK: {'eps_ttm': 235.33, 'bvps': 1123.12, 'dps': 0.06, 'roe': '20.9%', 'pe': 7.22, 'pb': 1.51}
+2026-05-19 17:56:26.618 INFO     debate_chamber.py:1016 | [Fundamental] Fair value for WIIM: 2968.0
+2026-05-19 17:56:26.619 INFO     fair_value_calculator.py:295 | [FairValue] TLKM: DPS derived from yield (6.88%) × price (2) = 0.16
+2026-05-19 17:56:26.619 INFO     fair_value_calculator.py:323 | [FairValue] TLKM: all key stats parsed OK: {'eps_ttm': 179.83, 'bvps': 1319.22, 'dps': 0.16, 'roe': '13.6%', 'pe': 17.13, 'pb': 2.33}
+2026-05-19 17:56:26.620 INFO     debate_chamber.py:1016 | [Fundamental] Fair value for TLKM: 3552.0
+2026-05-19 17:56:26.621 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:56:26.623 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:56:26.913 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:56:26.967 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:56:26.969 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:56:27.031 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:56:27.044 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:56:27.221 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:56:29.059 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:56:29.241 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:56:29.321 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:56:36.130 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:56:39.101 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:56:40.597 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:56:47.701 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:56:47.716 INFO     debate_chamber.py:1319 | [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-19 17:56:47.740 INFO     debate_chamber.py:1441 | [RAG] TLKM evidence: 9/9 chunks, ~598 tokens
+2026-05-19 17:56:47.743 INFO     debate_chamber.py:1541 | [Bull] Round 1 for TLKM
+2026-05-19 17:56:47.745 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:56:47.794 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:56:47.798 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:56:47.820 INFO     debate_chamber.py:1319 | [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-19 17:56:47.838 INFO     debate_chamber.py:1441 | [RAG] WIIM evidence: 8/9 chunks, ~586 tokens
+2026-05-19 17:56:47.842 INFO     debate_chamber.py:1319 | [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-19 17:56:47.847 INFO     debate_chamber.py:1441 | [RAG] ADRO evidence: 9/10 chunks, ~591 tokens
+2026-05-19 17:56:47.869 INFO     debate_chamber.py:1541 | [Bull] Round 1 for WIIM
+2026-05-19 17:56:47.872 INFO     debate_chamber.py:1541 | [Bull] Round 1 for ADRO
+2026-05-19 17:56:47.877 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:56:47.895 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:57:08.695 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:57:08.708 INFO     debate_chamber.py:1583 | [Bear] Round 1 for WIIM
+2026-05-19 17:57:08.710 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:57:09.307 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:57:09.320 INFO     debate_chamber.py:1583 | [Bear] Round 1 for TLKM
+2026-05-19 17:57:09.323 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:57:10.161 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:57:10.171 INFO     debate_chamber.py:1583 | [Bear] Round 1 for ADRO
+2026-05-19 17:57:10.173 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:57:29.378 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:57:29.388 INFO     debate_chamber.py:1637 | [Consensus] Evaluating 5-agent votes
+2026-05-19 17:57:29.389 INFO     debate_chamber.py:1640 | [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-19 17:57:29.393 INFO     debate_chamber.py:1673 | [State Cleaner] Deterministic pruning (no LLM)
+2026-05-19 17:57:29.395 INFO     debate_chamber.py:1541 | [Bull] Round 2 for TLKM
+2026-05-19 17:57:29.397 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:57:29.601 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:57:29.608 INFO     debate_chamber.py:1637 | [Consensus] Evaluating 5-agent votes
+2026-05-19 17:57:29.610 INFO     debate_chamber.py:1640 | [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-19 17:57:29.612 INFO     debate_chamber.py:1673 | [State Cleaner] Deterministic pruning (no LLM)
+2026-05-19 17:57:29.615 INFO     debate_chamber.py:1541 | [Bull] Round 2 for WIIM
+2026-05-19 17:57:29.617 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:57:29.992 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:57:30.000 INFO     debate_chamber.py:1637 | [Consensus] Evaluating 5-agent votes
+2026-05-19 17:57:30.002 INFO     debate_chamber.py:1640 | [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-19 17:57:30.005 INFO     debate_chamber.py:1673 | [State Cleaner] Deterministic pruning (no LLM)
+2026-05-19 17:57:30.006 INFO     debate_chamber.py:1541 | [Bull] Round 2 for ADRO
+2026-05-19 17:57:30.008 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:57:41.768 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:57:41.779 INFO     debate_chamber.py:1583 | [Bear] Round 2 for WIIM
+2026-05-19 17:57:41.782 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:57:46.685 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:57:46.693 INFO     debate_chamber.py:1583 | [Bear] Round 2 for TLKM
+2026-05-19 17:57:46.695 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:57:46.989 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:57:46.996 INFO     debate_chamber.py:1583 | [Bear] Round 2 for ADRO
+2026-05-19 17:57:46.998 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:57:59.713 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:58:01.039 INFO     debate_chamber.py:1637 | [Consensus] Evaluating 5-agent votes
+2026-05-19 17:58:01.045 INFO     debate_chamber.py:1640 | [Consensus] Result: reached=True method=soft_hold winner={'agent': 'soft_hold_rule', 'position': 'HOLD', 'confidence': 0.85} dissent=['fundamental_scout', 'bull', 'bear']
+2026-05-19 17:58:01.052 INFO     debate_chamber.py:1719 | [Devil's Advocate] Injecting adversarial scenario
+2026-05-19 17:58:01.055 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:58:03.027 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:58:03.038 INFO     debate_chamber.py:1637 | [Consensus] Evaluating 5-agent votes
+2026-05-19 17:58:03.043 INFO     debate_chamber.py:1640 | [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-19 17:58:03.048 INFO     debate_chamber.py:1673 | [State Cleaner] Deterministic pruning (no LLM)
+2026-05-19 17:58:03.050 INFO     debate_chamber.py:1541 | [Bull] Round 3 for ADRO
+2026-05-19 17:58:03.051 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:58:05.415 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:58:05.427 INFO     debate_chamber.py:1637 | [Consensus] Evaluating 5-agent votes
+2026-05-19 17:58:05.430 INFO     debate_chamber.py:1640 | [Consensus] Result: reached=True method=soft_hold winner={'agent': 'soft_hold_rule', 'position': 'HOLD', 'confidence': 0.85} dissent=['fundamental_scout', 'bull', 'bear']
+2026-05-19 17:58:05.434 INFO     debate_chamber.py:1719 | [Devil's Advocate] Injecting adversarial scenario
+2026-05-19 17:58:05.437 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:58:13.823 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:58:13.833 INFO     debate_chamber.py:2138 | [CIO] Deliberating on WIIM (current price: 1,700)
+2026-05-19 17:58:13.850 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:58:15.410 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:58:15.418 INFO     debate_chamber.py:2138 | [CIO] Deliberating on TLKM (current price: 3,080)
+2026-05-19 17:58:15.422 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:58:16.328 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:58:16.336 INFO     debate_chamber.py:1583 | [Bear] Round 3 for ADRO
+2026-05-19 17:58:16.338 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:58:36.927 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:58:36.935 INFO     debate_chamber.py:1637 | [Consensus] Evaluating 5-agent votes
+2026-05-19 17:58:36.937 INFO     debate_chamber.py:1640 | [Consensus] Result: reached=False method=confidence_winner winner={'agent': 'fundamental_scout', 'position': 'BUY', 'confidence': 0.85, 'round': 0} dissent=['chartist', 'sentiment_specialist', 'bear']
+2026-05-19 17:58:36.939 INFO     debate_chamber.py:1719 | [Devil's Advocate] Injecting adversarial scenario
+2026-05-19 17:58:36.941 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:58:40.252 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:58:40.267 INFO     debate_chamber.py:2349 | [CIO] JSON parsed successfully for WIIM
+2026-05-19 17:58:40.267 INFO     debate_chamber.py:2367 | [CIO] Verdict delivered for WIIM
+2026-05-19 17:58:40.306 INFO     debate_chamber.py:2502 | [DebateChamber] ✅ Pipeline complete for WIIM
+2026-05-19 17:58:40.307 INFO     legacy.py:2680 | [Debate] ✓ Selesai: WIIM
+2026-05-19 17:58:40.307 INFO     legacy.py:2683 | [Debate] WIIM disagreement_type=timing
+2026-05-19 17:58:45.927 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:58:45.932 INFO     debate_chamber.py:2349 | [CIO] JSON parsed successfully for TLKM
+2026-05-19 17:58:45.932 INFO     debate_chamber.py:2367 | [CIO] Verdict delivered for TLKM
+2026-05-19 17:58:45.936 INFO     debate_chamber.py:2502 | [DebateChamber] ✅ Pipeline complete for TLKM
+2026-05-19 17:58:45.936 INFO     legacy.py:2680 | [Debate] ✓ Selesai: TLKM
+2026-05-19 17:58:45.937 INFO     legacy.py:2683 | [Debate] TLKM disagreement_type=timing
+2026-05-19 17:58:49.439 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:58:49.450 INFO     debate_chamber.py:2138 | [CIO] Deliberating on ADRO (current price: 2,330)
+2026-05-19 17:58:49.455 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-19 17:59:20.125 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-19 17:59:20.135 INFO     debate_chamber.py:2349 | [CIO] JSON parsed successfully for ADRO
+2026-05-19 17:59:20.136 INFO     debate_chamber.py:2367 | [CIO] Verdict delivered for ADRO
+2026-05-19 17:59:20.149 INFO     debate_chamber.py:2502 | [DebateChamber] ✅ Pipeline complete for ADRO
+2026-05-19 17:59:20.151 INFO     legacy.py:2680 | [Debate] ✓ Selesai: ADRO
+2026-05-19 17:59:20.152 INFO     legacy.py:2683 | [Debate] ADRO disagreement_type=direction
+2026-05-19 17:59:20.156 INFO     legacy.py:3010 | [Budget] Run selesai: Pro 3/200, Flash 26/2000
+2026-05-19 17:59:20.163 INFO     legacy.py:2401 | [News] ADRO: sentiment=UNKNOWN adjustment=+0.00
+2026-05-19 17:59:20.175 INFO     legacy.py:2453 | [RiskGovernor] ADRO: deployable (price_inside_entry_range)
+2026-05-19 17:59:20.184 INFO     legacy.py:2401 | [News] TLKM: sentiment=UNKNOWN adjustment=+0.00
+2026-05-19 17:59:20.184 INFO     legacy.py:2453 | [RiskGovernor] TLKM: deployable (price_inside_entry_range)
+2026-05-19 17:59:20.185 INFO     legacy.py:2401 | [News] WIIM: sentiment=UNKNOWN adjustment=+0.00
+2026-05-19 17:59:20.185 INFO     legacy.py:2453 | [RiskGovernor] WIIM: deployable (price_inside_entry_range)
+2026-05-19 17:59:20.187 INFO     legacy.py:4124 | [Orchestrator] Debate summary: 3 succeeded / 0 failed
+2026-05-19 17:59:20.504 INFO     historical_scorer.py:81 | [HistScorer] Loaded 138 debate records dari output\debates
+2026-05-19 17:59:20.534 INFO     legacy.py:3095 | [Rank] Excluded TLKM – rating HOLD
+2026-05-19 17:59:20.536 INFO     legacy.py:3095 | [Rank] Excluded WIIM – rating HOLD
+2026-05-19 17:59:20.540 INFO     portfolio_optimizer.py:90 | [Portfolio] 1 dipilih dari 1 eligible (top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-19 17:59:20.540 INFO     legacy.py:3124 | [Rank] Top 1 dipilih: ['ADRO'] (dari 1 eligible, top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-19 17:59:20.554 INFO     legacy.py:4155 | [Sizing] 0 posisi | Deployed: Rp 0 (0.0%)
+2026-05-19 17:59:20.565 INFO     legacy.py:3145 | [Persist] Full results -> output\full_batch_results.json
+2026-05-19 17:59:20.607 INFO     legacy.py:2552 | [Audit] ADRO: ADRO→BUY: chartist won by confidence (0.85) after 3 round(s). 3 agent(s) dissented. Negative technical momentum with price below MA50 and EMA20, which are now resistance.
+2026-05-19 17:59:20.626 INFO     legacy.py:2552 | [Audit] TLKM: TLKM→HOLD: soft_hold_rule applied (0.55) after 2 round(s). 3 agent(s) dissented. Structural downtrend (price below MA200), making this a high-risk counter-trend trade.
+2026-05-19 17:59:20.639 INFO     legacy.py:2552 | [Audit] WIIM: WIIM→HOLD: soft_hold_rule applied (0.42) after 2 round(s). 3 agent(s) dissented. Negative short-term technical momentum; price is below EMA20 and MA50 which now act as overhead resistance.
+2026-05-19 17:59:20.641 INFO     legacy.py:3260 | [Persist] 3 versioned debate records disimpan ke output\debates
+2026-05-19 17:59:20.647 INFO     legacy.py:3821 | [Persist] Top 1 report -> output\TOP_3_SWING_TRADES.md
+2026-05-19 17:59:20.659 INFO     legacy.py:3284 | [ArtifactValidator] Output artifacts valid.
+2026-05-19 17:59:20.681 INFO     legacy.py:2628 | [Telemetry] Batch report saved for 20260519_175614
+2026-05-19 17:59:20.695 INFO     legacy.py:2641 | [ReportConsistency] passed
+2026-05-19 17:59:20.696 INFO     legacy.py:4225 | [Orchestrator] Pipeline selesai
+2026-05-19 17:59:20.696 INFO     legacy.py:4226 | [Orchestrator] Regime: NORMAL | Top N: 1
+2026-05-19 17:59:20.697 INFO     legacy.py:4227 | [Orchestrator] Full results -> output\full_batch_results.json
+2026-05-19 17:59:20.697 INFO     legacy.py:4228 | [Orchestrator] Top 1 report -> output\TOP_3_SWING_TRADES.md
