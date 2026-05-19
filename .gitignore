@@ -1,10 +1,14 @@
-# exclude folders
-.idea
-.venv
-logs
-__pycache__
-.pytest_cache
-tmp
+# Local environments and caches
+.idea/
+.vscode/
+.venv/
+logs/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.uv-cache/
+tmp/
+pipeline.log
 
 # AI agent / vibe-coding workspace files
 .agent/
@@ -15,18 +19,27 @@ tmp
 .github/skills/
 AGENTS.md
 
-# exclude files
+# Secrets and local data
 .env
+.env.*
+!.env.example
+!.env.test
 *.http
 *.xlsx
 *.cache
 *.db
 
-# Svelte
-node_modules
+# Generated runtime artifacts
+/output/**
+!/output/.gitkeep
+!/output/debates/
+!/output/debates/.gitkeep
+!/output/backtest/
+!/output/backtest/.gitkeep
+.output/
 
-# Output
-.output
+# Frontend/build output
+node_modules/
 .vercel
 .netlify
 .wrangler
@@ -36,12 +49,6 @@ node_modules
 # OS
 .DS_Store
 Thumbs.db
-
-# Env
-.env
-.env.*
-!.env.example
-!.env.test
 
 # Vite
 vite.config.js.timestamp-*
