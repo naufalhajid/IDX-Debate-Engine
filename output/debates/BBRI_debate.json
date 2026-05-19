@@ -1,0 +1,59 @@
+{
+  "ticker": "BBRI",
+  "verdict": {
+    "ticker": "BBRI",
+    "rating": "HOLD",
+    "confidence": 0.0,
+    "fair_value": null,
+    "entry_price_range": "2980 - 3070",
+    "target_price": 3360.0,
+    "stop_loss": 2860.0,
+    "current_price": 3070.0,
+    "timeframe": "1-3 Months",
+    "weighted_reasoning": "",
+    "critical_risk_factor": "",
+    "key_catalysts": [],
+    "key_risks": [
+      "Fair value tidak tersedia — validasi fundamental secara manual sebelum entry."
+    ],
+    "summary": "CIO parse error — raw response stored. Error: Unterminated string starting at: line 5 column 14 (char 78)",
+    "expected_return": "+11.1%",
+    "risk_reward_ratio": 2.03,
+    "is_overvalued": null,
+    "wait_and_see": true
+  },
+  "debate_rounds": 2,
+  "debate_history": [
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 209, Rp 3,070, Rp 4,028, Rp 3,034",
+      "round": 0
+    },
+    {
+      "role": "bull",
+      "content": "…significant discount relative to its 52-week high of Rp 4,028 and is just above its 52-week low of Rp 3,034, making it fundamentally attractive for dividend-seeking investors at this depressed valuation.\n\n2.  **TECHNICAL ENTRY:** The optimal entry zone is identified around the current price of Rp 3,070, which is critically positioned just above the 52-week low of Rp 3,034. This level represents a high-probability support zone, as historical lows often act as strong psychological and technical floors for price action. The RSI14 at 36.9 also suggests the stock is approaching oversold conditions,",
+      "round": 1
+    },
+    {
+      "role": "bear",
+      "content": "As a Forensic Financial Auditor, the proposed swing trade BUY case for BBRI presents significant red flags and an unfavorable risk profile, making it a strong AVOID/SELL candidate.\n\n1.  **OVERVALUATION CHECK & LACK OF MARGIN OF SAFETY:** The absence of a calculable fair",
+      "round": 1
+    },
+    {
+      "role": "bull",
+      "content": "The Bear's assessment of an \"unfavorable risk profile\" fundamentally misinterprets the current market dynamics for BBRI. While a traditional fair value calculation is unavailable, the *income-based intrinsic value* derived from the announced dividend is substantial. A 6.2% yield, coupled",
+      "round": 2
+    },
+    {
+      "role": "bear",
+      "content": "As a Forensic Financial Auditor, the Bull's reliance on an \"income-based intrinsic value\" from the dividend yield is a dangerous misdirection, particularly given the current technical landscape and inherent market volatility.\n\nFirst, the Bull's \"income-based intrinsic value\" derived from the",
+      "round": 2
+    },
+    {
+      "role": "devils_advocate",
+      "content": "1.  If foreign funds accelerate net selling across the IHSG, could the Rp 3,034 52-week low support break, triggering a deeper market correction towards Rp 2,900 within 1-3 months?\n\n2.  Given the",
+      "round": 3
+    }
+  ],
+  "raw_data_summary": "=== FUNDAMENTALS ===\n**FAIR VALUE: Tidak dapat dikalkulasi (Data Kosong / None)**\n\n**VALUATION VERDICT:**\nDue to insufficient data, a fair value calculation was not possible, and therefore, a valuation verdict (undervalued/fairly valued/overvalued) cannot be\n\n=== TECHNICALS ===\n**Technical Chart Analysis for IHSG Swing Trade**\n\nThe IHSG is currently in a strong bearish trend. The current price of Rp 3,070 is trading significantly below both the MA50 (Rp 3,369) and the MA200\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 3070.0,\n  \"sma20\": 3165.0,\n  \"ma50\": 3369.0,\n  \"ma200\": 3469.0,\n  \"rsi14\": 36.9,\n  \"atr14\": 82.0,\n  \"avg_volume_20d\": 293780760.0,\n  \"52w_high\": 4028.0,\n  \"52w_low\": 3034.0\n}\n\n=== SENTIMENT ===\n**Overall Mood:** BULLISH (90% Confidence). The sentiment is strongly positive, driven by the announcement of BBRI's final dividend of Rp209/share, indicating a robust 6.2% yield and an increased dividend payout ratio of ~92% for the 2025 fiscal year. This news is a clear positive catalyst for shareholders.\n\n**Dominant Discussion Theme:** The primary theme is the final dividend announcement for Bank Rakyat Indonesia ($BBRI), specifically the per-share amount, dividend yield, and the high dividend payout ratio. The community is discussing the implications of this significant corporate action.\n\n**Volume Anomaly:** Discussion volume is abnormally high. The post has garnered 411 replies and 784 likes, which are substantial engagement metrics for a single pinned post, indicating significant community interest and reaction to the dividend news.\n\n**Swing-Trade Timing Signal:** The sentiment is trending with a likely positive price action. This is a strong bullish signal, suggesting buying interest and potential upward momentum for BBRI. It is not an \"EXTREME\" contrarian signal but rather a confirmation of fundamental strength that could support a continuation of a bullish trend or initiate one. The positive sentiment is expected to align with positive price movement.\n\n**Red Flags:** No red flags detected. The post originates from \"Stockbit\" (a verified admin account), providing credible, factual information regarding a corporate action. There is no language indicative of coordinated pump signals, insider-leak patterns, or panic.\n\n=== DIVIDEND EX-DATE SCAN: BBRI ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n"
+}

@@ -1,0 +1,17 @@
+{
+  "prompt_version": "2026-05-11-critical-audit-v1",
+  "prompts": {
+    "FUNDAMENTAL_SCOUT_PROMPT": "fundamental_scout.txt",
+    "CHARTIST_PROMPT": "chartist.txt",
+    "SENTIMENT_PROMPT": "sentiment.txt",
+    "BULL_SYSTEM_PROMPT_R1": "bull_r1.txt",
+    "BULL_SYSTEM_PROMPT_R2": "bull_r2.txt",
+    "BEAR_SYSTEM_PROMPT_R1": "bear_r1.txt",
+    "BEAR_SYSTEM_PROMPT_R2": "bear_r2.txt",
+    "CONSENSUS_PROMPT": "consensus.txt",
+    "STATE_CLEANER_PROMPT": "state_cleaner.txt",
+    "DEVILS_ADVOCATE_PROMPT": "devils_advocate.txt",
+    "CIO_SYSTEM_PROMPT": "cio_judge.txt",
+    "AGENT_SIGNAL_PROMPT": "agent_signal.txt"
+  }
+}

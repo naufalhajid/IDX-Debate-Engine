@@ -1,0 +1,162 @@
+{
+  "ticker": "WIIM",
+  "verdict": {
+    "ticker": "WIIM",
+    "rating": "HOLD",
+    "confidence": 0.41,
+    "fair_value": 2968.0,
+    "entry_price_range": "1815 - 1870",
+    "target_price": 2000.0,
+    "stop_loss": 1765.0,
+    "current_price": 1870.0,
+    "timeframe": "1-3 Months",
+    "weighted_reasoning": "The decision to rate WIIM as HOLD is dictated by the 'soft_hold' consensus rule, which overrides the otherwise positive signals. On paper, the trade is attractive: the current price of Rp 1,870 is deeply undervalued against a fair value of Rp 2,968, and the Python-calculated trade envelope offers an excellent Risk/Reward ratio of 2.03. However, this long-term value proposition is countered by significant short-term risks. As highlighted by the Devil's Advocate, the price is already trading below its EMA20 and MA50, indicating technical weakness and vulnerability to a further decline towards the MA200 support. The absence of a clear catalyst within the 1-3 month swing trading horizon means there is no immediate trigger for the market to re-rate the stock. Therefore, despite the strong fundamentals, the immediate risk of a breakdown and lack of a short-term driver make a HOLD rating the most prudent course of action, pending a clear technical confirmation of support. Consensus override: Bull/Bear confidence gap was below 0.15, so the chamber treats this as soft consensus HOLD instead of forcing an entry.",
+    "critical_risk_factor": "",
+    "key_catalysts": [
+      "Significant undervaluation (58.7% discount to Fair Value of Rp 2,968) providing a strong margin of safety.",
+      "Excellent trade structure with a calculated Risk/Reward ratio of 2.03.",
+      "Strong fundamental health, including low debt (0.09 D/E) and high profitability (20.95% ROE)."
+    ],
+    "key_risks": [
+      "Technical Weakness: Price is currently trading below key short-term moving averages (EMA20, MA50), increasing the risk of a breakdown towards the MA200 support at Rp 1,490.",
+      "Lack of Near-Term Catalyst: No specific event (e.g., earnings, contracts) is identified within the 1-3 month timeframe to trigger a rapid price re-rating towards fair value.",
+      "Marginal Net Return: The Devil's Advocate stress test shows a net return of only ~2.56% after transaction costs, which is low for a swing trade."
+    ],
+    "summary": "This is a HOLD due to a mandatory consensus override. While the trade presents a compelling 2.03 R/R ratio and a significant 58.7% discount to fair value, these positives are negated by immediate technical weakness and a lack of near-term catalysts. The current price is below key moving averages, posing a breakdown risk that justifies waiting for stronger confirmation before entry.",
+    "expected_return": "+8.5%",
+    "risk_reward_ratio": 2.03,
+    "is_overvalued": false,
+    "wait_and_see": true,
+    "consensus_reached": true,
+    "consensus_method": "soft_hold",
+    "dissenting_agents": [
+      "fundamental_scout",
+      "bull",
+      "bear"
+    ]
+  },
+  "debate_rounds": 2,
+  "consensus_reached": true,
+  "consensus_method": "soft_hold",
+  "dissenting_agents": [
+    "fundamental_scout",
+    "bull",
+    "bear"
+  ],
+  "agent_votes": [
+    {
+      "agent": "fundamental_scout",
+      "position": "BUY",
+      "confidence": 0.75,
+      "round": 0
+    },
+    {
+      "agent": "chartist",
+      "position": "HOLD",
+      "confidence": 0.0,
+      "round": 0
+    },
+    {
+      "agent": "sentiment_specialist",
+      "position": "HOLD",
+      "confidence": 0.0,
+      "round": 0
+    },
+    {
+      "agent": "bull",
+      "position": "BUY",
+      "confidence": 0.85,
+      "round": 2
+    },
+    {
+      "agent": "bear",
+      "position": "AVOID",
+      "confidence": 0.9,
+      "round": 2
+    }
+  ],
+  "disagreement_type": "timing",
+  "debate_history": [
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 1,870, Rp 2,968, Rp 1,881, Rp 1,880, Rp 1,490, Rp 1,930, Rp 1,739, Rp 131, Rp 60",
+      "round": 0,
+      "position": "UNKNOWN",
+      "confidence": null
+    },
+    {
+      "role": "bull",
+      "content": "…en catalyst significantly weakens the conviction for a rapid price appreciation. Furthermore, the proposed technical trade setup yields an unfavorable risk/reward profile: Entry Rp 1,870 → Target Rp 1,930 → Stop Rp 1,739. This translates to a potential reward of Rp 60 and a potential risk of Rp 131, resulting in a Risk/Reward ratio of 0.46:1. This ratio is well below the typically desired 1.5:1 or 2:1 for a viable swing trade, indicating that the potential loss is more than double the potential gain.\n\nGiven the lack of a specific near-term catalyst and the\n\nPosition: BUY\nAgent Confidence: 0.60",
+      "round": 1,
+      "position": "BUY",
+      "confidence": 0.6
+    },
+    {
+      "role": "bear",
+      "content": "…he expected target.\n\nFurthermore, the proposed risk/reward (R/R) ratio is highly unfavorable and renders the trade unattractive. With an entry at Rp 1,870, a target at Rp 1,930, and a stop-loss at Rp 1,739, the potential reward is Rp 60, while the potential risk is Rp 131. This results in an R/R ratio of 0.46:1, meaning the potential loss is more than double the potential gain. This violates fundamental risk management principles, which typically demand an R/R of at least 1.5:1 or 2:1 for a viable swing trade, making this setup financially irresponsible.\n\nPosition: AVOID\nAgent Confidence: 0.90",
+      "round": 1,
+      "position": "AVOID",
+      "confidence": 0.9
+    },
+    {
+      "role": "bull",
+      "content": "The Bear's concern regarding the absence of a near-term event catalyst overlooks the robust fundamental undervaluation as a potent, ongoing driver for price appreciation. WIIM's current market valuation is at a substantial discount to its calculated intrinsic worth, providing a significant margin of safety. This inherent value gap, underpinned by exceptional profitability metrics like a high Return on Equity and remarkably low financial leverage, acts as a compelling, enduring catalyst for a re-rating. The company's strong operational performance and pristine balance sheet offer a solid foundation for sustained upward movement, independent of specific event-driven news.\n\nThe argument that immediate technical support levels are precarious fails to acknowledge the deeper, more resilient structural floor. Should the initial consolidation area be breached, a robust secondary support exists considerably lower, firmly established by the 200-day moving average. This long-term average represents a historically significant demand zone, providing a substantial buffer against further declines and effectively limiting the overall downside risk. The stock's well-defined structural uptrend further supports the expectation of a rebound from these foundational levels, rather than a sustained breakdown.\n\nThe Bear's critique of the short-term technical risk-reward ratio overlooks the profound implications of the wide price-to-fair-value gap. The substantial upside potential to the company's intrinsic value fundamentally redefines the overall risk-reward profile. This significant undervaluation provides an ample cushion to absorb the Bear's projected risk scenario, suggesting that even a temporary dip to the proposed stop-loss level would still leave the asset trading at a deep discount to its true worth. Such a scenario would merely present an enhanced entry opportunity for investors focused on long-term value realization, effectively mitigating the perceived short-term technical risk.\n\nPosition: BUY\nAgent Confidence: 0.85",
+      "round": 2,
+      "position": "BUY",
+      "confidence": 0.85
+    },
+    {
+      "role": "bear",
+      "content": "The Bull's reliance on the EMA20 and MA50 as robust support for an entry zone between Rp 1,870 and Rp 1,881 is fundamentally flawed for a swing trade. The current price of Rp 1,870 is already trading below both the EMA20 at Rp 1,880 and the MA50 at Rp 1,881. This positioning suggests a potential breakdown of these levels rather than a confirmed bounce, invalidating the premise of entering on support. Furthermore, the provided data lacks historical context to demonstrate WIIM's consistent respect for these specific moving averages as reliable support, making their current proximity an unproven thesis for a swing long.\n\nThe Bull's assumed maximum loss, based on a stop-loss at Rp 1,739, severely underestimates the true downside risk. If the initial support levels around Rp 1,880 fail, the next significant structural floor identified is the MA200 at Rp 1,490. This implies that if the trade were to proceed and the initial stop loss proved insufficient, the actual potential maximum loss from the entry price of Rp 1,870 could extend to Rp 1,490, representing a decline of Rp 380. This is significantly greater than the Bull's implied risk. Moreover, a margin of safety stress test using the ATR(14) of 94.0 reveals that a typical maximum 1-week adverse move (2 × ATR) for WIIM is Rp 188. This potential adverse move of Rp 188 *exceeds* the Bull's calculated risk tolerance of Rp 131 (Rp 1,870 - Rp 1,739), indicating the proposed stop loss is too tight and could be easily triggered by normal market volatility, rendering the swing trade unviable.\n\nThe assertion that a \"robust fundamental undervaluation\" with a Fair Value of Rp 2,968 provides an \"ongoing driver\" or \"significant margin of safety\" for a swing trade is misleading. While a substantial 58.7% upside to fair value might appeal to long-term value investors, this metric does not function as a reliable short-term catalyst for a 1-3 month swing trade. The absence of specific, near-term event catalysts (e.g., earnings, new contracts) within the swing horizon means there is no immediate trigger for the market to re-rate the stock towards this theoretical fair value. Relying solely on a static fair value calculation as a \"floor\" for a swing trade ignores the dynamic nature of market sentiment and technical price action, which are paramount for short-term movements.\n\nPosition: AVOID\nAgent Confidence: 0.90",
+      "round": 2,
+      "position": "AVOID",
+      "confidence": 0.9
+    },
+    {
+      "role": "devils_advocate",
+      "content": "Position: BEARISH\nAgent Confidence: HIGH\n\n1.  **MACRO/COMPANY RISK & FOREIGN FLOW:**\n    Given WIIM's current price of Rp 1,870 is already below EMA20 (Rp 1,880) and MA50 (Rp 1,881), if broader market sentiment deteriorates, leading to accelerated foreign fund outflows from the IHSG, could this trigger a decisive breakdown of these immediate support levels, pushing the stock towards its MA200 at Rp 1,490 within 1-3 months?\n\n2.  **EXECUTION RISK — Transaction Cost Stress Test:**\n    Menggunakan harga entry Rp 1,870 dan target Rp 1,930, gross return yang diharapkan adalah (Rp 1,930 - Rp 1,870) / Rp 1,870 = 3.21%. Total biaya transaksi round-trip dihitung sebagai berikut: biaya beli 0.15% dari Rp 1,870, biaya jual 0.25% dari Rp 1,930, PPh final 0.10% dari Rp 1,930, dan estimasi slippage 0.15% (karena harga >= Rp 500) dari Rp 1,870. Secara persentase dari nilai entry, total biaya adalah 0.15% (beli) + 0.25% (jual) + 0.10% (PPh) + 0.15% (slippage) = 0.65%. Dengan demikian, net return setelah biaya adalah 3.21% - 0.65% = 2.56%. Berdasarkan kriteria, ini dikategorikan sebagai MARGINAL — only proceed if conviction high.",
+      "round": 3,
+      "position": "AVOID",
+      "confidence": 1.0
+    }
+  ],
+  "raw_data_summary": "=== EVIDENCE BRIEF: WIIM ===\nQuery: swing trade analysis\n\n[FAIR_VALUE]\nEvidence ID: WIIM_fair_value_0\nCurrent Price: 1870 | Fair Value: 2968 | Upside: 58.7%\nSource: stockbit | Score: 1.00\n\n[FUNDAMENTAL]\nEvidence ID: WIIM_fundamental_0\n{\"brief\":\"FAIR VALUE: Rp 2,968 WIIM is significantly undervalued, with a current market price of Rp 1,870 representing a 58.7% discount to its calculated fair value of Rp 2,968. This substantial upside potential is derived from P/E and P/B band methodologies, indicating a strong fundamental cushion for a swing trade setup. Key fundamental metrics support this valuation. The company exhibits\nSource: stockbit | Score: 0.90\n\n[FUNDAMENTAL]\nEvidence ID: WIIM_fundamental_1\nrobust profitability with a TTM Return on Equity (ROE) of 20.95% and a Net Profit Margin of 9.19%. Financial leverage is very low, with a Debt/Equity Ratio of 0.09, coupled with excellent interest coverage at 29.95x. WIIM also offers a dividend yield of 3.47%. Regarding growth catalysts, the latest dividend ex-date was 10 Jun 25, which is a PAST_EVENT_NOT_CATALYST relative to the current date\nSource: stockbit | Score: 0.90\n\n[FUNDAMENTAL]\nEvidence ID: WIIM_fundamental_2\n(2026-05-17). No other specific upcoming catalysts (e.g., earnings release, new contracts) within the 1-3 month swing trade horizon are identified from the provided data. For quality checks, no red flags were detected fo...\",\"exdate\":\"=== DIVIDEND EX-DATE SCAN: WIIM ===\\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\\n\"}\nSource: stockbit | Score: 0.90\n\n[TECHNICAL]\nEvidence ID: WIIM_technical_0\n{\"52w_high\":2100.0,\"52w_low\":730.0,\"atr14\":94.0,\"avg_volume_20d\":3292495.0,\"brief\":\"Saham dalam uptrend struktural. Swing long searah tren. Harga saat ini berada di dekat support EMA20 dan MA50, menunjukkan potensi untuk melanjutkan tren naik setelah koreksi minor. ENTRY ZONE: Rp 1,870 – Rp 1,881. Harga saat ini berada sedikit di bawah EMA20 dan MA50, mengindikasikan potensi re-test atau pantulan\nSource: yfinance | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: WIIM_technical_1\ndari area support ini. TARGET: Rp 1,930 (approx. 3% from entry mid). Level ini merupakan resistance terdekat yang signifikan berdasarkan orderbook. STOP LOSS: Rp 1,739 (1.5× ATR below EMA20). Stop loss ini ditempatkan di bawah volatilitas rata-rata Position: HOLD Agent Confidence:\nSource: yfinance | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: WIIM_technical_2\n0.00\",\"current_price\":1870.0,\"ema20\":1880.0,\"ma200\":1490.0,\"ma200_context\":\"ABOVE\",\"ma50\":1881.0,\"rsi14\":49.3,\"sma20\":1861.0}\nSource: yfinance | Score: 0.85\n\n[EXDATE]\nEvidence ID: WIIM_exdate_0\nDividend Ex-Date: === DIVIDEND EX-DATE SCAN: WIIM ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\nSource: stockbit | Score: 0.70\n\n[SENTIMENT]\nEvidence ID: WIIM_sentiment_0\n```json { \"sentiment\": \"INSUFFICIENT_DATA\", \"confidence\": 0, \"dominant_theme\": null, \"volume_anomaly\": null, \"swing_signal\": null, \"red_flags\": [], \"reason\": \"Data sosial tidak mencukupi (< 5 post)\" } ``` Position: HOLD Agent Confidence: 0.00\nSource: gemini | Score: 0.60\n\n---\nTotal evidence: 9/10 chunks selected\nToken estimate: ~587\n\n=== NEWS BRIEF: WIIM ===\nPeriod: last 60 days\nSentiment: UNKNOWN (score: +0.00)\nNo news data available\nConfidence adjustment: +0.00\nReason: No news data available - sentiment unverified\n\nTOP NEWS:\nnone",
+  "metadata": {
+    "prompt_version": "2026-05-11-critical-audit-v1",
+    "run_id": "unknown",
+    "market_data_source": "yfinance",
+    "market_data_cached": true,
+    "flash_calls": 8,
+    "pro_calls": 1,
+    "has_breaking_news": false,
+    "news_confidence_adjustment": 0.0,
+    "news_overall_sentiment": "UNKNOWN",
+    "news_brief": "=== NEWS BRIEF: WIIM ===\nPeriod: last 60 days\nSentiment: UNKNOWN (score: +0.00)\nNo news data available\nConfidence adjustment: +0.00\nReason: No news data available - sentiment unverified\n\nTOP NEWS:\nnone",
+    "rag_chunks_selected": 9,
+    "rag_chunks_considered": 10,
+    "rag_token_estimate": 587,
+    "duration_seconds": 117.3630545999622,
+    "batch_timestamp": "20260517_144536",
+    "versioned_output": true
+  },
+  "error": null,
+  "status": "success",
+  "conviction_score": 0.0,
+  "sector_key": "unknown",
+  "news_sentiment": "UNKNOWN",
+  "news_confidence_adjustment": 0.0,
+  "risk_governor": {
+    "ticker": "WIIM",
+    "status": "deployable",
+    "sizing_allowed": true,
+    "reason_codes": [
+      "price_inside_entry_range"
+    ],
+    "message": "Harga sekarang berada di zona entry; kandidat boleh masuk sizing.",
+    "current_price": 1870.0,
+    "entry_low": 1815.0,
+    "entry_high": 1870.0,
+    "target_price": 2000.0,
+    "stop_loss": 1765.0
+  }
+}

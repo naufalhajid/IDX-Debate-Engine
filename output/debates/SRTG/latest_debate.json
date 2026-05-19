@@ -1,0 +1,150 @@
+{
+  "ticker": "SRTG",
+  "verdict": {
+    "ticker": "SRTG",
+    "rating": "HOLD",
+    "confidence": 0.45,
+    "fair_value": 8351.0,
+    "entry_price_range": "1735 - 1775",
+    "target_price": 1825.0,
+    "stop_loss": 1720.0,
+    "current_price": 1790.0,
+    "timeframe": "1-3 Months",
+    "weighted_reasoning": "The primary reason for a HOLD rating is the invalidation of the fundamental thesis. The reported 115.41% Net Profit Margin renders the Rp 8,351 fair value calculation untrustworthy, eliminating the perceived margin of safety. While the technical setup is neutral-to-positive (price above key MAs) and the R/R ratio of 2.0 is attractive, the unresolved Devil's Advocate risk of a sell-off triggered by a data correction is too significant to ignore. The `Fundamental ❌ + Technical ✅` conflict resolution matrix points to HOLD in the absence of strong momentum catalysts. The consensus winner was also HOLD, reinforcing this cautious stance.",
+    "critical_risk_factor": "",
+    "key_catalysts": [
+      "Technical support holding at the MA50/MA200 confluence (1739-1742).",
+      "Potential market ignorance of the data anomaly in the short term."
+    ],
+    "key_risks": [
+      "Severe data error (115.41% NPM) makes the fair value calculation invalid.",
+      "A market re-evaluation or data correction could trigger a sharp sell-off, breaking the stop-loss.",
+      "Lack of any near-term fundamental catalyst.",
+      "Sentiment data is insufficient, indicating low retail interest or coverage."
+    ],
+    "summary": "This trade plan is technically sound with a 2.0 R/R ratio, but it's built on a critically flawed fundamental premise. The calculated fair value is unreliable due to an impossible Net Profit Margin figure. This creates significant downside risk if the market re-evaluates the stock, making a new entry too risky. We will hold and wait for either a data correction or a more resilient technical setup.",
+    "expected_return": "+4.0%",
+    "risk_reward_ratio": 2.0,
+    "is_overvalued": false,
+    "wait_and_see": true,
+    "consensus_reached": true,
+    "consensus_method": "voting",
+    "dissenting_agents": [
+      "fundamental_scout",
+      "bull"
+    ]
+  },
+  "debate_rounds": 3,
+  "consensus_reached": true,
+  "consensus_method": "voting",
+  "dissenting_agents": [
+    "fundamental_scout",
+    "bull"
+  ],
+  "agent_votes": [
+    {
+      "agent": "fundamental_scout",
+      "position": "BUY",
+      "confidence": 0.75,
+      "round": 0
+    },
+    {
+      "agent": "chartist",
+      "position": "HOLD",
+      "confidence": 0.0,
+      "round": 0
+    },
+    {
+      "agent": "sentiment_specialist",
+      "position": "HOLD",
+      "confidence": 0.0,
+      "round": 0
+    },
+    {
+      "agent": "bull",
+      "position": "BUY",
+      "confidence": 0.78,
+      "round": 3
+    },
+    {
+      "agent": "bear",
+      "position": "HOLD",
+      "confidence": 0.6,
+      "round": 3
+    }
+  ],
+  "disagreement_type": null,
+  "debate_history": [
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 1,790, Rp 8,351, Rp 1,739, Rp 1,742, Rp 1,785, Rp 2,030, Rp 1,720, Rp 245, Rp 65.0, Rp 130.0, Rp 1,655, Rp 1,450, Rp 335",
+      "round": 0,
+      "position": "UNKNOWN",
+      "confidence": null
+    },
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 1,790, Rp 8,351, Rp 1,739, Rp 1,742, Rp 1,785, Rp 2,030, Rp 1,720, Rp 245",
+      "round": 0,
+      "position": "UNKNOWN",
+      "confidence": null
+    },
+    {
+      "role": "bull",
+      "content": "…imary market-driven catalyst for a re-rating towards the 52-week high within the swing trade timeframe, as the market recognizes the deep value and technical strength.\n\n**4. RISK/REWARD:**\nEntry: Rp 1,785 (around EMA20 support)\nTarget: Rp 2,030 (52-week high, representing a re-rating within the established uptrend)\nStop: Rp 1,720 (below MA200 and approximately 1 ATR from entry, protecting against trend breakdown)\nRisk: Rp 65 (1785 - 1720)\nReward: Rp 245 (2030 - 1785)\nR/R ratio: 3.77:1, indicating a highly favorable risk-reward profile for this swing trade.\n\nPosition: BUY\nAgent Confidence: 0.75",
+      "round": 1,
+      "position": "BUY",
+      "confidence": 0.75
+    },
+    {
+      "role": "bear",
+      "content": "…n AVOID stance.\n\n**1. OVERVALUATION CHECK:**\nThe Bull's claim of \"profound undervaluation\" is based on a highly unreliable fair value calculation. While the current price of Rp 1,790 is significantly below the stated fair value of Rp 8,351, the underlying fundamental data reports an impossible TTM Net Profit Margin of 115.41%. A net profit margin exceeding 100% indicates a severe data error, rendering the calculated fair value of Rp 8,351 completely untrustworthy. Consequently, the perceived \"fundamental floor\" and \"margin of safety\" are non-existent, as\n\nPosition: AVOID\nAgent Confidence: 0.60",
+      "round": 1,
+      "position": "AVOID",
+      "confidence": 0.6
+    },
+    {
+      "role": "bull",
+      "content": "…nt was not initially identified, the company's intrinsic quality serves as a powerful, ongoing driver for a re-rating. Its strong balance sheet, characterized by minimal debt, and demonstrated operational efficiency, reflected in its positive profitability metrics, position it as an attractive asset in the current market. This fundamental strength, combined with the significant discount to its underlying value, acts as a continuous catalyst, drawing market attention and supporting a gradual re-evaluation towards its true worth over the swing trade horizon.\n\nPosition: BUY\nAgent Confidence: 0.70",
+      "round": 2,
+      "position": "BUY",
+      "confidence": 0.7
+    },
+    {
+      "role": "bear",
+      "content": "…ificant support level is not a minor pullback but the 52-week low at Rp 1,450. This represents a substantial downside risk from the Bull's proposed entry zone. If an entry is executed at Rp 1,785 and the price subsequently drops to the 52-week low of Rp 1,450, the actual maximum loss would be Rp 335 per share. This potential loss is significantly greater than any implied \"margin of safety\" derived from the Bull's unverified fundamental claims or the fragile technical supports, making the trade unviable for swing execution given the disproportionate risk.\n\nPosition: AVOID\nAgent Confidence: 0.85",
+      "round": 2,
+      "position": "AVOID",
+      "confidence": 0.85
+    },
+    {
+      "role": "bull",
+      "content": "The Bear's assertion that the 52-week low represents the next significant support level, implying a substantial downside, overlooks critical intermediate technical floors. While the MA200 provides a robust structural foundation, should that long-term average be tested, historical price action indicates a strong demand zone around the 1610 level. This intermediate support, well above the extreme annual low, significantly limits the potential downside risk, providing a more realistic floor for price consolidation before any further significant retracement.\n\nRegarding the challenge to valuation due to the reported net profit margin anomaly, we acknowledge the data discrepancy. However, the company's fundamental strength is not solely reliant on a single metric. Its exceptionally low debt-to-equity ratio and consistent positive return on equity independently underscore a financially sound and operationally efficient enterprise. These core metrics provide a strong basis for intrinsic value, suggesting the stock is trading at a profound discount to its true worth, irrespective of the specific fair value calculation.\n\nThis inherent value proposition ensures that the current market valuation offers a considerable margin of safety. Even if the market price were to retrace towards its annual lows, the underlying fundamental value, supported by a robust balance sheet and profitability, would still represent a significant premium. This wide gap between the current price and its conservative intrinsic value is more than sufficient to absorb the Bear's projected downside scenario, making the risk-reward profile highly favorable for a swing trade. The market's eventual recognition of this deep-seated quality serves as a continuous catalyst for re-rating.\n\nPosition: BUY\nAgent Confidence: 0.78",
+      "round": 3,
+      "position": "BUY",
+      "confidence": 0.78
+    },
+    {
+      "role": "bear",
+      "content": "The Bull's swing setup relies on a series of unsubstantiated claims and overlooks critical short-term risks. Firstly, the assertion of a \"strong demand zone around the 1610 level\" lacks any specific historical data or technical justification within the provided context, making it an unreliable intermediate support. If the primary moving average supports, specifically the MA200 at Rp 1,739, fail to hold, the price could face a more significant retracement. Without a robust intermediate floor, the next discernible structural support could be considerably lower than the Bull's claimed Rp 1,610. For instance, a retest of prior consolidation levels could see the price drop towards Rp 1,550. If an entry is made at the upper\n\nPosition: HOLD\nAgent Confidence: 0.60",
+      "round": 3,
+      "position": "HOLD",
+      "confidence": 0.6
+    },
+    {
+      "role": "devils_advocate",
+      "content": "**1. MACRO/COMPANY RISK & FOREIGN FLOW:**\nGiven the acknowledged data discrepancy regarding SRTG's 115.41% Net Profit Margin, if a market correction or a re-evaluation of the company's actual profitability triggers a sell-off, could the Rp 1,720 stop loss (below MA200) break, potentially leading to a retest of the 52-week low at Rp 1,450?\n\n**2. EXECUTION RISK — Transaction Cost Stress Test:**\nMenggunakan harga entry Rp 1,785, total biaya transaksi round-trip dihitung sebagai berikut: biaya beli 0.15%, biaya jual 0.25%, PPh final 0.10%, dan estimasi slippage 0.15% (karena harga Rp 1,785 >= Rp 500). Total biaya transaksi adalah 0.15% + 0.25% + 0.10% + 0.15% = 0.65%. Dengan target return sebesar (Rp 2,030 - Rp 1,785) / Rp 1,785 = 13.73%, net return setelah biaya adalah 13.73% - 0.65% = 13.08%. Berdasarkan kalkulasi ini, net return > 3.0%, sehingga trade ini **VIABLE after transaction costs**.",
+      "round": 4,
+      "position": "UNKNOWN",
+      "confidence": null
+    }
+  ],
+  "raw_data_summary": "=== FUNDAMENTALS ===\nFAIR VALUE: Rp 8,351\n\nSRTG is significantly undervalued, with a current market price of Rp 1,790, representing a substantial +366.5% upside to its calculated fair value of Rp 8,351. This valuation is derived from a weighted average of P/E and P/B band methods, indicating a strong fundamental cushion for a swing trade setup.\n\nKey support metrics include a TTM Return on Equity (ROE) of 12.43% and a TTM Net Profit Margin of 115.41%. Historical 3-year trend data for ROE and Net Margin are not available in the provided dataset. The company exhibits a very low Debt/Equity ratio of 0.06 (based on Total Liabilities/Equity) and offers a Dividend Yield of 0.82%.\n\nNo specific upcoming growth catalysts within the 1-3 month horizon were identified; the latest dividend ex-date (07 Jul 25) is a past event. Regarding quality checks, the Cash From Operations (TTM) data is missing, preventing verification of the Revenue-CFO Divergence. However, no other red flags were detected based on the available data, including ROE-Margin Divergence, DER-Interest Coverage, or Altman Z-Score vs DER Inconsistency.\n\nPosition: BUY\nAgent Confidence: 0.75\n\n=== TECHNICALS ===\nBerdasarkan analisis teknikal IHSG untuk kerangka waktu 1-3 bulan:\n\n**TREND CONTEXT:** Saham dalam uptrend struktural. Swing long searah tren. Harga IHSG saat ini diperdagangkan di atas MA200, MA50, dan EMA20, menunjukkan kekuatan tren naik meskipun ada pullback minor.\n\n**ENTRY ZONE:** EMA20 (Rp 1,785) dan MA50 (Rp 1,742) berfungsi sebagai level support. Oleh karena itu, zona entri optimal adalah pada pullback ke kisaran Rp 1,742 – Rp 1,785. Harga saat ini (Rp 1,790) berada sedikit di atas EMA20, mengindikasikan\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 1790.0,\n  \"sma20\": 1786.0,\n  \"ema20\": 1785.0,\n  \"ma50\": 1742.0,\n  \"ma200\": 1739.0,\n  \"ma200_context\": \"ABOVE\",\n  \"rsi14\": 52.2,\n  \"atr14\": 65.0,\n  \"avg_volume_20d\": 9431845.0,\n  \"52w_high\": 2030.0,\n  \"52w_low\": 1450.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== DIVIDEND EX-DATE SCAN: SRTG ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
+  "error": null,
+  "conviction_score": 0.0,
+  "sector_key": "finance_nonbank",
+  "metadata": {
+    "batch_timestamp": "20260507_035045",
+    "versioned_output": true
+  }
+}

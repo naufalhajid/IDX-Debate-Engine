@@ -1,0 +1,115 @@
+{
+  "ticker": "TLKM",
+  "verdict": {
+    "ticker": "TLKM",
+    "rating": "HOLD",
+    "confidence": 0.55,
+    "fair_value": 3552.0,
+    "entry_price_range": "2870 - 2960",
+    "target_price": 3030.0,
+    "stop_loss": 2860.0,
+    "current_price": 2960.0,
+    "timeframe": "1-3 Months",
+    "weighted_reasoning": "The final rating is a mandated HOLD due to the 'soft_hold' consensus outcome, reflecting a significant conflict between strong fundamentals and weak technicals. The stock is 20% undervalued against its fair value of Rp 3,552, and the trade offers a favorable R/R of 2.09. However, these positives are negated by the prevailing structural downtrend (price below MA200) and the absence of a near-term catalyst. The Devil's Advocate's concern regarding foreign outflow pressure in a downtrend is valid and unanswered, increasing the risk of the tight stop-loss at Rp 2,860 being triggered prematurely. Therefore, we await technical confirmation, such as a break above key moving averages, before considering a BUY. Consensus override: Bull/Bear confidence gap was below 0.15, so the chamber treats this as soft consensus HOLD instead of forcing an entry.",
+    "critical_risk_factor": "",
+    "key_catalysts": [
+      "Technical bounce from consolidation zone driven by significant undervaluation (20% discount to Fair Value)."
+    ],
+    "key_risks": [
+      "Continuation of the structural downtrend, with price remaining below the MA200.",
+      "Lack of a specific, near-term fundamental catalyst to reverse negative momentum.",
+      "Foreign fund outflows could easily breach the tight stop-loss level before any rebound materializes.",
+      "MA50 (approx. Rp 3,098) acting as strong resistance, limiting upside potential."
+    ],
+    "summary": "Despite a significant 20% undervaluation and an attractive R/R of 2.09, the trade plan is rated HOLD. The stock remains in a structural downtrend (below MA200) without a clear short-term catalyst, making it a high-risk counter-trend play. The consensus directive mandates a HOLD, waiting for stronger technical confirmation before committing capital.",
+    "expected_return": "+3.9%",
+    "risk_reward_ratio": 2.09,
+    "is_overvalued": false,
+    "wait_and_see": true,
+    "consensus_reached": true,
+    "consensus_method": "soft_hold",
+    "dissenting_agents": [
+      "fundamental_scout",
+      "bull",
+      "bear"
+    ]
+  },
+  "debate_rounds": 3,
+  "debate_history": [
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 2,960, Rp 3,552, Rp 2,900, Rp 3,261, Rp 2,401, Rp 3,098, Rp 2,830, Rp 130, Rp 138, Rp 178, Rp 2,782, Rp 559",
+      "round": 0
+    },
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 2,960, Rp 3,552, Rp 2,900, Rp 3,261, Rp 2,401, Rp 3,098, Rp 2,830, Rp 130, Rp 138",
+      "round": 0
+    },
+    {
+      "role": "bull",
+      "content": "…. The RSI(14) at 47.0 suggests neutral momentum, not yet oversold, but supportive of a potential rebound from these levels.\n\n**CATALYST:** While no specific news-driven fundamental catalyst has been identified within the 1-3 month swing trade horizon, the primary driver for price appreciation is anticipated to be a technical counter-trend bounce. This bounce is expected to be triggered by the market's recognition of the stock's significant 20% undervaluation (Fair Value: Rp 3,552) as it consolidates around the strong technical support zone of Rp 2,900 – Rp\n\nPosition: BUY\nAgent Confidence: 0.60",
+      "round": 1
+    },
+    {
+      "role": "bear",
+      "content": "…ainty and makes the trade highly speculative.\n\nFurthermore, the risk/reward ratio for this counter-trend trade is highly unfavorable. With an entry at the current price of Rp 2,960, a stop-loss at Rp 2,830, and a target price of Rp 3,098, the potential risk is Rp 130 (Rp 2,960 - Rp 2,830) while the potential reward is only Rp 138 (Rp 3,098 - Rp 2,960). This results in an R/R ratio of approximately 1.06:1. For a high-risk counter-trend trade, an R/R of at least 2:1 or 3:1 is typically required to justify the increased risk, making this setup unattractive.\n\nPosition: AVOID\nAgent Confidence: 0.85",
+      "round": 1
+    },
+    {
+      "role": "bull",
+      "content": "…es at a substantial discount to its intrinsic value, offering a significant buffer against short-term volatility and the potential triggering of a technical stop. This undervaluation implies that even if the market experiences further downward pressure, the stock has considerable room to rebound towards its fair value, providing a much larger potential upside than the immediate technical target. The fundamental strength and undervaluation provide a strong foundation, limiting the true economic risk even if the technical entry point faces initial headwinds.\n\nPosition: BUY\nAgent Confidence: 0.75",
+      "round": 2
+    },
+    {
+      "role": "bear",
+      "content": "…robust secondary support.\" This assumption drastically understates the actual maximum loss. If the initial technical support at Rp 2,830 breaks, the next significant support is not immediately apparent and could be much closer to the 52-week low. This would make the actual maximum loss from the current price of Rp 2,960 potentially Rp 559 (down to Rp 2,401), not the limited loss implied by the Bull's dismissal of the technical stop. Relying on a distant 52-week low as a swing trade stop is imprudent and exposes the position to unacceptable downside risk.\n\nPosition: AVOID\nAgent Confidence: 0.90",
+      "round": 2
+    },
+    {
+      "role": "bull",
+      "content": "The Bear's assertion that the maximum loss is understated and that secondary support is not apparent overlooks the inherent resilience provided by the stock's fundamental undervaluation. While the initial technical stop is set at a specific level, a deeper technical support, derived from a further standard deviation of volatility (ATR), can be identified around Rp 2,741. This level provides a more robust secondary technical floor than simply defaulting to the 52-week low, which represents an extreme rather than the next logical support. Crucially, the current price-to-fair-value gap, representing an intrinsic upside of Rp 592, significantly exceeds the Bear's projected maximum loss of Rp 559 to the 52-week low. This substantial fundamental buffer means\n\nPosition: BUY\nAgent Confidence: 0.60",
+      "round": 3
+    },
+    {
+      "role": "bear",
+      "content": "The Bull's swing setup for TLKM is fundamentally flawed, particularly concerning its target, margin of safety, and risk assessment in a structural downtrend.\n\nThe Bull's proposed target of Rp 3,098, identified as the MA50, is highly suspect in the context of a \"downtrend struktural\" (technical_0). In such a market condition, the MA50 typically acts as a resistance level, not a readily achievable target for a counter-trend bounce. The current price of Rp 2,960 is already below this MA50, indicating that any move towards it would be an uphill battle against prevailing bearish momentum. Furthermore, the claimed 5.7% potential gain to this target is meager when considering the stock'\n\nPosition: AVOID\nAgent Confidence: 0.60",
+      "round": 3
+    },
+    {
+      "role": "devils_advocate",
+      "content": "Agent Confidence: MEDIUM\n\n1.  **MACRO/COMPANY RISK & FOREIGN FLOW**: Given TLKM is in a structural downtrend and lacks immediate catalysts, if foreign funds continue their net selling trend in the Indonesian market, exacerbated by TLKM's existing bearish momentum, could the Rp 2,830 stop-loss level be easily breached, triggering further declines towards the Rp 2,741 secondary support within the next 1-3 months?\n\n2.  **EXECUTION RISK — Transaction Cost Stress Test**:\n    Menggunakan harga entry Rp 2,960 dan target Rp 3,098, potensi keuntungan kotor adalah 4.66%. Total biaya transaksi round-trip dihitung sebagai berikut: biaya beli 0.15%, biaya jual 0.25%, PPh final 0.10%, dan estimasi slippage 0.15% (karena harga saham >= Rp 500). Jadi, total biaya transaksi adalah 0.15% + 0.25% + 0.10% + 0.15% = 0.65%. Setelah dikurangi biaya, net return yang diharapkan adalah 4.66% - 0.65% = 4.01%. Karena net return ini lebih dari 3.0%, setup ini dianggap **VIABLE after transaction costs**.\n\nPosition: AVOID\nAgent Confidence: 1.00",
+      "round": 4
+    }
+  ],
+  "raw_data_summary": "=== EVIDENCE BRIEF: TLKM ===\nQuery: swing trade analysis\n\n[FAIR_VALUE]\nEvidence ID: TLKM_fair_value_0\nCurrent Price: 2960 | Fair Value: 3552 | Upside: 20.0%\nSource: stockbit | Score: 1.00\n\n[FUNDAMENTAL]\nEvidence ID: TLKM_fundamental_0\n{\"brief\":\"FAIR VALUE: Rp 3,552 TLKM is currently trading at Rp 2,960, which is 20.0% UNDERVALUED compared to its calculated fair value of Rp 3,552. This valuation suggests a strong fundamental cushion for a potential swing trade. Key fundamental metrics include a Return on Equity (ROE) of 13.63% (TTM) and a Net Profit Margin of 5.47% (Quarter). The company maintains a healthy Debt to Equity Ratio\nSource: stockbit | Score: 0.90\n\n[FUNDAMENTAL]\nEvidence ID: TLKM_fundamental_1\nof 0.39 (Quarter) and offers a significant Dividend Yield of 7.18%. No specific growth catalysts within the 1-3 month swing trade horizon were identified; the latest dividend ex-date of 11 Jun 25 is a PAST_EVENT_NOT_CATALYST. Based on the provided data, no financial statement inconsistencies were detected across the specified checks (ROE-Margin Divergence, DER-Interest Coverage, Revenue-CFO\nSource: stockbit | Score: 0.90\n\n[FUNDAMENTAL]\nEvidence ID: TLKM_fundamental_2\nDivergence, Altman Z-Score vs DER). Position: BUY Agent Confidence: 0.90\",\"exdate\":\"=== DIVIDEND EX-DATE SCAN: TLKM ===\\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\\n\"}\nSource: stockbit | Score: 0.90\n\n[TECHNICAL]\nEvidence ID: TLKM_technical_0\n{\"52w_high\":3940.0,\"52w_low\":2401.0,\"atr14\":89.0,\"avg_volume_20d\":107638545.0,\"brief\":\"**Analisis Teknis IHSG: TLKM** Saham TLKM saat ini berada dalam downtrend struktural karena harga bergerak di bawah MA200. Ini mengindikasikan potensi setup counter-trend bounce, sehingga target harga harus lebih konservatif dan ukuran posisi disarankan 50% dari normal. TLKM menunjukkan konsolidasi di sekitar\nSource: yfinance | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: TLKM_technical_1\nEMA20 setelah penurunan signifikan, mencoba mencari pijakan. Untuk potensi entri swing trade, zona beli yang direkomendasikan adalah antara Rp 2.900 – Rp 2.960, dengan EMA20 (Rp 2.960) sebagai batas atas dan level bid kuat di Rp 2.900 sebagai batas bawah. Target harga untuk bounce ini adalah Rp 3.098, yang merupakan level MA50 dan menawarkan potensi keuntungan sekitar 5.7% dari titik tengah\nSource: yfinance | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: TLKM_technical_2\nentri. Stop loss disarankan pada Rp 2.830, dihitung dari 1.5× ATR di bawah EMA20. ⚠️ Counter-trend trade — kurangi ukuran posisi 50% dari normal. Indikator RSI(14) berada di 47.0, menunjukkan momentum yang netral cenderung sedikit bearish, namun belum memasuki area oversold yang kuat. Untuk\nSource: yfinance | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: TLKM_technical_3\nsin...\",\"current_price\":2960.0,\"ema20\":2960.0,\"ma200\":3261.0,\"ma200_context\":\"BELOW\",\"ma50\":3098.0,\"rsi14\":47.0,\"sma20\":2944.0}\nSource: yfinance | Score: 0.85\n\n[EXDATE]\nEvidence ID: TLKM_exdate_0\nDividend Ex-Date: === DIVIDEND EX-DATE SCAN: TLKM ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\nSource: stockbit | Score: 0.70\n\n---\nTotal evidence: 9/11 chunks selected\nToken estimate: ~591",
+  "metadata": {
+    "prompt_version": "2026-05-11-critical-audit-v1",
+    "run_id": "20260514_174443",
+    "market_data_source": "yfinance",
+    "market_data_cached": true,
+    "flash_calls": 10,
+    "pro_calls": 1,
+    "rag_chunks_selected": 9,
+    "rag_chunks_considered": 11,
+    "rag_token_estimate": 591,
+    "batch_timestamp": "20260514_174443",
+    "run_timestamp": "20260514_174443",
+    "generated_at": "2026-05-14T17:44:43.105649+07:00",
+    "versioned_output": true
+  },
+  "risk_governor": {
+    "ticker": "TLKM",
+    "status": "deployable",
+    "sizing_allowed": true,
+    "reason_codes": [
+      "price_inside_entry_range"
+    ],
+    "message": "Harga sekarang berada di zona entry; kandidat boleh masuk sizing.",
+    "current_price": 2960.0,
+    "entry_low": 2870.0,
+    "entry_high": 2960.0,
+    "target_price": 3030.0,
+    "stop_loss": 2860.0
+  }
+}

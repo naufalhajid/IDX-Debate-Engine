@@ -1,0 +1,101 @@
+{
+  "ticker": "ADRO",
+  "verdict": {
+    "ticker": "ADRO",
+    "rating": "HOLD",
+    "confidence": 0.54,
+    "fair_value": 2919.0,
+    "entry_price_range": "2380 - 2430",
+    "target_price": 2660.0,
+    "stop_loss": 2280.0,
+    "current_price": 2520.0,
+    "timeframe": "1-3 Months",
+    "weighted_reasoning": "The final rating is HOLD, mandated by the 'soft_hold' consensus rule due to significant agent disagreement. Although the fundamental (15.8% undervaluation) and technical (uptrend, price > MA200) signals are positive, the trade is not currently actionable as the price (Rp 2,520) is well above the optimal entry zone (Rp 2,380-2,430). The excellent R/R ratio of 2.04 is only valid if entry is executed within that zone. The Devil's Advocate's concern regarding the 'Revenue-CFO Divergence' (negative FCF despite revenue growth) is a material risk that questions earnings quality and justifies waiting for a better entry price. Sentiment data is insufficient, adding to the uncertainty. Consensus override: Bull/Bear confidence gap was below 0.15, so the chamber treats this as soft consensus HOLD instead of forcing an entry.",
+    "critical_risk_factor": "",
+    "key_catalysts": [
+      "Potential market re-rating towards its fair value of Rp 2,919 due to a 15.8% discount.",
+      "Continuation of the technical uptrend, with price holding above key moving averages (MA50, MA200)."
+    ],
+    "key_risks": [
+      "Execution Risk: Current price is above the entry zone; entering now would invalidate the calculated 2.04 R/R ratio.",
+      "Fundamental Red Flag: Significant 'Revenue-CFO Divergence' suggests earnings may not be backed by cash, potentially deterring institutional investors and capping upside.",
+      "Macro Risk: A downturn in global coal prices could negate the bullish technical structure and pressure the stock downwards."
+    ],
+    "summary": "The trade plan is rated HOLD. While ADRO is fundamentally undervalued with a strong technical uptrend and an attractive R/R ratio of 2.04, the current price of Rp 2,520 is significantly above the calculated entry zone of Rp 2,380-2,430. A HOLD is warranted until the price pulls back to the designated entry area to validate the trade's risk/reward structure. The significant 'Revenue-CFO Divergence' also adds a layer of fundamental risk that justifies a cautious stance.",
+    "expected_return": "+10.6%",
+    "risk_reward_ratio": 2.04,
+    "is_overvalued": false,
+    "wait_and_see": true,
+    "consensus_reached": true,
+    "consensus_method": "soft_hold",
+    "dissenting_agents": [
+      "chartist",
+      "bull",
+      "bear"
+    ]
+  },
+  "debate_rounds": 3,
+  "debate_history": [
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 2,520, Rp 2,919, Rp 2,600, Rp 2,381, Rp 2,462, Rp 58",
+      "round": 0
+    },
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 2,520, Rp 2,919, Rp 2,600, Rp 2,381, Rp 2,462",
+      "round": 0
+    },
+    {
+      "role": "bull",
+      "content": "…1-3 month horizon) driven by significant undervaluation and strong technical momentum, despite the absence of a specific event catalyst.\n\n**FUNDAMENTAL FLOOR:** ADRO is fundamentally undervalued, with a current price of Rp 2,520, representing a 15.8% discount to its fair value estimate of Rp 2,919. This valuation is supported by robust fundamentals, including a TTM ROE of 9.95%, a healthy Net Margin of 27.21%, a low Debt/Equity ratio of 0.22, and an attractive Dividend Yield of 10.45%. While a \"Revenue-CFO Divergence\" flag is noted (positive revenue growth\n\nPosition: BUY\nAgent Confidence: 0.60",
+      "round": 1
+    },
+    {
+      "role": "bear",
+      "content": "…by the lack of volume confirmation. The significant \"Revenue-CFO Divergence\" (Revenue YoY Growth +27.16% vs. FCF Per Share TTM -54.97%) acts as a fundamental impediment, suggesting that the company's reported revenue growth is not translating into actual cash flow. This could prevent any re-rating based on perceived undervaluation and deter institutional interest, thus preventing any sustained upward movement within the 1-3 month timeframe. The past dividend ex-date (28 Apr 26) is also confirmed as a PAST_EVENT_NOT_CATALYST, removing any dividend-related\n\nPosition: AVOID\nAgent Confidence: 0.60",
+      "round": 1
+    },
+    {
+      "role": "bull",
+      "content": "…ation as the market eventually corrects this discount.\n\nThe absence of a specific event catalyst is addressed by the inherent market tendency to re-rate fundamentally undervalued assets, especially when supported by strong technical momentum. The RSI at 57.5 signals healthy buying interest without being overbought, indicating ample room for continued upward movement. This sustained momentum, coupled with the compelling undervaluation, acts as the primary catalyst for a swing trade, driving the stock towards its intrinsic value within the 1-3 month horizon.\n\nPosition: BUY\nAgent Confidence: 0.88",
+      "round": 2
+    },
+    {
+      "role": "bear",
+      "content": "…ing setup for ADRO exhibits critical flaws in its risk assessment and technical rationale. The claimed entry zone of Rp 2,381 – Rp 2,462, based on EMA20 and MA50, is entirely *below* the current price of Rp 2,520. This implies the Bull is either advocating buying above their own defined support, or waiting for a pullback. If entering at Rp 2,520, the immediate downside to EMA20 at Rp 2,462 represents an initial loss of Rp 58, before even testing the MA50 at Rp 2,381. This contradicts a sound swing entry strategy that seeks to enter *at* or *near* support\n\nPosition: AVOID\nAgent Confidence: 0.60",
+      "round": 2
+    },
+    {
+      "role": "bull",
+      "content": "The Bear's assertion regarding the entry zone mischaracterizes the current market dynamic for ADRO. While the EMA20 and MA50 indeed define a strong support area for a *pullback* entry, the stock's current trading near its 52-week high, coupled with robust bullish sentiment, signals a *momentum-driven* entry strategy. The RSI at 57.5, while not overbought, indicates sustained positive momentum, suggesting the stock is poised for a potential breakout rather than a mere retracement. Entering at the current level capitalizes on this upward trajectory, aiming to capture the initial leg of a breakout move, rather than waiting for a potentially missed opportunity.\n\nShould the immediate momentum entry face a temporary retracement, the technical structure provides clear downside protection. The MA50, positioned below the EMA20, serves as a robust secondary support level, offering a subsequent line of defense before the established stop-loss. Crucially, the substantial undervaluation of the stock, with a significant gap to its calculated fair value, provides a fundamental buffer against short-term price fluctuations. This inherent value discrepancy means that any temporary dip is likely to be absorbed by the market's eventual recognition of its intrinsic worth, limiting the true downside risk.\n\nThe primary catalyst for this swing trade remains the market's re-rating of a fundamentally sound yet undervalued asset, a process often initiated and sustained by strong technical momentum. The \"Revenue-CFO Divergence\" noted by the Bear is a known factor, but the compelling dividend yield and strong balance sheet metrics are more likely to drive investor interest within the 1-3 month horizon. The favorable risk-reward profile, anchored by the significant fair value upside against clearly defined technical support and stop levels, strongly supports a bullish stance, even with the current price trading above the initial pullback entry zone.\n\nPosition: BUY\nAgent Confidence: 0.92",
+      "round": 3
+    },
+    {
+      "role": "bear",
+      "content": "The Bull's \"momentum-driven entry\" at Rp 2,520, targeting the 52-week high of Rp 2,600, presents an unviable risk-reward profile for a swing trade. The claimed upside of merely Rp 80 from the entry price is dwarfed by the stock's inherent volatility. With an ATR(14) of Rp 70, a typical 1-week adverse move (2 × ATR) could be Rp 140. This Rp 140 adverse fluctuation is 175% of the Bull's entire profit target, meaning a standard weekly price swing could entirely wipe out the projected gain and push the price to Rp 2,380, immediately breaching the MA50 and nearing the stop loss. This severe imbalance renders the trade unviable for swing execution, as the \"margin of safety\" is non-existent against typical market noise.\n\nFurthermore, the reliance on MA50 at Rp 2,381 as a \"robust secondary support\" is highly questionable. As demonstrated by the 2xATR calculation, a common adverse move from the current price of Rp 2,520 would easily push the stock below Rp 2,381. Should this level and the Bull's stop loss at Rp 2,357 fail, the next significant technical support is considerably lower at the MA200, positioned at Rp 1,875. This implies a potential maximum loss of Rp 645 from the current entry price of Rp 2,520, drastically exceeding the Bull's assumed risk of Rp 163 to their stop loss.\n\nThe Bull's assertion of a \"fundamental buffer\" from undervaluation (fair value Rp 2,919) and a \"market re-rating\" catalyst is severely undermined by the explicit \"⚠️ Revenue-CFO Divergence\" flag. While revenue growth is positive at 27.16%, the Free Cashflow Per Share (TTM) is negative at -54.97%. This indicates that reported earnings may not be cash-backed, directly challenging the notion of a \"fundamentally sound\" asset and eroding the credibility of the fair value as a reliable floor. A re-rating based on non-cash-backed earnings is speculative and lacks the fundamental strength required for a sustained upward move within a 1-3 month horizon.\n\nPosition: AVOID\nAgent Confidence: 0.88",
+      "round": 3
+    },
+    {
+      "role": "devils_advocate",
+      "content": "Agent Confidence: HIGH\n\n**1. MACRO/COMPANY RISK & FOREIGN FLOW:**\nGiven the \"Revenue-CFO Divergence\" flag (Revenue YoY Growth +27.16% vs. FCF Per Share TTM -54.97%), if foreign funds begin to aggressively divest from ADRO due to concerns over non-cash-backed earnings or a broader downturn in global coal prices, could the MA50 support at Rp 2,381 break, potentially triggering a cascade of selling towards the MA200 at Rp 1,875?\n\n**2. EXECUTION RISK — Transaction Cost Stress Test:**\nUntuk posisi BUY ADRO dengan harga entry Rp 2,520 dan target Rp 2,600, gross return yang diproyeksikan adalah 3.17% ((2600-2520)/2520). Namun, setelah memperhitungkan biaya transaksi, net return akan jauh lebih rendah. Biaya beli adalah 0.15% dari nilai posisi, biaya jual 0.25% dari nilai posisi, PPh final 0.10% dari nilai jual, dan estimasi slippage 0.15% (karena harga >= Rp 500). Total biaya round-trip adalah 0.15% (beli) + 0.25% (jual) + 0.10% (PPh) + 0.15% (slippage) = 0.65% dari nilai posisi. Dengan demikian, net return setelah biaya adalah 3.17% - 0.65% = 2.52%. Verdict: MARGINAL — only proceed if conviction high.\n\nPosition: UNKNOWN\nAgent Confidence: 1.00",
+      "round": 4
+    }
+  ],
+  "raw_data_summary": "=== EVIDENCE BRIEF: ADRO ===\nQuery: swing trade analysis\n\n[FAIR_VALUE]\nEvidence ID: ADRO_fair_value_0\nCurrent Price: 2520 | Fair Value: 2919 | Upside: 15.8%\nSource: stockbit | Score: 1.00\n\n[FUNDAMENTAL]\nEvidence ID: ADRO_fundamental_0\n{\"brief\":\"FAIR VALUE: Rp 2,919 ADRO is currently priced at Rp 2,520, which is UNDERVALUED by 15.8% compared to its calculated fair value of Rp 2,919. The valuation is supported by a TTM ROE of 9.95%, a Net Margin of 27.21%, a low Debt/Equity ratio of 0.22, and a high Dividend Yield of 10.45%. No immediate growth catalyst within the 1-3 month horizon has been identified. The latest dividend\nSource: stockbit | Score: 0.90\n\n[FUNDAMENTAL]\nEvidence ID: ADRO_fundamental_1\nex-date (28 Apr 26) is a PAST_EVENT_NOT_CATALYST. A significant quality check flag is detected: Revenue (Quarter YoY Growth) is positive at 27.16%, but Free Cashflow Per Share (TTM) is negative at -54.97. This indicates a potential \\\"⚠️ Revenue-CFO Divergence — laba mungkin tidak cash-backed\\\". Other checks for ROE-Margin divergence, DER-Interest Coverage, and Altman Z-Score vs DER did not\nSource: stockbit | Score: 0.90\n\n[FUNDAMENTAL]\nEvidence ID: ADRO_fundamental_2\ntrigger any flags. Position: HOLD Agent Confidence: 0.85\",\"exdate\":\"=== DIVIDEND EX-DATE SCAN: ADRO ===\\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\\n\"}\nSource: stockbit | Score: 0.90\n\n[TECHNICAL]\nEvidence ID: ADRO_technical_0\n{\"52w_high\":2600.0,\"52w_low\":1446.0,\"atr14\":70.0,\"avg_volume_20d\":70725950.0,\"brief\":\"**Analisis Teknis IHSG (ADRO)** Saham dalam uptrend struktural. Swing long searah tren. Harga saat ini diperdagangkan mendekati level tertinggi 52 minggu, menunjukkan sentimen bullish yang kuat. ENTRY ZONE: Rp 2,381 – Rp 2,462 (area support EMA20 dan MA50). TARGET: Rp 2,600 (approx. 7.37% dari titik tengah\nSource: yfinance | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: ADRO_technical_1\nentry), yang merupakan level resistance 52-week high. STOP LOSS: Rp 2,357 (1.5× ATR di bawah EMA20). RSI(14) di 57.5 menunjukkan momentum bullish yang sehat, dengan ruang untuk kenaikan lebih lanjut sebelum mencapai kondisi overbought. Data volume harian untuk perbandingan langsung dengan rata-rata 20 hari tidak tersedia. Oleh karena itu, konfirmasi volume terhadap pergerakan harga saat ini\nSource: yfinance | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: ADRO_technical_2\ntidak dapat dinilai secara langsung. Position: BUY Agent Confidence: 0.90\",\"current_price\":2520.0,\"ema20\":2462.0,\"ma200\":1875.0,\"ma200_context\":\"ABOVE\",\"ma50\":2381.0,\"rsi14\":57.5,\"sma20\":2454.0}\nSource: yfinance | Score: 0.85\n\n[EXDATE]\nEvidence ID: ADRO_exdate_0\nDividend Ex-Date: === DIVIDEND EX-DATE SCAN: ADRO ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\nSource: stockbit | Score: 0.70\n\n[SENTIMENT]\nEvidence ID: ADRO_sentiment_0\n```json { \"sentiment\": \"INSUFFICIENT_DATA\", \"confidence\": 0, \"dominant_theme\": null, \"volume_anomaly\": null, \"swing_signal\": null, \"red_flags\": [], \"reason\": \"Data sosial tidak mencukupi (< 5 post)\" } ``` Position: HOLD Agent Confidence: 0.00\nSource: gemini | Score: 0.60\n\n---\nTotal evidence: 9/10 chunks selected\nToken estimate: ~588",
+  "metadata": {
+    "prompt_version": "2026-05-11-critical-audit-v1",
+    "run_id": "20260514_014526",
+    "market_data_source": "yfinance",
+    "market_data_cached": true,
+    "flash_calls": 10,
+    "pro_calls": 1,
+    "rag_chunks_selected": 9,
+    "rag_chunks_considered": 10,
+    "rag_token_estimate": 588,
+    "batch_timestamp": "20260514_014526",
+    "run_timestamp": "20260514_014526",
+    "generated_at": "2026-05-14T01:45:26.335786+07:00",
+    "versioned_output": true
+  }
+}

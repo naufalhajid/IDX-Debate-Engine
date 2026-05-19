@@ -1,0 +1,39 @@
+╔══════════════════════════════════════════╗
+║  AUDIT REPORT: BBCA — HOLD       ║
+╚══════════════════════════════════════════╝
+
+Summary : BBCA→HOLD: soft_hold_rule applied (0.41) after 2 round(s). 2 agent(s) dissented. Absence of a fundamental fair value, making the trade purely speculative on technicals.
+Run ID  : 20260514_201055
+Generated: 2026-05-14T13:13:41.776917+00:00
+
+VERDICT
+───────
+Rating     : HOLD (confidence: 41%)
+Method     : soft_hold
+Consensus  : yes
+Rounds     : 2
+Dissent    : 40% (2 of 5 agents)
+
+AGENT VOTES
+───────────
+  bull                   BUY      conf= 0.60  ❌
+  bear                   HOLD     conf= 0.60  ✅
+  bull                   BUY      conf= 0.65  ❌
+  bear                   AVOID    conf= 0.60  ❌
+  devils_advocate        BEARISH  conf=    ?  ❌
+
+KEY ARGUMENTS
+─────────────
+Bull  : The Bear's assertion that the absence of a fundamental fair value renders the trade purely speculative is acknowledged. However, for a swing trade focused on a technical bounce, the *relative* valuation derived from market price history is a more pertinent indicator of opportunity. The current tradi
+Bear  : The Bull's swing setup for BBCA is fundamentally flawed, relying on a precarious technical floor and an inadequate margin of safety. The proposed entry zone, situated near the annual price floor of 5850, is not a reliable accumulation signal but rather an indicator of sustained selling pressure. The
+Devil : Position: BEARISH
+Agent Confidence: MEDIUM
+
+**Question 1: MACRO/COMPANY RISK & FOREIGN FLOW**
+Given BBCA's structural downtrend and lack of fundamental support, if foreign funds accelerate net selling pressure on Indonesian banks due to global risk aversion, or if there's an unexpected negative macr
+
+DATA QUALITY
+────────────
+Freshness OK : False
+Stale sources: sentiment
+Missing      : none

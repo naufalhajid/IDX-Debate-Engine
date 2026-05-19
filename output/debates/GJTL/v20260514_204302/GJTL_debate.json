@@ -1,0 +1,104 @@
+{
+  "ticker": "GJTL",
+  "verdict": {
+    "ticker": "GJTL",
+    "rating": "HOLD",
+    "confidence": 0.77,
+    "fair_value": 4464.0,
+    "entry_price_range": "3853 - 4088",
+    "target_price": 4271.0,
+    "stop_loss": 3604.0,
+    "current_price": 4000.0,
+    "timeframe": "1-3 Months",
+    "weighted_reasoning": "Dry-run mock verdict untuk validasi pipeline.",
+    "critical_risk_factor": "Dry-run: bukan rekomendasi investasi aktual.",
+    "key_catalysts": [
+      "Sektor defensif mock diasumsikan bergerak lebih moderat.",
+      "Risk/reward mock memenuhi ambang awal."
+    ],
+    "key_risks": [
+      "Margin dan daya beli masih menjadi risiko validasi utama.",
+      "Dry-run memakai data sintetis."
+    ],
+    "summary": "Ini adalah hasil simulasi dry-run untuk menguji parsing, scoring, persistensi, dan report generation tanpa API call.",
+    "expected_return": "+7.6%",
+    "risk_reward_ratio": 0.82,
+    "is_overvalued": false,
+    "wait_and_see": true,
+    "consensus_reached": true,
+    "consensus_method": "voting",
+    "dissenting_agents": [
+      "bear"
+    ]
+  },
+  "debate_rounds": 3,
+  "consensus_reached": true,
+  "consensus_method": "voting",
+  "dissenting_agents": [],
+  "agent_votes": [
+    {
+      "agent": "fundamental_scout",
+      "position": "BUY",
+      "confidence": 0.66,
+      "round": 0
+    },
+    {
+      "agent": "chartist",
+      "position": "BUY",
+      "confidence": 0.64,
+      "round": 0
+    },
+    {
+      "agent": "sentiment_specialist",
+      "position": "HOLD",
+      "confidence": 0.55,
+      "round": 0
+    },
+    {
+      "agent": "bull",
+      "position": "BUY",
+      "confidence": 0.7,
+      "round": 1
+    },
+    {
+      "agent": "bear",
+      "position": "AVOID",
+      "confidence": 0.58,
+      "round": 1
+    }
+  ],
+  "debate_history": [
+    {
+      "role": "bull",
+      "content": "Dry-run bull case: setup teknikal mock mendukung entry bertahap.\n\nPosition: BUY\nAgent Confidence: 0.70",
+      "round": 1,
+      "position": "BUY",
+      "confidence": 0.7
+    },
+    {
+      "role": "bear",
+      "content": "Dry-run bear case: kualitas data sintetis tidak boleh dipakai untuk trading.\n\nPosition: AVOID\nAgent Confidence: 0.58",
+      "round": 1,
+      "position": "AVOID",
+      "confidence": 0.58
+    },
+    {
+      "role": "devils_advocate",
+      "content": "Dry-run challenge: konfirmasi ulang semua level harga dengan data live.",
+      "round": 2,
+      "position": "HOLD",
+      "confidence": 0.0
+    }
+  ],
+  "raw_data_summary": "DRY_RUN mock data; no provider or Gemini call executed.",
+  "error": null,
+  "conviction_score": 0.0,
+  "sector_key": "consumer_disc",
+  "metadata": {
+    "dry_run": true,
+    "mock_profile": "consumer_disc",
+    "prompt_version": "2026-05-11-critical-audit-v1",
+    "batch_timestamp": "20260514_204302",
+    "versioned_output": true
+  }
+}

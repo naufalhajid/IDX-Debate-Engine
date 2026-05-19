@@ -1,0 +1,40 @@
+╔══════════════════════════════════════════╗
+║  AUDIT REPORT: BMRI — BUY        ║
+╚══════════════════════════════════════════╝
+
+Summary : BMRI→BUY: chartist won by confidence (0.90) after 3 round(s). 3 agent(s) dissented. Persistent downtrend (price below MA200) could continue, invalidating the setup.
+Run ID  : 20260516_145348
+Generated: 2026-05-16T07:56:50.914337+00:00
+
+VERDICT
+───────
+Rating     : BUY (confidence: 90%)
+Method     : confidence_winner
+Consensus  : no
+Rounds     : 3
+Dissent    : 60% (3 of 5 agents)
+
+AGENT VOTES
+───────────
+  bull                   BUY      conf= 0.60  ✅
+  bear                   AVOID    conf= 0.60  ❌
+  bull                   BUY      conf= 0.60  ✅
+  bear                   AVOID    conf= 0.85  ❌
+  bull                   BUY      conf= 0.90  ✅
+  bear                   AVOID    conf= 0.60  ❌
+  devils_advocate        UNKNOWN  conf= 1.00  ❌
+
+KEY ARGUMENTS
+─────────────
+Bull  : The Bear's projection of a short-term decline to Rp 4,038, based on a volatility measure, fundamentally misjudges the resilience provided by the significant undervaluation. The substantial gap between the current market price and its intrinsic worth acts as a robust buffer, providing an ample margin
+Bear  : The Bull's reliance on a 63.6% undervaluation to Rp 6,872 as a "robust buffer" for a swing trade is fundamentally flawed. This "fair value" is a long-term assessment, not a short-term protective mechanism against volatility. Crucially, the reported negative Revenue Growth (Quarter YoY) of -5.97% dir
+Devil : **Agent Confidence:** HIGH
+
+1.  **MACRO/COMPANY RISK & FOREIGN FLOW:**
+    Given BMRI's negative Revenue Growth (-5.97% YoY) and lack of specific catalysts, if this trend persists or worsens in the next quarter's earnings, combined with sustained net foreign selling pressure on Indonesian banking st
+
+DATA QUALITY
+────────────
+Freshness OK : False
+Stale sources: sentiment
+Missing      : none

@@ -1,0 +1,40 @@
+╔══════════════════════════════════════════╗
+║  AUDIT REPORT: TLKM — AVOID      ║
+╚══════════════════════════════════════════╝
+
+Summary : TLKM→AVOID: fundamental_scout won by confidence (0.95) after 3 round(s). 4 agent(s) dissented. Continuation of the structural downtrend as the price remains below the MA200.
+Run ID  : 20260514_163838
+Generated: 2026-05-14T09:45:34.696261+00:00
+
+VERDICT
+───────
+Rating     : AVOID (confidence: 95%)
+Method     : confidence_winner
+Consensus  : no
+Rounds     : 3
+Dissent    : 80% (4 of 5 agents)
+
+AGENT VOTES
+───────────
+  bull                   BUY      conf= 0.65  ❌
+  bear                   AVOID    conf= 0.85  ✅
+  bull                   BUY      conf= 0.75  ❌
+  bear                   AVOID    conf= 0.92  ✅
+  bull                   BUY      conf= 0.60  ❌
+  bear                   AVOID    conf= 0.95  ✅
+  devils_advocate        UNKNOWN  conf= 1.00  ❌
+
+KEY ARGUMENTS
+─────────────
+Bull  : The Bear's assertion that the margin of safety is insufficient fundamentally misjudges the depth of undervaluation. The company trades at a substantial discount to its intrinsic value, a gap derived from robust valuation methodologies. This significant fundamental cushion is more than adequate to ab
+Bear  : The Bull's assertion of a "significant fundamental cushion" is critically undermined by the explicit lack of historical trend data for key profitability metrics like Return on Equity (ROE) and Net Profit Margin. Without knowing if the 13.63% ROE or 5.47% Net Margin are improving or deteriorating, th
+Devil : **Agent Confidence: HIGH**
+
+1.  **MACRO/COMPANY RISK & FOREIGN FLOW:**
+    Given TLKM's structural downtrend and the absence of near-term growth catalysts, if foreign funds accelerate net selling pressure, could the Rp 2,820 stop loss break, potentially pushing the price towards the 52-week low of R
+
+DATA QUALITY
+────────────
+Freshness OK : True
+Stale sources: none
+Missing      : none

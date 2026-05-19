@@ -1,0 +1,66 @@
+{
+  "ticker": "ELSA",
+  "verdict": {
+    "ticker": "ELSA",
+    "rating": "HOLD",
+    "confidence": 0.0,
+    "fair_value": 1493.0,
+    "entry_price_range": "745 - 770",
+    "target_price": 850.0,
+    "stop_loss": 710.0,
+    "current_price": 770.0,
+    "timeframe": "1-3 Months",
+    "weighted_reasoning": "",
+    "critical_risk_factor": "",
+    "key_catalysts": [],
+    "key_risks": [],
+    "summary": "CIO parse error — raw response stored. Error: RetryError[<Future at 0x1daeaaaa150 state=finished raised RuntimeError>]",
+    "expected_return": "+12.2%",
+    "risk_reward_ratio": 1.95,
+    "is_overvalued": false,
+    "wait_and_see": true
+  },
+  "debate_rounds": 2,
+  "consensus_reached": false,
+  "disagreement_type": "direction",
+  "debate_history": [
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 770",
+      "round": 0
+    },
+    {
+      "role": "bull",
+      "content": "**ELSA: Swing Trade BUY Case (1-3 Month Horizon)**\n\n**1. FUNDAMENTAL FLOOR:**\nELSA presents a compelling fundamental floor for a swing trade. The stock is currently trading at Rp 770, significantly undervalued by 93.9%",
+      "round": 1
+    },
+    {
+      "role": "bear",
+      "content": "As a Forensic Financial Auditor, I find the ELSA swing trade BUY case to be highly questionable, warranting an AVOID verdict. While the stock appears fundamentally undervalued, several critical factors present significant risks for a 1-3 month swing trade horizon.\n\n1.  **OVERVAL",
+      "round": 1
+    },
+    {
+      "role": "bull",
+      "content": "The Bear's assessment of ELSA's technical vulnerability and lack of immediate catalyst overlooks critical aspects that solidify the entry timing for a swing trade. While consolidation near short-term moving averages is noted, it's crucial to recognize this as a healthy accumulation phase within a robust structural uptrend,",
+      "round": 2
+    },
+    {
+      "role": "bear",
+      "content": "As a Forensic Financial Auditor, I find the Bull's swing setup for ELSA to be built on precarious assumptions, particularly regarding its entry timing and the reliability of its \"fundamental cushion\" for a short-term trade. The claim of a \"healthy accumulation phase\" near short-term moving",
+      "round": 2
+    },
+    {
+      "role": "devils_advocate",
+      "content": "**1. MACRO/COMPANY RISK & FOREIGN FLOW:**\nJika sentimen pasar IHSG memburuk secara",
+      "round": 3
+    }
+  ],
+  "raw_data_summary": "=== FUNDAMENTALS ===\n**FAIR VALUE: Rp 1,493**\n\nELSA is currently trading at Rp 770, which is **UNDERVALUED** by 93.9% compared to its calculated fair value of Rp 1,493. This valuation is based on a weighted average of P/E Band and P/B Band methods, with a medium confidence level. The significant upside suggests a strong fundamental cushion for a swing trade setup.\n\nKey support metrics include a TTM Return on Equity (ROE) of 13.11% and a Net Profit Margin of 5.24%. The Debt/Equity Ratio is very low at 0.13, indicating a healthy balance sheet. The TTM Dividend Yield stands at 5.06%. Note that 3-year trend data for ROE and Net Margin is not available in the provided input.\n\nNo specific upcoming growth catalyst, such as earnings or new contracts, has been identified within the 1-3 month swing trade horizon. The\n\n=== TECHNICALS ===\n**Analisis Teknikal IHSG (1-3 Bulan Swing Trade)**\n\n**TREND CONTEXT:**\nSaham dalam uptrend struktural karena harga saat ini berada jauh di atas MA200. Posisi harga yang konsolidasi di sekitar EMA20 dan MA50 menunjukkan\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 770.0,\n  \"sma20\": 750.0,\n  \"ema20\": 764.0,\n  \"ma50\": 771.0,\n  \"ma200\": 584.0,\n  \"ma200_context\": \"ABOVE\",\n  \"rsi14\": 52.3,\n  \"atr14\": 39.0,\n  \"avg_volume_20d\": 65744660.0,\n  \"52w_high\": 1000.0,\n  \"52w_low\": 429.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\n=== DIVIDEND EX-DATE SCAN: ELSA ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
+  "error": null,
+  "conviction_score": 0.0,
+  "sector_key": "energy",
+  "metadata": {
+    "batch_timestamp": "20260506_131717",
+    "versioned_output": true
+  }
+}

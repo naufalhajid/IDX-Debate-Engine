@@ -1,0 +1,41 @@
+╔══════════════════════════════════════════╗
+║  OPS TELEMETRY: 20260514_152605         ║
+╚══════════════════════════════════════════╝
+
+BATCH SUMMARY
+─────────────
+Tickers   : 3 (3 ok / 0 fail / 0 timeout / 0 skip)
+Success   : 100%
+Timestamp : 20260514_152605
+
+VERDICTS
+────────
+  BUY      1
+  HOLD     2
+Avg confidence : 68%
+Avg rounds     : 2.3
+Avg duration   : 147s
+Longest run    : MARK (168s)
+
+TOKEN SPEND (estimated)
+───────────────────────
+Flash calls : 26 (~20,800 tokens)
+Pro calls   : 3 (~6,000 tokens)
+Total est.  : ~26,800 tokens
+
+RAG EFFICIENCY
+──────────────
+Avg chunks     : 7.7 selected / 11.0 considered
+Avg RAG tokens : ~593 tokens
+Context saving : 30% chunks filtered out
+
+PROVIDER HEALTH
+───────────────
+Errors : none
+Stale  : none
+
+PER-TICKER
+──────────
+  MAPI   success  HOLD  conf=55%  134s R2  RAG:8/11
+  MARK   success  BUY   conf=95%  168s R3  RAG:7/11
+  ULTJ   success  HOLD  conf=55%  140s R2  RAG:8/11

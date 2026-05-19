@@ -1,0 +1,40 @@
+╔══════════════════════════════════════════╗
+║  AUDIT REPORT: DSSA — AVOID      ║
+╚══════════════════════════════════════════╝
+
+Summary : DSSA→AVOID: chartist won by confidence (0.90) after 3 round(s). 3 agent(s) dissented. Extreme Overvaluation: Current price of Rp 1,035 is over 240% above the fair value of Rp 304, indicating significant downside risk.
+Run ID  : 20260514_205556
+Generated: 2026-05-14T13:58:59.369177+00:00
+
+VERDICT
+───────
+Rating     : AVOID (confidence: 90%)
+Method     : confidence_winner
+Consensus  : no
+Rounds     : 3
+Dissent    : 60% (3 of 5 agents)
+
+AGENT VOTES
+───────────
+  bull                   BUY      conf= 0.60  ❌
+  bear                   AVOID    conf= 0.60  ✅
+  bull                   BUY      conf= 0.65  ❌
+  bear                   AVOID    conf= 0.90  ✅
+  bull                   BUY      conf= 0.60  ❌
+  bear                   AVOID    conf= 0.95  ✅
+  devils_advocate        BUY      conf= 1.00  ❌
+
+KEY ARGUMENTS
+─────────────
+Bull  : The Bear's assessment of volatility, using 2xATR as a typical adverse move, overstates the immediate downside risk for a counter-trend bounce. While the Average True Range (ATR14) indicates daily fluctuations, a 2xATR move is an extreme scenario, not a standard expectation for a short-term swing. Ou
+Bear  : The Bull's assertion that a 2xATR move "overstates the immediate downside risk" fundamentally misinterprets the volatility inherent in a structurally downtrending stock at its 52-week low. The entry zone of Rp 1,000 – Rp 1,050, while seemingly based on an "oversold condition" (RSI14 at 18.6), ignore
+Devil : Agent Confidence: HIGH
+
+**1. MACRO/COMPANY RISK & FOREIGN FLOW:**
+Given DSSA's structural downtrend and extreme overvaluation relative to its Rp 304 fair value, if foreign funds continue to accelerate net selling pressure on Indonesian equities, or if any negative company-specific news emerges, coul
+
+DATA QUALITY
+────────────
+Freshness OK : False
+Stale sources: sentiment
+Missing      : none

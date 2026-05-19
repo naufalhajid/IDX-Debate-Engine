@@ -1,0 +1,49 @@
+╔══════════════════════════════════════════╗
+║  OPS TELEMETRY: 20260514_174443         ║
+╚══════════════════════════════════════════╝
+
+BATCH SUMMARY
+─────────────
+Tickers   : 10 (10 ok / 0 fail / 0 timeout / 0 skip)
+Success   : 100%
+Timestamp : 20260514_174443
+
+VERDICTS
+────────
+  BUY      2
+  HOLD     6
+  AVOID    2
+Avg confidence : 53%
+Avg rounds     : 2.3
+Avg duration   : 149s
+Longest run    : GOTO (186s)
+
+TOKEN SPEND (estimated)
+───────────────────────
+Flash calls : 86 (~68,800 tokens)
+Pro calls   : 10 (~20,000 tokens)
+Total est.  : ~88,800 tokens
+
+RAG EFFICIENCY
+──────────────
+Avg chunks     : 8.5 selected / 9.8 considered
+Avg RAG tokens : ~591 tokens
+Context saving : 13% chunks filtered out
+
+PROVIDER HEALTH
+───────────────
+Errors : none
+Stale  : none
+
+PER-TICKER
+──────────
+  BBCA   success  HOLD  conf=45%  136s R2  RAG:9/9
+  ADRO   success  BUY   conf=76%  103s R1  RAG:8/11
+  TLKM   success  HOLD  conf=55%  176s R3  RAG:9/11
+  WIIM   success  HOLD  conf=47%  169s R3  RAG:9/9
+  MAPI   success  HOLD  conf=53%  156s R2  RAG:9/9
+  MARK   success  AVOID conf=10%  121s R2  RAG:7/11
+  ULTJ   success  HOLD  conf=52%  127s R2  RAG:8/10
+  BRIS   success  HOLD  conf=10%  129s R2  RAG:8/10
+  GOTO   success  AVOID conf=95%  186s R3  RAG:9/9
+  BMRI   success  BUY   conf=85%  184s R3  RAG:9/9

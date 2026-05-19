@@ -1,0 +1,38 @@
+╔══════════════════════════════════════════╗
+║  OPS TELEMETRY: 20260514_205556         ║
+╚══════════════════════════════════════════╝
+
+BATCH SUMMARY
+─────────────
+Tickers   : 1 (1 ok / 0 fail / 0 timeout / 0 skip)
+Success   : 100%
+Timestamp : 20260514_205556
+
+VERDICTS
+────────
+  AVOID    1
+Avg confidence : 90%
+Avg rounds     : 3.0
+Avg duration   : 179s
+Longest run    : DSSA (179s)
+
+TOKEN SPEND (estimated)
+───────────────────────
+Flash calls : 10 (~8,000 tokens)
+Pro calls   : 1 (~2,000 tokens)
+Total est.  : ~10,000 tokens
+
+RAG EFFICIENCY
+──────────────
+Avg chunks     : 9.0 selected / 10.0 considered
+Avg RAG tokens : ~584 tokens
+Context saving : 10% chunks filtered out
+
+PROVIDER HEALTH
+───────────────
+Errors : none
+Stale  : none
+
+PER-TICKER
+──────────
+  DSSA   success  AVOID conf=90%  179s R3  RAG:9/10

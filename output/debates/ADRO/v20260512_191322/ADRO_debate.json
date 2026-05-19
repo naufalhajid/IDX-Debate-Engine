@@ -1,0 +1,81 @@
+{
+  "ticker": "ADRO",
+  "verdict": {
+    "ticker": "ADRO",
+    "rating": "HOLD",
+    "confidence": 0.55,
+    "fair_value": 2919.0,
+    "entry_price_range": "2380 - 2420",
+    "target_price": 2640.0,
+    "stop_loss": 2280.0,
+    "current_price": 2600.0,
+    "timeframe": "1-3 Months",
+    "weighted_reasoning": "Rating is set to HOLD as per the 'soft_hold' consensus directive, which is appropriate given the current market conditions. While the stock is fundamentally undervalued (FV Rp 2,919 vs Price Rp 2,600) and the proposed trade envelope offers an excellent R/R of 2.0, the current price is technically overextended. The 'OVEREXTENDED FLAG' (price 8-10% above MA50) confirms the need for caution, as entry now would offer a poor risk/reward profile. The Devil's Advocate risk regarding a potential reversal in foreign flows, compounded by a negative FCF per share, remains a material concern that is not fully mitigated. Therefore, we will wait for technical confirmation via a pullback to the Rp 2,380-2,420 zone before considering an entry. Consensus override: Bull/Bear confidence gap was below 0.15, so the chamber treats this as soft consensus HOLD instead of forcing an entry.",
+    "critical_risk_factor": "",
+    "key_catalysts": [
+      "Fundamentally undervalued with a 12.3% discount to Fair Value (Rp 2,919).",
+      "Strong technical momentum, trading above all key moving averages (MA50, MA200).",
+      "High foreign inflow and trading volume indicating strong institutional interest."
+    ],
+    "key_risks": [
+      "Price is technically overextended at a 52-week high, requiring a significant pullback of ~7-8% to reach the entry zone.",
+      "Devil's Advocate Risk: Heavy reliance on continued foreign buying; a reversal could trigger a sharp correction, especially given the stock's commodity sensitivity.",
+      "Fundamental Red Flag: Revenue-CFO divergence (Negative FCF per share), suggesting earnings quality may be low and the fundamental floor is less reliable."
+    ],
+    "summary": "The trade plan for ADRO is valid but requires a significant pullback to the entry zone of Rp 2,380 – Rp 2,420. The current price of Rp 2,600 is extended and at a 52-week high, making a new entry unfavorable from a risk/reward perspective. We rate ADRO a HOLD, pending a price correction to the specified entry zone where the attractive 2.0 R/R can be realized. Key risks include reliance on continued foreign inflow and a noted Revenue-CFO divergence.",
+    "expected_return": "+10.0%",
+    "risk_reward_ratio": 2.0,
+    "is_overvalued": false,
+    "wait_and_see": true,
+    "consensus_reached": true,
+    "consensus_method": "soft_hold",
+    "dissenting_agents": [
+      "chartist",
+      "bull",
+      "bear"
+    ]
+  },
+  "debate_rounds": 2,
+  "debate_history": [
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 2,600, Rp 2,919",
+      "round": 0
+    },
+    {
+      "role": "bull",
+      "content": "…ion and strong market momentum.\n\n**1. FUNDAMENTAL FLOOR:**\nADRO is fundamentally undervalued, currently trading at Rp 2,600, which is a 12.3% discount to its fair value estimate of Rp 2,919. This valuation provides a robust fundamental floor, suggesting significant upside potential. The company also maintains a healthy balance sheet with a Debt to Equity Ratio of 0.22 and offers an attractive TTM Dividend Yield of 10.13%. While a Revenue-CFO divergence is noted, for a 1-3 month swing trade, the undervaluation and strong market interest are prioritized.\n\n**\n\nPosition: BUY\nAgent Confidence: 0.60",
+      "round": 1
+    },
+    {
+      "role": "bear",
+      "content": "…garding its technical setup, catalyst reliability, and risk/reward profile from the current price.\n\nWhile the fundamental brief indicates ADRO is currently trading at Rp 2,600, a 12.3% discount to its fair value estimate of Rp 2,919, this undervaluation does not automatically translate into a safe swing trade entry. The current price of Rp 2,600 is also the 52-week high, suggesting the stock is technically extended. The RSI(14) at 66.7, while strong, is approaching the overbought threshold of 70, which often precedes a period of consolidation or pullback\n\nPosition: AVOID\nAgent Confidence: 0.60",
+      "round": 1
+    },
+    {
+      "role": "bull",
+      "content": "The Bear's assertion that the current price, being a 52-week high, signifies an extended technical position and that the RSI(14) at 66.7 portends an imminent pullback misinterprets strong bullish momentum. A new 52-week high, especially when accompanied by high trading volume and significant foreign buying, is often a confirmation of a structural uptrend and a breakout, not a sign of exhaustion. The RSI, while elevated, is not yet in the overbought zone (above 70), and in robust uptrends, momentum indicators can remain strong for extended periods, reflecting sustained buying pressure rather than an immediate reversal. The technical setup explicitly anticipates a potential pullback to a defined entry zone before continuation, which is a standard characteristic of a healthy uptrend.\n\nRegarding downside risk, while the Bear implies a consolidation, our technical analysis provides clear downside protection. The primary support is anchored by the EMA20 at Rp 2,456, with a tight stop loss set at Rp 2,355. Should this immediate level be breached, the MA50 at Rp 2,375 serves as a robust secondary support, providing a strong technical floor that limits further downside. This layered support structure, combined with the stock's \"uptrend struktural\" context, suggests that any pullback is likely to be a temporary consolidation within the broader bullish channel, offering re-entry opportunities rather than a sustained decline.\n\nThe absence of a specific *upcoming* growth catalyst, as noted by the Bear, is effectively mitigated by the ongoing, market-driven catalyst of significant foreign buying and consistently high trading volume. This sustained institutional interest acts as a powerful corroborating force, demonstrating active market participation and demand for the stock, which is a potent driver of price appreciation in the short to medium term. Furthermore, the substantial 12.3% discount to fair value provides a significant buffer against the Bear's implied risk scenario. This valuation gap is more than sufficient to absorb any potential short-term consolidation or pullback, ensuring that even if the stock retraces to the proposed stop loss, it would still be trading at a fundamentally attractive level, thereby limiting the true economic downside for investors.\n\nPosition: BUY\nAgent Confidence: 0.85",
+      "round": 2
+    },
+    {
+      "role": "bear",
+      "content": "The Bull's swing setup for ADRO exhibits critical vulnerabilities, particularly concerning its entry zone, assumed downside protection, and the reliability of its fundamental floor. The proposed target of Rp 2,650 offers a meager upside of only Rp 50 from the current price of Rp 2,600, making the risk/reward highly unfavorable if the stock fails to pull back to the specified entry zone of Rp 2,375 – Rp 2,456. Furthermore, relying on the MA50 at Rp 2,375 as a \"robust secondary support\" is speculative; moving averages are lagging indicators, and a break below the EMA20 at Rp 2,456 could trigger accelerated selling. If the Bull's tight stop loss at Rp 2,355 is breached, the next significant structural support is considerably lower at the MA200, located at Rp 1,870. This implies that the actual maximum loss from the Bull's mid-entry point of approximately Rp 2,415 could be Rp 545, not the assumed Rp 60, fundamentally altering the trade's viability.\n\nThe Bull's claimed margin of safety is severely undermined by market volatility. With an ATR(14) of Rp 65, the maximum 1-week adverse move (2 × ATR) is Rp 130. This potential weekly fluctuation of Rp 130 is more than double the Bull's stated technical stop loss risk of Rp 60 (from entry mid-point Rp 2,415 to stop loss Rp 2,355). Such a tight stop loss, easily triggered by normal market noise, renders the trade unviable for swing execution, as it fails to account for typical price movements. Moreover, the assertion of a 12.3% discount to fair value (Rp 2,919) as a \"significant buffer\" is compromised by the explicit \"Revenue-CFO Divergence\" noted in the fundamental brief, where Free Cash Flow Per Share TTM is negative at -54.97%. This indicates that reported earnings are not cash-backed, making the fair value estimate, and thus any derived fundamental floor, highly unreliable and prone to downward revision.\n\nFinally, the Bull's reliance on \"ongoing, market-driven catalyst of significant foreign buying and consistently high trading volume\" is a mischaracterization. These are effects of price movement, not forward-looking catalysts. The fundamental brief explicitly states, \"No specific upcoming growth catalyst... has been identified within the next 1-3 months.\" Without a tangible future driver, the current momentum, especially at a 52-week high, is susceptible to reversal. Given the true downside risk to Rp 1,870 if the Bull's stop loss fails, the actual risk/reward ratio from the proposed entry becomes highly unfavorable, making this a high-risk proposition with limited, unconfirmed upside.\n\nPosition: AVOID\nAgent Confidence: 0.75",
+      "round": 2
+    },
+    {
+      "role": "devils_advocate",
+      "content": "Agent Confidence: HIGH\n\n1.  **MACRO/COMPANY RISK & FOREIGN FLOW:**\n    Given the noted Revenue-CFO divergence and ADRO's reliance on commodity prices, if foreign funds reverse their 'significant buying' into net selling due to a broader market correction or a sharp decline in coal prices, could the Rp 2,375 MA50 support level break, potentially triggering a cascade towards the MA200 at Rp 1,870 within 1-3 months?\n\n2.  **EXECUTION RISK — Transaction Cost Stress Test:**\n    Untuk posisi BUY ADRO dengan harga entry Rp 2,415 (mid-point dari entry zone Rp 2,375 – Rp 2,456) dan target Rp 2,650, total biaya transaksi round-trip adalah sebagai berikut: biaya beli 0.15%, biaya jual 0.25%, PPh final 0.10% dari nilai jual, dan estimasi slippage 0.15% (karena harga Rp 2,415 >= Rp 500). Total biaya transaksi adalah 0.15% + 0.25% + 0.10% + 0.15% = 0.65%. Dengan potensi keuntungan kotor sebesar ((Rp 2,650 - Rp 2,415) / Rp 2,415) * 100% = 9.73%, maka net return setelah biaya adalah 9.73% - 0.65% = 9.08%. Ini menunjukkan bahwa trade ini **VIABLE after transaction costs**.\n\nPosition: BUY\nAgent Confidence: 1.00",
+      "round": 3
+    }
+  ],
+  "raw_data_summary": "Ticker: ADRO\nAs Of: 2026-05-12T12:16:15.217403+00:00\nCurrent Price: Rp 2,600\nFair Value Estimate: Rp 2,919\nData Sources: stockbit, gemini, yfinance\nMissing Fields: none\nTechnical Indicators: {\"52w_high\":2600.0,\"52w_low\":1446.0,\"atr14\":65.0,\"avg_volume_20d\":72783285.0,\"brief\":\"**Analisis Teknis IHSG (ADRO)** Saham dalam uptrend struktural. Swing long searah tren. Harga saat ini berada di level tertinggi 52 minggu, menunjukkan momentum bullish yang kuat. ENTRY ZONE: Rp 2,375 – Rp 2,456 TARGET: Rp 2,650 (approx. 9.7% from entry mid) STOP LOSS: Rp 2,355 (1.5× ATR below EMA20) RSI(14) di 66.7 menunjukkan momentum bullish yang kuat, mendekati zona overbought namun belum mencapai level tersebut. Volume perdagangan tinggi, didukung oleh pembelian asing yang signifikan dan harga yang ditutup di level tertinggi 52 minggu, mengkonfirmasi kekuatan pergerakan harga. Setup ini mengindikasikan potensi kelanjutan kenaikan setelah pullback ke zona entri yang ditentukan. Position: BUY Agent Confidence: 0.90\",\"current_price\":2600.0,\"ema20\":2456.0,\"ma200\":1870.0,\"ma200_context\":\"ABOVE\",\"ma50\":2375.0,\"rsi14\":66.7,\"sma20\":2444.0}\n\nFundamental Brief: {\"brief\":\"FAIR VALUE: Rp 2,919 ADRO is currently trading at Rp 2,600, which indicates it is UNDERVALUED by 12.3% compared to its calculated fair value of Rp 2,919. This valuation is derived from a weighted average of P/E Band and P/B Band methods. Key support metrics include a TTM Return on Equity of 9.95% and a TTM Net Profit Margin of 27.21%. (Note: 3-year trend data for ROE and Net Margin were not provided in the raw data). The company maintains a healthy balance sheet with a Debt to Equity Ratio of 0.22 and offers a high Dividend Yield of 10.13%. No specific upcoming growth catalyst, such as earnings announcements or new contracts, has been identified within the next 1-3 months. The latest dividend ex-date (28 Apr 26) is in the past. **Quality Check:** * ⚠️ Revenue-CFO Divergence — laba mungkin tidak cash-backed. (Revenue growth positive at 27.16% YoY, but Free Cash Flow Per Share TTM is negative at -54.97). Position: HOLD Agent Confidence: 0.90\",\"exdate\":\"=== DIVIDEND EX-DATE SCAN: ADRO ===\\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\\n\"}\n\nSentiment Brief: ```json { \"sentiment\": \"INSUFFICIENT_DATA\", \"confidence\": 0, \"dominant_theme\": null, \"volume_anomaly\": null, \"swing_signal\": null, \"red_flags\": [], \"reason\": \"Data sosial tidak mencukupi (< 5 post)\" } ``` Position: HOLD Agent Confidence: 0.00",
+  "metadata": {
+    "prompt_version": "2026-05-11-critical-audit-v1",
+    "market_data_source": "yfinance",
+    "market_data_cached": true,
+    "batch_timestamp": "20260512_191322",
+    "run_timestamp": "20260512_191322",
+    "generated_at": "2026-05-12T19:13:22.502215+07:00",
+    "versioned_output": true
+  }
+}

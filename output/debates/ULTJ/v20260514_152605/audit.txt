@@ -1,0 +1,37 @@
+╔══════════════════════════════════════════╗
+║  AUDIT REPORT: ULTJ — HOLD       ║
+╚══════════════════════════════════════════╝
+
+Summary : ULTJ→HOLD: soft_hold_rule applied (0.55) after 2 round(s). 3 agent(s) dissented. Lack of a specific, near-term catalyst within the 1-3 month swing horizon, which could leave the stock range-bound.
+Run ID  : 20260514_152605
+Generated: 2026-05-14T08:33:31.023778+00:00
+
+VERDICT
+───────
+Rating     : HOLD (confidence: 55%)
+Method     : soft_hold
+Consensus  : yes
+Rounds     : 2
+Dissent    : 60% (3 of 5 agents)
+
+AGENT VOTES
+───────────
+  bull                   BUY      conf= 0.60  ❌
+  bear                   AVOID    conf= 0.60  ❌
+  bull                   BUY      conf= 0.75  ❌
+  bear                   AVOID    conf= 0.85  ❌
+  devils_advocate        BUY      conf= 1.00  ❌
+
+KEY ARGUMENTS
+─────────────
+Bull  : The Bear's assertion that a lack of a specific near-term catalyst renders the undervaluation unactionable overlooks the inherent catalysts present. The company's persistent and substantial undervaluation, evidenced by its trading multiples significantly below historical averages, acts as a continuou
+Bear  : The Bull's reliance on "persistent undervaluation" as an inherent catalyst for a swing trade is fundamentally flawed. While ULTJ's P/E of 11.2x and P/B of 1.9x are below historical averages, and ROE is strong at 17.0%, these are long-term value indicators, not short-term swing catalysts. The absence
+Devil : Agent Confidence: HIGH
+
+1.  **MACRO/COMPANY RISK & FOREIGN FLOW:** Given the absence of near-term catalysts and the current market's sensitivity, if foreign funds were to initiate a significant net sell-off in the broader consumer staples sector, could the Rp 1,494 stop-loss level break, potentially
+
+DATA QUALITY
+────────────
+Freshness OK : True
+Stale sources: none
+Missing      : none

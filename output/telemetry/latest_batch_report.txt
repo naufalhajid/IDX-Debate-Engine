@@ -1,0 +1,41 @@
+╔══════════════════════════════════════════╗
+║  OPS TELEMETRY: 20260519_175614         ║
+╚══════════════════════════════════════════╝
+
+BATCH SUMMARY
+─────────────
+Tickers   : 3 (3 ok / 0 fail / 0 timeout / 0 skip)
+Success   : 100%
+Timestamp : 20260519_175920
+
+VERDICTS
+────────
+  BUY      1
+  HOLD     2
+Avg confidence : 61%
+Avg rounds     : 2.3
+Avg duration   : 151s
+Longest run    : ADRO (175s)
+
+TOKEN SPEND (estimated)
+───────────────────────
+Flash calls : 26 (~20,800 tokens)
+Pro calls   : 3 (~6,000 tokens)
+Total est.  : ~26,800 tokens
+
+RAG EFFICIENCY
+──────────────
+Avg chunks     : 8.7 selected / 9.3 considered
+Avg RAG tokens : ~592 tokens
+Context saving : 7% chunks filtered out
+
+PROVIDER HEALTH
+───────────────
+Errors : none
+Stale  : none
+
+PER-TICKER
+──────────
+  ADRO   success  BUY   conf=85%  175s R3  RAG:9/10
+  TLKM   success  HOLD  conf=55%  141s R2  RAG:9/9
+  WIIM   success  HOLD  conf=42%  136s R2  RAG:8/9

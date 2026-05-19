@@ -1,0 +1,105 @@
+{
+  "ticker": "ERAA",
+  "verdict": {
+    "ticker": "ERAA",
+    "rating": "BUY",
+    "confidence": 0.71,
+    "fair_value": 1288.0,
+    "entry_price_range": "394 - 406",
+    "target_price": 444.0,
+    "stop_loss": 378.0,
+    "current_price": 406.0,
+    "timeframe": "1-3 Months",
+    "weighted_reasoning": "The decision is weighted heavily towards the significant undervaluation (Current Price Rp 406 vs. Fair Value Rp 1,288) and the favorable Risk/Reward ratio of 2.00. The technical setup supports a bounce from the MA50/EMA20 confluence zone. These factors are strong enough to justify a BUY rating despite key weaknesses: 1) This is a counter-trend trade, as the price is below its MA200, which increases risk. 2) There is no identifiable short-term catalyst to drive the price towards fair value. 3) The Devil's Advocate's concern about macro headwinds breaking support is valid and unanswerable, necessitating the strict stop-loss. Confidence is set at 0.71, reflecting the solid R/R but capped by the counter-trend nature and lack of catalyst.",
+    "critical_risk_factor": "",
+    "key_catalysts": [
+      "Technical bounce from the confluence of MA50 (Rp 399) and EMA20 (Rp 404) support levels.",
+      "Mean reversion play driven by the extreme discount of 217% to its fair value of Rp 1,288."
+    ],
+    "key_risks": [
+      "Counter-trend trade risk: Price remains below the MA200 (Rp 426), indicating a persistent long-term downtrend.",
+      "Lack of a specific short-term (1-3 month) fundamental catalyst to trigger a significant re-rating.",
+      "Macroeconomic headwinds or negative market sentiment could cause a break of technical support, as highlighted by the Devil's Advocate."
+    ],
+    "summary": "This is a BUY recommendation based on a compelling risk/reward setup. The stock is severely undervalued, offering a significant margin of safety, and the trade plan provides a clear 2.0 R/R ratio. However, this is a counter-trend trade without a near-term catalyst, warranting a reduced position size as a precaution.",
+    "expected_return": "+11.0%",
+    "risk_reward_ratio": 2.0,
+    "is_overvalued": false,
+    "wait_and_see": false,
+    "consensus_reached": true,
+    "consensus_method": "voting",
+    "dissenting_agents": [
+      "sentiment_specialist"
+    ]
+  },
+  "debate_rounds": 1,
+  "consensus_reached": true,
+  "consensus_method": "voting",
+  "dissenting_agents": [
+    "sentiment_specialist"
+  ],
+  "agent_votes": [
+    {
+      "agent": "fundamental_scout",
+      "position": "BUY",
+      "confidence": 0.8,
+      "round": 0
+    },
+    {
+      "agent": "chartist",
+      "position": "BUY",
+      "confidence": 0.7,
+      "round": 0
+    },
+    {
+      "agent": "sentiment_specialist",
+      "position": "HOLD",
+      "confidence": 0.0,
+      "round": 0
+    },
+    {
+      "agent": "bull",
+      "position": "BUY",
+      "confidence": 0.6,
+      "round": 1
+    },
+    {
+      "agent": "bear",
+      "position": "BUY",
+      "confidence": 0.6,
+      "round": 1
+    }
+  ],
+  "disagreement_type": null,
+  "debate_history": [
+    {
+      "role": "bull",
+      "content": "ERAA presents a compelling swing trade BUY opportunity (1-3 month horizon) driven by extreme undervaluation and a high-probability technical bounce from established support levels, despite the absence of a specific fundamental catalyst.\n\n**1. FUNDAMENTAL FLOOR:**\nERAA is significantly undervalued, with its current market price of Rp 406 trading at a substantial 217.24% discount to its calculated fair value of Rp 1,288. This deep discount provides a strong fundamental floor, limiting long-term downside risk and offering a compelling value proposition. While a \"ROE-Margin Divergence\" (ROE 15.14% vs. Net Margin 2.02%) suggests potential reliance on leverage, the overall undervaluation remains\n\nPosition: BUY\nAgent Confidence: 0.60",
+      "round": 1,
+      "position": "BUY",
+      "confidence": 0.6
+    },
+    {
+      "role": "bear",
+      "content": "The Bull's argument for a compelling swing trade BUY opportunity in ERAA is significantly flawed, primarily due to the inherent risks of a counter-trend trade, questionable fundamental support for a short-term horizon, and an unfavorable risk-reward profile.\n\n1.  **Misplaced Fundamental Reliance & Catalyst Risk:** While ERAA is indeed fundamentally undervalued at Rp 406 compared to its fair value of Rp 1,288, this deep discount does not constitute a reliable *swing trade catalyst* within a 1-3 month horizon. The Bull explicitly acknowledges the absence of any immediate growth catalysts (earnings, contracts, ex-dividend) for the swing trade period. Furthermore, the \"ROE-Margin Divergence\" (ROE 15.14% vs\n\nPosition: BUY\nAgent Confidence: 0.60",
+      "round": 1,
+      "position": "BUY",
+      "confidence": 0.6
+    },
+    {
+      "role": "devils_advocate",
+      "content": "Berikut adalah tantangan terhadap setup trade ERAA:\n\n1.  **MACRO/COMPANY RISK & FOREIGN FLOW:**\n    Given ERAA's structural downtrend and the 'ROE-Margin Divergence' suggesting potential reliance on leverage, if broader market sentiment sours or foreign funds accelerate their selling pressure on the IHSG, could the Rp 399 MA50 support level break, potentially triggering stops and pushing the price towards its 52-week low of Rp 360?\n\n2.  **EXECUTION RISK — Transaction Cost Stress Test:**\n    Menggunakan harga entry Rp 404 dan target Rp 426, potensi gross return adalah 5.45%. Biaya transaksi round-trip untuk saham ERAA (harga < Rp 500) adalah sebagai berikut: biaya beli 0.15%, biaya jual 0.25%, PPh final 0.10%, dan estimasi slippage 0.30%. Total biaya transaksi adalah 0.15% + 0.25% + 0.10% + 0.30% = 0.80%. Dengan demikian, net return setelah biaya adalah 5.45% - 0.80% = 4.65%. Berdasarkan perhitungan ini, trade ini **VIABLE after transaction costs**.\n\nPosition: HOLD\nAgent Confidence: 0.00",
+      "round": 2,
+      "position": "HOLD",
+      "confidence": 0.0
+    }
+  ],
+  "raw_data_summary": "=== FUNDAMENTALS ===\nFAIR VALUE: Rp 1,288\n\nERAA is significantly UNDERVALUED, with a current market price of Rp 406 representing a 217.24% discount to its calculated fair value of Rp 1,288. Key support metrics include a TTM Return on Equity (ROE) of 15.14%, a TTM Net Margin of 2.02%, a Debt/Equity Ratio of 0.96, and a Dividend Yield of 4.68%.\n\nA quality check reveals a \"⚠️ ROE-Margin Divergence — verifikasi kualitas laba\" as ROE (15.14%) is high while Net Margin (2.02%) is low, suggesting potential reliance on leverage or asset revaluation rather than strong operational profitability. No other red flags were triggered by the available data. No immediate upcoming growth catalyst (earnings, ex-dividend, contract) has been identified within the 1-3 month swing trade horizon, as the latest dividend ex-date (19 Jun 25) is a past event.\n\nPosition: BUY\nAgent Confidence: 0.80\n\n=== TECHNICALS ===\n**Analisis Teknis ERAA (1-3 Bulan Swing)**\n\nSaham dalam downtrend struktural. Ini counter-trend bounce — target lebih konservatif, size 50%. ERAA saat ini diperdagangkan di bawah MA200-nya, mengindikasikan tren jangka panjang yang bearish.\n\nENTRY ZONE: Rp 399 – Rp 404. Harga saat ini (Rp 406) berada sedikit di atas EMA20 (Rp 404), dengan MA50 (Rp 399) sebagai support berikutnya.\n⚠️ Counter-trend trade — kurangi ukuran posisi 50% dari normal.\nTARGET: Rp 426 (approx. 6.10% from entry mid). Target ini adalah level MA200, yang berfungsi sebagai resistensi kuat dalam tren turun.\nSTOP LOSS: Rp 388 (1.5× ATR below EMA20).\n\nRSI(14) berada di 53.4, menunjukkan momentum netral yang sedikit positif, namun belum memasuki zona overbought. Volume data harian spesifik tidak tersedia untuk perbandingan langsung dengan rata-rata volume 20 hari untuk mengkonfirmasi atau menyangkal pergerakan harga.\n\nPosition: BUY\nAgent Confidence: 0.70\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 406.0,\n  \"sma20\": 406.0,\n  \"ema20\": 404.0,\n  \"ma50\": 399.0,\n  \"ma200\": 426.0,\n  \"ma200_context\": \"BELOW\",\n  \"rsi14\": 53.4,\n  \"atr14\": 11.0,\n  \"avg_volume_20d\": 45046385.0,\n  \"52w_high\": 555.0,\n  \"52w_low\": 360.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\nPosition: HOLD\nAgent Confidence: 0.00\n\n=== DIVIDEND EX-DATE SCAN: ERAA ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
+  "error": null,
+  "conviction_score": 0.555,
+  "sector_key": "consumer_disc",
+  "metadata": {
+    "batch_timestamp": "20260509_145357",
+    "versioned_output": true
+  }
+}

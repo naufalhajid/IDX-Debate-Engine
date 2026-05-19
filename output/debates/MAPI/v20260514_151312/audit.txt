@@ -1,0 +1,38 @@
+╔══════════════════════════════════════════╗
+║  AUDIT REPORT: MAPI — HOLD       ║
+╚══════════════════════════════════════════╝
+
+Summary : MAPI→HOLD: soft_hold_rule applied (0.54) after 2 round(s). 3 agent(s) dissented. Price is technically overextended, trading far above the optimal entry zone, indicating a high risk of a sharp pullback.
+Run ID  : 20260514_151312
+Generated: 2026-05-14T08:15:46.984749+00:00
+
+VERDICT
+───────
+Rating     : HOLD (confidence: 54%)
+Method     : soft_hold
+Consensus  : yes
+Rounds     : 2
+Dissent    : 60% (3 of 5 agents)
+
+AGENT VOTES
+───────────
+  bull                   BUY      conf= 0.60  ❌
+  bear                   AVOID    conf= 0.60  ❌
+  bull                   BUY      conf= 0.85  ❌
+  bear                   AVOID    conf= 0.95  ❌
+  devils_advocate        AVOID    conf= 1.00  ❌
+
+KEY ARGUMENTS
+─────────────
+Bull  : The Bear's assertion that the current market valuation offers no technical margin of safety due to its proximity to the annual peak misinterprets the prevailing market dynamics. This level, far from being a ceiling, signifies robust upward momentum, with the stock consistently trading above its key 
+Bear  : The Bull's swing setup for MAPI is fundamentally flawed, riddled with internal contradictions and a misapplication of technical and fundamental indicators for a short-term horizon. The assertion of a "BUY" signal at the current price of Rp 1,475 directly contradicts the Bull's own technical analysis
+Devil : Agent Confidence: HIGH
+
+**1. MACRO/COMPANY RISK & FOREIGN FLOW:**
+If foreign funds initiate a significant net sell-off in MAPI, or if broader market sentiment turns negative due to unexpected macro headwinds, could the MA50 support at Rp 1,254 break, potentially triggering a cascade towards the MA20
+
+DATA QUALITY
+────────────
+Freshness OK : True
+Stale sources: none
+Missing      : none

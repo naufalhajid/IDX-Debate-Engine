@@ -1,0 +1,71 @@
+{
+  "ticker": "AADI",
+  "verdict": {
+    "ticker": "AADI",
+    "rating": "HOLD",
+    "confidence": 0.5,
+    "fair_value": 19355.0,
+    "entry_price_range": "10275 - 10475",
+    "target_price": 11375.0,
+    "stop_loss": 9875.0,
+    "current_price": 11600.0,
+    "timeframe": "1-3 Months",
+    "weighted_reasoning": "The HOLD rating is primarily driven by the mandatory Conflict Resolution signal (Fundamental ✅ + Technical ❌), which dictates waiting for technical confirmation. The stock is fundamentally attractive, trading at a significant discount to its fair value (Rp 19,355). However, the technical picture is prohibitive for a new swing entry; the current price of Rp 11,600 has overshot not only the entry zone but also the target price (Rp 11,375), indicating a missed entry window. The Devil's Advocate scenario of a correction due to a lack of near-term catalysts further supports a patient approach. The excellent R/R of 2.0 is only valid if the price pulls back over 10% into the specified entry zone.",
+    "critical_risk_factor": "",
+    "key_catalysts": [
+      "Strong fundamental valuation with a fair value of Rp 19,355, providing a significant margin of safety on a long-term basis.",
+      "Positive market sentiment surrounding the future Kestrel divestment and potential for a large special dividend, which could provide underlying support."
+    ],
+    "key_risks": [
+      "The current price is technically extended and trading near its 52-week high, creating a poor risk/reward for new entries and increasing the probability of a sharp pullback.",
+      "The primary catalyst (special dividend) is expected in 3Q26, which is outside the 1-3 month swing timeframe, leaving a lack of immediate drivers.",
+      "As noted by the Devil's Advocate, a breakdown of the MA50 support (Rp 10,273) during a pullback could trigger a much deeper correction."
+    ],
+    "summary": "The trade plan for AADI is rated HOLD. While the stock is fundamentally undervalued with a strong fair value of Rp 19,355, the current market price of Rp 11,600 is significantly extended and well above the calculated entry zone of Rp 10,275-10,475. A substantial pullback is required to establish a favorable risk/reward profile; entering at current levels is technically unfavorable.",
+    "expected_return": "+9.6%",
+    "risk_reward_ratio": 2.0,
+    "is_overvalued": false,
+    "wait_and_see": true
+  },
+  "debate_rounds": 2,
+  "debate_history": [
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 11,600, Rp 19,355, Rp 10,273, Rp 10,799, Rp 7,942, Rp 11,675, Rp 10,210, Rp 876",
+      "round": 0
+    },
+    {
+      "role": "bull",
+      "content": "…ial dividend are significant long-term positives, the transaction completion is targeted for 3Q26, falling outside the 1-3 month window. The analyst commentary regarding this divestment was also a PAST_EVENT_NOT_CATALYST (2026-04-15) for a fresh swing thesis.\n\n**4. RISK/REWARD (Upon Pullback):**\nThis trade setup is contingent on a pullback to the identified support zone.\n*   **Entry (Conditional):** Rp 10,799 (upper bound of support zone)\n*   **Target:** Rp 11,675 (52-week high, immediate strong resistance)\n*   **Stop Loss:** Rp 10,210 (1.5x ATR below SMA20)\n*   **Reward:** Rp 876 (11675 - 107",
+      "round": 1
+    },
+    {
+      "role": "bear",
+      "content": "…rket price of Rp 11,600 offers **NO margin of safety** for a swing trade entry. The stock is trading just Rp 75 (0.65%) below its 52-week high of Rp 11,675. Entering at or near this level means immediate upside is severely capped by strong overhead resistance. Even if a pullback to the proposed entry zone of Rp 10,273 – Rp 10,799 occurs, the target remains the 52-week high, indicating that the stock is already at a price point where significant resistance is expected, making further upward movement challenging without a strong catalyst.\n\n**2. TECHNICAL BREAKDOWN RISK:**\nThe current price of Rp",
+      "round": 1
+    },
+    {
+      "role": "bull",
+      "content": "Analyst,\n\nThe Bear's focus on immediate technical resistance and a perceived lack of margin of safety overlooks the broader valuation context and robust underlying support.\n\nFirstly, the assertion of \"no margin of safety\" is predicated on a narrow view of immediate overhead resistance. While the current market price is near its recent peak, the stock's calculated intrinsic worth is substantially higher, indicating a significant undervaluation. This wide disparity between market price and fundamental value provides a considerable buffer, suggesting that any short-term technical ceiling is a temporary hurdle rather than a definitive cap on appreciation. The current market valuation is trading at a deep discount to its calculated intrinsic worth, implying that the immediate technical resistance is a transient obstacle, not a long-term valuation ceiling.\n\nSecondly, regarding the \"technical breakdown risk,\" even if the primary support level around the 50-day moving average were to be breached, a robust secondary support exists at the longer-term 200-day moving average. This significantly lower level represents a strong foundational support, confirming the enduring bullish trend and limiting potential downside risk well below the proposed stop-loss. The substantial distance between the current price and this long-term average provides a significant safety net against any severe technical retracement.\n\nFinally, while the divestment announcement is a past event for a fresh swing thesis, the *anticipation* of a substantial special dividend, backed by the company's strong Return on Equity and healthy Net Margin, acts as a continuous, powerful sentiment driver. This forward-looking market expectation, coupled with the firm's robust financial health (evidenced by a low Debt/Equity ratio), provides a compelling fundamental catalyst that underpins sustained buying interest. The market often prices in such high-probability, value-accretive events well in advance, making the current positive sentiment a persistent force for upward momentum, irrespective of a specific near-term news release. This significant price-to-fair-value gap is more than sufficient to absorb the Bear's short-term technical risk scenario.",
+      "round": 2
+    },
+    {
+      "role": "bear",
+      "content": "The Bull's swing setup for AADI is fundamentally flawed when subjected to a rigorous cross-examination of its risk parameters and catalyst claims.\n\nFirstly, the Bull's assertion of a \"considerable buffer\" from the Rp 19,355 fair value is irrelevant for a swing trade's immediate risk. A stress test using the ATR(14) of Rp 393 reveals that a maximum 1-week adverse move (2 × ATR) is Rp 786. This single-week volatility alone is more than double the Bull's implied maximum loss of Rp 326 (calculated from the entry midpoint of Rp 10,536 to the stop loss of Rp 10,210). This significant disparity renders the swing trade unviable, as typical market fluctuations can easily obliterate the assumed margin of safety before the trade has a chance to develop.\n\nSecondly, the Bull's reliance on the MA50 at Rp 10,273 as \"robust primary support\" is contradicted by their own stop-loss placement. The proposed stop loss at Rp 10,210 is already positioned *below* the MA50, implicitly acknowledging its potential failure. If this primary support and the stop loss are breached, the next significant technical level is the MA200 at Rp 7,942. This would imply a potential downside of Rp 2,268 from the stop loss, making the *actual* maximum loss from the entry midpoint (Rp 10,536) a staggering Rp 2,600, not the mere Rp 326 the Bull assumes. This vastly increases the risk profile, exposing traders to disproportionate losses.\n\nFinally, the \"anticipation\" of a special dividend as a continuous catalyst is a weak premise for a swing trade. The divestment announcement (2026-04-15) is a PAST_EVENT_NOT_CATALYST for a fresh 1-3 month swing thesis, and the transaction's completion is targeted for 3Q26, placing the actual dividend event well outside the typical swing trade timeframe. Furthermore, while strong ROE (19.9%) and Net Margin (13.7%) are cited, the absence of 3-year trend data for these metrics prevents an assessment of whether this \"fundamental floor\" is stable or has been eroding, making its long-term relevance questionable for short-term price action.",
+      "round": 2
+    },
+    {
+      "role": "devils_advocate",
+      "content": "1.  **MACRO/COMPANY RISK & FOREIGN FLOW:** If foreign funds, lacking immediate catalysts, accelerate selling from current levels (Rp 11,600), could the MA50 support at Rp 10,273 break, triggering a deeper correction towards the MA200 at Rp 7,942?\n\n2.  **EXECUTION RISK:** Can the projected 8.11% return from the Rp 10,799 entry survive transaction costs if the stock only approaches, but fails to decisively break, the strong 52-week high resistance at Rp 11,675, forcing an early exit?",
+      "round": 3
+    }
+  ],
+  "raw_data_summary": "=== FUNDAMENTALS ===\nBerdasarkan laporan fair value, AADI memiliki FAIR VALUE sebesar Rp 19,355. Dengan harga pasar saat ini Rp 11,600, saham ini dinilai UNDERVALUED dengan potensi upside sebesar +66.9%. Kalkulasi fair value memiliki tingkat kepercayaan MEDIUM karena 2 dari 3 metode penilaian (P/E Band dan P/B Band) valid.\n\nDari sisi fundamental, AADI menunjukkan Return on Equity (ROE) TTM yang kuat di 19.9% dan Net Margin TTM sebesar 13.7%. Rasio Debt/Equity yang rendah di 0.24 menunjukkan posisi keuangan yang sehat. Saham ini juga menawarkan Dividend Yield sebesar 4.64%. Namun, data tren 3 tahun untuk ROE dan Net Margin tidak tersedia dalam informasi yang diberikan.\n\nTidak ada katalis pertumbuhan spesifik (seperti pengumuman pendapatan, ex-dividend, atau kontrak baru) yang teridentifikasi dalam rentang 1-3 bulan ke depan. Tanggal ex-dividend terakhir yang tercatat adalah 18 November 2025, yang merupakan peristiwa masa lalu dan bukan katalis untuk periode swing trade 1-3 bulan.\n\n=== TECHNICALS ===\nIHSG is currently in a strong uptrend, with the current price of Rp 11,600 significantly above both the MA50 at Rp 10,273 and the MA200 at Rp 7,942. The MA50 is also well above the MA200, confirming a robust long-term bullish trend.\n\nFor a swing trade entry, the nearest confirmed support lies between the MA50 and SMA20.\nENTRY ZONE: Rp 10,273 – Rp 10,799.\nTARGET: Rp 11,675 (approx. 10.8% from entry mid). This represents the 52-week high, acting as immediate strong resistance.\nSTOP LOSS: Rp 10,210 (1.5× ATR below SMA20).\n\nThe RSI(14) at 64.2 indicates strong bullish momentum, with the index not yet in overbought territory, suggesting room for further upward movement if resistance is broken. However, current volume data for the specific day is not provided, making it impossible to assess if the current price move is being confirmed or denied by volume.\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 11600.0,\n  \"sma20\": 10799.0,\n  \"ma50\": 10273.0,\n  \"ma200\": 7942.0,\n  \"rsi14\": 64.2,\n  \"atr14\": 393.0,\n  \"avg_volume_20d\": 15885035.0,\n  \"52w_high\": 11675.0,\n  \"52w_low\": 6288.0\n}\n\n=== SENTIMENT ===\n**Sentiment Analysis for AADI (Adaro Andalan Indonesia)**\n\nThe overall mood surrounding AADI, as indicated by the Stockbit analyst commentary, is **BULLISH (90% confidence)**. The dominant discussion theme revolves around AADI's planned divestment of its 47.99% stake in Kestrel Coal Group for up to US$1.2 billion. This transaction is viewed highly positively due to an attractive valuation (minimum 51x P/E vs AADI's current 6x P/E 2025), minimal impact on AADI's recurring income (Kestrel contributed only ~2% to 2025 net profit), and, most significantly, the potential for a substantial special dividend. The analyst highlights a potential dividend yield of 19% (~Rp1,938/share) from the upfront cash considerations, which is a strong positive driver.\n\nDiscussion volume appears moderately high for a single analytical post, with 169 likes and 49 replies, and its status as a \"pinned post\" suggests platform emphasis. However, without a comparative baseline, it's difficult to definitively label it as \"abnormally high\" or \"low.\" Regarding swing-trade timing, the post's creation date (2026-04-15) makes it a PAST_EVENT_NOT_CATALYST relative to the current date (2026-05-03) for a fresh 1-3 month swing thesis based on this specific information dissemination. While the sentiment is strongly bullish due to the significant potential dividend, the transaction's completion is targeted for 3Q26. Without current price action data, it is impossible to determine if this bullish sentiment is already priced in, trending with recent price movements, or if it represents an extreme contrarian opportunity.\n\nNo red flags are identified. The post originates from \"Stockbit\" and is attributed to an \"Investment Analyst Stockbit,\" suggesting it is an official research piece rather than speculative or coordinated pump activity. The language is analytical, factual, and provides clear financial details and sources, indicating a professional assessment.\n\n=== DIVIDEND EX-DATE SCAN: AADI ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
+  "error": null,
+  "conviction_score": 0.0,
+  "sector_key": "energy",
+  "metadata": {
+    "batch_timestamp": "20260503_141917",
+    "versioned_output": true
+  }
+}

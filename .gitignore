@@ -1,0 +1,51 @@
+# exclude folders
+.idea
+.venv
+logs
+__pycache__
+.pytest_cache
+tmp
+
+# AI agent / vibe-coding workspace files
+.agent/
+.agents/
+.codex/
+.cursor/
+.windsurf/
+.github/skills/
+AGENTS.md
+
+# exclude files
+.env
+*.http
+*.xlsx
+*.cache
+*.db
+
+# Svelte
+node_modules
+
+# Output
+.output
+.vercel
+.netlify
+.wrangler
+/.svelte-kit
+/build
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*
+!.env.example
+!.env.test
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# SQLite
+*.db

@@ -1,0 +1,85 @@
+{
+  "ticker": "BRPT",
+  "verdict": {
+    "ticker": "BRPT",
+    "rating": "AVOID",
+    "confidence": 0.4,
+    "fair_value": 1212.0,
+    "entry_price_range": "1825 - 1865",
+    "target_price": 1870.0,
+    "stop_loss": 1750.0,
+    "current_price": 2080.0,
+    "timeframe": "1-3 Months",
+    "weighted_reasoning": "The AVOID rating is driven by three critical factors, weighted with maximum importance: 1) Extreme Overvaluation: The current price of Rp 2,080 is 71.6% above the calculated fair value of Rp 1,212, indicating a severe negative margin of safety, the primary killer of swing trades. 2) Unacceptable Risk/Reward: The trade plan has an R/R ratio of 0.26, which is far below the minimum acceptable threshold of 1.0. The potential loss (-5.1%) heavily outweighs the minimal potential gain (+1.4%). 3) Negative Signal Consensus: The conflict resolution matrix explicitly points to AVOID (Fundamental ❌ + Technical ❌), as the stock is in a long-term downtrend and shows fundamental quality red flags like high leverage. The Devil's Advocate's risk scenario of a potential sharp drop towards fair value remains a significant, unmitigated threat.",
+    "critical_risk_factor": "",
+    "key_catalysts": [
+      "No clear short-term catalysts identified to justify the current premium valuation or to reverse the structural downtrend."
+    ],
+    "key_risks": [
+      "Severe overvaluation (71.6% above fair value) creates a high risk of price correction towards its fundamental value.",
+      "Extremely poor risk/reward ratio (0.26) makes the trade mathematically unsound for capital deployment.",
+      "High leverage (D/E 3.47) and fundamental red flags (ROE-Margin divergence) increase vulnerability during market downturns.",
+      "Stock is in a confirmed long-term downtrend (below MA200), making any bounce attempt a high-risk, counter-trend trade."
+    ],
+    "summary": "This trade plan is rejected. The stock is severely overvalued, trading significantly above its fair value. The proposed trade offers an extremely poor risk/reward ratio of 0.26, risking over 5% for a potential gain of just 1.4%, which is below the minimum threshold for a swing trade. Both fundamental and technical signals are negative, making this an unacceptably high-risk setup.",
+    "expected_return": "+1.4%",
+    "risk_reward_ratio": 0.26,
+    "is_overvalued": true,
+    "wait_and_see": true,
+    "consensus_reached": true,
+    "consensus_method": "voting",
+    "dissenting_agents": [
+      "chartist",
+      "sentiment_specialist"
+    ]
+  },
+  "debate_rounds": 2,
+  "debate_history": [
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 2,080, Rp 1,212, Rp 2,693, Rp 1,826, Rp 2,057, Rp 2,130, Rp 1,710, Rp 370, Rp 1,941.5, Rp 188.5, Rp 231.5",
+      "round": 0
+    },
+    {
+      "role": "bull",
+      "content": "…d market data for BRPT reveals significant challenges in constructing a strong swing trade BUY case for a 1-3 month horizon. The fundamental valuation, lack of a clear catalyst, and critically, an unfavorable risk/reward profile, lead to a cautious stance.\n\n**Fundamental Floor:** BRPT is fundamentally overvalued, trading at Rp 2,080 against a fair value estimate of Rp 1,212, representing a -41.7% upside (or 71.6% overvaluation). Key fundamental metrics show quality red flags, including a \"ROE-Margin Divergence\" (high ROE of 23.64% with low Net Margin of 3.\n\nPosition: BUY\nAgent Confidence: 0.60",
+      "round": 1
+    },
+    {
+      "role": "bear",
+      "content": "…, the Bull's target of Rp 2,130 offers a mere Rp 50 potential gain. In contrast, the proposed stop-loss at Rp 1,710 implies a substantial Rp 370 potential loss. This results in an abysmal R/R ratio of approximately 0.135:1 (Rp 50 gain / Rp 370 loss), which is far below any acceptable standard for a swing trade. Even using the midpoint of the Bull's entry zone (Rp 1,941.5), the R/R is only 0.81:1 (Rp 188.5 gain / Rp 231.5 loss). This setup exposes traders to disproportionately high risk for minimal potential returns, making it an unattractive proposition.\n\nPosition: AVOID\nAgent Confidence: 0.95",
+      "round": 1
+    },
+    {
+      "role": "bull",
+      "content": "The Bear's assessment of the risk/reward ratio is overly simplistic, focusing solely on a conservative initial target. While the stock is indeed in a structural downtrend, the current price action represents a valid counter-trend bounce, a recognized swing trade setup. The entry is strategically positioned near key short-term moving averages, providing a robust technical foundation. The initial target is merely a first resistance point; a successful breach could open the path towards the longer-term trend indicator, which resides significantly above current trading levels. This potential for a more substantial upward move, driven by short-term momentum, fundamentally alters the reward profile beyond the Bear's narrow calculation.\n\nThe Bear's concern regarding the stop-loss implies a breakdown below immediate support. However, a significant intermediate-\n\nPosition: AVOID\nAgent Confidence: 0.60",
+      "round": 2
+    },
+    {
+      "role": "bear",
+      "content": "The Bull's assertion of a \"robust technical foundation\" for a counter-trend bounce is fundamentally flawed within BRPT's confirmed structural downtrend. The stock trades significantly below its MA200 at Rp 2,693, indicating that short-term moving averages like the MA50 (Rp 1,826) and EMA20 (Rp 2,057) are more likely to serve as temporary resistance or weak support rather than a reliable base. In a persistent downtrend, these levels frequently fail to sustain upward momentum; for instance, the journey from its 52-week high of Rp 4,280 to the current price of Rp 2,080 would have seen numerous breaches of such short-term supports, demonstrating their unreliability in preventing further declines. The neutral RSI(14) at 51.6 offers no strong momentum signal to support a significant bounce.\n\nFurthermore, the Bull's claim of \"potential for a more substantial upward move\" is severely undermined by the stock's profound fundamental overvaluation. BRPT is currently trading at Rp 2,080, which is a staggering 41.7% above its calculated fair value of Rp 1,212. This substantial fundamental ceiling acts as a powerful gravitational pull, making any sustained rally beyond minor technical resistance highly improbable. If the Bull's proposed stop-loss at Rp 1,710 breaks, the next significant support is not a minor level but potentially the fundamental fair value of Rp 1,212, or even the 52-week low of Rp 855. This implies an actual maximum loss from the current price of Rp 2,080 could be Rp 868 (to Rp 1,212) or even Rp 1,225 (to Rp 855), vastly exceeding the Bull's assumed risk and making the trade's downside severely underestimated.\n\nThe Bull's implied margin of safety for this counter-trend trade is entirely negated by typical market volatility. With an ATR(14) of 229, a maximum 1-week adverse move (2 × ATR) is Rp 458. Applying this adverse movement from the current price of Rp 2,080 would push the stock down to Rp 1,622. This level is not only well below the Bull's proposed stop-loss of Rp 1,710 but also significantly below the entire entry zone (Rp 1,826 – Rp 2,057). The potential adverse movement within a single week (Rp 458) dwarfs the entire upside potential to the Bull's initial target of Rp 2,130 (a mere Rp 50 from the current price). This extreme vulnerability to normal market fluctuations renders the swing trade unviable, as the risk of being stopped out prematurely or incurring substantial losses is exceptionally high.\n\nPosition: AVOID\nAgent Confidence: 0.90",
+      "round": 2
+    },
+    {
+      "role": "devils_advocate",
+      "content": "Agent Confidence: HIGH\n\n1.  **MACRO/COMPANY RISK & FOREIGN FLOW:** Given BRPT's high Debt/Equity ratio (3.47) and significant overvaluation (fair value Rp 1,212), if a broader market correction or negative sentiment towards highly leveraged companies emerges, could the proposed stop-loss at Rp 1,710 break, potentially accelerating its fall towards its fundamental fair value?\n\n2.  **EXECUTION RISK — Transaction Cost Stress Test:** Mari kita hitung total biaya transaksi untuk posisi ini. Dengan harga entry di titik tengah zona Bull yaitu Rp 1,941.5 dan target jual Rp 2,130, potensi keuntungan kotor adalah 9.70%. Biaya beli 0.15% dari Rp 1,941.5, biaya jual 0.25% dari Rp 2,130, PPh final 0.10% dari Rp 2,130, dan estimasi slippage 0.15% (karena harga >= Rp 500) menghasilkan total biaya transaksi round-trip sebesar 0.15% + 0.25% + 0.10% + 0.15% = 0.65%. Setelah dikurangi biaya, net return yang diharapkan adalah 9.70% - 0.65% = 9.05%. Berdasarkan perhitungan ini, trade ini dianggap **VIABLE after transaction costs**.\n\nPosition: BUY\nAgent Confidence: 1.00",
+      "round": 3
+    }
+  ],
+  "raw_data_summary": "=== EVIDENCE BRIEF: BRPT ===\nQuery: swing trade analysis\n\n[FAIR_VALUE]\nEvidence ID: BRPT_fair_value_0\nCurrent Price: 2080 | Fair Value: 1212 | Upside: -41.7%\nSource: stockbit | Score: 1.00\n\n[FUNDAMENTAL]\nEvidence ID: BRPT_fundamental_0\n{\"brief\":\"FAIR VALUE: Rp 1,212 BRPT is currently trading at Rp 2,080, which is 41.7% OVERVALUED compared to its calculated fair value of Rp 1,212. This significant premium indicates a negative margin of safety for swing trade entry. Key fundamental metrics show a TTM ROE of 23.64% and a Net Margin of 3.52%. The Debt/Equity Ratio stands at 3.47, indicating high leverage. Dividend Yield is null. No\nSource: stockbit | Score: 0.90\n\n[FUNDAMENTAL]\nEvidence ID: BRPT_fundamental_1\nimmediate growth catalyst, such as earnings or an upcoming ex-dividend date, has been identified within the 1-3 month swing trade horizon. The latest dividend ex-date (27 Jun 24) is a past event relative to the current date (2026-05-14). Several quality red flags are detected. There is a \\\"⚠️ ROE-Margin Divergence — verifikasi kualitas laba\\\" as ROE (23.64%) is high while Net Margin (3.52%) is\nSource: stockbit | Score: 0.90\n\n[FUNDAMENTAL]\nEvidence ID: BRPT_fundamental_2\nlow, suggesting ROE might be inflated by high leverage. Furthermore, a \\\"⚠️ Revenue-CFO Divergence — laba mungkin tidak cash-backed\\\" is present, with positive revenue growth (242.32% YoY) but negative Free Cash Flow...\",\"exdate\":\"=== DIVIDEND EX-DATE SCAN: BRPT ===\\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\\n\"}\nSource: stockbit | Score: 0.90\n\n[TECHNICAL]\nEvidence ID: BRPT_technical_0\n{\"52w_high\":4280.0,\"52w_low\":855.0,\"atr14\":229.0,\"avg_volume_20d\":321674150.0,\"brief\":\"Saham dalam downtrend struktural. Ini counter-trend bounce — target lebih konservatif, size 50%. Harga saat ini berada di bawah MA200 yang jauh di atas, mengkonfirmasi tren turun jangka panjang. ⚠️ Counter-trend trade — kurangi ukuran posisi 50% dari normal. ENTRY ZONE: Rp 1,826 – Rp 2,057 (antara MA50 dan\nSource: yfinance | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: BRPT_technical_1\nEMA20). TARGET: Rp 2,130 (approx. 9.71% dari titik tengah entry), yang bertepatan dengan level SMA20 dan resistensi orderbook. STOP LOSS: Rp 1,710 (1.5× ATR di bawah EMA20). RSI(14) di 51.6 menunjukkan momentum netral, tidak ada kondisi overbought atau oversold yang signifikan. Data volume saat ini tidak tersedia untuk mengkonfirmasi pergerakan harga; hanya rata-rata volume 20 hari yang\nSource: yfinance | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: BRPT_technical_2\ndiberikan. Position: BUY Agent Confidence: 0.70\",\"current_price\":2080.0,\"ema20\":2057.0,\"ma200\":2693.0,\"ma200_context\":\"BELOW\",\"ma50\":1826.0,\"rsi14\":51.6,\"sma20\":2129.0}\nSource: yfinance | Score: 0.85\n\n[EXDATE]\nEvidence ID: BRPT_exdate_0\nDividend Ex-Date: === DIVIDEND EX-DATE SCAN: BRPT ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\nSource: stockbit | Score: 0.70\n\n[METADATA]\nEvidence ID: BRPT_metadata_0\nData Sources: stockbit, gemini, yfinance | Missing Fields: none\nSource: stockbit, gemini, yfinance | Score: 0.30\n\n---\nTotal evidence: 9/10 chunks selected\nToken estimate: ~580",
+  "metadata": {
+    "prompt_version": "2026-05-11-critical-audit-v1",
+    "run_id": "20260514_014257",
+    "market_data_source": "yfinance",
+    "market_data_cached": true,
+    "flash_calls": 8,
+    "pro_calls": 1,
+    "rag_chunks_selected": 9,
+    "rag_chunks_considered": 10,
+    "rag_token_estimate": 580,
+    "batch_timestamp": "20260514_014257",
+    "run_timestamp": "20260514_014257",
+    "generated_at": "2026-05-14T01:42:57.086682+07:00",
+    "versioned_output": true
+  }
+}

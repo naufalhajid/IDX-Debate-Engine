@@ -1,0 +1,158 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://your-project/schemas/cio_verdict_swing.json",
+  "title": "CIOVerdict — Swing Trade Edition",
+  "description": "Final trade plan from the CIO Judge. Validated by Pydantic on the Python side. Auto-computed fields (expected_return, risk_reward_ratio, is_overvalued, wait_and_see) are always present and never need to be calculated by the Svelte frontend.",
+  "type": "object",
+  "required": [
+    "ticker", "rating", "confidence",
+    "fair_value", "entry_price_range", "target_price", "stop_loss", "current_price",
+    "timeframe", "expected_return", "risk_reward_ratio",
+    "is_overvalued", "wait_and_see",
+    "weighted_reasoning", "critical_risk_factor",
+    "key_catalysts", "key_risks", "summary"
+  ],
+  "properties": {
+    "ticker": {
+      "type": "string",
+      "description": "IHSG stock ticker, e.g. 'BBRI'."
+    },
+    "rating": {
+      "type": "string",
+      "enum": ["STRONG_BUY", "BUY", "HOLD", "SELL", "AVOID"],
+      "description": "CIO's final swing-trade rating. Already downgraded to HOLD/AVOID by Pydantic if R/R < 1.0 or expected return is outside 3-10%."
+    },
+    "confidence": {
+      "type": "number", "minimum": 0.0, "maximum": 1.0,
+      "description": "CIO conviction score. Below 0.60 auto-sets wait_and_see=true."
+    },
+    "fair_value": {
+      "type": "number",
+      "description": "Intrinsic value in IDR, calculated via P/E and P/B Band vs 3-5yr historical median."
+    },
+    "entry_price_range": {
+      "type": "string",
+      "description": "Safe accumulation zone near confirmed support. Format: 'XXXX - YYYY'."
+    },
+    "target_price": {
+      "type": "number",
+      "description": "Swing-trade profit target in IDR. 3-10% above entry midpoint and below nearest resistance."
+    },
+    "stop_loss": {
+      "type": "number",
+      "description": "Hard cut-loss price in IDR. Just below key support used for entry."
+    },
+    "current_price": {
+      "type": "number",
+      "description": "Last traded price in IDR at analysis time. Used for is_overvalued check."
+    },
+    "timeframe": {
+      "type": "string",
+      "default": "1-3 Months"
+    },
+    "expected_return": {
+      "type": "string",
+      "description": "Auto-calculated % gain from entry midpoint to target_price. Format: '+7.3%'."
+    },
+    "risk_reward_ratio": {
+      "type": "number",
+      "description": "Auto-calculated: potential_gain_pct / potential_loss_pct. Below 1.0 triggers wait_and_see."
+    },
+    "is_overvalued": {
+      "type": "boolean",
+      "description": "Auto-flag: true when current_price > fair_value."
+    },
+    "wait_and_see": {
+      "type": "boolean",
+      "description": "Auto-flag: true when confidence < 0.60 OR risk_reward_ratio < 1.0."
+    },
+    "weighted_reasoning": {
+      "type": "string",
+      "description": "CIO's explicit explanation of how Technical entry and Fundamental fair value were combined."
+    },
+    "critical_risk_factor": {
+      "type": "string",
+      "description": "The single factor most likely to invalidate this swing trade within 1-3 months."
+    },
+    "key_catalysts": {
+      "type": "array", "items": { "type": "string" },
+      "minItems": 1, "maxItems": 5
+    },
+    "key_risks": {
+      "type": "array", "items": { "type": "string" },
+      "minItems": 1, "maxItems": 5
+    },
+    "summary": {
+      "type": "string",
+      "description": "3-sentence executive summary for the Svelte trade card."
+    }
+  },
+  "additionalProperties": false,
+
+  "x-svelte-trade-card": {
+    "description": "Call CIOVerdict.to_trade_card() on the Python side for a leaner payload. The Svelte table maps 1:1 to these keys.",
+    "trade_table_fields": {
+      "buy_at":          "entry_price_range — label: 'Beli di'",
+      "sell_at":         "target_price      — label: 'Jual di'",
+      "cut_loss":        "stop_loss         — label: 'Cut Loss'",
+      "fair_value":      "fair_value        — label: 'Harga Wajar'",
+      "expected_return": "expected_return   — label: 'Potensi Profit'",
+      "risk_reward":     "risk_reward_ratio — label: 'R/R Ratio'"
+    },
+    "rating_color_map": {
+      "STRONG_BUY": "#16a34a",
+      "BUY":        "#4ade80",
+      "HOLD":       "#facc15",
+      "SELL":       "#f97316",
+      "AVOID":      "#dc2626"
+    },
+    "badge_rules": {
+      "is_overvalued_true": "Red badge: 'Overvalued ⚠️ — Margin of Safety Negatif'",
+      "wait_and_see_true":  "Yellow banner: 'Konviksi Rendah — Pertimbangkan untuk Menunggu'",
+      "risk_reward_lt_1":   "Highlight R/R cell in red"
+    },
+    "example_trade_card_payload": {
+      "ticker":          "BBRI",
+      "rating":          "BUY",
+      "buy_at":          "4800 - 4950",
+      "sell_at":         5280,
+      "cut_loss":        4650,
+      "fair_value":      5200,
+      "expected_return": "+7.3%",
+      "risk_reward":     1.8,
+      "is_overvalued":   false,
+      "wait_and_see":    false,
+      "confidence":      0.74,
+      "summary":         "BBRI diperdagangkan ~7% di bawah harga wajar Rp 5.200 dengan support kuat di MA50. Target swing 1-3 bulan di Rp 5.280 dengan stop di Rp 4.650.",
+      "critical_risk":   "Kenaikan NPL yang berkelanjutan dapat menekan valuasi jika BI Rate tetap tinggi."
+    },
+    "example_full_verdict": {
+      "ticker":             "BBRI",
+      "rating":             "BUY",
+      "confidence":         0.74,
+      "fair_value":         5200.0,
+      "entry_price_range":  "4800 - 4950",
+      "target_price":       5280.0,
+      "stop_loss":          4650.0,
+      "current_price":      4875.0,
+      "timeframe":          "1-3 Months",
+      "expected_return":    "+7.3%",
+      "risk_reward_ratio":  1.8,
+      "is_overvalued":      false,
+      "wait_and_see":       false,
+      "weighted_reasoning": "Harga saat ini (Rp 4.875) berada 6,2% di bawah harga wajar (Rp 5.200), memberikan margin of safety yang memadai. Chartist mengkonfirmasi konsolidasi di atas MA50 dengan volume yang menurun. Devil's Advocate mempertanyakan risiko BI Rate, namun valuasi diskon sudah memperhitungkan skenario ini.",
+      "critical_risk_factor": "NPL ratio naik YoY (3,2% ke 3,8%) bisa menekan NIM jika BI Rate tetap tinggi hingga akhir tahun.",
+      "key_catalysts": [
+        "Harga 6,2% di bawah harga wajar — margin of safety positif",
+        "Ex-dividen Q3 diperkirakan yield 2,1% — katalis jangka pendek",
+        "Konsolidasi MA50 selama 6 minggu dengan volume turun — sinyal akumulasi"
+      ],
+      "key_risks": [
+        "NPL ratio naik YoY — risiko penurunan kualitas kredit",
+        "BI Rate tinggi berkepanjangan dapat menekan NIM",
+        "Pelemahan Rupiah meningkatkan biaya utang valas"
+      ],
+      "summary": "BBRI menawarkan setup swing trade yang menarik dengan harga di bawah nilai wajar dan support teknikal yang kuat. Entry di zona Rp 4.800-4.950 dengan target Rp 5.280 memberikan potensi profit 7,3% dalam 1-3 bulan. Stop loss di Rp 4.650 memberikan R/R ratio 1,8 — layak untuk posisi swing dengan sizing yang terukur."
+    }
+  }
+}

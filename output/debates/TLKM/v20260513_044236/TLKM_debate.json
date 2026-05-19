@@ -1,0 +1,81 @@
+{
+  "ticker": "TLKM",
+  "verdict": {
+    "ticker": "TLKM",
+    "rating": "HOLD",
+    "confidence": 0.46,
+    "fair_value": 3552.0,
+    "entry_price_range": "2860 - 2950",
+    "target_price": 3220.0,
+    "stop_loss": 2750.0,
+    "current_price": 2950.0,
+    "timeframe": "1-3 Months",
+    "weighted_reasoning": "The final rating is a mandatory HOLD due to the 'soft_hold' consensus rule, which is appropriate given the conflict between strong fundamentals and weak technicals. The primary positive driver is the substantial 20.4% discount to its fair value of Rp 3,552 and a compelling R/R of 2.03. However, this is outweighed by significant negative factors: the stock is in a structural downtrend (price below MA50/MA200), and there are no identifiable short-term catalysts. The Devil's Advocate's concern about foreign outflow risk remains unaddressed and is a key reason for caution. Therefore, we must wait for a technical trend reversal or a clear break above resistance before committing capital. Consensus override: Bull/Bear confidence gap was below 0.15, so the chamber treats this as soft consensus HOLD instead of forcing an entry.",
+    "critical_risk_factor": "",
+    "key_catalysts": [
+      "Significant undervaluation (20.4% discount to Fair Value) may attract value investors.",
+      "High dividend yield (7.20%) provides a long-term support floor, though not a short-term catalyst."
+    ],
+    "key_risks": [
+      "Persistent technical downtrend with price below MA50 and MA200.",
+      "Lack of a specific, near-term catalyst to drive a re-rating within the 1-3 month timeframe.",
+      "Risk of accelerated foreign selling pressure on Indonesian large-caps could break current support levels."
+    ],
+    "summary": "The trade plan is rated HOLD. Despite a significant undervaluation (20.4% below fair value) and an attractive R/R of 2.03, the stock remains in a clear technical downtrend, trading below key moving averages (MA50, MA200). The lack of a near-term catalyst and the unresolved risk of further downside from foreign selling pressure warrant waiting for technical confirmation before entering a new position.",
+    "expected_return": "+10.8%",
+    "risk_reward_ratio": 2.03,
+    "is_overvalued": false,
+    "wait_and_see": true,
+    "consensus_reached": true,
+    "consensus_method": "soft_hold",
+    "dissenting_agents": [
+      "fundamental_scout",
+      "bull",
+      "bear"
+    ]
+  },
+  "debate_rounds": 2,
+  "debate_history": [
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 3,552, Rp 2,950",
+      "round": 0
+    },
+    {
+      "role": "bull",
+      "content": "… fundamental undervaluation and a high-probability technical entry point, despite the absence of a specific news-driven catalyst.\n\n**1. FUNDAMENTAL FLOOR:** TLKM is fundamentally undervalued, with a Fair Value Estimate of Rp 3,552 against its current market price of Rp 2,950. This represents a substantial 20.4% discount, providing a strong fundamental cushion for a potential upward correction. The company exhibits healthy financials with a Return on Equity (ROE) of 13.63%, a Net Margin of 5.47%, and a low Debt/Equity Ratio of 0.39.\n\n**2. TECHNICAL ENTRY:**\n\nPosition: BUY\nAgent Confidence: 0.60",
+      "round": 1
+    },
+    {
+      "role": "bear",
+      "content": "…DAMENTAL MISALIGNMENT:**\nWhile the current price of Rp 2,950 is indeed below the Fair Value Estimate of Rp 3,552, indicating a 20.4% discount, this fundamental undervaluation alone does not constitute a compelling short-term swing trade catalyst. There is no premium to fair value, but this undervaluation is insufficient to drive a 1-3 month price correction without an active catalyst. The market often takes longer to recognize and correct such discrepancies, especially when technicals are bearish.\n\n**2. TECHNICAL BREAKDOWN RISK:**\nThe Bull's argument for\n\nPosition: AVOID\nAgent Confidence: 0.60",
+      "round": 1
+    },
+    {
+      "role": "bull",
+      "content": "The Bear's assertion that fundamental undervaluation is insufficient without an immediate catalyst overlooks the inherent gravitational pull of a substantial intrinsic value gap. While a specific news-driven event within the next 1-3 months is not identified, the company's attractive dividend yield of 7.20% acts as a continuous, underlying demand driver, providing a fundamental floor and attracting value-oriented capital. This consistent payout, coupled with the company's healthy financial structure and low leverage, ensures that the market's current technical downtrend presents a temporary dislocation rather than a permanent impairment of value. The significant discount to intrinsic worth itself becomes a compelling catalyst for a re-rating as market participants recognize the opportunity.\n\nRegarding the technical breakdown risk, while the stock is indeed in a structural downtrend, the current trading levels are near a critical support zone. Should this immediate support fail, a robust secondary support exists at the annual low point, which represents a strong psychological and technical barrier where buying interest is historically proven to re-emerge. This 52-week floor provides a clear downside limit, significantly mitigating the risk of a prolonged freefall. Furthermore, the typical daily volatility suggests that any immediate dip below the current level would likely be contained within a reasonable range before encountering this stronger, established floor.\n\nThe current wide gap between the company's estimated intrinsic value and its market valuation provides a substantial safety margin, effectively absorbing the Bear's risk scenario. Even if the stock experiences a further decline towards the aforementioned annual low point, it would still trade at a deep discount to its estimated fair value. This means that the downside risk, relative to the company's true economic worth, is considerably mitigated. The current market price offers a sufficiently wide buffer to absorb potential short-term volatility and the Bear's downside projections, while still presenting a compelling opportunity for a swing trade aiming for a partial re-rating towards its fundamental valuation.\n\nPosition: BUY\nAgent Confidence: 0.75",
+      "round": 2
+    },
+    {
+      "role": "bear",
+      "content": "The Bull's assertion that fundamental undervaluation provides an inherent \"gravitational pull\" and a \"fundamental floor\" for a swing trade is highly speculative without an active catalyst. The cited dividend yield of 7.20% is based on a PAST_EVENT_NOT_CATALYST (ex-date 11 Jun 25), offering no forward-looking demand driver for the 1-3 month horizon. The market has consistently disregarded the estimated fair value of Rp 3,552, allowing the price to trade significantly below the MA50 at Rp 3,109 and the MA200 at Rp 3,259. This demonstrates that a theoretical intrinsic value gap, in the absence of a specific, near-term event, does not prevent further price depreciation in a structural downtrend.\n\nThe Bull's reliance on a \"critical support zone\" between Rp 2,900 – Rp 2,960 is tenuous. The current price of Rp 2,950 is already below the EMA20 (Rp 2,960) and SMA20 (Rp 2,952), indicating immediate technical weakness. The MA50 at Rp 3,109, which would typically act as support in an uptrend, has been decisively broken and now serves as a strong overhead resistance, confirming the dominant bearish sentiment. If the immediate support around Rp 2,900 breaks, the next significant support is the 52-week low of Rp 2,401. This makes the actual maximum loss from the Bull's assumed entry point (e.g., Rp 2,950) to the next major support a substantial Rp 549 per share, not a \"clear downside limit\" as the Bull assumes for a swing trade.\n\nThe Bull's claim of a \"substantial safety margin\" from the intrinsic value gap is severely undermined by the stock's volatility. With an ATR(14) of 88.0, the maximum 1-week adverse move (2 × ATR) is Rp 176. From the Bull's entry point of Rp 2,950, a 1-week adverse move could easily push the price down to Rp 2,774. This potential short-term decline of Rp 176 per share represents a 5.97% drop from the current price, significantly eroding any perceived \"safety margin\" for a swing trade. This magnitude of immediate downside risk, which is well within typical weekly volatility, makes the trade unviable for swing execution, as the \"deep discount\" to fair value at Rp 3,552 offers no practical protection against such short-term price movements.\n\nPosition: AVOID\nAgent Confidence: 0.85",
+      "round": 2
+    },
+    {
+      "role": "devils_advocate",
+      "content": "Agent Confidence: HIGH\n\n**1. MACRO/COMPANY RISK & FOREIGN FLOW:**\nIf foreign funds accelerate net selling pressure on large-cap Indonesian stocks like TLKM, or if an unexpected negative company announcement (e.g., disappointing Q1 2026 results) emerges, could the Rp 2,900 support level break, triggering a cascade towards the 52-week low of Rp 2,401 within the next 1-3 months?\n\n**2. EXECUTION RISK — Transaction Cost Stress Test:**\nUsing an entry price of Rp 2,950 and a conservative swing target of Rp 3,109 (MA50), the gross return is 5.39%. Total transaction costs would be: Beli 0.15%, Jual 0.25%, PPh final 0.10%, dan Slippage 0.15% (for price >= Rp 500), totaling 0.65%. After these costs, the net return is 5.39% - 0.65% = 4.74%. This makes the trade VIABLE after transaction costs.\n\nPosition: UNKNOWN\nAgent Confidence: 1.00",
+      "round": 3
+    }
+  ],
+  "raw_data_summary": "Ticker: TLKM\nAs Of: 2026-05-12T21:48:08.830531+00:00\nCurrent Price: Rp 2,950\nFair Value Estimate: Rp 3,552\nData Sources: stockbit, gemini, yfinance\nMissing Fields: none\nTechnical Indicators: {\"52w_high\":3940.0,\"52w_low\":2401.0,\"atr14\":88.0,\"avg_volume_20d\":109150005.0,\"brief\":\"Analisis teknikal untuk IHSG menunjukkan saham ini berada dalam downtrend struktural, dengan harga saat ini di bawah MA200. Ini mengindikasikan potensi untuk swing long sebagai counter-trend bounce, namun dengan target yang lebih konservatif dan ukuran posisi yang dikurangi. Harga saat ini (Rp 2,950) berada sedikit di bawah EMA20 (Rp 2,960) dan jauh di bawah MA50 (Rp 3,109) serta MA200 (Rp 3,259), menegaskan tekanan jual yang dominan. Untuk setup swing long counter-trend, zona entri yang direkomendasikan adalah antara Rp 2,900 – Rp 2,960. Position: HOLD Agent Confidence: 0.00\",\"current_price\":2950.0,\"ema20\":2960.0,\"ma200\":3259.0,\"ma200_context\":\"BELOW\",\"ma50\":3109.0,\"rsi14\":45.9,\"sma20\":2952.0}\n\nFundamental Brief: {\"brief\":\"FAIR VALUE: Rp 3,552. Based on the provided Python calculation, TLKM is currently undervalued by 20.4% against its market price of Rp 2,950. This indicates a strong fundamental cushion for a potential swing trade. The fair value calculation confidence is MEDIUM, derived from two valid valuation methods (P/E Band and P/B Band). Key fundamental metrics for TLKM include a Return on Equity (ROE) of 13.63% and a Net Margin of 5.47%. The Debt/Equity Ratio stands at a healthy 0.39, indicating low leverage. The stock also offers an attractive Dividend Yield of 7.20%. Trend data for ROE and Net Margin over 3 years is INSUFFICIENT_DATA in the provided information. Regarding growth catalysts, the latest dividend ex-date was 11 Jun 25, which is a PAST_EVENT_NOT_CATALYST relative to the current date (2026-05-13). No specific upcoming earnings, ex-dividend, or contract events within the 1-3 month horizon are identified from the provided data. A quality check for financial inconsistencies reveals no...\",\"exdate\":\"=== DIVIDEND EX-DATE SCAN: TLKM ===\\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\\n\"}\n\nSentiment Brief: ```json { \"sentiment\": \"INSUFFICIENT_DATA\", \"confidence\": 0, \"dominant_theme\": null, \"volume_anomaly\": null, \"swing_signal\": null, \"red_flags\": [], \"reason\": \"Data sosial tidak mencukupi (< 5 post)\" } ``` Position: HOLD Agent Confidence: 0.00",
+  "metadata": {
+    "prompt_version": "2026-05-11-critical-audit-v1",
+    "run_id": "20260513_044236",
+    "market_data_source": "yfinance",
+    "market_data_cached": true,
+    "batch_timestamp": "20260513_044236",
+    "run_timestamp": "20260513_044236",
+    "generated_at": "2026-05-13T04:42:36.742474+07:00",
+    "versioned_output": true
+  }
+}

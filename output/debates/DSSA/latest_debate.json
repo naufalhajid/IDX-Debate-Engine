@@ -1,0 +1,117 @@
+{
+  "ticker": "DSSA",
+  "verdict": {
+    "ticker": "DSSA",
+    "rating": "AVOID",
+    "confidence": 0.8999999999999999,
+    "fair_value": 304.0,
+    "entry_price_range": "1005 - 1035",
+    "target_price": 1040.0,
+    "stop_loss": 965.0,
+    "current_price": 1035.0,
+    "timeframe": "1-3 Months",
+    "weighted_reasoning": "The AVOID rating is driven by three critical, non-negotiable factors. First, the stock is fundamentally overvalued by over 240% (Price: 1,035 vs. FV: 304), representing a severe negative margin of safety. Second, the trade structure is mathematically unsound, with a risk/reward ratio of 0.36, far below our minimum of 1.5. The potential 2.0% return does not justify the 5.4% risk. Third, the technical picture is overwhelmingly bearish; the stock is at a 52-week low and in a structural downtrend, making a long entry a high-probability failure. The consensus winner (AVOID) and the Fundamental ❌ + Technical ❌ signal confirm this decision. Consensus override: no 60% vote after 3 rounds, so fundamental_scout wins by highest numeric confidence. CIO did not override the winner. News sentiment confidence adjustment applied: -0.05.",
+    "critical_risk_factor": "",
+    "key_catalysts": [],
+    "key_risks": [
+      "Extreme Overvaluation: Current price of Rp 1,035 is over 240% above the fair value of Rp 304, indicating significant downside risk.",
+      "Poor Trade Structure: The risk/reward ratio is a highly unfavorable 0.36, offering insufficient compensation for the risk taken.",
+      "Strong Bearish Momentum: The stock is in a structural downtrend, trading at its 52-week low and well below all key moving averages, increasing the probability of the stop-loss being hit.",
+      "Lack of Catalysts: No identifiable fundamental or technical catalysts exist to support a price reversal in the 1-3 month timeframe."
+    ],
+    "summary": "This trade is rejected. The stock is severely overvalued, trading at a 240% premium to its fair value. The proposed trade has an extremely poor risk/reward ratio of 0.36 and a negligible target return of 2.0%. The stock is in a clear structural downtrend, making any long position a high-risk, counter-trend gamble with no identifiable catalyst.",
+    "expected_return": "+2.0%",
+    "risk_reward_ratio": 0.36,
+    "is_overvalued": true,
+    "wait_and_see": true,
+    "consensus_reached": false,
+    "consensus_method": "confidence_winner",
+    "dissenting_agents": [
+      "chartist",
+      "sentiment_specialist",
+      "bull"
+    ]
+  },
+  "debate_rounds": 3,
+  "debate_history": [
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 1,035, Rp 304, Rp 1,817, Rp 2,553, Rp 3,527, Rp 1,000, Rp 800, Rp 235, Rp 202, Rp 404, Rp 631",
+      "round": 0
+    },
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 1,035, Rp 304",
+      "round": 0
+    },
+    {
+      "role": "bull",
+      "content": "…uation and the absence of a clear catalyst.\n\n**1. FUNDAMENTAL FLOOR:**\nDSSA is fundamentally overvalued, with a current market price of Rp 1,035 significantly above its fair value estimate of Rp 304, representing a -70.6% upside (or 70.6% downside to fair value). Key fundamental metrics such as ROE (12.51%) and Net Margin (6.90%) do not indicate strong underlying value. For a swing trade, this extreme overvaluation is a major red flag, and there are no fundamental growth catalysts identified within the 1-3 month horizon to justify entry based on value.\n\n**\n\nPosition: BUY\nAgent Confidence: 0.60",
+      "round": 1
+    },
+    {
+      "role": "bear",
+      "content": "…sk, and a complete absence of catalysts, making an AVOID/SELL position the only prudent course of action.\n\n**1. OVERVALUATION CHECK:** The current market price of DSSA at Rp 1,035 is egregiously overvalued, trading at a staggering 240.46% premium over its calculated fair value of Rp 304 (DSSA_fair_value_0, DSSA_fundamental_0). This extreme disparity, explicitly noted as a \"negative margin of safety\" by the Bull's own analysis, renders any swing trade entry at current levels fundamentally unsound and offers NO margin of safety against significant downside\n\nPosition: AVOID\nAgent Confidence: 0.60",
+      "round": 1
+    },
+    {
+      "role": "bull",
+      "content": "… challenges. The substantial gap between the current market price and fair value, while noted, is largely irrelevant for a short-term tactical trade aiming for a modest percentage gain from a deeply oversold level. The objective is not for the stock to reach its fair value, but to capitalize on a temporary mean reversion. The extremely low Relative Strength Index and the stock's position at its annual low provide the necessary technical impetus for this short-term move, acting as a robust fallback catalyst even in the absence of immediate fundamental news.\n\nPosition: BUY\nAgent Confidence: 0.65",
+      "round": 2
+    },
+    {
+      "role": "bear",
+      "content": "…e True Range (ATR14) of Rp 202, a typical 1-week adverse move (2 × ATR) could be as much as Rp 404. If an entry is made at Rp 1,035, a Rp 404 adverse move would push the price down to Rp 631. This single week's potential fluctuation alone is more than double the Bull's implied maximum loss of Rp 235 (from Rp 1,035 to Rp 800), and completely obliterates any \"tight risk-reward\" from a stop below Rp 1,000. This level of volatility renders the swing trade unviable, as the market's natural movements can easily trigger stops and exceed assumed risk parameters.\n\nPosition: AVOID\nAgent Confidence: 0.90",
+      "round": 2
+    },
+    {
+      "role": "bull",
+      "content": "The Bear's assessment of volatility, using 2xATR as a typical adverse move, overstates the immediate downside risk for a counter-trend bounce. While the Average True Range (ATR14) indicates daily fluctuations, a 2xATR move is an extreme scenario, not a standard expectation for a short-term swing. Our entry strategy is predicated on the stock's deeply oversold condition, not a sustained downtrend at an accelerated pace. The stop-loss is strategically placed below the critical psychological support level, which is the lower bound of the identified entry zone, rather than a fixed percentage, providing a more robust defense against typical market noise.\n\nShould the immediate support at the lower end of the entry range fail, the Bear's own calculated extreme downside, which\n\nPosition: BUY\nAgent Confidence: 0.60",
+      "round": 3
+    },
+    {
+      "role": "bear",
+      "content": "The Bull's assertion that a 2xATR move \"overstates the immediate downside risk\" fundamentally misinterprets the volatility inherent in a structurally downtrending stock at its 52-week low. The entry zone of Rp 1,000 – Rp 1,050, while seemingly based on an \"oversold condition\" (RSI14 at 18.6), ignores the profound weakness indicated by the current price of Rp 1,035 being the absolute 52-week low. This isn't merely oversold; it signifies a complete breakdown of prior support, making any bounce highly speculative and prone to further capitulation. Furthermore, the fundamental fair value of Rp 304 reveals a staggering 70.6% overvaluation even at the 52-week low, indicating that the true \"floor\" is significantly lower than the Bull's proposed entry.\n\nThe Bull's claim of a \"robust defense\" with a stop-loss \"below the critical psychological support level\" (i.e., below Rp 1,000) is severely undermined by the stock's own volatility. With an ATR(14) of Rp 202, a stop placed, for instance, at Rp 990 (Rp 45 below the current price of Rp 1,035) represents less than a quarter of the average daily price fluctuation. Such a tight stop is not a defense against \"typical market noise\" but rather a guarantee of being stopped out by routine intraday movements, especially in a stock experiencing a \"downtrend struktural.\" This renders the proposed risk management inadequate for a swing trade.\n\nIf the \"critical psychological support\" at Rp 1,000 fails, the technical landscape offers no discernible support until much lower levels, effectively leaving the fundamental fair value of Rp 304 as the next significant floor. This means the actual maximum loss from an entry at Rp 1,035 could be Rp 731, not the minimal loss implied by a stop just below Rp 1,000. The stock's price is also drastically below its MA50 (Rp 2,553) and EMA20 (Rp 1,817), which now act as formidable resistance, reinforcing the strong bearish momentum and making a sustained counter-trend bounce highly improbable from these levels.\n\nPosition: AVOID\nAgent Confidence: 0.95",
+      "round": 3
+    },
+    {
+      "role": "devils_advocate",
+      "content": "Agent Confidence: HIGH\n\n**1. MACRO/COMPANY RISK & FOREIGN FLOW:**\nGiven DSSA's structural downtrend and extreme overvaluation relative to its Rp 304 fair value, if foreign funds continue to accelerate net selling pressure on Indonesian equities, or if any negative company-specific news emerges, could the critical psychological support at Rp 1,000 break, triggering further capitulation towards its fundamental floor?\n\n**2. EXECUTION RISK — Transaction Cost Stress Test:**\nUntuk posisi BUY DSSA dengan harga entry Rp 1,035 dan asumsi target gain sebesar 5% (target harga Rp 1,086.75), total biaya transaksi adalah sebagai berikut: biaya beli 0.15%, biaya jual 0.25%, PPh final 0.10%, dan estimasi slippage 0.15% (karena harga >= Rp 500). Total biaya round-trip adalah 0.15% + 0.25% + 0.10% + 0.15% = 0.65%. Dengan target return 5%, net return setelah biaya adalah 5% - 0.65% = 4.35%. Berdasarkan kalkulasi ini, posisi tersebut **VIABLE after transaction costs**.\n\nPosition: BUY\nAgent Confidence: 1.00",
+      "round": 4
+    }
+  ],
+  "raw_data_summary": "=== EVIDENCE BRIEF: DSSA ===\nQuery: swing trade analysis\n\n[FAIR_VALUE]\nEvidence ID: DSSA_fair_value_0\nCurrent Price: 1035 | Fair Value: 304 | Upside: -70.6%\nSource: stockbit | Score: 1.00\n\n[FUNDAMENTAL]\nEvidence ID: DSSA_fundamental_0\n{\"brief\":\"FAIR VALUE: Rp 304 DSSA is significantly overvalued based on the provided fair value analysis. The current market price of Rp 1,035 represents a 70.6% premium over the calculated fair value of Rp 304. This substantial overvaluation indicates a negative margin of safety, making it an unfavorable entry point for swing trading. Key fundamental metrics show a TTM Return on Equity (ROE) of\nSource: stockbit | Score: 0.90\n\n[FUNDAMENTAL]\nEvidence ID: DSSA_fundamental_1\n12.51% and a Net Margin of 6.90%. The Debt/Equity Ratio stands at 0.82, while the Dividend Yield is null. No 3-year trend data for ROE or Net Margin was available in the provided information. No specific upcoming growth catalysts (earnings, ex-dividend, contract) within the 1-3 month swing trade horizon were identified in the provided data. For quality checks, no red flags were detected based on\nSource: stockbit | Score: 0.90\n\n[FUNDAMENTAL]\nEvidence ID: DSSA_fundamental_2\nthe specified criteria: ROE (12.51%) is not above 15%, DER (0.82) is not below 0.3, and Altman Z-Score (4.74) is not above 10. Operating Cash Flow data was not explicitly available to assess the revenue-CFO diverg...\",\"exdate\":\"=== DIVIDEND EX-DATE SCAN: DSSA ===\\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\\n\"}\nSource: stockbit | Score: 0.90\n\n[TECHNICAL]\nEvidence ID: DSSA_technical_0\n{\"52w_high\":4640.0,\"52w_low\":1035.0,\"atr14\":202.0,\"avg_volume_20d\":80288935.0,\"brief\":\"**Analisis Teknikal IHSG (DSSA)** Saham dalam downtrend struktural. Ini counter-trend bounce — target lebih konservatif, size 50%. Harga saat ini berada di titik terendah 52 minggu, jauh di bawah semua moving average utama, mengindikasikan tekanan jual yang sangat kuat. ENTRY ZONE: Rp 1,000 – Rp 1,050. ⚠️\nSource: yfinance | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: DSSA_technical_1\nCounter-trend trade — kurangi ukuran posisi 50% dari normal. Perlu dicatat bahwa EMA20 (Rp 1,817) dan MA50 (Rp 2,553) saat ini berfungsi sebagai level resistensi yang signifikan, bukan support, mengingat harga berada jauh di bawahnya. TARGET: Position: HOLD Agent Confidence:\nSource: yfinance | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: DSSA_technical_2\n0.00\",\"current_price\":1035.0,\"ema20\":1817.0,\"ma200\":3527.0,\"ma200_context\":\"BELOW\",\"ma50\":2553.0,\"rsi14\":18.6,\"sma20\":2016.0}\nSource: yfinance | Score: 0.85\n\n[EXDATE]\nEvidence ID: DSSA_exdate_0\nDividend Ex-Date: === DIVIDEND EX-DATE SCAN: DSSA ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\nSource: stockbit | Score: 0.70\n\n[SENTIMENT]\nEvidence ID: DSSA_sentiment_0\n```json { \"sentiment\": \"INSUFFICIENT_DATA\", \"confidence\": 0, \"dominant_theme\": null, \"volume_anomaly\": null, \"swing_signal\": null, \"red_flags\": [], \"reason\": \"Data sosial tidak mencukupi (< 5 post)\" } ``` Position: HOLD Agent Confidence: 0.00\nSource: gemini | Score: 0.60\n\n---\nTotal evidence: 9/10 chunks selected\nToken estimate: ~584\n\n=== NEWS BRIEF: DSSA ===\nPeriod: last 60 days\nSentiment: UNKNOWN (score: +0.00)\nNo news data available\nConfidence adjustment: -0.05\nReason: No news data available - sentiment unverified\n\nTOP NEWS:\nnone",
+  "metadata": {
+    "prompt_version": "2026-05-11-critical-audit-v1",
+    "run_id": "20260514_205556",
+    "market_data_source": "yfinance",
+    "market_data_cached": true,
+    "flash_calls": 10,
+    "pro_calls": 1,
+    "has_breaking_news": false,
+    "news_confidence_adjustment": -0.05,
+    "news_overall_sentiment": "UNKNOWN",
+    "news_brief": "=== NEWS BRIEF: DSSA ===\nPeriod: last 60 days\nSentiment: UNKNOWN (score: +0.00)\nNo news data available\nConfidence adjustment: -0.05\nReason: No news data available - sentiment unverified\n\nTOP NEWS:\nnone",
+    "rag_chunks_selected": 9,
+    "rag_chunks_considered": 10,
+    "rag_token_estimate": 584,
+    "batch_timestamp": "20260514_205556",
+    "run_timestamp": "20260514_205556",
+    "generated_at": "2026-05-14T20:55:56.817015+07:00",
+    "versioned_output": true
+  },
+  "risk_governor": {
+    "ticker": "DSSA",
+    "status": "deployable",
+    "sizing_allowed": true,
+    "reason_codes": [
+      "price_inside_entry_range"
+    ],
+    "message": "Harga sekarang berada di zona entry; kandidat boleh masuk sizing.",
+    "current_price": 1035.0,
+    "entry_low": 1005.0,
+    "entry_high": 1035.0,
+    "target_price": 1040.0,
+    "stop_loss": 965.0
+  }
+}

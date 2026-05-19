@@ -1,0 +1,42 @@
+╔══════════════════════════════════════════╗
+║  AUDIT REPORT: BMRI — BUY        ║
+╚══════════════════════════════════════════╝
+
+Summary : BMRI→BUY: chartist won by confidence (0.85) after 3 round(s). 3 agent(s) dissented. Strong technical downtrend (price below MA50 & MA200)
+Run ID  : 20260514_174443
+Generated: 2026-05-14T11:09:36.347447+00:00
+
+VERDICT
+───────
+Rating     : BUY (confidence: 85%)
+Method     : confidence_winner
+Consensus  : no
+Rounds     : 3
+Dissent    : 60% (3 of 5 agents)
+
+AGENT VOTES
+───────────
+  bull                   BUY      conf= 0.60  ✅
+  bear                   AVOID    conf= 0.85  ❌
+  bull                   BUY      conf= 0.75  ✅
+  bear                   AVOID    conf= 0.90  ❌
+  bull                   BUY      conf= 0.85  ✅
+  bear                   AVOID    conf= 0.60  ❌
+  devils_advocate        AVOID    conf= 1.00  ❌
+
+KEY ARGUMENTS
+─────────────
+Bull  : The Bear's focus on short-term volatility, measured by the average true range, as a primary determinant for stop-loss placement overlooks the profound fundamental undervaluation at play. For an asset trading at a significant discount to its intrinsic worth, a tactical stop-loss is not solely dictate
+Bear  : The Bull's swing setup for BMRI is critically flawed, relying on long-term fundamental valuation while ignoring immediate technical headwinds and short-term volatility risks.
+
+The Bull's implied entry zone between Rp 4,150 and Rp 4,200 is precarious, positioned directly within a confirmed downtrend.
+Devil : Agent Confidence: HIGH
+
+**1. MACRO/COMPANY RISK & FOREIGN FLOW:**
+If foreign funds accelerate their net selling pressure on Indonesian banking stocks, or if an unexpected domestic interest rate hike triggers a broader market correction, could the immediate psychological support at Rp 4,150 break, le
+
+DATA QUALITY
+────────────
+Freshness OK : False
+Stale sources: sentiment
+Missing      : none

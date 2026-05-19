@@ -1,0 +1,40 @@
+╔══════════════════════════════════════════╗
+║  AUDIT REPORT: WIIM — HOLD       ║
+╚══════════════════════════════════════════╝
+
+Summary : WIIM→HOLD: soft_hold_rule applied (0.54) after 2 round(s). 3 agent(s) dissented. Lack of a clear short-term (1-3 month) catalyst to trigger a re-rating.
+Run ID  : 20260514_161822
+Generated: 2026-05-14T09:20:42.387356+00:00
+
+VERDICT
+───────
+Rating     : HOLD (confidence: 54%)
+Method     : soft_hold
+Consensus  : yes
+Rounds     : 2
+Dissent    : 60% (3 of 5 agents)
+
+AGENT VOTES
+───────────
+  bull                   BUY      conf= 0.60  ❌
+  bear                   AVOID    conf= 0.85  ❌
+  bull                   BUY      conf= 0.78  ❌
+  bear                   AVOID    conf= 0.92  ❌
+  devils_advocate        UNKNOWN  conf= 1.00  ❌
+
+KEY ARGUMENTS
+─────────────
+Bull  : The Bear's assessment of an unfavorable risk/reward ratio is overly narrow, focusing solely on immediate technical levels without accounting for the substantial fundamental cushion. While short-term volatility may present minor dips, the stock's intrinsic value provides a significant buffer against 
+Bear  : The Bull's argument for an "attractive entry point" at the current price of Rp 1870, slightly below the EMA20 (Rp 1883) and MA50 (Rp 1886) zone, directly contradicts the technical advice to await "konfirmasi reclaim atau konsolidasi di dalam zona ini." Entering below established support without conf
+Devil : **Agent Confidence:** HIGH
+
+---
+
+**1. MACRO/COMPANY RISK & FOREIGN FLOW:**
+If foreign funds accelerate net selling pressure on the broader market, or if WIIM faces unexpected negative company-specific news, could the Rp 1,728 stop-loss level break, potentially leading to a retest of the MA200 at Rp 
+
+DATA QUALITY
+────────────
+Freshness OK : False
+Stale sources: sentiment
+Missing      : none

@@ -1,0 +1,37 @@
+╔══════════════════════════════════════════╗
+║  AUDIT REPORT: BBCA — HOLD       ║
+╚══════════════════════════════════════════╝
+
+Summary : BBCA→HOLD: soft_hold_rule applied (0.41) after 2 round(s). 3 agent(s) dissented. Persistent technical downtrend; price is below MA50 and MA200, indicating strong selling pressure.
+Run ID  : 20260514_163838
+Generated: 2026-05-14T09:40:46.068083+00:00
+
+VERDICT
+───────
+Rating     : HOLD (confidence: 41%)
+Method     : soft_hold
+Consensus  : yes
+Rounds     : 2
+Dissent    : 60% (3 of 5 agents)
+
+AGENT VOTES
+───────────
+  bull                   BUY      conf= 0.80  ❌
+  bear                   AVOID    conf= 0.60  ❌
+  bull                   BUY      conf= 0.85  ❌
+  bear                   AVOID    conf= 0.88  ❌
+  devils_advocate        BUY      conf= 1.00  ❌
+
+KEY ARGUMENTS
+─────────────
+Bull  : The Bear's dismissal of an internal catalyst overlooks the profound valuation anomaly currently present. The stock's current price-to-earnings and price-to-book multiples are substantially below their long-term historical averages, representing a significant deviation from its typical market valuati
+Bear  : The Bull's reliance on a "profound valuation anomaly" as a swing catalyst is fundamentally flawed. A theoretical "fair value" of Rp 10,474, derived from historical multiples, represents a long-term intrinsic value, not a short-term driver for a 1-3 month swing trade. The claim of "consistent financi
+Devil : Agent Confidence: HIGH
+
+1.  **MACRO/COMPANY RISK & FOREIGN FLOW**: Given BBCA's structural downtrend and proximity to its 52-week low, if foreign funds accelerate net selling pressure on Indonesian banks due to global risk-off sentiment, could the Rp 5,800 stop-loss break, triggering a deeper declin
+
+DATA QUALITY
+────────────
+Freshness OK : False
+Stale sources: sentiment
+Missing      : none

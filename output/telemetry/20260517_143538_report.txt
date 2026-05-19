@@ -1,0 +1,39 @@
+╔══════════════════════════════════════════╗
+║  OPS TELEMETRY: 20260517_143538         ║
+╚══════════════════════════════════════════╝
+
+BATCH SUMMARY
+─────────────
+Tickers   : 2 (0 ok / 2 fail / 0 timeout / 0 skip)
+Success   : 0%
+Timestamp : 20260517_143857
+
+VERDICTS
+────────
+  none
+Avg confidence : -
+Avg rounds     : 0.0
+Avg duration   : 145s
+Longest run    : BBCA (168s)
+
+TOKEN SPEND (estimated)
+───────────────────────
+Flash calls : 0 (~0 tokens)
+Pro calls   : 0 (~0 tokens)
+Total est.  : ~0 tokens
+
+RAG EFFICIENCY
+──────────────
+Avg chunks     : 0.0 selected / 0.0 considered
+Avg RAG tokens : ~0 tokens
+Context saving : no RAG data
+
+PROVIDER HEALTH
+───────────────
+Errors : none
+Stale  : none
+
+PER-TICKER
+──────────
+  WIIM   failed   -     conf=0%  122s R0  RAG:0/0
+  BBCA   failed   -     conf=0%  168s R0  RAG:0/0

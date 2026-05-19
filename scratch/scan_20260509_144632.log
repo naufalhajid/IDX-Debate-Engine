@@ -1,0 +1,38 @@
+2026-05-09 14:46:32,919 [INFO] ============================================================
+2026-05-09 14:46:32,919 [INFO] IHSG Quantitative Swing-Trade Scouting Engine v3.2
+2026-05-09 14:46:32,920 [INFO] ============================================================
+2026-05-09 14:46:32,921 [INFO] Input file: output\IDX Fundamental Analysis 2026-05-09.xlsx
+2026-05-09 14:46:32,921 [INFO] [XlsxAdapter] Initialized dengan: output\IDX Fundamental Analysis 2026-05-09.xlsx
+2026-05-09 14:46:32,921 [INFO] [Adapter] XlsxDataAdapter aktif → output\IDX Fundamental Analysis 2026-05-09.xlsx
+2026-05-09 14:46:32,922 [INFO] Membaca: output\IDX Fundamental Analysis 2026-05-09.xlsx
+2026-05-09 14:46:33,849 [INFO] Total ticker universe: 957
+2026-05-09 14:46:33,853 [INFO] Exclude PEMANTAUAN KHUSUS: 957 → 795
+2026-05-09 14:46:33,855 [INFO] [Sector] Cache loaded: 957 ticker dari output\sector_cache.json
+2026-05-09 14:46:33,856 [INFO] [Sector] Resolve selesai: cache=795, hardcode=0, keyword=0, default=0
+2026-05-09 14:46:33,868 [INFO] Lolos static filter: 147 ticker
+2026-05-09 14:46:33,871 [INFO] Distribusi sektor:
+Sector
+consumer_staples    36
+consumer_disc       22
+industrials         16
+basic_materials     16
+tech                12
+property            10
+energy               9
+transport            9
+healthcare           7
+finance_nonbank      6
+infrastructure       3
+bank                 1
+2026-05-09 14:46:33,874 [WARNING] [Graham] LPLI: FV=4,528 > 5.0x price=292. Capped ke 1,460.
+2026-05-09 14:46:33,874 [WARNING] [Graham] PALM: FV=1,844 > 5.0x price=368. Capped ke 1,840.
+2026-05-09 14:46:33,880 [INFO] yfinance download attempt 1/3 (147 ticker)...
+2026-05-09 14:46:44,280 [INFO] Download berhasil. Shape: (120, 735)
+2026-05-09 14:46:44,949 [INFO] IHSG return 1 bulan: -0.02%
+2026-05-09 14:46:45,366 [INFO] [XlsxAdapter] Loaded key-statistics: 957 tickers
+2026-05-09 14:46:45,542 [INFO] [RDTX] Excluded: suspek suspended/FCA (volume anomali)
+2026-05-09 14:46:45,569 [INFO] [STTP] Excluded: suspek suspended/FCA (volume anomali)
+2026-05-09 14:46:45,745 [INFO] Top 10 kandidat berhasil disaring.
+2026-05-09 14:46:45,749 [INFO] JSON diekspor → output\top10_candidates.json
+2026-05-09 14:46:45,752 [INFO] Report → scratch\report.md
+2026-05-09 14:46:45,752 [INFO] PIPELINE SELESAI.

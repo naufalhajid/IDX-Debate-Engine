@@ -1,0 +1,86 @@
+{
+  "ticker": "ULTJ",
+  "verdict": {
+    "ticker": "ULTJ",
+    "rating": "BUY",
+    "confidence": 0.61,
+    "fair_value": 1938.0,
+    "entry_price_range": "1555 - 1605",
+    "target_price": 1690.0,
+    "stop_loss": 1525.0,
+    "current_price": 1605.0,
+    "timeframe": "1-3 Months",
+    "weighted_reasoning": "The BUY rating is primarily supported by a significant 20.7% undervaluation against its fair value of Rp 1,938 and an attractive R/R ratio of 2.0. The technical posture is constructive, with the price above its 200-day moving average, confirming a long-term uptrend. However, confidence is capped at a low level (0.61) due to several key risks that were weighted heavily: 1) The Bear's valid critique that the stop-loss at Rp 1,525 is too tight relative to the stock's ATR of Rp 70, increasing the risk of a premature stop-out. 2) A clear lack of identifiable catalysts within the 1-3 month timeframe to drive the price towards its fair value. 3) A strong directional disagreement between agents during the debate, warranting caution. The current price at the peak of the entry zone (Rp 1,605) also presents a less-than-optimal entry point.",
+    "critical_risk_factor": "",
+    "key_catalysts": [
+      "Re-rating towards fair value due to strong fundamentals (17% ROE, 17.8% NPM, low debt).",
+      "Continuation of the existing technical uptrend."
+    ],
+    "key_risks": [
+      "Stop-loss at Rp 1,525 is too tight for the stock's average volatility (ATR=Rp 70), risking a premature exit.",
+      "Absence of a specific, near-term catalyst could lead to price stagnation.",
+      "Potential for macro headwinds or foreign selling pressure in the consumer sector.",
+      "Entry at the top of the range (Rp 1,605) offers the weakest risk/reward within the plan."
+    ],
+    "summary": "This is a fundamentally-driven swing trade on an undervalued stock with a solid 2.0 R/R ratio. The trade is rated BUY, but with low confidence, due to a tight stop-loss vulnerable to normal volatility and a lack of near-term catalysts. Entry should be sought closer to the bottom of the provided range to improve the risk profile.",
+    "expected_return": "+7.0%",
+    "risk_reward_ratio": 2.0,
+    "is_overvalued": false,
+    "wait_and_see": false,
+    "consensus_reached": true,
+    "consensus_method": "voting",
+    "dissenting_agents": [
+      "sentiment_specialist",
+      "bear"
+    ]
+  },
+  "debate_rounds": 2,
+  "debate_history": [
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 1,605, Rp 1,938, Rp 1,574, Rp 1,599, Rp 1,444, Rp 1,700, Rp 1,635, Rp 1,494, Rp 111",
+      "round": 0
+    },
+    {
+      "role": "bull",
+      "content": "…ts significant undervaluation and a supportive technical structure, despite the absence of an immediate, identifiable catalyst within the 1-3 month horizon.\n\n**1. FUNDAMENTAL FLOOR:**\nULTJ is fundamentally undervalued, with a current price of Rp 1,605 significantly below its fair value estimate of Rp 1,938, representing a 20.7% upside. This valuation is supported by a P/E ratio of 11.2x (below its historical average of 15.0x) and a P/B ratio of 1.9x (below its historical average of 2.0x). The company exhibits robust financial health, including a TTM Return\n\nPosition: BUY\nAgent Confidence: 0.60",
+      "round": 1
+    },
+    {
+      "role": "bear",
+      "content": "…ear-term resistance, limiting upside.\n\nEntering at the current price of Rp 1,605 presents an extremely unfavorable risk-reward ratio. The proposed target of Rp 1,635 offers a mere Rp 30 potential gain. In contrast, the suggested stop-loss at Rp 1,494 exposes the trade to a potential loss of Rp 111. This calculates to an R/R ratio of approximately 0.27:1 (or 1:3.7), meaning the potential loss is nearly four times the potential gain. Such an imbalance makes the trade highly unattractive and does not provide a sufficient margin of safety for a swing trader.\n\nPosition: AVOID\nAgent Confidence: 0.85",
+      "round": 1
+    },
+    {
+      "role": "bull",
+      "content": "The Bear's argument for an unfavorable risk-reward ratio is predicated on a narrow view of the immediate technical resistance, failing to account for the substantial intrinsic undervaluation. The stock's current trading level represents a significant discount to its calculated fair value, indicating a much broader potential for appreciation beyond the initial technical target. This fundamental valuation gap provides a robust cushion, fundamentally altering the risk-reward profile and suggesting that the immediate resistance is merely a short-term hurdle, not the ultimate ceiling for the swing trade. The existing price-to-fair-value differential is more than sufficient to absorb the Bear's perceived risk scenario, offering a compelling long-term value proposition.\n\nRegarding the downside risk to the initial technical stop, the stock's established structural uptrend provides a strong underlying defense. Should the initial tactical stop level be breached, the 200-day moving average stands as a robust secondary support. This key technical level has historically served as a significant floor for price action in an established uptrend, offering a deeper, more fundamental technical defense against a sustained decline and effectively limiting further downside exposure.\n\nWhile an immediate, explicit news-driven catalyst was not identified, the company's powerful intrinsic strengths serve as a continuous, underlying catalyst for value realization. Its consistently strong profitability, demonstrated by robust Return on Equity and Net Profit Margin, alongside an attractive dividend yield, inherently attracts capital and supports a market re-rating towards its fair value. These sustained operational excellences and shareholder returns provide a compelling reason for appreciation over the swing trade horizon, even in the absence of specific news events.\n\nPosition: BUY\nAgent Confidence: 0.75",
+      "round": 2
+    },
+    {
+      "role": "bear",
+      "content": "The Bull's swing setup for ULTJ exhibits critical vulnerabilities, particularly concerning its entry, assumed support levels, and an inadequate margin of safety for the proposed timeframe.\n\nFirstly, the Bull's \"ideal entry zone\" of Rp 1,574 – Rp 1,599 is already compromised, as the current price of Rp 1,605 sits above this range. Entering at the current level means the Bull's proposed target of Rp 1,635 offers a mere Rp 30 upside from the current price, making the immediate reward negligible. The reliance on MA50 (Rp 1,574) as a primary support within this entry zone is precarious, especially when the price is already above it, and its historical efficacy as a consistent floor for this specific stock is not substantiated by the provided data.\n\nSecondly, the assertion of a \"substantial intrinsic undervaluation\" and \"fundamental cushion\" as a continuous catalyst is weakened by the explicit lack of \"Three-year trends for ROE and Net Margin\" in the evidence. This absence undermines the claim of \"consistently strong profitability\" as a reliable, ongoing driver for a market re-rating. A theoretical fair value of Rp 1,938, derived from static P/E and P/B comparisons, does not guarantee a price floor or act as an immediate catalyst for a 1-3 month swing trade, where technicals and short-term sentiment often dominate. The latest dividend ex-date (04 May 26) is a PAST_EVENT_NOT_CATALYST, leaving no immediate fundamental drivers for the swing timeframe.\n\nFinally, the Bull's assumed maximum loss to the stop at Rp 1,494 is dangerously optimistic. If the MA50 (Rp 1,574) and the MA200 (Rp 1,444) fail to hold as supports, the next significant technical floor is the 52-week low of Rp 1,265. This implies a potential downside of Rp 340 from the current price of Rp 1,605, making the actual maximum loss significantly greater than the Bull's assumed Rp 111 to the initial stop. Furthermore, the margin of safety stress test reveals a critical flaw: with an ATR(14) of Rp 70, a maximum 1-week adverse move (2 × ATR) is Rp 140. The Bull's technical margin of safety from the midpoint of their entry zone (Rp 1,586.5) to their stop loss (Rp 1,494) is only Rp 92.5. Since Rp 140 far exceeds Rp 92.5, a typical weekly price fluctuation could easily breach the proposed stop loss, rendering the trade unviable for swing execution due to insufficient risk buffer.\n\nPosition: AVOID\nAgent Confidence: 0.90",
+      "round": 2
+    },
+    {
+      "role": "devils_advocate",
+      "content": "**Agent Confidence:** HIGH\n\n**1. MACRO/COMPANY RISK & FOREIGN FLOW:**\nJika terjadi akselerasi net foreign sell di sektor consumer goods atau sentimen pasar global memburuk, mampukah support MA200 di Rp 1,444 bertahan, memicu penurunan lebih lanjut menuju 52-week low di Rp 1,265?\n\n**2. EXECUTION RISK — Transaction Cost Stress Test:**\nMenggunakan harga entry midpoint dari zona Bull di Rp 1,586.5 dan target harga Rp 1,635, potensi gross return adalah 3.057%. Total biaya transaksi round-trip dihitung sebagai berikut: biaya beli 0.15%, biaya jual 0.25%, PPh final 0.10% dari nilai jual, dan estimasi slippage 0.15% (karena harga >= Rp 500). Total biaya transaksi adalah 0.15% + 0.25% + 0.10% + 0.15% = 0.65%. Dengan demikian, net return setelah biaya adalah 3.057% - 0.65% = 2.407%. **MARGINAL — only proceed if conviction high.**\n\nPosition: UNKNOWN\nAgent Confidence: 1.00",
+      "round": 3
+    }
+  ],
+  "raw_data_summary": "=== EVIDENCE BRIEF: ULTJ ===\nQuery: swing trade analysis\n\n[FAIR_VALUE]\nEvidence ID: ULTJ_fair_value_0\nCurrent Price: 1605 | Fair Value: 1938 | Upside: 20.7%\nSource: stockbit | Score: 1.00\n\n[FUNDAMENTAL]\nEvidence ID: ULTJ_fundamental_0\n{\"brief\":\"FAIR VALUE: Rp 1,938 ULTJ's current market price of Rp 1,605 is significantly UNDERVALUED by 20.7% compared to its calculated fair value of Rp 1,938. This valuation is supported by a current P/E of 11.2x against a historical average of 15.0x, and a P/B of 1.9x against a historical average of 2.0x, indicating a strong fundamental cushion for a potential swing trade. Key fundamental\nSource: stockbit | Score: 0.90\n\n[FUNDAMENTAL]\nEvidence ID: ULTJ_fundamental_1\nmetrics for ULTJ include a robust TTM Return on Equity (ROE) of 17.02% and a strong Net Profit Margin of 17.81%. The company demonstrates excellent solvency with a Total Liabilities/Equity ratio of 0.14 and an exceptionally high Interest Coverage Ratio of 14,312.37x. Furthermore, ULTJ offers an attractive Dividend Yield of 8.10%. Three-year trends for ROE and Net Margin are not explicitly\nSource: stockbit | Score: 0.90\n\n[FUNDAMENTAL]\nEvidence ID: ULTJ_fundamental_2\nprovided in the current data. Regarding growth catalysts, the latest dividend ex-date was 04 May 26, which is a PAST_EVENT_NOT_CATALYST relative to the current date. No immediate future catalysts within the 1-3 month swing t...\",\"exdate\":\"=== DIVIDEND EX-DATE SCAN: ULTJ ===\\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\\n\"}\nSource: stockbit | Score: 0.90\n\n[TECHNICAL]\nEvidence ID: ULTJ_technical_0\n{\"52w_high\":1700.0,\"52w_low\":1265.0,\"atr14\":70.0,\"avg_volume_20d\":4182835.0,\"brief\":\"**Analisis Teknis ULTJ (1-3 Bulan Swing Trade)** Saham dalam uptrend struktural karena harga saat ini (Rp 1,605) berada di atas MA200 (Rp 1,444). Ini mengindikasikan sentimen bullish jangka panjang yang kuat, mendukung strategi swing long searah tren. Zona entri ideal untuk swing trade berada di antara support\nSource: yfinance | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: ULTJ_technical_1\nEMA20 dan MA50. ENTRY ZONE: Rp 1,574 – Rp 1,599 Target harga terdekat yang signifikan adalah level resistensi di Rp 1,635, yang menawarkan potensi keuntungan sekitar 3.05% dari titik tengah zona entri. Untuk membatasi risiko, stop loss ditempatkan 1.5 kali ATR di bawah EMA20. TARGET: Rp 1,635 (approx. 3.05% from entry mid) STOP LOSS: Rp 1,494 (1.5× ATR below EMA20) Indikator RSI(14) berada di\nSource: yfinance | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: ULTJ_technical_2\n51.6, menunjukkan momentum yang netral cenderung positif, dengan sedikit dorongan beli. Data volume perdagangan harian saat ini tidak tersedia untuk dibandingkan dengan rata-rata volume 20 hari (4,182,835), sehingga tidak dapat dipastikan apakah pergerakan harga saat ini didukung oleh\nSource: yfinance | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: ULTJ_technical_3\nvolume...\",\"current_price\":1605.0,\"ema20\":1599.0,\"ma200\":1444.0,\"ma200_context\":\"ABOVE\",\"ma50\":1574.0,\"rsi14\":51.6,\"sma20\":1595.0}\nSource: yfinance | Score: 0.85\n\n---\nTotal evidence: 8/11 chunks selected\nToken estimate: ~597",
+  "metadata": {
+    "prompt_version": "2026-05-11-critical-audit-v1",
+    "run_id": "20260514_151312",
+    "market_data_source": "yfinance",
+    "market_data_cached": true,
+    "flash_calls": 8,
+    "pro_calls": 1,
+    "rag_chunks_selected": 8,
+    "rag_chunks_considered": 11,
+    "rag_token_estimate": 597,
+    "batch_timestamp": "20260514_151312",
+    "run_timestamp": "20260514_151312",
+    "generated_at": "2026-05-14T15:13:12.232986+07:00",
+    "versioned_output": true
+  }
+}

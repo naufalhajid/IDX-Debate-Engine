@@ -1,0 +1,41 @@
+╔══════════════════════════════════════════╗
+║  AUDIT REPORT: WIIM — HOLD       ║
+╚══════════════════════════════════════════╝
+
+Summary : WIIM→HOLD: soft_hold_rule applied (0.47) after 3 round(s). 3 agent(s) dissented. Price has broken below short-term supports (EMA20, MA50), which now act as resistance.
+Run ID  : 20260514_174443
+Generated: 2026-05-14T10:54:32.458080+00:00
+
+VERDICT
+───────
+Rating     : HOLD (confidence: 47%)
+Method     : soft_hold
+Consensus  : yes
+Rounds     : 3
+Dissent    : 60% (3 of 5 agents)
+
+AGENT VOTES
+───────────
+  bull                   BUY      conf= 0.80  ❌
+  bear                   AVOID    conf= 0.60  ❌
+  bull                   BUY      conf= 0.85  ❌
+  bear                   AVOID    conf= 0.60  ❌
+  bull                   BUY      conf= 0.88  ❌
+  bear                   AVOID    conf= 0.75  ❌
+  devils_advocate        HOLD     conf= 0.00  ✅
+
+KEY ARGUMENTS
+─────────────
+Bull  : The Bear's volatility stress test, projecting a short-term decline, fails to account for the robust structural supports that define the true downside limits for this swing trade. While a temporary dip below the initial entry zone is plausible, the stock's long-term moving average, positioned signifi
+Bear  : The Bull's swing setup for WIIM is fundamentally flawed, relying on theoretical long-term value and distant support levels that are irrelevant for a 1-3 month swing horizon.
+
+The proposed entry zone of Rp 1,850 – Rp 1,886 is already compromised. The current price of Rp 1,870 is *below* the MA50 at R
+Devil : Here are two challenges to the proposed WIIM swing trade setup:
+
+1.  **MACRO/COMPANY RISK & FOREIGN FLOW:** If broader market sentiment deteriorates, leading to accelerated net foreign selling pressure on mid-cap stocks, could the MA200 support at Rp 1,480 fail to hold, triggering a deeper correctio
+
+DATA QUALITY
+────────────
+Freshness OK : False
+Stale sources: sentiment
+Missing      : none

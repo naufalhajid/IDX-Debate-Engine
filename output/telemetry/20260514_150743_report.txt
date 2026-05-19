@@ -1,0 +1,38 @@
+╔══════════════════════════════════════════╗
+║  OPS TELEMETRY: 20260514_150743         ║
+╚══════════════════════════════════════════╝
+
+BATCH SUMMARY
+─────────────
+Tickers   : 1 (1 ok / 0 fail / 0 timeout / 0 skip)
+Success   : 100%
+Timestamp : 20260514_150743
+
+VERDICTS
+────────
+  BUY      1
+Avg confidence : 74%
+Avg rounds     : 2.0
+Avg duration   : 139s
+Longest run    : WIIM (139s)
+
+TOKEN SPEND (estimated)
+───────────────────────
+Flash calls : 8 (~6,400 tokens)
+Pro calls   : 1 (~2,000 tokens)
+Total est.  : ~8,400 tokens
+
+RAG EFFICIENCY
+──────────────
+Avg chunks     : 8.0 selected / 11.0 considered
+Avg RAG tokens : ~597 tokens
+Context saving : 27% chunks filtered out
+
+PROVIDER HEALTH
+───────────────
+Errors : none
+Stale  : none
+
+PER-TICKER
+──────────
+  WIIM   success  BUY   conf=74%  139s R2  RAG:8/11

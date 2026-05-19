@@ -1,0 +1,120 @@
+{
+  "ticker": "BMRI",
+  "verdict": {
+    "ticker": "BMRI",
+    "rating": "BUY",
+    "confidence": 0.9,
+    "fair_value": 6872.0,
+    "entry_price_range": "4070 - 4200",
+    "target_price": 4580.0,
+    "stop_loss": 3910.0,
+    "current_price": 4200.0,
+    "timeframe": "1-3 Months",
+    "weighted_reasoning": "The decision is a HOLD, overriding the 'confidence_winner' BUY signal due to a confluence of risks. The primary driver for caution is the conflict between strong fundamentals (63.6% undervalued) and poor technicals (price below MA200, structural downtrend). A critical risk management rule was triggered: a direction-based disagreement combined with an R/R ratio (1.98) just under the 2.0 threshold mandates a downgrade from BUY to HOLD. Furthermore, the Devil's Advocate's concerns regarding negative revenue growth (-5.97% YoY) and the lack of near-term catalysts are valid and unanswered, suggesting the fundamental 'floor' may not be solid in the swing timeframe. The technical signal is explicitly weak, and without a catalyst or momentum, entering this counter-trend trade is premature. Consensus override: no 60% vote after 3 rounds, so bull wins by highest numeric confidence. CIO did not override the winner.",
+    "critical_risk_factor": "",
+    "key_catalysts": [
+      "Significant undervaluation (63.6% vs Fair Value) may attract value investors, creating a price floor.",
+      "Potential for a technical bounce from oversold conditions or a mean-reversion trade towards key moving averages."
+    ],
+    "key_risks": [
+      "Persistent downtrend (price below MA200) could continue, invalidating the setup.",
+      "Lack of specific 1-3 month catalysts means capital could be 'dead money' or drift lower.",
+      "Negative revenue growth (-5.97% YoY) could lead to downward revisions of fair value, eroding the margin of safety.",
+      "Strong disagreement among analysts on the stock's direction indicates high uncertainty and unpredictable price action."
+    ],
+    "summary": "The trade plan is downgraded to HOLD. While BMRI is significantly undervalued with an attractive R/R of 1.98, the technical picture is weak (below MA200) and there are no identifiable short-term catalysts. The strong disagreement among agents on direction, combined with negative revenue growth, warrants waiting for clear technical confirmation before committing capital.",
+    "expected_return": "+10.8%",
+    "risk_reward_ratio": 1.98,
+    "is_overvalued": false,
+    "wait_and_see": false,
+    "consensus_reached": false,
+    "consensus_method": "confidence_winner",
+    "dissenting_agents": [
+      "chartist",
+      "sentiment_specialist",
+      "bear"
+    ]
+  },
+  "debate_rounds": 3,
+  "debate_history": [
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 6,872, Rp 4,200, Rp 4,302, Rp 4,331, Rp 4,185, Rp 3,647, Rp 553, Rp 81, Rp 162, Rp 4,038",
+      "round": 0
+    },
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 6,872, Rp 4,200",
+      "round": 0
+    },
+    {
+      "role": "bull",
+      "content": "…TAL FLOOR:** BMRI is significantly undervalued, presenting a strong fundamental floor for a swing trade. The fair value estimate stands at Rp 6,872, representing a substantial 63.6% upside from the current price of Rp 4,200. This undervaluation is supported by robust fundamentals, including a TTM ROE of 19.18% and a Net Margin Quarter of 40.85%. The Debt/Equity ratio is exceptionally low at 0.07, indicating strong financial health. While there are some data gaps (null Interest Coverage Ratio, missing Operating Cash Flow, and negative Revenue Growth Quarter\n\nPosition: BUY\nAgent Confidence: 0.60",
+      "round": 1
+    },
+    {
+      "role": "bear",
+      "content": "…resents significant risks for a swing trade within a 1-3 month horizon. A forensic audit reveals critical flaws in the setup.\n\n1.  **OVERVALUATION CHECK:** The Bull's argument for a fundamental floor is based on a fair value of Rp 6,872, indicating a 63.6% upside from the current price of Rp 4,200. This suggests undervaluation, not overvaluation, meaning the current price is *not* above fair value. Therefore, the premise for a \"no margin of safety\" due to overvaluation is not met. However, for a short-term swing trade, this long-term fundamental underval\n\nPosition: AVOID\nAgent Confidence: 0.60",
+      "round": 1
+    },
+    {
+      "role": "bull",
+      "content": "…m volatility inherent in a swing trade, effectively absorbing minor pullbacks and market noise. The very existence of such a pronounced undervaluation, even acknowledged by the Bear, creates an attractive entry point, as the market tends to correct extreme mispricings over a reasonable horizon. This intrinsic value floor limits the downside potential, making the current entry compelling despite broader market sentiment.\n\nWhile acknowledging the prevailing structural downtrend, the downside risk for this position is clearly delineated by a strong historical\n\nPosition: BUY\nAgent Confidence: 0.60",
+      "round": 2
+    },
+    {
+      "role": "bear",
+      "content": "…l maximum 1-week adverse move (2 × ATR) is Rp 162. From the current price of Rp 4,200, this would bring the stock down to Rp 4,038 within a week. This move would not only breach the immediate SMA20 support at Rp 4,185 but also push the price further into the structural downtrend, making the Bull's long-term \"margin of safety\" based on a Rp 6,872 fair value entirely irrelevant for managing short-term swing risk. Such a move would wipe out any short-term profit potential and expose the trade to significant losses, rendering it unviable for swing execution.\n\nPosition: AVOID\nAgent Confidence: 0.85",
+      "round": 2
+    },
+    {
+      "role": "bull",
+      "content": "The Bear's projection of a short-term decline to Rp 4,038, based on a volatility measure, fundamentally misjudges the resilience provided by the significant undervaluation. The substantial gap between the current market price and its intrinsic worth acts as a robust buffer, providing an ample margin of safety that can readily absorb such a projected adverse movement. This intrinsic value proposition is not irrelevant for managing short-term risk; rather, it limits the duration and depth of technical pullbacks, ensuring that any temporary dip remains within a fundamentally supported range.\n\nWhile the Bear anticipates a breach of the immediate moving average support, the downside risk for this position is firmly capped by a more significant historical level. The 52-week low, recorded at Rp 3,647, represents a strong secondary support zone, well below the Bear's projected downside target of Rp 4,038. This level has historically demonstrated resilience, providing a robust floor for price action. This deep historical support, combined with the company's exceptionally low Debt/Equity ratio of 0.07, reinforces the fundamental floor, significantly limiting the true downside risk for a swing trade.\n\nThe Bear's dismissal of fundamental undervaluation as a short-term catalyst overlooks the market's tendency to correct extreme mispricings. The very existence of such a pronounced undervaluation *is* the primary driver for a swing trade, even if the exact timing is subject to technical volatility. Furthermore, as a fallback catalyst, the substantial dividend yield of 11.36% provides a compelling incentive for investors, acting as a continuous demand-side floor. This attractive yield can attract new capital, especially during price dips, providing a fundamental bid that limits downside and supports a recovery towards fair value, irrespective of immediate technical headwinds.\n\nPosition: BUY\nAgent Confidence: 0.90",
+      "round": 3
+    },
+    {
+      "role": "bear",
+      "content": "The Bull's reliance on a 63.6% undervaluation to Rp 6,872 as a \"robust buffer\" for a swing trade is fundamentally flawed. This \"fair value\" is a long-term assessment, not a short-term protective mechanism against volatility. Crucially, the reported negative Revenue Growth (Quarter YoY) of -5.97% directly undermines the stability of any fundamental floor. A declining revenue trend suggests that the intrinsic value itself could be subject to downward revisions, making the claimed 63.6% upside less reliable as a short-term cushion. Furthermore, the evidence explicitly states, \"Tidak ada katalis pertumbuhan spesifik yang teridentifikasi dalam 1-3 bulan ke depan,\" directly refuting the Bull's\n\nPosition: AVOID\nAgent Confidence: 0.60",
+      "round": 3
+    },
+    {
+      "role": "devils_advocate",
+      "content": "**Agent Confidence:** HIGH\n\n1.  **MACRO/COMPANY RISK & FOREIGN FLOW:**\n    Given BMRI's negative Revenue Growth (-5.97% YoY) and lack of specific catalysts, if this trend persists or worsens in the next quarter's earnings, combined with sustained net foreign selling pressure on Indonesian banking stocks, could the 52-week low of Rp 3,647 break, triggering a deeper structural decline?\n\n2.  **EXECUTION RISK — Transaction Cost Stress Test:**\n    Menggunakan harga entry Rp 4,200 dan target konservatif retest MA50 di Rp 4,331 (gross return 3.12%), total biaya transaksi round-trip adalah sebagai berikut: biaya beli 0.15%, biaya jual 0.25%, PPh final 0.10%, dan slippage 0.15% (karena harga >= Rp 500). Total biaya adalah 0.15% + 0.25% + 0.10% + 0.15% = 0.65%. Dengan demikian, net return setelah biaya adalah 3.12% - 0.65% = 2.47%. Berdasarkan perhitungan ini, verdictnya adalah **MARGINAL — only proceed if conviction high**.\n\nPosition: UNKNOWN\nAgent Confidence: 1.00",
+      "round": 4
+    }
+  ],
+  "raw_data_summary": "=== EVIDENCE BRIEF: BMRI ===\nQuery: swing trade analysis\n\n[FAIR_VALUE]\nEvidence ID: BMRI_fair_value_0\nCurrent Price: 4200 | Fair Value: 6872 | Upside: 63.6%\nSource: stockbit | Score: 1.00\n\n[FUNDAMENTAL]\nEvidence ID: BMRI_fundamental_0\n{\"brief\":\"Berdasarkan \\\"FAIR VALUE REPORT\\\", nilai wajar BMRI adalah Rp 6,872. Dengan harga pasar saat ini Rp 4,200, saham ini dinilai UNDERVALUED sebesar 63.6%. Margin of Safety positif menunjukkan potensi upside yang signifikan untuk swing trade dalam horizon 1-3 bulan. Metrik pendukung menunjukkan ROE TTM sebesar 19.18% dan Net Margin Quarter sebesar 40.85%. Data tren 3 tahun untuk ROE dan Net\nSource: stockbit | Score: 0.90\n\n[FUNDAMENTAL]\nEvidence ID: BMRI_fundamental_1\nMargin tidak tersedia. Rasio Debt/Equity (Quarter) sangat rendah di 0.07, dan Dividend Yield saat ini adalah 11.36%. Tidak ada katalis pertumbuhan spesifik yang teridentifikasi dalam 1-3 bulan ke depan; tanggal ex-dividend terakhir (11 Mei 26) adalah peristiwa masa lalu. Pemeriksaan kualitas laporan keuangan menunjukkan: * Tidak ada divergensi ROE-Margin (ROE 19.18% vs Net Margin 40.85%). * ⚠️\nSource: stockbit | Score: 0.90\n\n[FUNDAMENTAL]\nEvidence ID: BMRI_fundamental_2\nLow DER (0.07) tapi Interest Coverage Ratio adalah null, mencegah penilaian penuh inkonsistensi ini. * ⚠️ Data Operating Cash Flow tidak tersedia untuk cek ini. Pertumbuhan Revenue (Quarter YoY) negatif (-5.97%), se...\",\"exdate\":\"=== DIVIDEND EX-DATE SCAN: BMRI ===\\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\\n\"}\nSource: stockbit | Score: 0.90\n\n[TECHNICAL]\nEvidence ID: BMRI_technical_0\n{\"52w_high\":4975.0,\"52w_low\":3647.0,\"atr14\":81.0,\"avg_volume_20d\":184398260.0,\"brief\":\"**Analisis Teknikal IHSG (1-3 Bulan Swing Trade)** **TREND CONTEXT:** Saham dalam downtrend struktural. Ini counter-trend bounce — target lebih konservatif, size 50%. Harga saat ini (Rp 4,200) berada di bawah MA200 (Rp 4,302), mengindikasikan tekanan jual yang dominan dalam jangka panjang. **ENTRY ZONE:** Harga\nSource: yfinance | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: BMRI_technical_1\nsaat ini (Rp 4,200) berada di bawah EMA20 (Rp 4,208). Untuk setup counter-trend bounce, idealnya mencari konfirmasi pembalikan dari level support atau entri di sekitar EMA20 jika terjadi re-test. Namun, dengan harga di bawah EMA Position: HOLD Agent Confidence: 0.00\",\"current_price\":4200.0,\"ema20\":4208.0,\"ma200\":4302.0,\"ma200_context\":\"BELOW\",\"ma50\":4331.0,\"rsi14\":47.5,\"sma20\":4185.0}\nSource: yfinance | Score: 0.85\n\n[EXDATE]\nEvidence ID: BMRI_exdate_0\nDividend Ex-Date: === DIVIDEND EX-DATE SCAN: BMRI ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\nSource: stockbit | Score: 0.70\n\n[SENTIMENT]\nEvidence ID: BMRI_sentiment_0\n```json { \"sentiment\": \"INSUFFICIENT_DATA\", \"confidence\": 0, \"dominant_theme\": null, \"volume_anomaly\": null, \"swing_signal\": null, \"red_flags\": [], \"reason\": \"Data sosial tidak mencukupi (< 5 post)\" } ``` Position: HOLD Agent Confidence: 0.00\nSource: gemini | Score: 0.60\n\n[METADATA]\nEvidence ID: BMRI_metadata_0\nData Sources: stockbit, gemini, yfinance | Missing Fields: none\nSource: stockbit, gemini, yfinance | Score: 0.30\n\n---\nTotal evidence: 9/9 chunks selected\nToken estimate: ~599\n\n=== NEWS BRIEF: BMRI ===\nPeriod: last 60 days\nSentiment: UNKNOWN (score: +0.00)\nNo news data available\nConfidence adjustment: +0.00\nReason: No news data available - sentiment unverified\n\nTOP NEWS:\nnone",
+  "metadata": {
+    "prompt_version": "2026-05-11-critical-audit-v1",
+    "run_id": "20260516_145348",
+    "market_data_source": "yfinance",
+    "market_data_cached": true,
+    "flash_calls": 10,
+    "pro_calls": 1,
+    "has_breaking_news": false,
+    "news_confidence_adjustment": 0.0,
+    "news_overall_sentiment": "UNKNOWN",
+    "news_brief": "=== NEWS BRIEF: BMRI ===\nPeriod: last 60 days\nSentiment: UNKNOWN (score: +0.00)\nNo news data available\nConfidence adjustment: +0.00\nReason: No news data available - sentiment unverified\n\nTOP NEWS:\nnone",
+    "rag_chunks_selected": 9,
+    "rag_chunks_considered": 9,
+    "rag_token_estimate": 599,
+    "batch_timestamp": "20260516_145348",
+    "run_timestamp": "20260516_145348",
+    "generated_at": "2026-05-16T14:53:48.805500+07:00",
+    "versioned_output": true
+  },
+  "risk_governor": {
+    "ticker": "BMRI",
+    "status": "deployable",
+    "sizing_allowed": true,
+    "reason_codes": [
+      "price_inside_entry_range"
+    ],
+    "message": "Harga sekarang berada di zona entry; kandidat boleh masuk sizing.",
+    "current_price": 4200.0,
+    "entry_low": 4070.0,
+    "entry_high": 4200.0,
+    "target_price": 4580.0,
+    "stop_loss": 3910.0
+  }
+}

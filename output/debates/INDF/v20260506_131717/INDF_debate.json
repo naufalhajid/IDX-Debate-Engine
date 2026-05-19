@@ -1,0 +1,66 @@
+{
+  "ticker": "INDF",
+  "verdict": {
+    "ticker": "INDF",
+    "rating": "HOLD",
+    "confidence": 0.0,
+    "fair_value": 18197.0,
+    "entry_price_range": "6550 - 6675",
+    "target_price": 7250.0,
+    "stop_loss": 6300.0,
+    "current_price": 7000.0,
+    "timeframe": "1-3 Months",
+    "weighted_reasoning": "",
+    "critical_risk_factor": "",
+    "key_catalysts": [],
+    "key_risks": [],
+    "summary": "CIO parse error — raw response stored. Error: RetryError[<Future at 0x1daec3a68d0 state=finished raised RuntimeError>]",
+    "expected_return": "+9.6%",
+    "risk_reward_ratio": 2.04,
+    "is_overvalued": false,
+    "wait_and_see": true
+  },
+  "debate_rounds": 2,
+  "consensus_reached": false,
+  "disagreement_type": "direction",
+  "debate_history": [
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 18,197",
+      "round": 0
+    },
+    {
+      "role": "bull",
+      "content": "**INDF: Swing Trade BUY Case (1-3 Month Horizon)**\n\n**1. FUNDAMENTAL FLOOR:**\nINDF presents a compelling fundamental floor for a swing trade. With a fair value estimate of Rp 18,197, the current market price of Rp",
+      "round": 1
+    },
+    {
+      "role": "bear",
+      "content": "**Forensic Financial Audit: INDF Swing Trade AVOID/SELL Case**\n\nThis audit challenges the proposed INDF swing trade BUY case, highlighting significant risks that undermine its viability for a 1-3 month horizon.\n\n1.  **OVERVALUATION CHECK:**\n    The",
+      "round": 1
+    },
+    {
+      "role": "bull",
+      "content": "The Bear's assessment of INDF's valuation and technical posture warrants a closer look, but it overlooks critical nuances that underpin a robust swing trade entry.\n\nFirstly, the Bear's challenge to the fair value, citing historical P/E and P/B averages, fails",
+      "round": 2
+    },
+    {
+      "role": "bear",
+      "content": "The Bull's attempt to frame INDF as a robust swing trade entry at Rp 7,000 is fundamentally flawed, particularly when scrutinizing the reliability of its claimed support levels and the true margin of safety.\n\nThe assertion of a \"fair value\" at Rp 1",
+      "round": 2
+    },
+    {
+      "role": "devils_advocate",
+      "content": "**1. MACRO/COMPANY RISK & FOREIGN FLOW:**\nGiven INDF is in a structural downtrend and",
+      "round": 3
+    }
+  ],
+  "raw_data_summary": "=== FUNDAMENTALS ===\n**FAIR VALUE: Rp 18,197**\n\nINDF is significantly undervalued with a fair value of Rp 18,197, compared to its current market price of Rp 7,000. This represents a substantial 160.0% upside, indicating a strong fundamental cushion for a swing trade setup. The fair value calculation confidence is MEDIUM, derived from valid P/E Band and P/B Band methods.\n\nKey support metrics include a Return on Equity (TTM) of 14.12% and a Net Profit Margin (Quarter) of 8.73%. The Debt to Equity Ratio (Quarter) stands at 0.99\n\n=== TECHNICALS ===\nBerikut adalah analisis teknikal untuk swing trade IHSG:\n\n**TREND CONTEXT:**\nSaham dalam downtrend struktural. Ini counter-trend bounce — target lebih konservatif, size 50%. Harga saat ini (Rp 7,000) masih diperdagangkan\n\n=== PRE-COMPUTED TECHNICAL INDICATORS (Python Ground Truth) ===\n{\n  \"current_price\": 7000.0,\n  \"sma20\": 6868.0,\n  \"ema20\": 6820.0,\n  \"ma50\": 6546.0,\n  \"ma200\": 7162.0,\n  \"ma200_context\": \"BELOW\",\n  \"rsi14\": 62.8,\n  \"atr14\": 132.0,\n  \"avg_volume_20d\": 9925585.0,\n  \"52w_high\": 8525.0,\n  \"52w_low\": 5900.0\n}\n\n=== SENTIMENT ===\n```json\n{\n  \"sentiment\": \"INSUFFICIENT_DATA\",\n  \"confidence\": 0,\n  \"dominant_theme\": null,\n  \"volume_anomaly\": null,\n  \"swing_signal\": null,\n  \"red_flags\": [],\n  \"reason\": \"Data sosial tidak mencukupi (< 5 post)\"\n}\n```\n\n=== DIVIDEND EX-DATE SCAN: INDF ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\n",
+  "error": null,
+  "conviction_score": 0.0,
+  "sector_key": "consumer_staples",
+  "metadata": {
+    "batch_timestamp": "20260506_131717",
+    "versioned_output": true
+  }
+}
