@@ -2838,3 +2838,1059 @@
 2026-05-17 14:45:35.927 | INFO     | services.debate_chamber:_cio_judge_node:2367 - [CIO] Verdict delivered for BBCA
 2026-05-17 14:45:35.929 | INFO     | services.debate_chamber:run:2502 - [DebateChamber] ✅ Pipeline complete for BBCA
 2026-05-17 14:45:35.929 | INFO     | core.orchestrator.legacy:_run_single_debate:1086 - [Debate] âœ… Selesai: BBCA
+2026-05-17 15:27:01.551 | INFO     | core.orchestrator.legacy:run_batch_debates:1407 - [Orchestrator] Meluncurkan 2 debate (concurrency=3, RPM=10)
+2026-05-17 15:27:02.866 | INFO     | services.stockbit_api_client:_request_challenge:315 - Logged in successfully with existing token!
+2026-05-17 15:27:03.410 | INFO     | core.orchestrator.legacy:_guarded:1332 - [BBCA] Budget terpakai: 1/200
+2026-05-17 15:27:03.410 | INFO     | core.orchestrator.legacy:_run_single_debate:1070 - [Debate] Mulai: BBCA
+2026-05-17 15:27:03.410 | INFO     | services.debate_chamber:run:2480 - [DebateChamber] ▶ Starting swing-trade pipeline for BBCA @ Rp 6,100
+2026-05-17 15:27:03.413 | INFO     | core.orchestrator.legacy:_guarded:1332 - [ADRO] Budget terpakai: 2/200
+2026-05-17 15:27:03.414 | INFO     | core.orchestrator.legacy:_run_single_debate:1070 - [Debate] Mulai: ADRO
+2026-05-17 15:27:03.414 | INFO     | services.debate_chamber:run:2480 - [DebateChamber] ▶ Starting swing-trade pipeline for ADRO @ Rp 2,520
+2026-05-17 15:27:03.415 | INFO     | services.debate_chamber:_chartist_node:1080 - [Chartist] Fetching OHLCV + orderbook for BBCA
+2026-05-17 15:27:03.416 | INFO     | services.debate_chamber:_fundamental_node:993 - [Fundamental] Fetching for BBCA
+2026-05-17 15:27:03.417 | INFO     | services.debate_chamber:_sentiment_node:1241 - [Sentiment] Fetching for BBCA
+2026-05-17 15:27:03.419 | INFO     | services.debate_chamber:_chartist_node:1080 - [Chartist] Fetching OHLCV + orderbook for ADRO
+2026-05-17 15:27:03.420 | INFO     | services.debate_chamber:_fundamental_node:993 - [Fundamental] Fetching for ADRO
+2026-05-17 15:27:03.421 | INFO     | services.debate_chamber:_sentiment_node:1241 - [Sentiment] Fetching for ADRO
+2026-05-17 15:27:03.885 | INFO     | services.fair_value_calculator:extract_keystats:295 - [FairValue] BBCA: DPS derived from yield (5.51%) × price (3) = 0.16
+2026-05-17 15:27:03.885 | INFO     | services.fair_value_calculator:extract_keystats:323 - [FairValue] BBCA: all key stats parsed OK: {'eps_ttm': 471.1, 'bvps': 2102.07, 'dps': 0.16, 'roe': '22.4%', 'pe': 12.95, 'pb': 2.9}
+2026-05-17 15:27:03.885 | INFO     | services.debate_chamber:_fundamental_node:1016 - [Fundamental] Fair value for BBCA: 10474.0
+2026-05-17 15:27:03.886 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:27:03.889 | INFO     | services.fair_value_calculator:extract_keystats:295 - [FairValue] ADRO: DPS derived from yield (10.45%) × price (1) = 0.09
+2026-05-17 15:27:03.889 | INFO     | services.fair_value_calculator:extract_keystats:323 - [FairValue] ADRO: all key stats parsed OK: {'eps_ttm': 281.86, 'bvps': 2831.8, 'dps': 0.09, 'roe': '9.9%', 'pe': 8.94, 'pb': 0.89}
+2026-05-17 15:27:03.889 | INFO     | services.debate_chamber:_fundamental_node:1016 - [Fundamental] Fair value for ADRO: 2919.0
+2026-05-17 15:27:03.891 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:27:03.930 | INFO     | services.debate_chamber:_chartist_node:1147 - [Chartist] Technicals computed: MA50=6425.0, RSI=42.8
+2026-05-17 15:27:03.934 | INFO     | services.debate_chamber:_chartist_node:1147 - [Chartist] Technicals computed: MA50=2393.0, RSI=57.5
+2026-05-17 15:27:04.001 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:27:04.007 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:27:04.464 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:27:04.537 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:27:06.553 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:27:06.776 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:27:14.207 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:27:18.656 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:27:21.712 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:27:21.716 | INFO     | services.debate_chamber:_synthesizer_node:1319 - [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-17 15:27:21.718 | INFO     | services.debate_chamber:_synthesizer_node:1441 - [RAG] ADRO evidence: 8/11 chunks, ~596 tokens
+2026-05-17 15:27:21.719 | INFO     | services.debate_chamber:_bullish_node:1541 - [Bull] Round 1 for ADRO
+2026-05-17 15:27:21.719 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:27:22.383 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:27:22.387 | INFO     | services.debate_chamber:_synthesizer_node:1319 - [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-17 15:27:22.389 | INFO     | services.debate_chamber:_synthesizer_node:1441 - [RAG] BBCA evidence: 9/10 chunks, ~586 tokens
+2026-05-17 15:27:22.390 | INFO     | services.debate_chamber:_bullish_node:1541 - [Bull] Round 1 for BBCA
+2026-05-17 15:27:22.391 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:27:34.412 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:27:34.417 | INFO     | services.debate_chamber:_bearish_node:1583 - [Bear] Round 1 for ADRO
+2026-05-17 15:27:34.417 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:27:35.764 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:27:35.769 | INFO     | services.debate_chamber:_bearish_node:1583 - [Bear] Round 1 for BBCA
+2026-05-17 15:27:35.770 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:27:52.764 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:27:52.769 | INFO     | services.debate_chamber:_consensus_evaluator_node:1637 - [Consensus] Evaluating 5-agent votes
+2026-05-17 15:27:52.770 | INFO     | services.debate_chamber:_consensus_evaluator_node:1640 - [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-17 15:27:52.771 | INFO     | services.debate_chamber:_state_cleaner_node:1673 - [State Cleaner] Deterministic pruning (no LLM)
+2026-05-17 15:27:52.771 | INFO     | services.debate_chamber:_bullish_node:1541 - [Bull] Round 2 for BBCA
+2026-05-17 15:27:52.772 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:27:52.995 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:27:52.999 | INFO     | services.debate_chamber:_consensus_evaluator_node:1637 - [Consensus] Evaluating 5-agent votes
+2026-05-17 15:27:53.000 | INFO     | services.debate_chamber:_consensus_evaluator_node:1640 - [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-17 15:27:53.001 | INFO     | services.debate_chamber:_state_cleaner_node:1673 - [State Cleaner] Deterministic pruning (no LLM)
+2026-05-17 15:27:53.002 | INFO     | services.debate_chamber:_bullish_node:1541 - [Bull] Round 2 for ADRO
+2026-05-17 15:27:53.003 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:28:05.295 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:28:05.297 | INFO     | services.debate_chamber:_bearish_node:1583 - [Bear] Round 2 for ADRO
+2026-05-17 15:28:05.298 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:28:13.931 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:28:13.934 | INFO     | services.debate_chamber:_bearish_node:1583 - [Bear] Round 2 for BBCA
+2026-05-17 15:28:13.935 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:28:24.819 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:28:24.823 | INFO     | services.debate_chamber:_consensus_evaluator_node:1637 - [Consensus] Evaluating 5-agent votes
+2026-05-17 15:28:24.823 | INFO     | services.debate_chamber:_consensus_evaluator_node:1640 - [Consensus] Result: reached=True method=voting winner={'agent': 'chartist', 'position': 'BUY', 'confidence': 0.9, 'round': 0} dissent=['sentiment_specialist', 'bear']
+2026-05-17 15:28:24.824 | INFO     | services.debate_chamber:_devils_advocate_node:1719 - [Devil's Advocate] Injecting adversarial scenario
+2026-05-17 15:28:24.825 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:28:32.277 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:28:32.281 | INFO     | services.debate_chamber:_consensus_evaluator_node:1637 - [Consensus] Evaluating 5-agent votes
+2026-05-17 15:28:32.282 | INFO     | services.debate_chamber:_consensus_evaluator_node:1640 - [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-17 15:28:32.283 | INFO     | services.debate_chamber:_state_cleaner_node:1673 - [State Cleaner] Deterministic pruning (no LLM)
+2026-05-17 15:28:32.283 | INFO     | services.debate_chamber:_bullish_node:1541 - [Bull] Round 3 for BBCA
+2026-05-17 15:28:32.284 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:28:34.779 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:28:34.783 | INFO     | services.debate_chamber:_cio_judge_node:2138 - [CIO] Deliberating on ADRO (current price: 2,520)
+2026-05-17 15:28:34.786 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:28:52.651 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:28:52.654 | INFO     | services.debate_chamber:_bearish_node:1583 - [Bear] Round 3 for BBCA
+2026-05-17 15:28:52.655 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:29:12.113 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:29:12.118 | INFO     | services.debate_chamber:_cio_judge_node:2349 - [CIO] JSON parsed successfully for ADRO
+2026-05-17 15:29:12.118 | INFO     | services.debate_chamber:_cio_judge_node:2367 - [CIO] Verdict delivered for ADRO
+2026-05-17 15:29:12.121 | INFO     | services.debate_chamber:run:2502 - [DebateChamber] ✅ Pipeline complete for ADRO
+2026-05-17 15:29:12.122 | INFO     | core.orchestrator.legacy:_run_single_debate:1089 - [Debate] âœ… Selesai: ADRO
+2026-05-17 15:29:13.484 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:29:13.488 | INFO     | services.debate_chamber:_consensus_evaluator_node:1637 - [Consensus] Evaluating 5-agent votes
+2026-05-17 15:29:13.489 | INFO     | services.debate_chamber:_consensus_evaluator_node:1640 - [Consensus] Result: reached=True method=soft_hold winner={'agent': 'soft_hold_rule', 'position': 'HOLD', 'confidence': 0.6} dissent=['fundamental_scout', 'bull', 'bear']
+2026-05-17 15:29:13.490 | INFO     | services.debate_chamber:_devils_advocate_node:1719 - [Devil's Advocate] Injecting adversarial scenario
+2026-05-17 15:29:13.491 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:29:22.397 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:29:22.399 | INFO     | services.debate_chamber:_cio_judge_node:2138 - [CIO] Deliberating on BBCA (current price: 6,100)
+2026-05-17 15:29:22.400 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:29:49.168 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:29:49.171 | INFO     | services.debate_chamber:_cio_judge_node:2349 - [CIO] JSON parsed successfully for BBCA
+2026-05-17 15:29:49.171 | INFO     | services.debate_chamber:_cio_judge_node:2367 - [CIO] Verdict delivered for BBCA
+2026-05-17 15:29:49.172 | INFO     | services.debate_chamber:run:2502 - [DebateChamber] ✅ Pipeline complete for BBCA
+2026-05-17 15:29:49.172 | INFO     | core.orchestrator.legacy:_run_single_debate:1089 - [Debate] âœ… Selesai: BBCA
+2026-05-17 15:29:49.173 | INFO     | core.orchestrator.legacy:_run_single_debate:1092 - [Debate] BBCA disagreement_type=timing
+2026-05-17 15:38:05.245 | INFO     | core.orchestrator.legacy:run_batch_debates:1407 - [Orchestrator] Meluncurkan 1 debate (concurrency=3, RPM=10)
+2026-05-17 15:38:06.779 | INFO     | services.stockbit_api_client:_request_challenge:315 - Logged in successfully with existing token!
+2026-05-17 15:38:07.331 | INFO     | core.orchestrator.legacy:_guarded:1332 - [WIIM] Budget terpakai: 1/200
+2026-05-17 15:38:07.331 | INFO     | core.orchestrator.legacy:_run_single_debate:1070 - [Debate] Mulai: WIIM
+2026-05-17 15:38:07.333 | INFO     | services.debate_chamber:run:2480 - [DebateChamber] ▶ Starting swing-trade pipeline for WIIM @ Rp 1,870
+2026-05-17 15:38:07.337 | INFO     | services.debate_chamber:_chartist_node:1080 - [Chartist] Fetching OHLCV + orderbook for WIIM
+2026-05-17 15:38:07.339 | INFO     | services.debate_chamber:_fundamental_node:993 - [Fundamental] Fetching for WIIM
+2026-05-17 15:38:07.340 | INFO     | services.debate_chamber:_sentiment_node:1241 - [Sentiment] Fetching for WIIM
+2026-05-17 15:38:07.761 | INFO     | services.fair_value_calculator:extract_keystats:295 - [FairValue] WIIM: DPS derived from yield (3.47%) × price (2) = 0.06
+2026-05-17 15:38:07.761 | INFO     | services.fair_value_calculator:extract_keystats:323 - [FairValue] WIIM: all key stats parsed OK: {'eps_ttm': 235.33, 'bvps': 1123.12, 'dps': 0.06, 'roe': '20.9%', 'pe': 7.95, 'pb': 1.67}
+2026-05-17 15:38:07.762 | INFO     | services.debate_chamber:_fundamental_node:1016 - [Fundamental] Fair value for WIIM: 2968.0
+2026-05-17 15:38:07.764 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:38:07.849 | INFO     | services.debate_chamber:_chartist_node:1147 - [Chartist] Technicals computed: MA50=1881.0, RSI=49.3
+2026-05-17 15:38:07.916 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:38:08.393 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:38:10.554 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:38:17.653 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:38:25.131 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:38:25.139 | INFO     | services.debate_chamber:_synthesizer_node:1319 - [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-17 15:38:25.142 | INFO     | services.debate_chamber:_synthesizer_node:1441 - [RAG] WIIM evidence: 9/10 chunks, ~588 tokens
+2026-05-17 15:38:25.143 | INFO     | services.debate_chamber:_bullish_node:1541 - [Bull] Round 1 for WIIM
+2026-05-17 15:38:25.144 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:38:40.410 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:38:40.415 | INFO     | services.debate_chamber:_bearish_node:1583 - [Bear] Round 1 for WIIM
+2026-05-17 15:38:40.416 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:38:54.083 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:38:54.101 | INFO     | services.debate_chamber:_consensus_evaluator_node:1637 - [Consensus] Evaluating 5-agent votes
+2026-05-17 15:38:54.103 | INFO     | services.debate_chamber:_consensus_evaluator_node:1640 - [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-17 15:38:54.107 | INFO     | services.debate_chamber:_state_cleaner_node:1673 - [State Cleaner] Deterministic pruning (no LLM)
+2026-05-17 15:38:54.112 | INFO     | services.debate_chamber:_bullish_node:1541 - [Bull] Round 2 for WIIM
+2026-05-17 15:38:54.116 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:39:04.942 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:39:04.946 | INFO     | services.debate_chamber:_bearish_node:1583 - [Bear] Round 2 for WIIM
+2026-05-17 15:39:04.947 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:39:20.192 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:39:20.209 | INFO     | services.debate_chamber:_consensus_evaluator_node:1637 - [Consensus] Evaluating 5-agent votes
+2026-05-17 15:39:20.212 | INFO     | services.debate_chamber:_consensus_evaluator_node:1640 - [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-17 15:39:20.215 | INFO     | services.debate_chamber:_state_cleaner_node:1673 - [State Cleaner] Deterministic pruning (no LLM)
+2026-05-17 15:39:20.216 | INFO     | services.debate_chamber:_bullish_node:1541 - [Bull] Round 3 for WIIM
+2026-05-17 15:39:20.217 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:39:36.843 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:39:36.853 | INFO     | services.debate_chamber:_bearish_node:1583 - [Bear] Round 3 for WIIM
+2026-05-17 15:39:36.855 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:39:52.168 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:39:52.179 | INFO     | services.debate_chamber:_consensus_evaluator_node:1637 - [Consensus] Evaluating 5-agent votes
+2026-05-17 15:39:52.181 | INFO     | services.debate_chamber:_consensus_evaluator_node:1640 - [Consensus] Result: reached=True method=soft_hold winner={'agent': 'soft_hold_rule', 'position': 'HOLD', 'confidence': 0.9} dissent=['fundamental_scout', 'bull', 'bear']
+2026-05-17 15:39:52.184 | INFO     | services.debate_chamber:_devils_advocate_node:1719 - [Devil's Advocate] Injecting adversarial scenario
+2026-05-17 15:39:52.186 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:40:11.596 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:40:11.604 | INFO     | services.debate_chamber:_cio_judge_node:2138 - [CIO] Deliberating on WIIM (current price: 1,870)
+2026-05-17 15:40:11.628 | INFO     | logging:callHandlers:1737 - AFC is enabled with max remote calls: 10.
+2026-05-17 15:40:38.486 | INFO     | logging:callHandlers:1737 - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-17 15:40:38.508 | INFO     | services.debate_chamber:_cio_judge_node:2349 - [CIO] JSON parsed successfully for WIIM
+2026-05-17 15:40:38.512 | INFO     | services.debate_chamber:_cio_judge_node:2367 - [CIO] Verdict delivered for WIIM
+2026-05-17 15:40:38.539 | INFO     | services.debate_chamber:run:2502 - [DebateChamber] ✅ Pipeline complete for WIIM
+2026-05-17 15:40:38.541 | INFO     | core.orchestrator.legacy:_run_single_debate:1089 - [Debate] âœ… Selesai: WIIM
+2026-05-17 15:40:38.541 | INFO     | core.orchestrator.legacy:_run_single_debate:1092 - [Debate] WIIM disagreement_type=timing
+2026-05-17 16:02:37.285 INFO     legacy.py:2745 | [Orchestrator] Memulai IHSG Swing Trade Pipeline
+2026-05-17 16:02:37.289 INFO     legacy.py:2746 | [Orchestrator] Mode: multi
+2026-05-17 16:02:37.294 INFO     legacy.py:758 | [PromptLinter] Prompt pack OK
+2026-05-17 16:02:37.314 INFO     legacy.py:2775 | [CLI] Menggunakan --tickers override; skip quant filter dan top10_candidates.json.
+2026-05-17 16:02:37.898 INFO     regime.py:70 | [Regime] IHSG realized vol (20d): 0.0138 (1.38%)
+2026-05-17 16:02:37.898 INFO     regime.py:101 | [Regime] NORMAL volatility (1.38%)
+2026-05-17 16:02:37.899 INFO     legacy.py:2813 | [Regime] NORMAL -- no overrides applied.
+2026-05-17 16:02:37.899 INFO     legacy.py:2821 | [CLI] 1 ticker dari --tickers: ['BBCA']
+2026-05-17 16:02:37.900 INFO     legacy.py:2881 | [DryRun] Melewati run_batch_debates(); memakai mock results.
+2026-05-17 16:02:37.909 INFO     legacy.py:2458 | [DryRun] Generated 1 mock debate results.
+2026-05-17 16:02:37.910 INFO     legacy.py:1369 | [RiskGovernor] BBCA: deployable (price_inside_entry_range)
+2026-05-17 16:02:37.910 INFO     legacy.py:2894 | [Orchestrator] Debate summary: 1 succeeded / 0 failed
+2026-05-17 16:02:37.914 INFO     legacy.py:2044 | [Rank] Excluded BBCA – rating HOLD
+2026-05-17 16:02:37.915 WARNING  portfolio_optimizer.py:41 | [Portfolio] Tidak ada kandidat dengan conviction >= 30%. Fallback ke semua scorable tanpa conviction filter.
+2026-05-17 16:02:37.916 INFO     portfolio_optimizer.py:90 | [Portfolio] 0 dipilih dari 0 eligible (top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 16:02:37.916 INFO     legacy.py:2073 | [Rank] Top 0 dipilih: [] (dari 0 eligible, top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 16:02:37.918 INFO     legacy.py:2919 | [Sizing] 0 posisi | Deployed: Rp 0 (0.0%)
+2026-05-17 16:02:37.922 INFO     legacy.py:2093 | [Persist] Full results -> tmp\cli_present_check\full_batch_results.json
+2026-05-17 16:02:37.931 INFO     legacy.py:1468 | [Audit] BBCA: BBCA→HOLD: unknown won by voting (0.77) after 3 round(s). 1 agent(s) dissented. Data sintetis tidak merepresentasikan kondisi emiten aktual.
+2026-05-17 16:02:37.932 INFO     legacy.py:2207 | [Persist] 1 versioned debate records disimpan ke tmp\cli_present_check\debates
+2026-05-17 16:02:37.935 INFO     legacy.py:2231 | [ArtifactValidator] Output artifacts valid.
+2026-05-17 16:02:37.940 INFO     legacy.py:1544 | [Telemetry] Batch report saved for 20260517_160237
+2026-05-17 16:02:37.941 INFO     legacy.py:1557 | [ReportConsistency] passed
+2026-05-17 16:02:37.942 INFO     legacy.py:2965 | [Orchestrator] Pipeline selesai
+2026-05-17 16:02:37.942 INFO     legacy.py:2966 | [Orchestrator] Regime: NORMAL | Top N: 0
+2026-05-17 16:02:37.943 INFO     legacy.py:2967 | [Orchestrator] Full results -> tmp\cli_present_check\full_batch_results.json
+2026-05-17 16:02:37.944 INFO     legacy.py:2968 | [Orchestrator] Top 0 report -> tmp\cli_present_check\TOP_3_SWING_TRADES.md
+2026-05-17 16:15:41.892 INFO     legacy.py:2750 | [Orchestrator] Memulai IHSG Swing Trade Pipeline
+2026-05-17 16:15:41.894 INFO     legacy.py:2751 | [Orchestrator] Mode: multi
+2026-05-17 16:15:41.897 INFO     legacy.py:762 | [PromptLinter] Prompt pack OK
+2026-05-17 16:15:41.929 INFO     legacy.py:2780 | [CLI] Menggunakan --tickers override; skip quant filter dan top10_candidates.json.
+2026-05-17 16:15:42.443 INFO     regime.py:70 | [Regime] IHSG realized vol (20d): 0.0138 (1.38%)
+2026-05-17 16:15:42.443 INFO     regime.py:101 | [Regime] NORMAL volatility (1.38%)
+2026-05-17 16:15:42.444 INFO     legacy.py:2818 | [Regime] NORMAL -- no overrides applied.
+2026-05-17 16:15:42.444 INFO     legacy.py:2826 | [CLI] 1 ticker dari --tickers: ['BBCA']
+2026-05-17 16:15:42.445 INFO     legacy.py:2886 | [DryRun] Melewati run_batch_debates(); memakai mock results.
+2026-05-17 16:15:42.452 INFO     legacy.py:2462 | [DryRun] Generated 1 mock debate results.
+2026-05-17 16:15:42.452 INFO     legacy.py:1373 | [RiskGovernor] BBCA: deployable (price_inside_entry_range)
+2026-05-17 16:15:42.452 INFO     legacy.py:2899 | [Orchestrator] Debate summary: 1 succeeded / 0 failed
+2026-05-17 16:15:42.460 INFO     historical_scorer.py:81 | [HistScorer] Loaded 1 debate records dari tmp\cli_present_check\debates
+2026-05-17 16:15:42.461 INFO     legacy.py:2048 | [Rank] Excluded BBCA – rating HOLD
+2026-05-17 16:15:42.463 WARNING  portfolio_optimizer.py:41 | [Portfolio] Tidak ada kandidat dengan conviction >= 30%. Fallback ke semua scorable tanpa conviction filter.
+2026-05-17 16:15:42.465 INFO     portfolio_optimizer.py:90 | [Portfolio] 0 dipilih dari 0 eligible (top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 16:15:42.465 INFO     legacy.py:2077 | [Rank] Top 0 dipilih: [] (dari 0 eligible, top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 16:15:42.466 INFO     legacy.py:2924 | [Sizing] 0 posisi | Deployed: Rp 0 (0.0%)
+2026-05-17 16:15:42.468 INFO     legacy.py:2097 | [Persist] Full results -> tmp\cli_present_check\full_batch_results.json
+2026-05-17 16:15:42.476 INFO     legacy.py:1472 | [Audit] BBCA: BBCA→HOLD: unknown won by voting (0.77) after 3 round(s). 1 agent(s) dissented. Data sintetis tidak merepresentasikan kondisi emiten aktual.
+2026-05-17 16:15:42.477 INFO     legacy.py:2211 | [Persist] 1 versioned debate records disimpan ke tmp\cli_present_check\debates
+2026-05-17 16:15:42.479 INFO     legacy.py:2235 | [ArtifactValidator] Output artifacts valid.
+2026-05-17 16:15:42.485 INFO     legacy.py:1548 | [Telemetry] Batch report saved for 20260517_161541
+2026-05-17 16:15:42.487 INFO     legacy.py:1561 | [ReportConsistency] passed
+2026-05-17 16:15:42.487 INFO     legacy.py:2970 | [Orchestrator] Pipeline selesai
+2026-05-17 16:15:42.488 INFO     legacy.py:2971 | [Orchestrator] Regime: NORMAL | Top N: 0
+2026-05-17 16:15:42.488 INFO     legacy.py:2972 | [Orchestrator] Full results -> tmp\cli_present_check\full_batch_results.json
+2026-05-17 16:15:42.489 INFO     legacy.py:2973 | [Orchestrator] Top 0 report -> tmp\cli_present_check\TOP_3_SWING_TRADES.md
+2026-05-17 16:21:50.204 INFO     legacy.py:2982 | [Orchestrator] Memulai IHSG Swing Trade Pipeline
+2026-05-17 16:21:50.206 INFO     legacy.py:2983 | [Orchestrator] Mode: multi
+2026-05-17 16:21:50.210 INFO     legacy.py:994 | [PromptLinter] Prompt pack OK
+2026-05-17 16:21:50.226 INFO     legacy.py:3012 | [CLI] Menggunakan --tickers override; skip quant filter dan top10_candidates.json.
+2026-05-17 16:21:50.713 INFO     regime.py:70 | [Regime] IHSG realized vol (20d): 0.0138 (1.38%)
+2026-05-17 16:21:50.713 INFO     regime.py:101 | [Regime] NORMAL volatility (1.38%)
+2026-05-17 16:21:50.713 INFO     legacy.py:3050 | [Regime] NORMAL -- no overrides applied.
+2026-05-17 16:21:50.716 INFO     legacy.py:3063 | [CLI] 1 ticker dari --tickers: ['BBCA']
+2026-05-17 16:21:50.717 INFO     legacy.py:3123 | [DryRun] Melewati run_batch_debates(); memakai mock results.
+2026-05-17 16:21:50.726 INFO     legacy.py:2694 | [DryRun] Generated 1 mock debate results.
+2026-05-17 16:21:50.726 INFO     legacy.py:1605 | [RiskGovernor] BBCA: deployable (price_inside_entry_range)
+2026-05-17 16:21:50.726 INFO     legacy.py:3136 | [Orchestrator] Debate summary: 1 succeeded / 0 failed
+2026-05-17 16:21:50.731 INFO     legacy.py:2280 | [Rank] Excluded BBCA – rating HOLD
+2026-05-17 16:21:50.732 WARNING  portfolio_optimizer.py:41 | [Portfolio] Tidak ada kandidat dengan conviction >= 30%. Fallback ke semua scorable tanpa conviction filter.
+2026-05-17 16:21:50.733 INFO     portfolio_optimizer.py:90 | [Portfolio] 0 dipilih dari 0 eligible (top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 16:21:50.733 INFO     legacy.py:2309 | [Rank] Top 0 dipilih: [] (dari 0 eligible, top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 16:21:50.733 INFO     legacy.py:3166 | [Sizing] 0 posisi | Deployed: Rp 0 (0.0%)
+2026-05-17 16:21:50.740 INFO     legacy.py:2329 | [Persist] Full results -> tmp\cli_present_check2\full_batch_results.json
+2026-05-17 16:21:50.749 INFO     legacy.py:1704 | [Audit] BBCA: BBCA→HOLD: unknown won by voting (0.77) after 3 round(s). 1 agent(s) dissented. Data sintetis tidak merepresentasikan kondisi emiten aktual.
+2026-05-17 16:21:50.750 INFO     legacy.py:2443 | [Persist] 1 versioned debate records disimpan ke tmp\cli_present_check2\debates
+2026-05-17 16:21:50.752 INFO     legacy.py:2467 | [ArtifactValidator] Output artifacts valid.
+2026-05-17 16:21:50.756 INFO     legacy.py:1780 | [Telemetry] Batch report saved for 20260517_162150
+2026-05-17 16:21:50.756 INFO     legacy.py:1793 | [ReportConsistency] passed
+2026-05-17 16:21:50.761 INFO     legacy.py:3232 | [Orchestrator] Pipeline selesai
+2026-05-17 16:21:50.761 INFO     legacy.py:3233 | [Orchestrator] Regime: NORMAL | Top N: 0
+2026-05-17 16:21:50.761 INFO     legacy.py:3234 | [Orchestrator] Full results -> tmp\cli_present_check2\full_batch_results.json
+2026-05-17 16:21:50.761 INFO     legacy.py:3235 | [Orchestrator] Top 0 report -> tmp\cli_present_check2\TOP_3_SWING_TRADES.md
+2026-05-17 16:22:41.590 INFO     legacy.py:2991 | [Orchestrator] Memulai IHSG Swing Trade Pipeline
+2026-05-17 16:22:41.591 INFO     legacy.py:2992 | [Orchestrator] Mode: multi
+2026-05-17 16:22:41.595 INFO     legacy.py:1003 | [PromptLinter] Prompt pack OK
+2026-05-17 16:22:41.604 INFO     legacy.py:3021 | [CLI] Menggunakan --tickers override; skip quant filter dan top10_candidates.json.
+2026-05-17 16:22:42.037 INFO     regime.py:70 | [Regime] IHSG realized vol (20d): 0.0138 (1.38%)
+2026-05-17 16:22:42.037 INFO     regime.py:101 | [Regime] NORMAL volatility (1.38%)
+2026-05-17 16:22:42.037 INFO     legacy.py:3059 | [Regime] NORMAL -- no overrides applied.
+2026-05-17 16:22:42.038 INFO     legacy.py:3072 | [CLI] 1 ticker dari --tickers: ['BBCA']
+2026-05-17 16:22:42.040 INFO     legacy.py:3132 | [DryRun] Melewati run_batch_debates(); memakai mock results.
+2026-05-17 16:22:42.045 INFO     legacy.py:2703 | [DryRun] Generated 1 mock debate results.
+2026-05-17 16:22:42.045 INFO     legacy.py:1614 | [RiskGovernor] BBCA: deployable (price_inside_entry_range)
+2026-05-17 16:22:42.045 INFO     legacy.py:3145 | [Orchestrator] Debate summary: 1 succeeded / 0 failed
+2026-05-17 16:22:42.051 INFO     legacy.py:2289 | [Rank] Excluded BBCA – rating HOLD
+2026-05-17 16:22:42.051 WARNING  portfolio_optimizer.py:41 | [Portfolio] Tidak ada kandidat dengan conviction >= 30%. Fallback ke semua scorable tanpa conviction filter.
+2026-05-17 16:22:42.052 INFO     portfolio_optimizer.py:90 | [Portfolio] 0 dipilih dari 0 eligible (top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 16:22:42.052 INFO     legacy.py:2318 | [Rank] Top 0 dipilih: [] (dari 0 eligible, top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 16:22:42.052 INFO     legacy.py:3175 | [Sizing] 0 posisi | Deployed: Rp 0 (0.0%)
+2026-05-17 16:22:42.078 INFO     legacy.py:2338 | [Persist] Full results -> tmp\cli_present_check3\full_batch_results.json
+2026-05-17 16:22:42.088 INFO     legacy.py:1713 | [Audit] BBCA: BBCA→HOLD: unknown won by voting (0.77) after 3 round(s). 1 agent(s) dissented. Data sintetis tidak merepresentasikan kondisi emiten aktual.
+2026-05-17 16:22:42.089 INFO     legacy.py:2452 | [Persist] 1 versioned debate records disimpan ke tmp\cli_present_check3\debates
+2026-05-17 16:22:42.092 INFO     legacy.py:2476 | [ArtifactValidator] Output artifacts valid.
+2026-05-17 16:22:42.096 INFO     legacy.py:1789 | [Telemetry] Batch report saved for 20260517_162241
+2026-05-17 16:22:42.096 INFO     legacy.py:1802 | [ReportConsistency] passed
+2026-05-17 16:22:42.101 INFO     legacy.py:3241 | [Orchestrator] Pipeline selesai
+2026-05-17 16:22:42.101 INFO     legacy.py:3242 | [Orchestrator] Regime: NORMAL | Top N: 0
+2026-05-17 16:22:42.102 INFO     legacy.py:3243 | [Orchestrator] Full results -> tmp\cli_present_check3\full_batch_results.json
+2026-05-17 16:22:42.102 INFO     legacy.py:3244 | [Orchestrator] Top 0 report -> tmp\cli_present_check3\TOP_3_SWING_TRADES.md
+2026-05-17 16:23:01.404 INFO     legacy.py:2991 | [Orchestrator] Memulai IHSG Swing Trade Pipeline
+2026-05-17 16:23:01.405 INFO     legacy.py:2992 | [Orchestrator] Mode: compare
+2026-05-17 16:23:01.408 INFO     legacy.py:1003 | [PromptLinter] Prompt pack OK
+2026-05-17 16:23:01.421 INFO     legacy.py:3021 | [CLI] Menggunakan --tickers override; skip quant filter dan top10_candidates.json.
+2026-05-17 16:23:01.800 INFO     regime.py:70 | [Regime] IHSG realized vol (20d): 0.0138 (1.38%)
+2026-05-17 16:23:01.800 INFO     regime.py:101 | [Regime] NORMAL volatility (1.38%)
+2026-05-17 16:23:01.800 INFO     legacy.py:3059 | [Regime] NORMAL -- no overrides applied.
+2026-05-17 16:23:01.802 INFO     legacy.py:3072 | [CLI] 1 ticker dari --tickers: ['BBCA']
+2026-05-17 16:23:01.803 INFO     single_agent_analyzer.py:310 | [SingleAgent] Starting BBCA
+2026-05-17 16:23:02.748 INFO     stockbit_api_client.py:315 | Logged in successfully with existing token!
+2026-05-17 16:23:03.118 INFO     fair_value_calculator.py:295 | [FairValue] BBCA: DPS derived from yield (5.51%) × price (3) = 0.16
+2026-05-17 16:23:03.119 INFO     fair_value_calculator.py:323 | [FairValue] BBCA: all key stats parsed OK: {'eps_ttm': 471.1, 'bvps': 2102.07, 'dps': 0.16, 'roe': '22.4%', 'pe': 12.95, 'pb': 2.9}
+2026-05-17 16:23:03.805 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 16:23:13.821 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 16:23:13.837 INFO     single_agent_analyzer.py:324 | [SingleAgent] BBCA: BUY conf=70%
+2026-05-17 16:23:13.841 INFO     legacy.py:2352 | [SingleAgent] BBCA: BUY conf=70%
+2026-05-17 16:23:13.846 INFO     legacy.py:3132 | [DryRun] Melewati run_batch_debates(); memakai mock results.
+2026-05-17 16:23:13.852 INFO     legacy.py:2703 | [DryRun] Generated 1 mock debate results.
+2026-05-17 16:23:13.853 INFO     legacy.py:1614 | [RiskGovernor] BBCA: deployable (price_inside_entry_range)
+2026-05-17 16:23:13.853 INFO     legacy.py:3145 | [Orchestrator] Debate summary: 1 succeeded / 0 failed
+2026-05-17 16:23:13.858 INFO     legacy.py:2289 | [Rank] Excluded BBCA – rating HOLD
+2026-05-17 16:23:13.858 WARNING  portfolio_optimizer.py:41 | [Portfolio] Tidak ada kandidat dengan conviction >= 30%. Fallback ke semua scorable tanpa conviction filter.
+2026-05-17 16:23:13.859 INFO     portfolio_optimizer.py:90 | [Portfolio] 0 dipilih dari 0 eligible (top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 16:23:13.859 INFO     legacy.py:2318 | [Rank] Top 0 dipilih: [] (dari 0 eligible, top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 16:23:13.860 INFO     legacy.py:3175 | [Sizing] 0 posisi | Deployed: Rp 0 (0.0%)
+2026-05-17 16:23:13.866 INFO     legacy.py:2338 | [Persist] Full results -> tmp\cli_compare_check\full_batch_results.json
+2026-05-17 16:23:13.873 INFO     legacy.py:1713 | [Audit] BBCA: BBCA→HOLD: unknown won by voting (0.77) after 3 round(s). 1 agent(s) dissented. Data sintetis tidak merepresentasikan kondisi emiten aktual.
+2026-05-17 16:23:13.874 INFO     legacy.py:2452 | [Persist] 1 versioned debate records disimpan ke tmp\cli_compare_check\debates
+2026-05-17 16:23:13.875 INFO     legacy.py:2476 | [ArtifactValidator] Output artifacts valid.
+2026-05-17 16:23:13.878 INFO     legacy.py:1789 | [Telemetry] Batch report saved for 20260517_162301
+2026-05-17 16:23:13.878 INFO     legacy.py:1802 | [ReportConsistency] passed
+2026-05-17 16:23:13.880 INFO     legacy.py:3218 | [Compare] Agreement rate: 0%
+2026-05-17 16:23:13.881 INFO     legacy.py:3219 | [Compare] Report saved: tmp\cli_compare_check\comparison_report.md
+2026-05-17 16:23:13.893 INFO     legacy.py:3241 | [Orchestrator] Pipeline selesai
+2026-05-17 16:23:13.893 INFO     legacy.py:3242 | [Orchestrator] Regime: NORMAL | Top N: 0
+2026-05-17 16:23:13.893 INFO     legacy.py:3243 | [Orchestrator] Full results -> tmp\cli_compare_check\full_batch_results.json
+2026-05-17 16:23:13.894 INFO     legacy.py:3244 | [Orchestrator] Top 0 report -> tmp\cli_compare_check\TOP_3_SWING_TRADES.md
+2026-05-17 16:24:05.899 INFO     legacy.py:2999 | [Orchestrator] Memulai IHSG Swing Trade Pipeline
+2026-05-17 16:24:05.900 INFO     legacy.py:3000 | [Orchestrator] Mode: multi
+2026-05-17 16:24:05.903 INFO     legacy.py:1011 | [PromptLinter] Prompt pack OK
+2026-05-17 16:24:05.914 INFO     legacy.py:3029 | [CLI] Menggunakan --tickers override; skip quant filter dan top10_candidates.json.
+2026-05-17 16:24:06.346 INFO     regime.py:70 | [Regime] IHSG realized vol (20d): 0.0138 (1.38%)
+2026-05-17 16:24:06.346 INFO     regime.py:101 | [Regime] NORMAL volatility (1.38%)
+2026-05-17 16:24:06.346 INFO     legacy.py:3067 | [Regime] NORMAL -- no overrides applied.
+2026-05-17 16:24:06.348 INFO     legacy.py:3080 | [CLI] 1 ticker dari --tickers: ['BBCA']
+2026-05-17 16:24:06.349 INFO     legacy.py:3140 | [DryRun] Melewati run_batch_debates(); memakai mock results.
+2026-05-17 16:24:06.354 INFO     legacy.py:2711 | [DryRun] Generated 1 mock debate results.
+2026-05-17 16:24:06.354 INFO     legacy.py:1622 | [RiskGovernor] BBCA: deployable (price_inside_entry_range)
+2026-05-17 16:24:06.354 INFO     legacy.py:3153 | [Orchestrator] Debate summary: 1 succeeded / 0 failed
+2026-05-17 16:24:06.358 INFO     legacy.py:2297 | [Rank] Excluded BBCA – rating HOLD
+2026-05-17 16:24:06.358 WARNING  portfolio_optimizer.py:41 | [Portfolio] Tidak ada kandidat dengan conviction >= 30%. Fallback ke semua scorable tanpa conviction filter.
+2026-05-17 16:24:06.359 INFO     portfolio_optimizer.py:90 | [Portfolio] 0 dipilih dari 0 eligible (top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 16:24:06.359 INFO     legacy.py:2326 | [Rank] Top 0 dipilih: [] (dari 0 eligible, top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 16:24:06.359 INFO     legacy.py:3183 | [Sizing] 0 posisi | Deployed: Rp 0 (0.0%)
+2026-05-17 16:24:06.362 INFO     legacy.py:2346 | [Persist] Full results -> tmp\cli_verbose_check\full_batch_results.json
+2026-05-17 16:24:06.369 INFO     legacy.py:1721 | [Audit] BBCA: BBCA→HOLD: unknown won by voting (0.77) after 3 round(s). 1 agent(s) dissented. Data sintetis tidak merepresentasikan kondisi emiten aktual.
+2026-05-17 16:24:06.370 INFO     legacy.py:2460 | [Persist] 1 versioned debate records disimpan ke tmp\cli_verbose_check\debates
+2026-05-17 16:24:06.372 INFO     legacy.py:2484 | [ArtifactValidator] Output artifacts valid.
+2026-05-17 16:24:06.375 INFO     legacy.py:1797 | [Telemetry] Batch report saved for 20260517_162405
+2026-05-17 16:24:06.377 INFO     legacy.py:1810 | [ReportConsistency] passed
+2026-05-17 16:24:06.385 INFO     legacy.py:3249 | [Orchestrator] Pipeline selesai
+2026-05-17 16:24:06.386 INFO     legacy.py:3250 | [Orchestrator] Regime: NORMAL | Top N: 0
+2026-05-17 16:24:06.387 INFO     legacy.py:3251 | [Orchestrator] Full results -> tmp\cli_verbose_check\full_batch_results.json
+2026-05-17 16:24:06.387 INFO     legacy.py:3252 | [Orchestrator] Top 0 report -> tmp\cli_verbose_check\TOP_3_SWING_TRADES.md
+2026-05-17 16:26:31.442 INFO     legacy.py:2999 | [Orchestrator] Memulai IHSG Swing Trade Pipeline
+2026-05-17 16:26:31.443 INFO     legacy.py:3000 | [Orchestrator] Mode: multi
+2026-05-17 16:26:31.446 INFO     legacy.py:1011 | [PromptLinter] Prompt pack OK
+2026-05-17 16:26:31.465 INFO     legacy.py:3029 | [CLI] Menggunakan --tickers override; skip quant filter dan top10_candidates.json.
+2026-05-17 16:26:32.320 INFO     regime.py:70 | [Regime] IHSG realized vol (20d): 0.0138 (1.38%)
+2026-05-17 16:26:32.320 INFO     regime.py:101 | [Regime] NORMAL volatility (1.38%)
+2026-05-17 16:26:32.320 INFO     legacy.py:3067 | [Regime] NORMAL -- no overrides applied.
+2026-05-17 16:26:32.322 INFO     legacy.py:3080 | [CLI] 1 ticker dari --tickers: ['BBCA']
+2026-05-17 16:26:32.657 INFO     stockbit_api_client.py:315 | Logged in successfully with existing token!
+2026-05-17 16:26:33.006 INFO     legacy.py:3109 | [ProviderHealth] stockbit_ok=True yfinance_ok=True can_proceed=True failures=0
+2026-05-17 16:26:33.012 INFO     legacy.py:2185 | [Orchestrator] Meluncurkan 1 debate (concurrency=3, RPM=10)
+2026-05-17 16:26:34.463 INFO     stockbit_api_client.py:315 | Logged in successfully with existing token!
+2026-05-17 16:26:35.022 INFO     legacy.py:2110 | [BBCA] Budget terpakai: 1/200
+2026-05-17 16:26:35.022 INFO     legacy.py:1830 | [Debate] Mulai: BBCA
+2026-05-17 16:26:35.554 INFO     debate_chamber.py:2480 | [DebateChamber] ▶ Starting swing-trade pipeline for BBCA @ Rp 6,100
+2026-05-17 16:26:35.559 INFO     debate_chamber.py:1080 | [Chartist] Fetching OHLCV + orderbook for BBCA
+2026-05-17 16:26:35.560 INFO     debate_chamber.py:993 | [Fundamental] Fetching for BBCA
+2026-05-17 16:26:35.561 INFO     debate_chamber.py:1241 | [Sentiment] Fetching for BBCA
+2026-05-17 16:26:35.892 INFO     fair_value_calculator.py:295 | [FairValue] BBCA: DPS derived from yield (5.51%) × price (3) = 0.16
+2026-05-17 16:26:35.892 INFO     fair_value_calculator.py:323 | [FairValue] BBCA: all key stats parsed OK: {'eps_ttm': 471.1, 'bvps': 2102.07, 'dps': 0.16, 'roe': '22.4%', 'pe': 12.95, 'pb': 2.9}
+2026-05-17 16:26:35.892 INFO     debate_chamber.py:1016 | [Fundamental] Fair value for BBCA: 10474.0
+2026-05-17 16:26:35.919 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 16:26:36.083 INFO     debate_chamber.py:1147 | [Chartist] Technicals computed: MA50=6425.0, RSI=42.8
+2026-05-17 16:26:36.151 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 16:26:36.606 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 16:26:38.774 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 16:26:54.754 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 16:26:57.045 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 16:26:57.051 INFO     debate_chamber.py:1319 | [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-17 16:26:57.055 INFO     debate_chamber.py:1441 | [RAG] BBCA evidence: 9/9 chunks, ~525 tokens
+2026-05-17 16:26:57.056 INFO     debate_chamber.py:1541 | [Bull] Round 1 for BBCA
+2026-05-17 16:26:57.057 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 16:27:10.836 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 16:27:10.840 INFO     debate_chamber.py:1583 | [Bear] Round 1 for BBCA
+2026-05-17 16:27:10.840 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 16:27:24.126 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 16:27:24.133 INFO     debate_chamber.py:1637 | [Consensus] Evaluating 5-agent votes
+2026-05-17 16:27:24.134 INFO     debate_chamber.py:1640 | [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-17 16:27:24.135 INFO     debate_chamber.py:1673 | [State Cleaner] Deterministic pruning (no LLM)
+2026-05-17 16:27:24.136 INFO     debate_chamber.py:1541 | [Bull] Round 2 for BBCA
+2026-05-17 16:27:24.138 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 16:27:43.891 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 16:27:43.902 INFO     debate_chamber.py:1583 | [Bear] Round 2 for BBCA
+2026-05-17 16:27:43.903 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 16:28:02.424 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 16:28:02.431 INFO     debate_chamber.py:1637 | [Consensus] Evaluating 5-agent votes
+2026-05-17 16:28:02.432 INFO     debate_chamber.py:1640 | [Consensus] Result: reached=True method=voting winner={'agent': 'fundamental_scout', 'position': 'HOLD', 'confidence': 0.55, 'round': 0} dissent=['bull', 'bear']
+2026-05-17 16:28:02.433 INFO     debate_chamber.py:1719 | [Devil's Advocate] Injecting adversarial scenario
+2026-05-17 16:28:02.434 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 16:28:09.003 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 16:28:09.006 INFO     debate_chamber.py:2138 | [CIO] Deliberating on BBCA (current price: 6,100)
+2026-05-17 16:28:09.008 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 16:28:34.492 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-17 16:28:34.515 INFO     debate_chamber.py:2349 | [CIO] JSON parsed successfully for BBCA
+2026-05-17 16:28:34.515 INFO     debate_chamber.py:2367 | [CIO] Verdict delivered for BBCA
+2026-05-17 16:28:34.521 INFO     debate_chamber.py:2502 | [DebateChamber] ✅ Pipeline complete for BBCA
+2026-05-17 16:28:34.522 INFO     legacy.py:1849 | [Debate] ✓ Selesai: BBCA
+2026-05-17 16:28:34.530 INFO     legacy.py:2215 | [Budget] Run selesai: Pro 1/200, Flash 8/2000
+2026-05-17 16:28:34.530 INFO     legacy.py:1572 | [News] BBCA: sentiment=UNKNOWN adjustment=+0.00
+2026-05-17 16:28:34.531 INFO     legacy.py:1622 | [RiskGovernor] BBCA: deployable (price_inside_entry_range)
+2026-05-17 16:28:34.531 INFO     legacy.py:3153 | [Orchestrator] Debate summary: 1 succeeded / 0 failed
+2026-05-17 16:28:34.550 INFO     legacy.py:2297 | [Rank] Excluded BBCA – rating HOLD
+2026-05-17 16:28:34.550 WARNING  portfolio_optimizer.py:41 | [Portfolio] Tidak ada kandidat dengan conviction >= 30%. Fallback ke semua scorable tanpa conviction filter.
+2026-05-17 16:28:34.550 INFO     portfolio_optimizer.py:90 | [Portfolio] 0 dipilih dari 0 eligible (top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 16:28:34.551 INFO     legacy.py:2326 | [Rank] Top 0 dipilih: [] (dari 0 eligible, top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 16:28:34.551 INFO     legacy.py:3183 | [Sizing] 0 posisi | Deployed: Rp 0 (0.0%)
+2026-05-17 16:28:34.556 INFO     legacy.py:2346 | [Persist] Full results -> tmp\cli_present_real_check\full_batch_results.json
+2026-05-17 16:28:34.562 INFO     legacy.py:1721 | [Audit] BBCA: BBCA→HOLD: unknown won by voting (0.55) after 2 round(s). 2 agent(s) dissented. Strong technical downtrend with price below MA50 and MA200, acting as major overhead resistance.
+2026-05-17 16:28:34.564 INFO     legacy.py:2460 | [Persist] 1 versioned debate records disimpan ke tmp\cli_present_real_check\debates
+2026-05-17 16:28:34.567 INFO     legacy.py:2484 | [ArtifactValidator] Output artifacts valid.
+2026-05-17 16:28:34.571 INFO     legacy.py:1797 | [Telemetry] Batch report saved for 20260517_162631
+2026-05-17 16:28:34.572 INFO     legacy.py:1810 | [ReportConsistency] passed
+2026-05-17 16:28:34.574 INFO     legacy.py:3249 | [Orchestrator] Pipeline selesai
+2026-05-17 16:28:34.574 INFO     legacy.py:3250 | [Orchestrator] Regime: NORMAL | Top N: 0
+2026-05-17 16:28:34.574 INFO     legacy.py:3251 | [Orchestrator] Full results -> tmp\cli_present_real_check\full_batch_results.json
+2026-05-17 16:28:34.574 INFO     legacy.py:3252 | [Orchestrator] Top 0 report -> tmp\cli_present_real_check\TOP_3_SWING_TRADES.md
+2026-05-17 17:35:54.718 INFO     legacy.py:3571 | [Orchestrator] Memulai IHSG Swing Trade Pipeline
+2026-05-17 17:35:54.719 INFO     legacy.py:3572 | [Orchestrator] Mode: compare
+2026-05-17 17:35:54.722 INFO     legacy.py:1525 | [PromptLinter] Prompt pack OK
+2026-05-17 17:35:54.751 INFO     legacy.py:3601 | [CLI] Menggunakan --tickers override; skip quant filter dan top10_candidates.json.
+2026-05-17 17:35:55.502 INFO     regime.py:70 | [Regime] IHSG realized vol (20d): 0.0138 (1.38%)
+2026-05-17 17:35:55.502 INFO     regime.py:101 | [Regime] NORMAL volatility (1.38%)
+2026-05-17 17:35:55.502 INFO     legacy.py:3641 | [Regime] NORMAL -- no overrides applied.
+2026-05-17 17:35:55.503 INFO     legacy.py:3654 | [CLI] 1 ticker dari --tickers: ['WIIM']
+2026-05-17 17:35:55.505 INFO     single_agent_analyzer.py:310 | [SingleAgent] Starting WIIM
+2026-05-17 17:35:56.884 INFO     stockbit_api_client.py:315 | Logged in successfully with existing token!
+2026-05-17 17:35:57.456 INFO     fair_value_calculator.py:295 | [FairValue] WIIM: DPS derived from yield (3.47%) × price (2) = 0.06
+2026-05-17 17:35:57.456 INFO     fair_value_calculator.py:323 | [FairValue] WIIM: all key stats parsed OK: {'eps_ttm': 235.33, 'bvps': 1123.12, 'dps': 0.06, 'roe': '20.9%', 'pe': 7.95, 'pb': 1.67}
+2026-05-17 17:35:58.351 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 17:35:59.385 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-05-17 17:35:59.388 INFO     __init__.py:1737 | Retrying google.genai._api_client.BaseApiClient._async_request_once in 1.36 seconds as it raised ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap. Learn more at https://ai.google.dev/gemini-api/docs/billing#project-spend-caps. ', 'status': 'RESOURCE_EXHAUSTED'}}.
+2026-05-17 17:36:01.326 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-05-17 17:36:01.327 INFO     __init__.py:1737 | Retrying google.genai._api_client.BaseApiClient._async_request_once in 2.55 seconds as it raised ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap. Learn more at https://ai.google.dev/gemini-api/docs/billing#project-spend-caps. ', 'status': 'RESOURCE_EXHAUSTED'}}.
+2026-05-17 17:36:04.501 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-05-17 17:36:04.503 INFO     __init__.py:1737 | Retrying google.genai._api_client.BaseApiClient._async_request_once in 4.78 seconds as it raised ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap. Learn more at https://ai.google.dev/gemini-api/docs/billing#project-spend-caps. ', 'status': 'RESOURCE_EXHAUSTED'}}.
+2026-05-17 17:36:09.933 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-05-17 17:36:09.936 INFO     __init__.py:1737 | Retrying google.genai._api_client.BaseApiClient._async_request_once in 8.02 seconds as it raised ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap. Learn more at https://ai.google.dev/gemini-api/docs/billing#project-spend-caps. ', 'status': 'RESOURCE_EXHAUSTED'}}.
+2026-05-17 17:36:18.635 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-05-17 17:36:18.637 INFO     __init__.py:1737 | Retrying google.genai._api_client.BaseApiClient._async_request_once in 16.6 seconds as it raised ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap. Learn more at https://ai.google.dev/gemini-api/docs/billing#project-spend-caps. ', 'status': 'RESOURCE_EXHAUSTED'}}.
+2026-05-17 17:36:35.882 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-05-17 17:36:35.885 WARNING  single_agent_analyzer.py:330 | [SingleAgent] WIIM: failed
+2026-05-17 17:36:35.893 WARNING  legacy.py:2872 | [SingleAgent] WIIM: failed
+2026-05-17 17:36:37.168 INFO     stockbit_api_client.py:315 | Logged in successfully with existing token!
+2026-05-17 17:36:38.405 INFO     legacy.py:3681 | [ProviderHealth] stockbit_ok=True yfinance_ok=True can_proceed=True failures=0
+2026-05-17 17:36:38.425 INFO     legacy.py:2689 | [Orchestrator] Meluncurkan 1 debate (concurrency=3, RPM=10)
+2026-05-17 17:36:43.825 INFO     stockbit_api_client.py:315 | Logged in successfully with existing token!
+2026-05-17 17:36:44.470 INFO     legacy.py:2603 | [WIIM] Budget terpakai: 1/200
+2026-05-17 17:36:44.470 INFO     legacy.py:2368 | [Debate] Mulai: WIIM
+2026-05-17 17:36:44.471 INFO     debate_chamber.py:2480 | [DebateChamber] ▶ Starting swing-trade pipeline for WIIM @ Rp 1,870
+2026-05-17 17:36:44.477 INFO     debate_chamber.py:1080 | [Chartist] Fetching OHLCV + orderbook for WIIM
+2026-05-17 17:36:44.481 INFO     debate_chamber.py:993 | [Fundamental] Fetching for WIIM
+2026-05-17 17:36:44.486 INFO     debate_chamber.py:1241 | [Sentiment] Fetching for WIIM
+2026-05-17 17:36:45.003 INFO     debate_chamber.py:1147 | [Chartist] Technicals computed: MA50=1881.0, RSI=49.3
+2026-05-17 17:36:45.875 INFO     fair_value_calculator.py:295 | [FairValue] WIIM: DPS derived from yield (3.47%) × price (2) = 0.06
+2026-05-17 17:36:45.875 INFO     fair_value_calculator.py:323 | [FairValue] WIIM: all key stats parsed OK: {'eps_ttm': 235.33, 'bvps': 1123.12, 'dps': 0.06, 'roe': '20.9%', 'pe': 7.95, 'pb': 1.67}
+2026-05-17 17:36:45.876 INFO     debate_chamber.py:1016 | [Fundamental] Fair value for WIIM: 2968.0
+2026-05-17 17:36:45.880 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 17:36:46.387 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 17:36:46.593 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-05-17 17:36:46.597 INFO     __init__.py:1737 | Retrying google.genai._api_client.BaseApiClient._async_request_once in 1.18 seconds as it raised ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap. Learn more at https://ai.google.dev/gemini-api/docs/billing#project-spend-caps. ', 'status': 'RESOURCE_EXHAUSTED'}}.
+2026-05-17 17:36:46.897 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 17:36:47.304 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-05-17 17:36:47.306 INFO     __init__.py:1737 | Retrying google.genai._api_client.BaseApiClient._async_request_once in 1.65 seconds as it raised ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap. Learn more at https://ai.google.dev/gemini-api/docs/billing#project-spend-caps. ', 'status': 'RESOURCE_EXHAUSTED'}}.
+2026-05-17 17:36:47.509 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-05-17 17:36:47.512 INFO     __init__.py:1737 | Retrying google.genai._api_client.BaseApiClient._async_request_once in 1.59 seconds as it raised ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap. Learn more at https://ai.google.dev/gemini-api/docs/billing#project-spend-caps. ', 'status': 'RESOURCE_EXHAUSTED'}}.
+2026-05-17 17:36:48.431 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-05-17 17:36:48.437 INFO     __init__.py:1737 | Retrying google.genai._api_client.BaseApiClient._async_request_once in 2.09 seconds as it raised ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap. Learn more at https://ai.google.dev/gemini-api/docs/billing#project-spend-caps. ', 'status': 'RESOURCE_EXHAUSTED'}}.
+2026-05-17 17:36:49.558 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-05-17 17:36:49.561 INFO     __init__.py:1737 | Retrying google.genai._api_client.BaseApiClient._async_request_once in 2.03 seconds as it raised ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap. Learn more at https://ai.google.dev/gemini-api/docs/billing#project-spend-caps. ', 'status': 'RESOURCE_EXHAUSTED'}}.
+2026-05-17 17:36:49.639 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-05-17 17:36:49.642 INFO     __init__.py:1737 | Retrying google.genai._api_client.BaseApiClient._async_request_once in 2.2 seconds as it raised ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap. Learn more at https://ai.google.dev/gemini-api/docs/billing#project-spend-caps. ', 'status': 'RESOURCE_EXHAUSTED'}}.
+2026-05-17 17:36:51.097 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-05-17 17:36:51.099 INFO     __init__.py:1737 | Retrying google.genai._api_client.BaseApiClient._async_request_once in 4.83 seconds as it raised ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap. Learn more at https://ai.google.dev/gemini-api/docs/billing#project-spend-caps. ', 'status': 'RESOURCE_EXHAUSTED'}}.
+2026-05-17 17:36:52.223 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-05-17 17:36:52.225 INFO     __init__.py:1737 | Retrying google.genai._api_client.BaseApiClient._async_request_once in 4.15 seconds as it raised ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap. Learn more at https://ai.google.dev/gemini-api/docs/billing#project-spend-caps. ', 'status': 'RESOURCE_EXHAUSTED'}}.
+2026-05-17 17:36:52.429 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-05-17 17:36:52.432 INFO     __init__.py:1737 | Retrying google.genai._api_client.BaseApiClient._async_request_once in 4.73 seconds as it raised ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap. Learn more at https://ai.google.dev/gemini-api/docs/billing#project-spend-caps. ', 'status': 'RESOURCE_EXHAUSTED'}}.
+2026-05-17 17:36:56.526 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-05-17 17:36:56.529 INFO     __init__.py:1737 | Retrying google.genai._api_client.BaseApiClient._async_request_once in 8.92 seconds as it raised ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap. Learn more at https://ai.google.dev/gemini-api/docs/billing#project-spend-caps. ', 'status': 'RESOURCE_EXHAUSTED'}}.
+2026-05-17 17:36:56.933 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-05-17 17:36:56.936 INFO     __init__.py:1737 | Retrying google.genai._api_client.BaseApiClient._async_request_once in 8.78 seconds as it raised ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap. Learn more at https://ai.google.dev/gemini-api/docs/billing#project-spend-caps. ', 'status': 'RESOURCE_EXHAUSTED'}}.
+2026-05-17 17:36:57.751 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-05-17 17:36:57.753 INFO     __init__.py:1737 | Retrying google.genai._api_client.BaseApiClient._async_request_once in 8.58 seconds as it raised ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap. Learn more at https://ai.google.dev/gemini-api/docs/billing#project-spend-caps. ', 'status': 'RESOURCE_EXHAUSTED'}}.
+2026-05-17 17:37:06.149 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-05-17 17:37:06.151 INFO     __init__.py:1737 | Retrying google.genai._api_client.BaseApiClient._async_request_once in 16.2 seconds as it raised ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap. Learn more at https://ai.google.dev/gemini-api/docs/billing#project-spend-caps. ', 'status': 'RESOURCE_EXHAUSTED'}}.
+2026-05-17 17:37:06.316 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-05-17 17:37:06.318 INFO     __init__.py:1737 | Retrying google.genai._api_client.BaseApiClient._async_request_once in 16.5 seconds as it raised ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap. Learn more at https://ai.google.dev/gemini-api/docs/billing#project-spend-caps. ', 'status': 'RESOURCE_EXHAUSTED'}}.
+2026-05-17 17:37:06.967 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-05-17 17:37:06.969 INFO     __init__.py:1737 | Retrying google.genai._api_client.BaseApiClient._async_request_once in 16.5 seconds as it raised ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap. Learn more at https://ai.google.dev/gemini-api/docs/billing#project-spend-caps. ', 'status': 'RESOURCE_EXHAUSTED'}}.
+2026-05-17 17:37:22.941 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-05-17 17:37:22.942 ERROR    debate_chamber.py:1038 | [Fundamental] Error: Error calling model 'gemini-2.5-flash' (RESOURCE_EXHAUSTED): 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap. Learn more at https://ai.google.dev/gemini-api/docs/billing#project-spend-caps. ', 'status': 'RESOURCE_EXHAUSTED'}}
+2026-05-17 17:37:22.946 INFO     debate_chamber.py:307 | [Planner] 🔄 [FUNDAMENTAL_FETCH] WIIM → RETRY (attempt 0): FUNDAMENTAL_FETCH failed with QUOTA, retrying
+2026-05-17 17:37:22.946 WARNING  debate_chamber.py:320 | [Planner] Failed during FUNDAMENTAL_FETCH planning for WIIM; using original behavior: _ledger_call() got multiple values for argument 'action'
+2026-05-17 17:37:23.521 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-05-17 17:37:23.542 ERROR    debate_chamber.py:2487 | [DebateChamber] Guard failed for WIIM: {'ticker': 'WIIM', 'status': 'failed', 'error': "Error calling model 'gemini-2.5-flash' (RESOURCE_EXHAUSTED): 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap. Learn more at https://ai.google.dev/gemini-api/docs/billing#project-spend-caps. ', 'status': 'RESOURCE_EXHAUSTED'}}", 'result': None}
+2026-05-17 17:37:23.542 ERROR    legacy.py:2425 | [Debate] ERROR WIIM gagal: Error calling model 'gemini-2.5-flash' (RESOURCE_EXHAUSTED): 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap. Learn more at https://ai.google.dev/gemini-api/docs/billing#project-spend-caps. ', 'status': 'RESOURCE_EXHAUSTED'}}
+2026-05-17 17:37:23.560 INFO     legacy.py:2717 | [Budget] Run selesai: Pro 0/200, Flash 3/2000
+2026-05-17 17:37:24.070 INFO     legacy.py:2108 | [News] WIIM: sentiment=UNKNOWN adjustment=+0.00
+2026-05-17 17:37:24.077 INFO     legacy.py:3749 | [Orchestrator] Debate summary: 0 succeeded / 1 failed
+2026-05-17 17:37:24.284 INFO     historical_scorer.py:81 | [HistScorer] Loaded 137 debate records dari output\debates
+2026-05-17 17:37:24.284 INFO     legacy.py:2797 | [Rank] Lewati WIIM – tidak ada verdict
+2026-05-17 17:37:24.284 WARNING  portfolio_optimizer.py:41 | [Portfolio] Tidak ada kandidat dengan conviction >= 30%. Fallback ke semua scorable tanpa conviction filter.
+2026-05-17 17:37:24.285 INFO     portfolio_optimizer.py:90 | [Portfolio] 0 dipilih dari 0 eligible (top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 17:37:24.285 INFO     legacy.py:2831 | [Rank] Top 0 dipilih: [] (dari 0 eligible, top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 17:37:24.285 INFO     legacy.py:3778 | [Sizing] 0 posisi | Deployed: Rp 0 (0.0%)
+2026-05-17 17:37:24.290 INFO     legacy.py:2852 | [Persist] Full results -> output\full_batch_results.json
+2026-05-17 17:37:24.293 INFO     legacy.py:2991 | [ArtifactValidator] Output artifacts valid.
+2026-05-17 17:37:24.297 INFO     legacy.py:2335 | [Telemetry] Batch report saved for 20260517_173554
+2026-05-17 17:37:24.297 INFO     legacy.py:2348 | [ReportConsistency] passed
+2026-05-17 17:37:24.300 INFO     legacy.py:3825 | [Compare] Agreement rate: 0%
+2026-05-17 17:37:24.300 INFO     legacy.py:3826 | [Compare] Report saved: output\comparison_report.md
+2026-05-17 17:37:24.307 INFO     legacy.py:3848 | [Orchestrator] Pipeline selesai
+2026-05-17 17:37:24.308 INFO     legacy.py:3849 | [Orchestrator] Regime: NORMAL | Top N: 0
+2026-05-17 17:37:24.308 INFO     legacy.py:3850 | [Orchestrator] Full results -> output\full_batch_results.json
+2026-05-17 17:37:24.308 INFO     legacy.py:3851 | [Orchestrator] Top 0 report -> output\TOP_3_SWING_TRADES.md
+2026-05-17 20:12:56.540 INFO     legacy.py:3697 | [Orchestrator] Memulai IHSG Swing Trade Pipeline
+2026-05-17 20:12:56.542 INFO     legacy.py:3698 | [Orchestrator] Mode: compare
+2026-05-17 20:12:56.547 INFO     legacy.py:1651 | [PromptLinter] Prompt pack OK
+2026-05-17 20:12:56.570 INFO     legacy.py:3727 | [CLI] Menggunakan --tickers override; skip quant filter dan top10_candidates.json.
+2026-05-17 20:12:57.165 INFO     regime.py:70 | [Regime] IHSG realized vol (20d): 0.0138 (1.38%)
+2026-05-17 20:12:57.165 INFO     regime.py:101 | [Regime] NORMAL volatility (1.38%)
+2026-05-17 20:12:57.165 INFO     legacy.py:3767 | [Regime] NORMAL -- no overrides applied.
+2026-05-17 20:12:57.169 INFO     legacy.py:3780 | [CLI] 1 ticker dari --tickers: ['WIIM']
+2026-05-17 20:12:57.174 INFO     single_agent_analyzer.py:310 | [SingleAgent] Starting WIIM
+2026-05-17 20:12:58.164 INFO     stockbit_api_client.py:315 | Logged in successfully with existing token!
+2026-05-17 20:12:58.657 INFO     fair_value_calculator.py:295 | [FairValue] WIIM: DPS derived from yield (3.47%) × price (2) = 0.06
+2026-05-17 20:12:58.657 INFO     fair_value_calculator.py:323 | [FairValue] WIIM: all key stats parsed OK: {'eps_ttm': 235.33, 'bvps': 1123.12, 'dps': 0.06, 'roe': '20.9%', 'pe': 7.95, 'pb': 1.67}
+2026-05-17 20:12:59.477 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 20:13:12.366 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 20:13:12.390 INFO     single_agent_analyzer.py:324 | [SingleAgent] WIIM: BUY conf=75%
+2026-05-17 20:13:12.400 INFO     legacy.py:2992 | [SingleAgent] WIIM: BUY conf=75%
+2026-05-17 20:13:12.921 INFO     stockbit_api_client.py:315 | Logged in successfully with existing token!
+2026-05-17 20:13:13.403 INFO     legacy.py:3809 | [ProviderHealth] stockbit_ok=True yfinance_ok=True can_proceed=True failures=0
+2026-05-17 20:13:13.414 INFO     legacy.py:2815 | [Orchestrator] Meluncurkan 1 debate (concurrency=3, RPM=10)
+2026-05-17 20:13:15.516 INFO     stockbit_api_client.py:315 | Logged in successfully with existing token!
+2026-05-17 20:13:16.125 INFO     legacy.py:2729 | [WIIM] Budget terpakai: 1/200
+2026-05-17 20:13:16.125 INFO     legacy.py:2494 | [Debate] Mulai: WIIM
+2026-05-17 20:13:16.127 INFO     debate_chamber.py:2480 | [DebateChamber] ▶ Starting swing-trade pipeline for WIIM @ Rp 1,870
+2026-05-17 20:13:16.149 INFO     debate_chamber.py:1080 | [Chartist] Fetching OHLCV + orderbook for WIIM
+2026-05-17 20:13:16.151 INFO     debate_chamber.py:993 | [Fundamental] Fetching for WIIM
+2026-05-17 20:13:16.153 INFO     debate_chamber.py:1241 | [Sentiment] Fetching for WIIM
+2026-05-17 20:13:16.550 INFO     fair_value_calculator.py:295 | [FairValue] WIIM: DPS derived from yield (3.47%) × price (2) = 0.06
+2026-05-17 20:13:16.550 INFO     fair_value_calculator.py:323 | [FairValue] WIIM: all key stats parsed OK: {'eps_ttm': 235.33, 'bvps': 1123.12, 'dps': 0.06, 'roe': '20.9%', 'pe': 7.95, 'pb': 1.67}
+2026-05-17 20:13:16.550 INFO     debate_chamber.py:1016 | [Fundamental] Fair value for WIIM: 2968.0
+2026-05-17 20:13:16.553 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 20:13:16.672 INFO     debate_chamber.py:1147 | [Chartist] Technicals computed: MA50=1881.0, RSI=49.3
+2026-05-17 20:13:16.741 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 20:13:17.206 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 20:13:18.935 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 20:13:29.962 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 20:13:33.713 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 20:13:33.740 INFO     debate_chamber.py:1319 | [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-17 20:13:33.745 INFO     debate_chamber.py:1441 | [RAG] WIIM evidence: 8/11 chunks, ~597 tokens
+2026-05-17 20:13:33.748 INFO     debate_chamber.py:1541 | [Bull] Round 1 for WIIM
+2026-05-17 20:13:33.749 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 20:13:52.378 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 20:13:52.394 INFO     debate_chamber.py:1583 | [Bear] Round 1 for WIIM
+2026-05-17 20:13:52.399 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 20:14:07.866 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 20:14:07.874 INFO     debate_chamber.py:1637 | [Consensus] Evaluating 5-agent votes
+2026-05-17 20:14:07.875 INFO     debate_chamber.py:1640 | [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-17 20:14:07.877 INFO     debate_chamber.py:1673 | [State Cleaner] Deterministic pruning (no LLM)
+2026-05-17 20:14:07.878 INFO     debate_chamber.py:1541 | [Bull] Round 2 for WIIM
+2026-05-17 20:14:07.880 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 20:14:21.017 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 20:14:21.025 INFO     debate_chamber.py:1583 | [Bear] Round 2 for WIIM
+2026-05-17 20:14:21.027 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 20:14:38.630 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 20:14:38.637 INFO     debate_chamber.py:1637 | [Consensus] Evaluating 5-agent votes
+2026-05-17 20:14:38.639 INFO     debate_chamber.py:1640 | [Consensus] Result: reached=True method=soft_hold winner={'agent': 'soft_hold_rule', 'position': 'HOLD', 'confidence': 0.92} dissent=['fundamental_scout', 'chartist', 'bull', 'bear']
+2026-05-17 20:14:38.641 INFO     debate_chamber.py:1719 | [Devil's Advocate] Injecting adversarial scenario
+2026-05-17 20:14:38.642 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 20:14:48.971 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 20:14:48.975 INFO     debate_chamber.py:2138 | [CIO] Deliberating on WIIM (current price: 1,870)
+2026-05-17 20:14:48.977 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 20:15:09.864 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-17 20:15:09.870 INFO     debate_chamber.py:2349 | [CIO] JSON parsed successfully for WIIM
+2026-05-17 20:15:09.870 INFO     debate_chamber.py:2367 | [CIO] Verdict delivered for WIIM
+2026-05-17 20:15:09.876 INFO     debate_chamber.py:2502 | [DebateChamber] ✅ Pipeline complete for WIIM
+2026-05-17 20:15:09.877 INFO     legacy.py:2513 | [Debate] ✓ Selesai: WIIM
+2026-05-17 20:15:09.877 INFO     legacy.py:2516 | [Debate] WIIM disagreement_type=timing
+2026-05-17 20:15:09.878 INFO     legacy.py:2843 | [Budget] Run selesai: Pro 1/200, Flash 8/2000
+2026-05-17 20:15:09.879 INFO     legacy.py:2234 | [News] WIIM: sentiment=UNKNOWN adjustment=+0.00
+2026-05-17 20:15:09.879 INFO     legacy.py:2286 | [RiskGovernor] WIIM: deployable (price_inside_entry_range)
+2026-05-17 20:15:09.879 INFO     legacy.py:3877 | [Orchestrator] Debate summary: 1 succeeded / 0 failed
+2026-05-17 20:15:09.979 INFO     legacy.py:2928 | [Rank] Excluded WIIM – rating HOLD
+2026-05-17 20:15:09.979 WARNING  portfolio_optimizer.py:41 | [Portfolio] Tidak ada kandidat dengan conviction >= 30%. Fallback ke semua scorable tanpa conviction filter.
+2026-05-17 20:15:09.981 INFO     portfolio_optimizer.py:90 | [Portfolio] 0 dipilih dari 0 eligible (top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 20:15:09.981 INFO     legacy.py:2957 | [Rank] Top 0 dipilih: [] (dari 0 eligible, top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 20:15:09.981 INFO     legacy.py:3908 | [Sizing] 0 posisi | Deployed: Rp 0 (0.0%)
+2026-05-17 20:15:10.000 INFO     legacy.py:2978 | [Persist] Full results -> tmp\cli_present_bug_check\full_batch_results.json
+2026-05-17 20:15:10.026 INFO     legacy.py:2385 | [Audit] WIIM: WIIM→HOLD: soft_hold_rule applied (0.52) after 2 round(s). 4 agent(s) dissented. Lack of a specific, near-term (1-3 month) catalyst to drive price towards fair value.
+2026-05-17 20:15:10.029 INFO     legacy.py:3093 | [Persist] 1 versioned debate records disimpan ke tmp\cli_present_bug_check\debates
+2026-05-17 20:15:10.034 INFO     legacy.py:3117 | [ArtifactValidator] Output artifacts valid.
+2026-05-17 20:15:10.044 INFO     legacy.py:2461 | [Telemetry] Batch report saved for 20260517_201256
+2026-05-17 20:15:10.046 INFO     legacy.py:2474 | [ReportConsistency] passed
+2026-05-17 20:15:10.049 INFO     legacy.py:3955 | [Compare] Agreement rate: 0%
+2026-05-17 20:15:10.050 INFO     legacy.py:3956 | [Compare] Report saved: tmp\cli_present_bug_check\comparison_report.md
+2026-05-17 20:15:10.065 INFO     legacy.py:3978 | [Orchestrator] Pipeline selesai
+2026-05-17 20:15:10.065 INFO     legacy.py:3979 | [Orchestrator] Regime: NORMAL | Top N: 0
+2026-05-17 20:15:10.065 INFO     legacy.py:3980 | [Orchestrator] Full results -> tmp\cli_present_bug_check\full_batch_results.json
+2026-05-17 20:15:10.065 INFO     legacy.py:3981 | [Orchestrator] Top 0 report -> tmp\cli_present_bug_check\TOP_3_SWING_TRADES.md
+2026-05-17 20:16:18.064 INFO     legacy.py:3711 | [Orchestrator] Memulai IHSG Swing Trade Pipeline
+2026-05-17 20:16:18.064 INFO     legacy.py:3712 | [Orchestrator] Mode: compare
+2026-05-17 20:16:18.070 INFO     legacy.py:1665 | [PromptLinter] Prompt pack OK
+2026-05-17 20:16:18.092 INFO     legacy.py:3741 | [CLI] Menggunakan --tickers override; skip quant filter dan top10_candidates.json.
+2026-05-17 20:16:18.700 INFO     regime.py:70 | [Regime] IHSG realized vol (20d): 0.0138 (1.38%)
+2026-05-17 20:16:18.700 INFO     regime.py:101 | [Regime] NORMAL volatility (1.38%)
+2026-05-17 20:16:18.701 INFO     legacy.py:3781 | [Regime] NORMAL -- no overrides applied.
+2026-05-17 20:16:18.703 INFO     legacy.py:3794 | [CLI] 1 ticker dari --tickers: ['WIIM']
+2026-05-17 20:16:18.706 INFO     single_agent_analyzer.py:310 | [SingleAgent] Starting WIIM
+2026-05-17 20:16:20.111 INFO     stockbit_api_client.py:315 | Logged in successfully with existing token!
+2026-05-17 20:16:20.622 INFO     fair_value_calculator.py:295 | [FairValue] WIIM: DPS derived from yield (3.47%) × price (2) = 0.06
+2026-05-17 20:16:20.622 INFO     fair_value_calculator.py:323 | [FairValue] WIIM: all key stats parsed OK: {'eps_ttm': 235.33, 'bvps': 1123.12, 'dps': 0.06, 'roe': '20.9%', 'pe': 7.95, 'pb': 1.67}
+2026-05-17 20:16:21.461 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 20:16:31.479 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 20:16:31.483 INFO     single_agent_analyzer.py:324 | [SingleAgent] WIIM: BUY conf=75%
+2026-05-17 20:16:31.485 INFO     legacy.py:3006 | [SingleAgent] WIIM: BUY conf=75%
+2026-05-17 20:16:32.095 INFO     stockbit_api_client.py:315 | Logged in successfully with existing token!
+2026-05-17 20:16:32.716 INFO     legacy.py:3823 | [ProviderHealth] stockbit_ok=True yfinance_ok=True can_proceed=True failures=0
+2026-05-17 20:16:32.720 INFO     legacy.py:2829 | [Orchestrator] Meluncurkan 1 debate (concurrency=3, RPM=10)
+2026-05-17 20:16:34.674 INFO     stockbit_api_client.py:315 | Logged in successfully with existing token!
+2026-05-17 20:16:35.271 INFO     legacy.py:2743 | [WIIM] Budget terpakai: 1/200
+2026-05-17 20:16:35.272 INFO     legacy.py:2508 | [Debate] Mulai: WIIM
+2026-05-17 20:16:35.272 INFO     debate_chamber.py:2480 | [DebateChamber] ▶ Starting swing-trade pipeline for WIIM @ Rp 1,870
+2026-05-17 20:16:35.275 INFO     debate_chamber.py:1080 | [Chartist] Fetching OHLCV + orderbook for WIIM
+2026-05-17 20:16:35.294 INFO     debate_chamber.py:993 | [Fundamental] Fetching for WIIM
+2026-05-17 20:16:35.295 INFO     debate_chamber.py:1241 | [Sentiment] Fetching for WIIM
+2026-05-17 20:16:35.783 INFO     fair_value_calculator.py:295 | [FairValue] WIIM: DPS derived from yield (3.47%) × price (2) = 0.06
+2026-05-17 20:16:35.784 INFO     fair_value_calculator.py:323 | [FairValue] WIIM: all key stats parsed OK: {'eps_ttm': 235.33, 'bvps': 1123.12, 'dps': 0.06, 'roe': '20.9%', 'pe': 7.95, 'pb': 1.67}
+2026-05-17 20:16:35.784 INFO     debate_chamber.py:1016 | [Fundamental] Fair value for WIIM: 2968.0
+2026-05-17 20:16:35.787 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 20:16:35.810 INFO     debate_chamber.py:1147 | [Chartist] Technicals computed: MA50=1881.0, RSI=49.3
+2026-05-17 20:16:35.992 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 20:16:36.393 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 20:16:38.132 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 20:16:45.097 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 20:16:48.371 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 20:16:48.378 INFO     debate_chamber.py:1319 | [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-17 20:16:48.381 INFO     debate_chamber.py:1441 | [RAG] WIIM evidence: 7/10 chunks, ~588 tokens
+2026-05-17 20:16:48.383 INFO     debate_chamber.py:1541 | [Bull] Round 1 for WIIM
+2026-05-17 20:16:48.383 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 20:17:07.317 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 20:17:07.327 INFO     debate_chamber.py:1583 | [Bear] Round 1 for WIIM
+2026-05-17 20:17:07.328 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 20:17:22.813 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 20:17:22.822 INFO     debate_chamber.py:1637 | [Consensus] Evaluating 5-agent votes
+2026-05-17 20:17:22.823 INFO     debate_chamber.py:1640 | [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-17 20:17:22.825 INFO     debate_chamber.py:1673 | [State Cleaner] Deterministic pruning (no LLM)
+2026-05-17 20:17:22.826 INFO     debate_chamber.py:1541 | [Bull] Round 2 for WIIM
+2026-05-17 20:17:22.827 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 20:17:39.573 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 20:17:39.580 INFO     debate_chamber.py:1583 | [Bear] Round 2 for WIIM
+2026-05-17 20:17:39.581 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 20:17:55.239 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 20:17:55.247 INFO     debate_chamber.py:1637 | [Consensus] Evaluating 5-agent votes
+2026-05-17 20:17:55.248 INFO     debate_chamber.py:1640 | [Consensus] Result: reached=True method=soft_hold winner={'agent': 'soft_hold_rule', 'position': 'HOLD', 'confidence': 0.95} dissent=['fundamental_scout', 'chartist', 'bull', 'bear']
+2026-05-17 20:17:55.250 INFO     debate_chamber.py:1719 | [Devil's Advocate] Injecting adversarial scenario
+2026-05-17 20:17:55.252 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 20:18:05.890 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 20:18:05.896 INFO     debate_chamber.py:2138 | [CIO] Deliberating on WIIM (current price: 1,870)
+2026-05-17 20:18:05.899 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 20:18:29.543 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-17 20:18:29.549 INFO     debate_chamber.py:2349 | [CIO] JSON parsed successfully for WIIM
+2026-05-17 20:18:29.549 INFO     debate_chamber.py:2367 | [CIO] Verdict delivered for WIIM
+2026-05-17 20:18:29.552 INFO     debate_chamber.py:2502 | [DebateChamber] ✅ Pipeline complete for WIIM
+2026-05-17 20:18:29.553 INFO     legacy.py:2527 | [Debate] ✓ Selesai: WIIM
+2026-05-17 20:18:29.553 INFO     legacy.py:2530 | [Debate] WIIM disagreement_type=timing
+2026-05-17 20:18:29.554 INFO     legacy.py:2857 | [Budget] Run selesai: Pro 1/200, Flash 8/2000
+2026-05-17 20:18:29.554 INFO     legacy.py:2248 | [News] WIIM: sentiment=UNKNOWN adjustment=+0.00
+2026-05-17 20:18:29.554 INFO     legacy.py:2300 | [RiskGovernor] WIIM: deployable (price_inside_entry_range)
+2026-05-17 20:18:29.554 INFO     legacy.py:3891 | [Orchestrator] Debate summary: 1 succeeded / 0 failed
+2026-05-17 20:18:29.623 INFO     historical_scorer.py:81 | [HistScorer] Loaded 1 debate records dari tmp\cli_present_bug_check\debates
+2026-05-17 20:18:29.624 INFO     legacy.py:2942 | [Rank] Excluded WIIM – rating HOLD
+2026-05-17 20:18:29.625 WARNING  portfolio_optimizer.py:41 | [Portfolio] Tidak ada kandidat dengan conviction >= 30%. Fallback ke semua scorable tanpa conviction filter.
+2026-05-17 20:18:29.628 INFO     portfolio_optimizer.py:90 | [Portfolio] 0 dipilih dari 0 eligible (top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 20:18:29.629 INFO     legacy.py:2971 | [Rank] Top 0 dipilih: [] (dari 0 eligible, top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 20:18:29.630 INFO     legacy.py:3922 | [Sizing] 0 posisi | Deployed: Rp 0 (0.0%)
+2026-05-17 20:18:29.665 INFO     legacy.py:2992 | [Persist] Full results -> tmp\cli_present_bug_check\full_batch_results.json
+2026-05-17 20:18:29.690 INFO     legacy.py:2399 | [Audit] WIIM: WIIM→HOLD: soft_hold_rule applied (0.49) after 2 round(s). 4 agent(s) dissented. Lack of a specific, identifiable catalyst within the 1-3 month swing timeframe to trigger a re-rating.
+2026-05-17 20:18:29.694 INFO     legacy.py:3107 | [Persist] 1 versioned debate records disimpan ke tmp\cli_present_bug_check\debates
+2026-05-17 20:18:29.701 INFO     legacy.py:3131 | [ArtifactValidator] Output artifacts valid.
+2026-05-17 20:18:29.721 INFO     legacy.py:2475 | [Telemetry] Batch report saved for 20260517_201618
+2026-05-17 20:18:29.727 INFO     legacy.py:2488 | [ReportConsistency] passed
+2026-05-17 20:18:29.737 INFO     legacy.py:3969 | [Compare] Agreement rate: 0%
+2026-05-17 20:18:29.738 INFO     legacy.py:3970 | [Compare] Report saved: tmp\cli_present_bug_check\comparison_report.md
+2026-05-17 20:18:29.774 INFO     legacy.py:3992 | [Orchestrator] Pipeline selesai
+2026-05-17 20:18:29.774 INFO     legacy.py:3993 | [Orchestrator] Regime: NORMAL | Top N: 0
+2026-05-17 20:18:29.775 INFO     legacy.py:3994 | [Orchestrator] Full results -> tmp\cli_present_bug_check\full_batch_results.json
+2026-05-17 20:18:29.775 INFO     legacy.py:3995 | [Orchestrator] Top 0 report -> tmp\cli_present_bug_check\TOP_3_SWING_TRADES.md
+2026-05-17 22:35:22.304 INFO     legacy.py:3817 | [Orchestrator] Memulai IHSG Swing Trade Pipeline
+2026-05-17 22:35:22.306 INFO     legacy.py:3818 | [Orchestrator] Mode: compare
+2026-05-17 22:35:22.307 INFO     legacy.py:1769 | [PromptLinter] Prompt pack OK
+2026-05-17 22:35:22.318 INFO     legacy.py:3852 | [CLI] Menggunakan --tickers override; skip quant filter dan top10_candidates.json.
+2026-05-17 22:35:22.912 INFO     regime.py:70 | [Regime] IHSG realized vol (20d): 0.0138 (1.38%)
+2026-05-17 22:35:22.913 INFO     regime.py:101 | [Regime] NORMAL volatility (1.38%)
+2026-05-17 22:35:22.913 INFO     legacy.py:3892 | [Regime] NORMAL -- no overrides applied.
+2026-05-17 22:35:22.913 INFO     legacy.py:3905 | [CLI] 1 ticker dari --tickers: ['WIIM']
+2026-05-17 22:35:22.913 INFO     single_agent_analyzer.py:310 | [SingleAgent] Starting WIIM
+2026-05-17 22:35:24.423 INFO     stockbit_api_client.py:315 | Logged in successfully with existing token!
+2026-05-17 22:35:24.841 INFO     fair_value_calculator.py:295 | [FairValue] WIIM: DPS derived from yield (3.47%) × price (2) = 0.06
+2026-05-17 22:35:24.842 INFO     fair_value_calculator.py:323 | [FairValue] WIIM: all key stats parsed OK: {'eps_ttm': 235.33, 'bvps': 1123.12, 'dps': 0.06, 'roe': '20.9%', 'pe': 7.95, 'pb': 1.67}
+2026-05-17 22:35:25.595 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:35:36.940 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:35:36.945 INFO     single_agent_analyzer.py:324 | [SingleAgent] WIIM: BUY conf=75%
+2026-05-17 22:35:36.950 INFO     legacy.py:3112 | [SingleAgent] WIIM: BUY conf=75%
+2026-05-17 22:35:37.481 INFO     stockbit_api_client.py:315 | Logged in successfully with existing token!
+2026-05-17 22:35:37.950 INFO     legacy.py:3945 | [ProviderHealth] stockbit_ok=True yfinance_ok=True can_proceed=True failures=0
+2026-05-17 22:35:37.963 INFO     legacy.py:2935 | [Orchestrator] Meluncurkan 1 debate (concurrency=3, RPM=10)
+2026-05-17 22:35:39.393 INFO     stockbit_api_client.py:315 | Logged in successfully with existing token!
+2026-05-17 22:35:39.935 INFO     legacy.py:2849 | [WIIM] Budget terpakai: 1/200
+2026-05-17 22:35:39.936 INFO     legacy.py:2614 | [Debate] Mulai: WIIM
+2026-05-17 22:35:39.939 INFO     debate_chamber.py:2480 | [DebateChamber] ▶ Starting swing-trade pipeline for WIIM @ Rp 1,870
+2026-05-17 22:35:39.944 INFO     debate_chamber.py:1080 | [Chartist] Fetching OHLCV + orderbook for WIIM
+2026-05-17 22:35:39.946 INFO     debate_chamber.py:993 | [Fundamental] Fetching for WIIM
+2026-05-17 22:35:39.948 INFO     debate_chamber.py:1241 | [Sentiment] Fetching for WIIM
+2026-05-17 22:35:40.326 INFO     fair_value_calculator.py:295 | [FairValue] WIIM: DPS derived from yield (3.47%) × price (2) = 0.06
+2026-05-17 22:35:40.327 INFO     fair_value_calculator.py:323 | [FairValue] WIIM: all key stats parsed OK: {'eps_ttm': 235.33, 'bvps': 1123.12, 'dps': 0.06, 'roe': '20.9%', 'pe': 7.95, 'pb': 1.67}
+2026-05-17 22:35:40.327 INFO     debate_chamber.py:1016 | [Fundamental] Fair value for WIIM: 2968.0
+2026-05-17 22:35:40.330 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:35:40.457 INFO     debate_chamber.py:1147 | [Chartist] Technicals computed: MA50=1881.0, RSI=49.3
+2026-05-17 22:35:40.524 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:35:41.009 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:35:42.964 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:35:49.622 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:35:57.096 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:35:57.102 INFO     debate_chamber.py:1319 | [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-17 22:35:57.121 INFO     debate_chamber.py:1441 | [RAG] WIIM evidence: 8/10 chunks, ~587 tokens
+2026-05-17 22:35:57.123 INFO     debate_chamber.py:1541 | [Bull] Round 1 for WIIM
+2026-05-17 22:35:57.124 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:36:14.504 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:36:14.511 INFO     debate_chamber.py:1583 | [Bear] Round 1 for WIIM
+2026-05-17 22:36:14.513 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:36:30.083 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:36:30.088 INFO     debate_chamber.py:1637 | [Consensus] Evaluating 5-agent votes
+2026-05-17 22:36:30.091 INFO     debate_chamber.py:1640 | [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-17 22:36:30.092 INFO     debate_chamber.py:1673 | [State Cleaner] Deterministic pruning (no LLM)
+2026-05-17 22:36:30.093 INFO     debate_chamber.py:1541 | [Bull] Round 2 for WIIM
+2026-05-17 22:36:30.095 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:36:45.332 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:36:45.337 INFO     debate_chamber.py:1583 | [Bear] Round 2 for WIIM
+2026-05-17 22:36:45.338 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:37:03.451 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:37:03.460 INFO     debate_chamber.py:1637 | [Consensus] Evaluating 5-agent votes
+2026-05-17 22:37:03.461 INFO     debate_chamber.py:1640 | [Consensus] Result: reached=True method=soft_hold winner={'agent': 'soft_hold_rule', 'position': 'HOLD', 'confidence': 0.9} dissent=['fundamental_scout', 'chartist', 'bull', 'bear']
+2026-05-17 22:37:03.465 INFO     debate_chamber.py:1719 | [Devil's Advocate] Injecting adversarial scenario
+2026-05-17 22:37:03.467 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:37:21.882 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:37:21.888 INFO     debate_chamber.py:2138 | [CIO] Deliberating on WIIM (current price: 1,870)
+2026-05-17 22:37:21.892 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:37:48.097 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:37:48.119 INFO     debate_chamber.py:2349 | [CIO] JSON parsed successfully for WIIM
+2026-05-17 22:37:48.120 INFO     debate_chamber.py:2367 | [CIO] Verdict delivered for WIIM
+2026-05-17 22:37:48.127 INFO     debate_chamber.py:2502 | [DebateChamber] ✅ Pipeline complete for WIIM
+2026-05-17 22:37:48.128 INFO     legacy.py:2633 | [Debate] ✓ Selesai: WIIM
+2026-05-17 22:37:48.128 INFO     legacy.py:2636 | [Debate] WIIM disagreement_type=timing
+2026-05-17 22:37:48.129 INFO     legacy.py:2963 | [Budget] Run selesai: Pro 1/200, Flash 8/2000
+2026-05-17 22:37:48.129 INFO     legacy.py:2354 | [News] WIIM: sentiment=UNKNOWN adjustment=+0.00
+2026-05-17 22:37:48.129 INFO     legacy.py:2406 | [RiskGovernor] WIIM: deployable (price_inside_entry_range)
+2026-05-17 22:37:48.129 INFO     legacy.py:4017 | [Orchestrator] Debate summary: 1 succeeded / 0 failed
+2026-05-17 22:37:48.137 INFO     legacy.py:3048 | [Rank] Excluded WIIM – rating HOLD
+2026-05-17 22:37:48.138 WARNING  portfolio_optimizer.py:41 | [Portfolio] Tidak ada kandidat dengan conviction >= 30%. Fallback ke semua scorable tanpa conviction filter.
+2026-05-17 22:37:48.140 INFO     portfolio_optimizer.py:90 | [Portfolio] 0 dipilih dari 0 eligible (top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 22:37:48.141 INFO     legacy.py:3077 | [Rank] Top 0 dipilih: [] (dari 0 eligible, top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 22:37:48.142 INFO     legacy.py:4048 | [Sizing] 0 posisi | Deployed: Rp 0 (0.0%)
+2026-05-17 22:37:48.159 INFO     legacy.py:3098 | [Persist] Full results -> tmp\cli_compact_check\full_batch_results.json
+2026-05-17 22:37:48.173 INFO     legacy.py:2505 | [Audit] WIIM: WIIM→HOLD: soft_hold_rule applied (0.47) after 2 round(s). 4 agent(s) dissented. Price is currently trading below MA50/EMA20, which may now act as resistance, invalidating the entry premise.
+2026-05-17 22:37:48.174 INFO     legacy.py:3213 | [Persist] 1 versioned debate records disimpan ke tmp\cli_compact_check\debates
+2026-05-17 22:37:48.176 INFO     legacy.py:3237 | [ArtifactValidator] Output artifacts valid.
+2026-05-17 22:37:48.180 INFO     legacy.py:2581 | [Telemetry] Batch report saved for 20260517_223522
+2026-05-17 22:37:48.181 INFO     legacy.py:2594 | [ReportConsistency] passed
+2026-05-17 22:37:48.185 INFO     legacy.py:4095 | [Compare] Agreement rate: 0%
+2026-05-17 22:37:48.185 INFO     legacy.py:4096 | [Compare] Report saved: tmp\cli_compact_check\comparison_report.md
+2026-05-17 22:37:48.189 INFO     legacy.py:4118 | [Orchestrator] Pipeline selesai
+2026-05-17 22:37:48.189 INFO     legacy.py:4119 | [Orchestrator] Regime: NORMAL | Top N: 0
+2026-05-17 22:37:48.189 INFO     legacy.py:4120 | [Orchestrator] Full results -> tmp\cli_compact_check\full_batch_results.json
+2026-05-17 22:37:48.189 INFO     legacy.py:4121 | [Orchestrator] Top 0 report -> tmp\cli_compact_check\TOP_3_SWING_TRADES.md
+2026-05-17 22:38:45.720 INFO     legacy.py:3828 | [Orchestrator] Memulai IHSG Swing Trade Pipeline
+2026-05-17 22:38:45.720 INFO     legacy.py:3829 | [Orchestrator] Mode: compare
+2026-05-17 22:38:45.725 INFO     legacy.py:1780 | [PromptLinter] Prompt pack OK
+2026-05-17 22:38:45.733 INFO     legacy.py:3863 | [CLI] Menggunakan --tickers override; skip quant filter dan top10_candidates.json.
+2026-05-17 22:38:46.295 INFO     regime.py:70 | [Regime] IHSG realized vol (20d): 0.0138 (1.38%)
+2026-05-17 22:38:46.295 INFO     regime.py:101 | [Regime] NORMAL volatility (1.38%)
+2026-05-17 22:38:46.295 INFO     legacy.py:3903 | [Regime] NORMAL -- no overrides applied.
+2026-05-17 22:38:46.295 INFO     legacy.py:3916 | [CLI] 1 ticker dari --tickers: ['WIIM']
+2026-05-17 22:38:46.295 INFO     single_agent_analyzer.py:310 | [SingleAgent] Starting WIIM
+2026-05-17 22:38:47.492 INFO     stockbit_api_client.py:315 | Logged in successfully with existing token!
+2026-05-17 22:38:48.026 INFO     fair_value_calculator.py:295 | [FairValue] WIIM: DPS derived from yield (3.47%) × price (2) = 0.06
+2026-05-17 22:38:48.026 INFO     fair_value_calculator.py:323 | [FairValue] WIIM: all key stats parsed OK: {'eps_ttm': 235.33, 'bvps': 1123.12, 'dps': 0.06, 'roe': '20.9%', 'pe': 7.95, 'pb': 1.67}
+2026-05-17 22:38:49.075 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:39:02.155 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:39:02.159 INFO     single_agent_analyzer.py:324 | [SingleAgent] WIIM: BUY conf=80%
+2026-05-17 22:39:02.161 INFO     legacy.py:3123 | [SingleAgent] WIIM: BUY conf=80%
+2026-05-17 22:39:02.569 INFO     stockbit_api_client.py:315 | Logged in successfully with existing token!
+2026-05-17 22:39:03.262 INFO     legacy.py:3956 | [ProviderHealth] stockbit_ok=True yfinance_ok=True can_proceed=True failures=0
+2026-05-17 22:39:03.271 INFO     legacy.py:2946 | [Orchestrator] Meluncurkan 1 debate (concurrency=3, RPM=10)
+2026-05-17 22:39:05.398 INFO     stockbit_api_client.py:315 | Logged in successfully with existing token!
+2026-05-17 22:39:05.981 INFO     legacy.py:2860 | [WIIM] Budget terpakai: 1/200
+2026-05-17 22:39:05.981 INFO     legacy.py:2625 | [Debate] Mulai: WIIM
+2026-05-17 22:39:05.982 INFO     debate_chamber.py:2480 | [DebateChamber] ▶ Starting swing-trade pipeline for WIIM @ Rp 1,870
+2026-05-17 22:39:05.984 INFO     debate_chamber.py:1080 | [Chartist] Fetching OHLCV + orderbook for WIIM
+2026-05-17 22:39:05.984 INFO     debate_chamber.py:993 | [Fundamental] Fetching for WIIM
+2026-05-17 22:39:05.986 INFO     debate_chamber.py:1241 | [Sentiment] Fetching for WIIM
+2026-05-17 22:39:06.438 INFO     fair_value_calculator.py:295 | [FairValue] WIIM: DPS derived from yield (3.47%) × price (2) = 0.06
+2026-05-17 22:39:06.439 INFO     fair_value_calculator.py:323 | [FairValue] WIIM: all key stats parsed OK: {'eps_ttm': 235.33, 'bvps': 1123.12, 'dps': 0.06, 'roe': '20.9%', 'pe': 7.95, 'pb': 1.67}
+2026-05-17 22:39:06.440 INFO     debate_chamber.py:1016 | [Fundamental] Fair value for WIIM: 2968.0
+2026-05-17 22:39:06.443 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:39:06.507 INFO     debate_chamber.py:1147 | [Chartist] Technicals computed: MA50=1881.0, RSI=49.3
+2026-05-17 22:39:06.645 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:39:07.049 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:39:08.582 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:39:14.523 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:39:24.763 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:39:24.770 INFO     debate_chamber.py:1319 | [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-17 22:39:24.790 INFO     debate_chamber.py:1441 | [RAG] WIIM evidence: 8/11 chunks, ~597 tokens
+2026-05-17 22:39:24.793 INFO     debate_chamber.py:1541 | [Bull] Round 1 for WIIM
+2026-05-17 22:39:24.796 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:39:44.322 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:39:44.329 INFO     debate_chamber.py:1583 | [Bear] Round 1 for WIIM
+2026-05-17 22:39:44.331 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:39:57.330 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:39:57.353 INFO     debate_chamber.py:1637 | [Consensus] Evaluating 5-agent votes
+2026-05-17 22:39:57.354 INFO     debate_chamber.py:1640 | [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-17 22:39:57.356 INFO     debate_chamber.py:1673 | [State Cleaner] Deterministic pruning (no LLM)
+2026-05-17 22:39:57.357 INFO     debate_chamber.py:1541 | [Bull] Round 2 for WIIM
+2026-05-17 22:39:57.359 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:40:07.773 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:40:07.781 INFO     debate_chamber.py:1583 | [Bear] Round 2 for WIIM
+2026-05-17 22:40:07.783 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:40:27.025 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:40:27.030 INFO     debate_chamber.py:1637 | [Consensus] Evaluating 5-agent votes
+2026-05-17 22:40:27.031 INFO     debate_chamber.py:1640 | [Consensus] Result: reached=True method=voting winner={'agent': 'chartist', 'position': 'BUY', 'confidence': 0.9, 'round': 0} dissent=['sentiment_specialist', 'bear']
+2026-05-17 22:40:27.032 INFO     debate_chamber.py:1719 | [Devil's Advocate] Injecting adversarial scenario
+2026-05-17 22:40:27.034 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:40:39.721 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:40:39.729 INFO     debate_chamber.py:2138 | [CIO] Deliberating on WIIM (current price: 1,870)
+2026-05-17 22:40:39.751 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:41:11.976 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:41:11.996 INFO     debate_chamber.py:2349 | [CIO] JSON parsed successfully for WIIM
+2026-05-17 22:41:11.997 INFO     debate_chamber.py:2367 | [CIO] Verdict delivered for WIIM
+2026-05-17 22:41:12.000 INFO     debate_chamber.py:2502 | [DebateChamber] ✅ Pipeline complete for WIIM
+2026-05-17 22:41:12.000 INFO     legacy.py:2644 | [Debate] ✓ Selesai: WIIM
+2026-05-17 22:41:12.000 INFO     legacy.py:2974 | [Budget] Run selesai: Pro 1/200, Flash 8/2000
+2026-05-17 22:41:12.001 INFO     legacy.py:2365 | [News] WIIM: sentiment=UNKNOWN adjustment=+0.00
+2026-05-17 22:41:12.001 INFO     legacy.py:2417 | [RiskGovernor] WIIM: deployable (price_inside_entry_range)
+2026-05-17 22:41:12.001 INFO     legacy.py:4028 | [Orchestrator] Debate summary: 1 succeeded / 0 failed
+2026-05-17 22:41:12.006 INFO     historical_scorer.py:81 | [HistScorer] Loaded 1 debate records dari tmp\cli_compact_check\debates
+2026-05-17 22:41:12.007 INFO     portfolio_optimizer.py:90 | [Portfolio] 1 dipilih dari 1 eligible (top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 22:41:12.007 INFO     legacy.py:3088 | [Rank] Top 1 dipilih: ['WIIM'] (dari 1 eligible, top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 22:41:12.007 INFO     legacy.py:4059 | [Sizing] 1 posisi | Deployed: Rp 187,000 (18.7%)
+2026-05-17 22:41:12.009 INFO     legacy.py:3109 | [Persist] Full results -> tmp\cli_compact_check\full_batch_results.json
+2026-05-17 22:41:12.016 INFO     legacy.py:2516 | [Audit] WIIM: WIIM→BUY: unknown won by voting (0.67) after 2 round(s). 2 agent(s) dissented. Absence of a clear, near-term (1-3 month) catalyst to drive price towards the target.
+2026-05-17 22:41:12.018 INFO     legacy.py:3224 | [Persist] 1 versioned debate records disimpan ke tmp\cli_compact_check\debates
+2026-05-17 22:41:12.019 INFO     legacy.py:3785 | [Persist] Top 1 report -> tmp\cli_compact_check\TOP_3_SWING_TRADES.md
+2026-05-17 22:41:12.020 INFO     legacy.py:3248 | [ArtifactValidator] Output artifacts valid.
+2026-05-17 22:41:12.023 INFO     legacy.py:2592 | [Telemetry] Batch report saved for 20260517_223845
+2026-05-17 22:41:12.024 INFO     legacy.py:2605 | [ReportConsistency] passed
+2026-05-17 22:41:12.025 INFO     legacy.py:4106 | [Compare] Agreement rate: 100%
+2026-05-17 22:41:12.025 INFO     legacy.py:4107 | [Compare] Report saved: tmp\cli_compact_check\comparison_report.md
+2026-05-17 22:41:12.028 INFO     legacy.py:4129 | [Orchestrator] Pipeline selesai
+2026-05-17 22:41:12.028 INFO     legacy.py:4130 | [Orchestrator] Regime: NORMAL | Top N: 1
+2026-05-17 22:41:12.028 INFO     legacy.py:4131 | [Orchestrator] Full results -> tmp\cli_compact_check\full_batch_results.json
+2026-05-17 22:41:12.028 INFO     legacy.py:4132 | [Orchestrator] Top 1 report -> tmp\cli_compact_check\TOP_3_SWING_TRADES.md
+2026-05-17 22:42:37.747 INFO     legacy.py:3866 | [Orchestrator] Memulai IHSG Swing Trade Pipeline
+2026-05-17 22:42:37.747 INFO     legacy.py:3867 | [Orchestrator] Mode: compare
+2026-05-17 22:42:37.749 INFO     legacy.py:1818 | [PromptLinter] Prompt pack OK
+2026-05-17 22:42:37.756 INFO     legacy.py:3901 | [CLI] Menggunakan --tickers override; skip quant filter dan top10_candidates.json.
+2026-05-17 22:42:38.305 INFO     regime.py:70 | [Regime] IHSG realized vol (20d): 0.0138 (1.38%)
+2026-05-17 22:42:38.305 INFO     regime.py:101 | [Regime] NORMAL volatility (1.38%)
+2026-05-17 22:42:38.305 INFO     legacy.py:3941 | [Regime] NORMAL -- no overrides applied.
+2026-05-17 22:42:38.305 INFO     legacy.py:3954 | [CLI] 1 ticker dari --tickers: ['WIIM']
+2026-05-17 22:42:38.305 INFO     single_agent_analyzer.py:310 | [SingleAgent] Starting WIIM
+2026-05-17 22:42:39.529 INFO     stockbit_api_client.py:315 | Logged in successfully with existing token!
+2026-05-17 22:42:39.940 INFO     fair_value_calculator.py:295 | [FairValue] WIIM: DPS derived from yield (3.47%) × price (2) = 0.06
+2026-05-17 22:42:39.940 INFO     fair_value_calculator.py:323 | [FairValue] WIIM: all key stats parsed OK: {'eps_ttm': 235.33, 'bvps': 1123.12, 'dps': 0.06, 'roe': '20.9%', 'pe': 7.95, 'pb': 1.67}
+2026-05-17 22:42:40.645 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:42:50.896 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:42:50.901 INFO     single_agent_analyzer.py:324 | [SingleAgent] WIIM: BUY conf=75%
+2026-05-17 22:42:50.904 INFO     legacy.py:3161 | [SingleAgent] WIIM: BUY conf=75%
+2026-05-17 22:42:51.230 INFO     stockbit_api_client.py:315 | Logged in successfully with existing token!
+2026-05-17 22:42:51.617 INFO     legacy.py:3994 | [ProviderHealth] stockbit_ok=True yfinance_ok=True can_proceed=True failures=0
+2026-05-17 22:42:51.645 INFO     legacy.py:2984 | [Orchestrator] Meluncurkan 1 debate (concurrency=3, RPM=10)
+2026-05-17 22:42:53.148 INFO     stockbit_api_client.py:315 | Logged in successfully with existing token!
+2026-05-17 22:42:53.701 INFO     legacy.py:2898 | [WIIM] Budget terpakai: 1/200
+2026-05-17 22:42:53.702 INFO     legacy.py:2663 | [Debate] Mulai: WIIM
+2026-05-17 22:42:53.702 INFO     debate_chamber.py:2480 | [DebateChamber] ▶ Starting swing-trade pipeline for WIIM @ Rp 1,870
+2026-05-17 22:42:53.705 INFO     debate_chamber.py:1080 | [Chartist] Fetching OHLCV + orderbook for WIIM
+2026-05-17 22:42:53.706 INFO     debate_chamber.py:993 | [Fundamental] Fetching for WIIM
+2026-05-17 22:42:53.707 INFO     debate_chamber.py:1241 | [Sentiment] Fetching for WIIM
+2026-05-17 22:42:54.174 INFO     fair_value_calculator.py:295 | [FairValue] WIIM: DPS derived from yield (3.47%) × price (2) = 0.06
+2026-05-17 22:42:54.175 INFO     fair_value_calculator.py:323 | [FairValue] WIIM: all key stats parsed OK: {'eps_ttm': 235.33, 'bvps': 1123.12, 'dps': 0.06, 'roe': '20.9%', 'pe': 7.95, 'pb': 1.67}
+2026-05-17 22:42:54.175 INFO     debate_chamber.py:1016 | [Fundamental] Fair value for WIIM: 2968.0
+2026-05-17 22:42:54.178 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:42:54.218 INFO     debate_chamber.py:1147 | [Chartist] Technicals computed: MA50=1881.0, RSI=49.3
+2026-05-17 22:42:54.283 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:42:54.786 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:42:56.731 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:43:04.823 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:43:08.304 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:43:08.312 INFO     debate_chamber.py:1319 | [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-17 22:43:08.333 INFO     debate_chamber.py:1441 | [RAG] WIIM evidence: 9/10 chunks, ~561 tokens
+2026-05-17 22:43:08.336 INFO     debate_chamber.py:1541 | [Bull] Round 1 for WIIM
+2026-05-17 22:43:08.337 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:43:29.296 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:43:29.302 INFO     debate_chamber.py:1583 | [Bear] Round 1 for WIIM
+2026-05-17 22:43:29.304 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:43:49.264 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:43:49.270 INFO     debate_chamber.py:1637 | [Consensus] Evaluating 5-agent votes
+2026-05-17 22:43:49.272 INFO     debate_chamber.py:1640 | [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-17 22:43:49.274 INFO     debate_chamber.py:1673 | [State Cleaner] Deterministic pruning (no LLM)
+2026-05-17 22:43:49.275 INFO     debate_chamber.py:1541 | [Bull] Round 2 for WIIM
+2026-05-17 22:43:49.277 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:44:02.781 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:44:02.788 INFO     debate_chamber.py:1583 | [Bear] Round 2 for WIIM
+2026-05-17 22:44:02.790 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:44:16.911 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:44:16.917 INFO     debate_chamber.py:1637 | [Consensus] Evaluating 5-agent votes
+2026-05-17 22:44:16.919 INFO     debate_chamber.py:1640 | [Consensus] Result: reached=True method=voting winner={'agent': 'fundamental_scout', 'position': 'BUY', 'confidence': 0.9, 'round': 0} dissent=['sentiment_specialist', 'bear']
+2026-05-17 22:44:16.921 INFO     debate_chamber.py:1719 | [Devil's Advocate] Injecting adversarial scenario
+2026-05-17 22:44:16.923 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:44:30.225 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:44:30.229 INFO     debate_chamber.py:2138 | [CIO] Deliberating on WIIM (current price: 1,870)
+2026-05-17 22:44:30.231 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:44:56.848 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:44:56.854 INFO     debate_chamber.py:2349 | [CIO] JSON parsed successfully for WIIM
+2026-05-17 22:44:56.854 INFO     debate_chamber.py:2367 | [CIO] Verdict delivered for WIIM
+2026-05-17 22:44:56.859 INFO     debate_chamber.py:2502 | [DebateChamber] ✅ Pipeline complete for WIIM
+2026-05-17 22:44:56.859 INFO     legacy.py:2682 | [Debate] ✓ Selesai: WIIM
+2026-05-17 22:44:56.860 INFO     legacy.py:3012 | [Budget] Run selesai: Pro 1/200, Flash 8/2000
+2026-05-17 22:44:56.860 INFO     legacy.py:2403 | [News] WIIM: sentiment=UNKNOWN adjustment=+0.00
+2026-05-17 22:44:56.860 INFO     legacy.py:2455 | [RiskGovernor] WIIM: deployable (price_inside_entry_range)
+2026-05-17 22:44:56.860 INFO     legacy.py:4066 | [Orchestrator] Debate summary: 1 succeeded / 0 failed
+2026-05-17 22:44:56.871 INFO     historical_scorer.py:81 | [HistScorer] Loaded 2 debate records dari tmp\cli_compact_check\debates
+2026-05-17 22:44:56.871 INFO     portfolio_optimizer.py:90 | [Portfolio] 1 dipilih dari 1 eligible (top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 22:44:56.872 INFO     legacy.py:3126 | [Rank] Top 1 dipilih: ['WIIM'] (dari 1 eligible, top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 22:44:56.872 INFO     legacy.py:4097 | [Sizing] 1 posisi | Deployed: Rp 187,000 (18.7%)
+2026-05-17 22:44:56.874 INFO     legacy.py:3147 | [Persist] Full results -> tmp\cli_compact_check\full_batch_results.json
+2026-05-17 22:44:56.881 INFO     legacy.py:2554 | [Audit] WIIM: WIIM→BUY: unknown won by voting (0.77) after 2 round(s). 2 agent(s) dissented. Absence of a specific short-term (1-3 month) catalyst, potentially delaying price appreciation.
+2026-05-17 22:44:56.882 INFO     legacy.py:3262 | [Persist] 1 versioned debate records disimpan ke tmp\cli_compact_check\debates
+2026-05-17 22:44:56.884 INFO     legacy.py:3823 | [Persist] Top 1 report -> tmp\cli_compact_check\TOP_3_SWING_TRADES.md
+2026-05-17 22:44:56.885 INFO     legacy.py:3286 | [ArtifactValidator] Output artifacts valid.
+2026-05-17 22:44:56.887 INFO     legacy.py:2630 | [Telemetry] Batch report saved for 20260517_224237
+2026-05-17 22:44:56.888 INFO     legacy.py:2643 | [ReportConsistency] passed
+2026-05-17 22:44:56.890 INFO     legacy.py:4144 | [Compare] Agreement rate: 100%
+2026-05-17 22:44:56.890 INFO     legacy.py:4145 | [Compare] Report saved: tmp\cli_compact_check\comparison_report.md
+2026-05-17 22:44:56.892 INFO     legacy.py:4167 | [Orchestrator] Pipeline selesai
+2026-05-17 22:44:56.892 INFO     legacy.py:4168 | [Orchestrator] Regime: NORMAL | Top N: 1
+2026-05-17 22:44:56.892 INFO     legacy.py:4169 | [Orchestrator] Full results -> tmp\cli_compact_check\full_batch_results.json
+2026-05-17 22:44:56.893 INFO     legacy.py:4170 | [Orchestrator] Top 1 report -> tmp\cli_compact_check\TOP_3_SWING_TRADES.md
+2026-05-17 22:45:47.776 INFO     legacy.py:3863 | [Orchestrator] Memulai IHSG Swing Trade Pipeline
+2026-05-17 22:45:47.777 INFO     legacy.py:3864 | [Orchestrator] Mode: compare
+2026-05-17 22:45:47.779 INFO     legacy.py:1815 | [PromptLinter] Prompt pack OK
+2026-05-17 22:45:47.787 INFO     legacy.py:3898 | [CLI] Menggunakan --tickers override; skip quant filter dan top10_candidates.json.
+2026-05-17 22:45:48.381 INFO     regime.py:70 | [Regime] IHSG realized vol (20d): 0.0138 (1.38%)
+2026-05-17 22:45:48.382 INFO     regime.py:101 | [Regime] NORMAL volatility (1.38%)
+2026-05-17 22:45:48.382 INFO     legacy.py:3938 | [Regime] NORMAL -- no overrides applied.
+2026-05-17 22:45:48.382 INFO     legacy.py:3951 | [CLI] 1 ticker dari --tickers: ['WIIM']
+2026-05-17 22:45:48.382 INFO     single_agent_analyzer.py:310 | [SingleAgent] Starting WIIM
+2026-05-17 22:45:49.583 INFO     stockbit_api_client.py:315 | Logged in successfully with existing token!
+2026-05-17 22:45:50.098 INFO     fair_value_calculator.py:295 | [FairValue] WIIM: DPS derived from yield (3.47%) × price (2) = 0.06
+2026-05-17 22:45:50.098 INFO     fair_value_calculator.py:323 | [FairValue] WIIM: all key stats parsed OK: {'eps_ttm': 235.33, 'bvps': 1123.12, 'dps': 0.06, 'roe': '20.9%', 'pe': 7.95, 'pb': 1.67}
+2026-05-17 22:45:50.704 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:46:03.684 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:46:03.688 INFO     single_agent_analyzer.py:324 | [SingleAgent] WIIM: BUY conf=80%
+2026-05-17 22:46:03.690 INFO     legacy.py:3158 | [SingleAgent] WIIM: BUY conf=80%
+2026-05-17 22:46:04.123 INFO     stockbit_api_client.py:315 | Logged in successfully with existing token!
+2026-05-17 22:46:04.538 INFO     legacy.py:3991 | [ProviderHealth] stockbit_ok=True yfinance_ok=True can_proceed=True failures=0
+2026-05-17 22:46:04.548 INFO     legacy.py:2981 | [Orchestrator] Meluncurkan 1 debate (concurrency=3, RPM=10)
+2026-05-17 22:46:05.867 INFO     stockbit_api_client.py:315 | Logged in successfully with existing token!
+2026-05-17 22:46:06.415 INFO     legacy.py:2895 | [WIIM] Budget terpakai: 1/200
+2026-05-17 22:46:06.416 INFO     legacy.py:2660 | [Debate] Mulai: WIIM
+2026-05-17 22:46:06.417 INFO     debate_chamber.py:2480 | [DebateChamber] ▶ Starting swing-trade pipeline for WIIM @ Rp 1,870
+2026-05-17 22:46:06.420 INFO     debate_chamber.py:1080 | [Chartist] Fetching OHLCV + orderbook for WIIM
+2026-05-17 22:46:06.421 INFO     debate_chamber.py:993 | [Fundamental] Fetching for WIIM
+2026-05-17 22:46:06.422 INFO     debate_chamber.py:1241 | [Sentiment] Fetching for WIIM
+2026-05-17 22:46:06.891 INFO     fair_value_calculator.py:295 | [FairValue] WIIM: DPS derived from yield (3.47%) × price (2) = 0.06
+2026-05-17 22:46:06.892 INFO     fair_value_calculator.py:323 | [FairValue] WIIM: all key stats parsed OK: {'eps_ttm': 235.33, 'bvps': 1123.12, 'dps': 0.06, 'roe': '20.9%', 'pe': 7.95, 'pb': 1.67}
+2026-05-17 22:46:06.892 INFO     debate_chamber.py:1016 | [Fundamental] Fair value for WIIM: 2968.0
+2026-05-17 22:46:06.895 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:46:06.940 INFO     debate_chamber.py:1147 | [Chartist] Technicals computed: MA50=1881.0, RSI=49.3
+2026-05-17 22:46:07.099 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:46:07.506 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:46:09.279 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:46:16.417 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:46:27.270 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:46:27.280 INFO     debate_chamber.py:1319 | [Synthesizer] Merging parallel data + margin-of-safety check
+2026-05-17 22:46:27.285 INFO     debate_chamber.py:1441 | [RAG] WIIM evidence: 9/9 chunks, ~597 tokens
+2026-05-17 22:46:27.288 INFO     debate_chamber.py:1541 | [Bull] Round 1 for WIIM
+2026-05-17 22:46:27.289 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:46:40.374 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:46:40.382 INFO     debate_chamber.py:1583 | [Bear] Round 1 for WIIM
+2026-05-17 22:46:40.384 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:46:58.294 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:46:58.301 INFO     debate_chamber.py:1637 | [Consensus] Evaluating 5-agent votes
+2026-05-17 22:46:58.304 INFO     debate_chamber.py:1640 | [Consensus] Result: reached=False method=None winner=None dissent=[]
+2026-05-17 22:46:58.306 INFO     debate_chamber.py:1673 | [State Cleaner] Deterministic pruning (no LLM)
+2026-05-17 22:46:58.308 INFO     debate_chamber.py:1541 | [Bull] Round 2 for WIIM
+2026-05-17 22:46:58.309 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:47:11.813 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:47:11.819 INFO     debate_chamber.py:1583 | [Bear] Round 2 for WIIM
+2026-05-17 22:47:11.819 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:47:28.297 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:47:28.303 INFO     debate_chamber.py:1637 | [Consensus] Evaluating 5-agent votes
+2026-05-17 22:47:28.304 INFO     debate_chamber.py:1640 | [Consensus] Result: reached=True method=soft_hold winner={'agent': 'soft_hold_rule', 'position': 'HOLD', 'confidence': 0.9} dissent=['fundamental_scout', 'chartist', 'bull', 'bear']
+2026-05-17 22:47:28.306 INFO     debate_chamber.py:1719 | [Devil's Advocate] Injecting adversarial scenario
+2026-05-17 22:47:28.308 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:47:39.768 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:47:39.774 INFO     debate_chamber.py:2138 | [CIO] Deliberating on WIIM (current price: 1,870)
+2026-05-17 22:47:39.777 INFO     __init__.py:1737 | AFC is enabled with max remote calls: 10.
+2026-05-17 22:48:08.441 INFO     __init__.py:1737 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-17 22:48:08.449 INFO     debate_chamber.py:2349 | [CIO] JSON parsed successfully for WIIM
+2026-05-17 22:48:08.449 INFO     debate_chamber.py:2367 | [CIO] Verdict delivered for WIIM
+2026-05-17 22:48:08.454 INFO     debate_chamber.py:2502 | [DebateChamber] ✅ Pipeline complete for WIIM
+2026-05-17 22:48:08.455 INFO     legacy.py:2679 | [Debate] ✓ Selesai: WIIM
+2026-05-17 22:48:08.455 INFO     legacy.py:2682 | [Debate] WIIM disagreement_type=timing
+2026-05-17 22:48:08.456 INFO     legacy.py:3009 | [Budget] Run selesai: Pro 1/200, Flash 8/2000
+2026-05-17 22:48:08.456 INFO     legacy.py:2400 | [News] WIIM: sentiment=UNKNOWN adjustment=+0.00
+2026-05-17 22:48:08.457 INFO     legacy.py:2452 | [RiskGovernor] WIIM: deployable (price_inside_entry_range)
+2026-05-17 22:48:08.457 INFO     legacy.py:4063 | [Orchestrator] Debate summary: 1 succeeded / 0 failed
+2026-05-17 22:48:08.476 INFO     historical_scorer.py:81 | [HistScorer] Loaded 3 debate records dari tmp\cli_compact_check\debates
+2026-05-17 22:48:08.477 INFO     legacy.py:3094 | [Rank] Excluded WIIM – rating HOLD
+2026-05-17 22:48:08.477 WARNING  portfolio_optimizer.py:41 | [Portfolio] Tidak ada kandidat dengan conviction >= 30%. Fallback ke semua scorable tanpa conviction filter.
+2026-05-17 22:48:08.479 INFO     portfolio_optimizer.py:90 | [Portfolio] 0 dipilih dari 0 eligible (top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 22:48:08.479 INFO     legacy.py:3123 | [Rank] Top 0 dipilih: [] (dari 0 eligible, top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 22:48:08.479 INFO     legacy.py:4094 | [Sizing] 0 posisi | Deployed: Rp 0 (0.0%)
+2026-05-17 22:48:08.484 INFO     legacy.py:3144 | [Persist] Full results -> tmp\cli_compact_check\full_batch_results.json
+2026-05-17 22:48:08.498 INFO     legacy.py:2551 | [Audit] WIIM: WIIM→HOLD: soft_hold_rule applied (0.52) after 2 round(s). 4 agent(s) dissented. Lack of a specific, near-term (1-3 month) catalyst to drive price appreciation towards its fair value.
+2026-05-17 22:48:08.500 INFO     legacy.py:3259 | [Persist] 1 versioned debate records disimpan ke tmp\cli_compact_check\debates
+2026-05-17 22:48:08.504 INFO     legacy.py:3283 | [ArtifactValidator] Output artifacts valid.
+2026-05-17 22:48:08.509 INFO     legacy.py:2627 | [Telemetry] Batch report saved for 20260517_224547
+2026-05-17 22:48:08.510 INFO     legacy.py:2640 | [ReportConsistency] passed
+2026-05-17 22:48:08.513 INFO     legacy.py:4141 | [Compare] Agreement rate: 0%
+2026-05-17 22:48:08.513 INFO     legacy.py:4142 | [Compare] Report saved: tmp\cli_compact_check\comparison_report.md
+2026-05-17 22:48:08.520 INFO     legacy.py:4164 | [Orchestrator] Pipeline selesai
+2026-05-17 22:48:08.521 INFO     legacy.py:4165 | [Orchestrator] Regime: NORMAL | Top N: 0
+2026-05-17 22:48:08.522 INFO     legacy.py:4166 | [Orchestrator] Full results -> tmp\cli_compact_check\full_batch_results.json
+2026-05-17 22:48:08.522 INFO     legacy.py:4167 | [Orchestrator] Top 0 report -> tmp\cli_compact_check\TOP_3_SWING_TRADES.md
+2026-05-17 22:48:28.035 INFO     legacy.py:3863 | [Orchestrator] Memulai IHSG Swing Trade Pipeline
+2026-05-17 22:48:28.035 INFO     legacy.py:3864 | [Orchestrator] Mode: multi
+2026-05-17 22:48:28.041 INFO     legacy.py:1815 | [PromptLinter] Prompt pack OK
+2026-05-17 22:48:28.064 INFO     legacy.py:3898 | [CLI] Menggunakan --tickers override; skip quant filter dan top10_candidates.json.
+2026-05-17 22:48:28.804 INFO     regime.py:70 | [Regime] IHSG realized vol (20d): 0.0138 (1.38%)
+2026-05-17 22:48:28.804 INFO     regime.py:101 | [Regime] NORMAL volatility (1.38%)
+2026-05-17 22:48:28.805 INFO     legacy.py:3938 | [Regime] NORMAL -- no overrides applied.
+2026-05-17 22:48:28.810 INFO     legacy.py:3951 | [CLI] 1 ticker dari --tickers: ['WIIM']
+2026-05-17 22:48:28.818 INFO     legacy.py:4033 | [DryRun] Melewati run_batch_debates(); memakai mock results.
+2026-05-17 22:48:28.832 INFO     legacy.py:3550 | [DryRun] Generated 1 mock debate results.
+2026-05-17 22:48:28.832 INFO     legacy.py:2452 | [RiskGovernor] WIIM: deployable (price_inside_entry_range)
+2026-05-17 22:48:28.833 INFO     legacy.py:4063 | [Orchestrator] Debate summary: 1 succeeded / 0 failed
+2026-05-17 22:48:28.855 INFO     legacy.py:3094 | [Rank] Excluded WIIM – rating HOLD
+2026-05-17 22:48:28.856 WARNING  portfolio_optimizer.py:41 | [Portfolio] Tidak ada kandidat dengan conviction >= 30%. Fallback ke semua scorable tanpa conviction filter.
+2026-05-17 22:48:28.860 INFO     portfolio_optimizer.py:90 | [Portfolio] 0 dipilih dari 0 eligible (top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 22:48:28.861 INFO     legacy.py:3123 | [Rank] Top 0 dipilih: [] (dari 0 eligible, top_n=3, sector_cap=2, min_conviction=30%)
+2026-05-17 22:48:28.861 INFO     legacy.py:4094 | [Sizing] 0 posisi | Deployed: Rp 0 (0.0%)
+2026-05-17 22:48:28.886 INFO     legacy.py:3144 | [Persist] Full results -> tmp\cli_compact_verbose_dry\full_batch_results.json
+2026-05-17 22:48:28.908 INFO     legacy.py:2551 | [Audit] WIIM: WIIM→HOLD: unknown won by voting (0.77) after 3 round(s). 1 agent(s) dissented. Data sintetis tidak merepresentasikan kondisi emiten aktual.
+2026-05-17 22:48:28.911 INFO     legacy.py:3259 | [Persist] 1 versioned debate records disimpan ke tmp\cli_compact_verbose_dry\debates
+2026-05-17 22:48:28.915 INFO     legacy.py:3283 | [ArtifactValidator] Output artifacts valid.
+2026-05-17 22:48:28.919 INFO     legacy.py:2627 | [Telemetry] Batch report saved for 20260517_224828
+2026-05-17 22:48:28.920 INFO     legacy.py:2640 | [ReportConsistency] passed
+2026-05-17 22:48:28.924 INFO     legacy.py:4164 | [Orchestrator] Pipeline selesai
+2026-05-17 22:48:28.925 INFO     legacy.py:4165 | [Orchestrator] Regime: NORMAL | Top N: 0
+2026-05-17 22:48:28.925 INFO     legacy.py:4166 | [Orchestrator] Full results -> tmp\cli_compact_verbose_dry\full_batch_results.json
+2026-05-17 22:48:28.926 INFO     legacy.py:4167 | [Orchestrator] Top 0 report -> tmp\cli_compact_verbose_dry\TOP_3_SWING_TRADES.md

@@ -3,49 +3,50 @@
   "verdict": {
     "ticker": "BBCA",
     "rating": "HOLD",
-    "confidence": 0.52,
+    "confidence": 0.53,
     "fair_value": 10474.0,
     "entry_price_range": "5925 - 6100",
     "target_price": 6650.0,
     "stop_loss": 5700.0,
     "current_price": 6100.0,
     "timeframe": "1-3 Months",
-    "weighted_reasoning": "The final rating is HOLD, primarily driven by the 'Fundamental ✅ + Technical ❌' conflict resolution signal. The massive 71.7% discount to fair value (Rp 10,474) and the favorable R/R ratio (2.04) are strong arguments for a BUY. However, these are outweighed by significant short-term risks: the price is trading below its key moving averages (MA50, MA200), indicating a structural downtrend. Furthermore, the Devil's Advocate scenario of foreign selling pressure breaking the 52-week low support is a valid, unanswered risk for a 1-3 month timeframe. The absence of any near-term catalyst provides no impetus for a price reversal, making an immediate entry a low-probability, counter-trend trade. Therefore, we will keep this on the watchlist but await technical confirmation before entry.",
+    "weighted_reasoning": "The HOLD rating is a direct result of the 'soft_hold' consensus directive, triggered by a clear conflict between fundamentals and technicals (Fundamental ✅ + Technical ❌). The fundamental case is strong: the current price of Rp 6,100 is at a 71.7% discount to the fair value of Rp 10,474. The trade setup offers an attractive R/R of 2.04. However, this is overridden by the severe technical weakness; the stock is in a structural downtrend, trading below its MA50 and MA200. This counter-trend setup carries a high risk of failure. The Devil's Advocate risk of foreign outflows breaking the 52-week low was not adequately refuted, reinforcing the need for caution. Therefore, we will stand aside and await technical confirmation, such as a reclaim of a key moving average, before considering a BUY. Consensus override: Bull/Bear confidence gap was below 0.15, so the chamber treats this as soft consensus HOLD instead of forcing an entry.",
     "critical_risk_factor": "",
     "key_catalysts": [
-      "Potential technical rebound from the 52-week low support area.",
-      "Mean reversion towards its significant undervaluation (71.7% discount to fair value)."
+      "Significant undervaluation (71.7% discount to Fair Value) attracting value investors.",
+      "Potential for a technical counter-trend bounce from near the 52-week low support area."
     ],
     "key_risks": [
-      "Continuation of the existing technical downtrend, as the price is below the MA50 and MA200.",
-      "A breakdown below the 52-week low (Rp 5,850) could trigger further selling pressure, hitting the stop loss.",
-      "Lack of a clear, near-term fundamental catalyst to reverse negative price momentum.",
-      "Potential for accelerated foreign net selling in Indonesian blue-chip stocks due to macro sentiment."
+      "Persistent technical downtrend; price is below key moving averages (MA50, MA200) which now act as resistance.",
+      "Unrefuted risk of accelerated foreign selling pressure breaking the 52-week low support.",
+      "Lack of a specific, near-term fundamental catalyst to reverse the negative momentum."
     ],
-    "summary": "This trade presents a classic conflict between compelling fundamental value and a weak technical picture. While BBCA is significantly undervalued with a strong R/R ratio of 2.04, the stock is in a clear technical downtrend with no immediate catalysts. The prudent CIO action is to HOLD and wait for signs of technical confirmation, such as a break above short-term moving averages, before committing capital.",
+    "summary": "The trade plan is rated HOLD. While BBCA is fundamentally undervalued with a compelling >2.0 R/R ratio, the stock is in a clear technical downtrend, trading below all key moving averages. The conflict between strong value and weak momentum makes a new entry premature; we will wait for signs of technical confirmation before committing capital.",
     "expected_return": "+10.6%",
     "risk_reward_ratio": 2.04,
     "is_overvalued": false,
     "wait_and_see": true,
     "consensus_reached": true,
-    "consensus_method": "voting",
+    "consensus_method": "soft_hold",
     "dissenting_agents": [
-      "chartist",
-      "sentiment_specialist"
+      "fundamental_scout",
+      "bull",
+      "bear"
     ]
   },
   "debate_rounds": 3,
   "consensus_reached": true,
-  "consensus_method": "voting",
+  "consensus_method": "soft_hold",
   "dissenting_agents": [
-    "chartist",
-    "sentiment_specialist"
+    "fundamental_scout",
+    "bull",
+    "bear"
   ],
   "agent_votes": [
     {
       "agent": "fundamental_scout",
       "position": "BUY",
-      "confidence": 0.85,
+      "confidence": 0.9,
       "round": 0
     },
     {
@@ -68,78 +69,78 @@
     },
     {
       "agent": "bear",
-      "position": "BUY",
+      "position": "AVOID",
       "confidence": 0.6,
       "round": 3
     }
   ],
-  "disagreement_type": null,
+  "disagreement_type": "timing",
   "debate_history": [
     {
       "role": "system",
-      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 6,100, Rp 10,474, Rp 7,359, Rp 6,425, Rp 6,174, Rp 5,850, Rp 5,790, Rp 5,810",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 6,100, Rp 10,474, Rp 6,174, Rp 6,425, Rp 5,850, Rp 5,750, Rp 7,359, Rp 5,810, Rp 290.0, Rp 250.0",
       "round": 0,
       "position": "UNKNOWN",
       "confidence": null
     },
     {
       "role": "system",
-      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 6,100, Rp 10,474, Rp 7,359, Rp 6,425, Rp 6,174, Rp 5,850, Rp 5,790",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 6,100, Rp 10,474, Rp 6,174, Rp 6,425, Rp 5,850, Rp 5,750, Rp 7,359",
       "round": 0,
       "position": "UNKNOWN",
       "confidence": null
     },
     {
       "role": "bull",
-      "content": "…hile no specific corporate event (earnings, ex-dividend, contract) is identified within the 1-3 month swing trade horizon, the primary catalyst for this BUY thesis is a technical rebound driven by extreme undervaluation and the stock testing multi-month lows. The significant discount to fair value (71.7%) combined with the stock's depressed technical position creates a compelling setup for a counter-trend bounce as value investors and short-term traders step in.\nEntry Rp 6,100 → Target Rp 6,425 (MA50) → Stop Rp 5,790 (below 52-week low) → R/R ratio: 1.05:1\n\nPosition: BUY\nAgent Confidence: 0.65",
+      "content": "…has been identified. The latest dividend ex-date (30 Mar 26) is a PAST_EVENT_NOT_CATALYST. However, the extreme fundamental undervaluation of 71.7% relative to fair value, coupled with the stock approaching its 52-week low, is expected to attract value-seeking investors and trigger a technical counter-trend bounce. This market correction towards a more rational valuation, driven by the significant discount, serves as the primary driver for the anticipated price movement.\n\n**RISK/REWARD:**\nEntry Rp 5,850 → Target Rp 6,425 → Stop Rp 5,750 → R/R ratio: 5.75:1\n\nPosition: BUY\nAgent Confidence: 0.85",
       "round": 1,
       "position": "BUY",
-      "confidence": 0.65
-    },
-    {
-      "role": "bear",
-      "content": "…ings, ex-dividend, contract) are identified. Furthermore, the proposed risk/reward ratio of 1.05:1 (Entry Rp 6,100, Target Rp 6,425, Stop Rp 5,790) is highly unfavorable for a counter-trend trade. The potential reward of 325 points (Rp 6,425 - Rp 6,100) is barely greater than the risk of 310 points (Rp 6,100 - Rp 5,790). This meager R/R, combined with the high probability of the stock breaking below its 52-week low of Rp 5,850 (given the stop loss is at Rp 5,790), makes this trade unattractive and prone to being stopped out with minimal upside potential.\n\nPosition: AVOID\nAgent Confidence: 0.85",
-      "round": 1,
-      "position": "AVOID",
       "confidence": 0.85
     },
     {
+      "role": "bear",
+      "content": "…entified as a strong resistance level. In a structural downtrend, the probability of a counter-trend bounce not only reaching but sustaining above such a significant resistance is low. Furthermore, the stop loss at Rp 5,750 is only 100 points below the proposed entry of Rp 5,850, which is less than the 14-day Average True Range (ATR14) of 145.0. This tight stop makes the trade highly susceptible to being stopped out by normal market volatility, especially if the 52-week low fails to hold, thereby making the effective probability-weighted R/R unfavorable.\n\nPosition: AVOID\nAgent Confidence: 0.90",
+      "round": 1,
+      "position": "AVOID",
+      "confidence": 0.9
+    },
+    {
       "role": "bull",
-      "content": "…mense undervaluation provides a significant buffer against short-term price volatility and the Bear's perceived downside risk. The fundamental strength, highlighted by a high ROE of 22.4% and a Net Margin of 49.5%, corroborates the fair value assessment and suggests that the stock has a strong intrinsic foundation to eventually converge towards its true value. This fundamental strength significantly outweighs the short-term technical risks, making any further dip an even more compelling buying opportunity for a swing trade aiming for a substantial rebound.\n\nPosition: BUY\nAgent Confidence: 0.75",
+      "content": "…tes the powerful gravitational pull of fundamental undervaluation. The current market price of Rp 6,100 stands in stark contrast to the calculated fair value of Rp 10,474. This significant intrinsic value, buttressed by a robust 22.4% Return on Equity (TTM) and a 49.5% Net Margin (Quarter), provides a compelling fundamental catalyst for a counter-trend bounce. The current P/E of 12.9x and P/B of 2.9x, both substantially below historical averages, further underscore the deep discount, suggesting that value-seeking capital will eventually overcome short-term\n\nPosition: BUY\nAgent Confidence: 0.60",
       "round": 2,
       "position": "BUY",
-      "confidence": 0.75
+      "confidence": 0.6
     },
     {
       "role": "bear",
-      "content": "…is not only below the Bull's claimed \"robust fundamental floor\" of Rp 5,850 but also dangerously close to any reasonable stop-loss for a swing trade. This 290-point potential adverse move would effectively wipe out any practical short-term \"margin of safety\" for a swing trader, rendering the trade unviable for swing execution. If the 52-week low of Rp 5,850 breaks, the provided data does not identify an explicit next support level, implying that the actual maximum loss could extend significantly lower than assumed, a risk incompatible with swing trading.\n\nPosition: AVOID\nAgent Confidence: 0.90",
+      "content": "…drop by 290.0 points. This would push the price down to Rp 5,810 (Rp 6,100 - Rp 290.0). This level is *below* the 52-week low of Rp 5,850, explicitly demonstrating that typical weekly volatility can easily breach the Bull's assumed \"fundamental cushion.\" If the 52-week low of Rp 5,850 breaks, the actual maximum loss from the current price of Rp 6,100 would be at least Rp 250.0, and potentially much deeper as there is no clear technical support identified below this level, making the Bull's implied margin of safety entirely inadequate for swing execution.\n\nPosition: AVOID\nAgent Confidence: 0.90",
       "round": 2,
       "position": "AVOID",
       "confidence": 0.9
     },
     {
       "role": "bull",
-      "content": "The Bear misinterprets the \"margin of safety\" by focusing solely on the proximity to a technical stop-loss. The true margin of safety for this thesis is the substantial gap between the current market valuation and the calculated intrinsic value. With the stock trading at a significant discount to its fair value, the potential adverse move cited by the Bear is a mere fraction of the total upside. This immense undervaluation provides a robust buffer, ensuring that even if short-term technical levels are breached, the long-term fundamental value proposition remains overwhelmingly positive for a swing trade aiming for mean reversion.\n\nThe Bear's concern regarding the absence of an explicit next support level below the 52-week low is addressed by applying standard technical analysis. Should the 52-week low be breached,\n\nPosition: BUY\nAgent Confidence: 0.60",
+      "content": "The Bear's concern regarding short-term volatility pushing the price below the 52-week low, thereby \"breaching the fundamental cushion,\" misinterprets the nature of intrinsic value. While daily price action can indeed fluctuate, the substantial undervaluation, where the current market price is significantly below its calculated fair value, represents a robust long-term anchor. This gap is not merely a cushion but a powerful magnet. Temporary dips, even below recent lows, are often overreactions in a downtrend, creating enhanced buying opportunities for value investors, rather than signaling a fundamental breakdown. The underlying profitability metrics, such as the strong Return on Equity and Net Margin, remain intact, providing a solid foundation that will eventually assert itself.\n\nThe assertion that there is \"no clear technical support identified\n\nPosition: BUY\nAgent Confidence: 0.60",
       "round": 3,
       "position": "BUY",
       "confidence": 0.6
     },
     {
       "role": "bear",
-      "content": "The Bull's assertion that a substantial fundamental undervaluation constitutes the \"true margin of safety\" for a swing trade fundamentally misinterprets the short-term nature of such strategies. While the stock may appear undervalued by 71.7% relative to a fair value of Rp 10,474, the realization of intrinsic value is a long-term process, not a guaranteed outcome within a 1-3 month swing horizon. This theoretical upside is not a practical buffer against immediate downside risk. Furthermore, the absence of identified immediate catalysts, with the latest dividend ex-date (30 Mar 26) being a PAST_EVENT_NOT_CATALYST, provides no impetus for a rapid mean reversion, leaving the stock vulnerable to continued technical pressure.\n\nPosition: BUY\nAgent Confidence: 0.60",
+      "content": "The Bull's reliance on a \"fundamental cushion\" derived from a fair value of Rp 10,474 is highly questionable for a swing trade. The provided fundamental data explicitly states that \"Debt/Equity Ratio is null, and Interest Coverage (TTM) is also null, preventing a full assessment of solvency.\" A fair value calculation lacking these critical solvency metrics cannot be considered a \"robust long-term anchor,\" let alone a reliable short-term cushion. Furthermore, while the P/E ratio of 12.9x and P/B ratio of 2.9x are below historical averages of 25.0x and 4.5x respectively, this could signify a structural re-rating of the stock rather than a temporary undervaluation.\n\nPosition: AVOID\nAgent Confidence: 0.60",
       "round": 3,
-      "position": "BUY",
+      "position": "AVOID",
       "confidence": 0.6
     },
     {
       "role": "devils_advocate",
-      "content": "Agent Confidence: MEDIUM\n\n1.  **MACRO/COMPANY RISK & FOREIGN FLOW:**\n    Jika sentimen risk-off global memburuk dan memicu akselerasi net foreign selling pada saham-saham big-cap di IHSG, mungkinkah level support 52-minggu BBCA di Rp 5,850 jebol, memicu stop-loss hingga ke Rp 5,500?\n\n2.  **EXECUTION RISK — Transaction Cost Stress Test:**\n    Untuk posisi BUY BBCA dengan harga entry Rp 6,100 dan target Rp 6,425, estimasi gross return adalah 5.33%. Total biaya transaksi round-trip dihitung sebagai berikut: biaya beli 0.15% dari nilai posisi (Rp 6,100), biaya jual 0.25% dari nilai posisi (Rp 6,425), PPh final 0.10% dari nilai jual (Rp 6,425), dan estimasi slippage 0.15% (karena harga saham >= Rp 500). Ini menghasilkan total biaya transaksi sebesar 0.15% + 0.25% + 0.10% + 0.15% = 0.65% dari nilai transaksi rata-rata. Dengan demikian, net return setelah biaya adalah 5.33% - 0.65% = 4.68%. Berdasarkan kalkulasi ini, trade ini **VIABLE after transaction costs**.\n\nPosition: BUY\nAgent Confidence: 1.00",
+      "content": "**Agent Confidence:** HIGH\n\n**1. MACRO/COMPANY RISK & FOREIGN FLOW:**\nGiven the structural downtrend and the null solvency metrics highlighted by the Bear, if foreign funds accelerate net selling pressure on Indonesian banks, perhaps triggered by a global risk-off event, could BBCA's 52-week low of Rp 5,850 break, triggering further declines towards Rp 5,700?\n\n**2. EXECUTION RISK — Transaction Cost Stress Test:**\nUntuk posisi BUY dengan harga entry Rp 5,850 dan target Rp 6,425, proyeksi keuntungan kotor adalah 9.83%. Total biaya transaksi round-trip dihitung sebagai berikut: biaya beli 0.15%, biaya jual 0.25%, PPh final 0.10% dari nilai jual, dan estimasi slippage 0.15% (karena harga saham >= Rp 500). Jadi, total biaya transaksi adalah 0.15% + 0.25% + 0.10% + 0.15% = 0.65%. Setelah dikurangi biaya ini, net return yang diharapkan adalah 9.83% - 0.65% = 9.18%. Berdasarkan kalkulasi ini, trade setup ini **VIABLE after transaction costs**.\n\nPosition: BUY\nAgent Confidence: 1.00",
       "round": 4,
       "position": "BUY",
       "confidence": 1.0
     }
   ],
-  "raw_data_summary": "=== EVIDENCE BRIEF: BBCA ===\nQuery: swing trade analysis\n\n[FAIR_VALUE]\nEvidence ID: BBCA_fair_value_0\nCurrent Price: 6100 | Fair Value: 10474 | Upside: 71.7%\nSource: stockbit | Score: 1.00\n\n[FUNDAMENTAL]\nEvidence ID: BBCA_fundamental_0\n{\"brief\":\"BBCA is significantly undervalued based on the provided fair value analysis, presenting a strong fundamental setup for a swing trade. FAIR VALUE: Rp 10,474 VALUATION VERDICT: BBCA is UNDERVALUED by 71.7% compared to its current market price of Rp 6,100. SUPPORT METRICS: * ROE (TTM): 22.4% * ROE Trend (3yr): INSUFFICIENT_DATA * Net Margin (TTM): 49.5% * Net Margin Trend (3yr):\nSource: stockbit | Score: 0.90\n\n[FUNDAMENTAL]\nEvidence ID: BBCA_fundamental_1\nINSUFFICIENT_DATA * Debt/Equity: INSUFFICIENT_DATA (Debt to Equity Ratio is not provided; Total Liabilities/Equity is 5.33 for this banking entity) * Dividend Yield: 5.51% GROWTH CATALYST: The latest dividend ex-date (30 Mar 26) is a PAST_EVENT_NOT_CATALYST relative to the current date (2026-05-17). No immediate upcoming catalysts (earnings, ex-dividend, contract) identified within the 1-3 month\nSource: stockbit | Score: 0.90\n\n[FUNDAMENTAL]\nEvidence ID: BBCA_fundamental_2\nswing trade horizon. QUALITY CHECK — Deteksi inkonsistensi laporan keuangan: * ROE (22.4%) is high, but Net Margin (49.5%) is also high, not low. No ROE-Margin Divergence detected. * Debt/Equity and Interest Coverage Ratio...\",\"exdate\":\"=== DIVIDEND EX-DATE SCAN: BBCA ===\\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\\n\"}\nSource: stockbit | Score: 0.90\n\n[TECHNICAL]\nEvidence ID: BBCA_technical_0\n{\"52w_high\":9232.0,\"52w_low\":5850.0,\"atr14\":145.0,\"avg_volume_20d\":162983305.0,\"brief\":\"**Analisa Teknikal IHSG (1-3 Bulan)** **TREND CONTEXT:** Saham dalam downtrend struktural karena harga saat ini berada jauh di bawah MA200 (7359). Ini adalah setup counter-trend bounce, sehingga target akan lebih konservatif dan ukuran posisi harus dikurangi 50%. IHSG saat ini diperdagangkan mendekati level\nSource: yfinance | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: BBCA_technical_1\nterendah 52 minggu (5850), menunjukkan tekanan jual yang kuat. **ENTRY ZONE:** Harga saat ini (6100) berada di bawah EMA20 (6174) dan MA50 (6425), yang berarti level-level ini bertindak sebagai resistensi overhead. Untuk potensi *counter-trend bounce*, zona masuk yang Position: HOLD Agent Confidence:\nSource: yfinance | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: BBCA_technical_2\n0.00\",\"current_price\":6100.0,\"ema20\":6174.0,\"ma200\":7359.0,\"ma200_context\":\"BELOW\",\"ma50\":6425.0,\"rsi14\":42.8,\"sma20\":6145.0}\nSource: yfinance | Score: 0.85\n\n[EXDATE]\nEvidence ID: BBCA_exdate_0\nDividend Ex-Date: === DIVIDEND EX-DATE SCAN: BBCA ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\nSource: stockbit | Score: 0.70\n\n[SENTIMENT]\nEvidence ID: BBCA_sentiment_0\n```json { \"sentiment\": \"INSUFFICIENT_DATA\", \"confidence\": 0, \"dominant_theme\": null, \"volume_anomaly\": null, \"swing_signal\": null, \"red_flags\": [], \"reason\": \"Data sosial tidak mencukupi (< 5 post)\" } ``` Position: HOLD Agent Confidence: 0.00\nSource: gemini | Score: 0.60\n\n---\nTotal evidence: 9/10 chunks selected\nToken estimate: ~592\n\n=== NEWS BRIEF: BBCA ===\nPeriod: last 60 days\nSentiment: UNKNOWN (score: +0.00)\nNo news data available\nConfidence adjustment: +0.00\nReason: No news data available - sentiment unverified\n\nTOP NEWS:\nnone",
+  "raw_data_summary": "=== EVIDENCE BRIEF: BBCA ===\nQuery: swing trade analysis\n\n[FAIR_VALUE]\nEvidence ID: BBCA_fair_value_0\nCurrent Price: 6100 | Fair Value: 10474 | Upside: 71.7%\nSource: stockbit | Score: 1.00\n\n[FUNDAMENTAL]\nEvidence ID: BBCA_fundamental_0\n{\"brief\":\"FAIR VALUE: Rp 10,474 BBCA is currently trading at Rp 6,100, making it **UNDERVALUED** by 71.7% compared to its calculated fair value of Rp 10,474. This significant discount suggests a strong fundamental cushion for a swing trade setup. Key profitability metrics are robust, with a Return on Equity (ROE) of 22.4% (TTM) and a Net Margin of 49.5% (Quarter). The current P/E ratio is 12.9x\nSource: stockbit | Score: 0.90\n\n[FUNDAMENTAL]\nEvidence ID: BBCA_fundamental_1\nand P/B ratio is 2.9x, both significantly below their historical averages of 25.0x and 4.5x, respectively. Regarding support metrics, the TTM ROE is 22.4% and the Net Margin (Quarter) is 49.52%. The Debt/Equity Ratio is null, and Interest Coverage (TTM) is also null, preventing a full assessment of solvency based on these specific metrics. The Dividend Yield (TTM) is 5.51%. No specific upcoming\nSource: stockbit | Score: 0.90\n\n[FUNDAMENTAL]\nEvidence ID: BBCA_fundamental_2\ngrowth catalyst within the 1-3 month horizon was identified; the latest dividend ex-date (30 Mar 26) is a PAST_EVENT_NOT_CATALYST relative to the current date (2026-05-17). For quality checks, no red flags were det...\",\"exdate\":\"=== DIVIDEND EX-DATE SCAN: BBCA ===\\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\\n\"}\nSource: stockbit | Score: 0.90\n\n[TECHNICAL]\nEvidence ID: BBCA_technical_0\n{\"52w_high\":9232.0,\"52w_low\":5850.0,\"atr14\":145.0,\"avg_volume_20d\":162983305.0,\"brief\":\"**Analisa Teknikal IHSG (Swing Trade 1-3 Bulan)** **TREND CONTEXT:** Saham dalam downtrend struktural. Ini counter-trend bounce — target lebih konservatif, size 50%. IHSG saat ini diperdagangkan jauh di bawah MA200, EMA20, dan MA50, mengindikasikan tekanan jual yang kuat dan tren menurun yang dominan. **ENTRY\nSource: yfinance | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: BBCA_technical_1\nZONE:** Harga saat ini (Rp 6,100) berada di bawah EMA20 (Rp 6,174) dan MA50 (Rp 6,425), yang kini bertindak sebagai resistensi. Untuk potensi *counter-trend bounce*, zona akumulasi yang menarik berada di sekitar level support terdekat hingga Position: HOLD Agent Confidence:\nSource: yfinance | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: BBCA_technical_2\n0.00\",\"current_price\":6100.0,\"ema20\":6174.0,\"ma200\":7359.0,\"ma200_context\":\"BELOW\",\"ma50\":6425.0,\"rsi14\":42.8,\"sma20\":6145.0}\nSource: yfinance | Score: 0.85\n\n[EXDATE]\nEvidence ID: BBCA_exdate_0\nDividend Ex-Date: === DIVIDEND EX-DATE SCAN: BBCA ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\nSource: stockbit | Score: 0.70\n\n[SENTIMENT]\nEvidence ID: BBCA_sentiment_0\n```json { \"sentiment\": \"INSUFFICIENT_DATA\", \"confidence\": 0, \"dominant_theme\": null, \"volume_anomaly\": null, \"swing_signal\": null, \"red_flags\": [], \"reason\": \"Data sosial tidak mencukupi (< 5 post)\" } ``` Position: HOLD Agent Confidence: 0.00\nSource: gemini | Score: 0.60\n\n---\nTotal evidence: 9/10 chunks selected\nToken estimate: ~586\n\n=== NEWS BRIEF: BBCA ===\nPeriod: last 60 days\nSentiment: UNKNOWN (score: +0.00)\nNo news data available\nConfidence adjustment: +0.00\nReason: No news data available - sentiment unverified\n\nTOP NEWS:\nnone",
   "metadata": {
     "prompt_version": "2026-05-11-critical-audit-v1",
     "run_id": "unknown",
@@ -153,9 +154,9 @@
     "news_brief": "=== NEWS BRIEF: BBCA ===\nPeriod: last 60 days\nSentiment: UNKNOWN (score: +0.00)\nNo news data available\nConfidence adjustment: +0.00\nReason: No news data available - sentiment unverified\n\nTOP NEWS:\nnone",
     "rag_chunks_selected": 9,
     "rag_chunks_considered": 10,
-    "rag_token_estimate": 592,
-    "duration_seconds": 172.83700459997635,
-    "batch_timestamp": "20260517_144536",
+    "rag_token_estimate": 586,
+    "duration_seconds": 166.2705883999588,
+    "batch_timestamp": "20260517_152949",
     "versioned_output": true
   },
   "error": null,

@@ -2,35 +2,36 @@
 ║  AUDIT REPORT: ADRO — BUY        ║
 ╚══════════════════════════════════════════╝
 
-Summary : ADRO→BUY: unknown won by voting (0.76) after 1 round(s). 1 agent(s) dissented. Absence of a specific near-term catalyst, potentially delaying price appreciation.
-Run ID  : 20260514_174443
-Generated: 2026-05-14T10:48:47.756288+00:00
+Summary : ADRO→BUY: unknown won by voting (0.64) after 2 round(s). 2 agent(s) dissented. Sharp decline in global coal prices (Devil's Advocate risk).
+Run ID  : unknown
+Generated: 2026-05-17T08:29:49.281142+00:00
 
 VERDICT
 ───────
-Rating     : BUY (confidence: 76%)
+Rating     : BUY (confidence: 64%)
 Method     : voting
 Consensus  : yes
-Rounds     : 1
-Dissent    : 20% (1 of 5 agents)
+Rounds     : 2
+Dissent    : 40% (2 of 5 agents)
 
 AGENT VOTES
 ───────────
   bull                   BUY      conf= 0.75  ✅
-  bear                   BUY      conf= 0.60  ✅
+  bear                   AVOID    conf= 0.60  ❌
+  bull                   BUY      conf= 0.88  ✅
+  bear                   AVOID    conf= 0.60  ❌
   devils_advocate        BUY      conf= 1.00  ✅
 
 KEY ARGUMENTS
 ─────────────
-Bull  : ADRO presents a compelling swing trade BUY opportunity (1-3 month horizon) driven by significant undervaluation and robust technical support, despite the current price being slightly above the optimal entry zone.
+Bull  : The Bear's argument regarding the initial resistance level and the previous annual peak as limiting factors fundamentally misinterprets the broader market context. The stock exhibits a substantial intrinsic undervaluation, indicating that these technical points are merely temporary hurdles in a larg
+Bear  : The Bull's swing setup for ADRO is critically undermined by an inadequate risk assessment and a misinterpretation of fundamental "buffers" for short-term trading.
 
-**FUNDAMENTAL FLOOR:**
-ADRO is fundamentally undervalued, with a current market price 
-Bear  : While ADRO is presented as fundamentally undervalued with a current price of Rp 2,520 against a fair value of Rp 2,919, this perceived 15.8% discount does not translate into a reliable margin of safety for a short-term swing trade. The Bull's argument for a "fundamental floor" is undermined by a cri
-Devil : Agent Confidence: MEDIUM
+The Bull's proposed stop loss of Rp 2,376, implying a maximum loss of only Rp 56.5 from the entry midpoint of Rp 2,432.5 (derived from t
+Devil : **Agent Confidence:** HIGH
 
-1.  **MACRO/COMPANY RISK & FOREIGN FLOW:**
-    If foreign funds accelerate net selling pressure on ADRO, perhaps reacting to worsening global coal price sentiment or the identified 'Revenue-CFO Divergence', could the MA50 support at Rp 2,381 break, triggering stops and pote
+**Question 1: MACRO/COMPANY RISK & FOREIGN FLOW**
+If global coal prices experience a sharp decline in the next 1-3 months, coupled with accelerated net foreign selling pressure on the broader IHSG, could the Rp 2,393 MA50 support level break, potentially triggering a casc
 
 DATA QUALITY
 ────────────

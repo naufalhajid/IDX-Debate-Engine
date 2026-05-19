@@ -2,38 +2,36 @@
 ║  AUDIT REPORT: BBCA — HOLD       ║
 ╚══════════════════════════════════════════╝
 
-Summary : BBCA→HOLD: unknown won by voting (0.52) after 3 round(s). 2 agent(s) dissented. Continuation of the existing technical downtrend, as the price is below the MA50 and MA200.
+Summary : BBCA→HOLD: soft_hold_rule applied (0.53) after 3 round(s). 3 agent(s) dissented. Persistent technical downtrend; price is below key moving averages (MA50, MA200) which now act as resistance.
 Run ID  : unknown
-Generated: 2026-05-17T07:45:36.047647+00:00
+Generated: 2026-05-17T08:29:49.273647+00:00
 
 VERDICT
 ───────
-Rating     : HOLD (confidence: 52%)
-Method     : voting
+Rating     : HOLD (confidence: 53%)
+Method     : soft_hold
 Consensus  : yes
 Rounds     : 3
-Dissent    : 40% (2 of 5 agents)
+Dissent    : 60% (3 of 5 agents)
 
 AGENT VOTES
 ───────────
-  bull                   BUY      conf= 0.65  ❌
-  bear                   AVOID    conf= 0.85  ❌
-  bull                   BUY      conf= 0.75  ❌
+  bull                   BUY      conf= 0.85  ❌
   bear                   AVOID    conf= 0.90  ❌
   bull                   BUY      conf= 0.60  ❌
-  bear                   BUY      conf= 0.60  ❌
+  bear                   AVOID    conf= 0.90  ❌
+  bull                   BUY      conf= 0.60  ❌
+  bear                   AVOID    conf= 0.60  ❌
   devils_advocate        BUY      conf= 1.00  ❌
 
 KEY ARGUMENTS
 ─────────────
-Bull  : The Bear misinterprets the "margin of safety" by focusing solely on the proximity to a technical stop-loss. The true margin of safety for this thesis is the substantial gap between the current market valuation and the calculated intrinsic value. With the stock trading at a significant discount to it
-Bear  : The Bull's assertion that a substantial fundamental undervaluation constitutes the "true margin of safety" for a swing trade fundamentally misinterprets the short-term nature of such strategies. While the stock may appear undervalued by 71.7% relative to a fair value of Rp 10,474, the realization of
-Devil : Agent Confidence: MEDIUM
+Bull  : The Bear's concern regarding short-term volatility pushing the price below the 52-week low, thereby "breaching the fundamental cushion," misinterprets the nature of intrinsic value. While daily price action can indeed fluctuate, the substantial undervaluation, where the current market price is signi
+Bear  : The Bull's reliance on a "fundamental cushion" derived from a fair value of Rp 10,474 is highly questionable for a swing trade. The provided fundamental data explicitly states that "Debt/Equity Ratio is null, and Interest Coverage (TTM) is also null, preventing a full assessment of solvency." A fair
+Devil : **Agent Confidence:** HIGH
 
-1.  **MACRO/COMPANY RISK & FOREIGN FLOW:**
-    Jika sentimen risk-off global memburuk dan memicu akselerasi net foreign selling pada saham-saham big-cap di IHSG, mungkinkah level support 52-minggu BBCA di Rp 5,850 jebol, memicu stop-loss hingga ke Rp 5,500?
-
-2.  **EXECUTION
+**1. MACRO/COMPANY RISK & FOREIGN FLOW:**
+Given the structural downtrend and the null solvency metrics highlighted by the Bear, if foreign funds accelerate net selling pressure on Indonesian banks, perhaps triggered by a global risk-off event, could BBCA's 52-week low of
 
 DATA QUALITY
 ────────────

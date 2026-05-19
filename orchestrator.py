@@ -28,7 +28,9 @@ def configure_output_dir(output_dir: Path) -> None:
 
 
 def _run_cli(argv: list[str] | None = None) -> None:
+    _legacy._ensure_utf8_stdout()
     args = _legacy._parse_cli_args(argv)
+    _legacy.configure_cli_logging(verbose=args.verbose)
     configure_output_dir(Path(args.output_dir))
     scrape_cmd = _legacy.shlex.split(args.scrape_cmd) if args.scrape_cmd else None
     _legacy._cli.run(

@@ -1,0 +1,10 @@
+{
+  "ticker": "WIIM",
+  "run_id": "20260517_173554",
+  "verdict": null,
+  "status": "failed",
+  "error": "Error calling model 'gemini-2.5-flash' (RESOURCE_EXHAUSTED): 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap. Learn more at https://ai.google.dev/gemini-api/docs/billing#project-spend-caps. ', 'status': 'RESOURCE_EXHAUSTED'}}",
+  "duration_seconds": 40.38045830000192,
+  "context_tokens": 767,
+  "generated_at": "2026-05-17T10:36:35.885666+00:00"
+}
