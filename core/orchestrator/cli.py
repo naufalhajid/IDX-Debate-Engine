@@ -1,4 +1,4 @@
-from core.orchestrator import legacy as _legacy
+from core.orchestrator import pipeline as _pipeline
 
-InteractiveCLI = _legacy.InteractiveCLI
-_parse_cli_args = _legacy._parse_cli_args
+InteractiveCLI = _pipeline.InteractiveCLI
+_parse_cli_args = _pipeline._parse_cli_args

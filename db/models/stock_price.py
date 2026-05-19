@@ -1,7 +1,12 @@
+from typing import TYPE_CHECKING
+
 from sqlalchemy import BigInteger, ForeignKey
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 
 from db.models import BaseModel, FLOAT
+
+if TYPE_CHECKING:
+    from db.models.stock import Stock
 
 
 class StockPrice(BaseModel):

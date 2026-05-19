@@ -47,7 +47,6 @@ import logging
 import math
 import re
 from datetime import datetime, date, timezone
-from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -55,6 +54,7 @@ import numpy as np
 import pandas as pd
 
 if TYPE_CHECKING:
+    from fair_value_calculator import FairValueCalculator, KeyStats
     from utils.exdate_scanner import ExDateInfo
 
 logger = logging.getLogger(__name__)
@@ -318,9 +318,12 @@ class XlsxDataAdapter:
         stats.growth_rate       = multiples["growth_rate"]
 
         # Normalise — xlsx sudah dalam desimal untuk ROE/margin, tapi jaga-jaga
-        if stats.roe > 1.0:         stats.roe        = stats.roe / 100.0
-        if stats.net_margin > 1.0:  stats.net_margin = stats.net_margin / 100.0
-        if stats.roa > 1.0:         stats.roa        = stats.roa / 100.0
+        if stats.roe > 1.0:
+            stats.roe = stats.roe / 100.0
+        if stats.net_margin > 1.0:
+            stats.net_margin = stats.net_margin / 100.0
+        if stats.roa > 1.0:
+            stats.roa = stats.roa / 100.0
 
         return stats
 
@@ -478,10 +481,14 @@ class XlsxDataAdapter:
         }
 
         results: dict[str, float] = {}
-        if pe_fv:   results["pe"]  = pe_fv
-        if pb_fv:   results["pb"]  = pb_fv
-        if ddm_fv:  results["ddm"] = ddm_fv
-        if ev_fv:   results["ev"]  = ev_fv
+        if pe_fv:
+            results["pe"] = pe_fv
+        if pb_fv:
+            results["pb"] = pb_fv
+        if ddm_fv:
+            results["ddm"] = ddm_fv
+        if ev_fv:
+            results["ev"] = ev_fv
 
         if not results:
             return {
@@ -507,11 +514,16 @@ class XlsxDataAdapter:
         cp = calc.stats.current_price
         if cp > 0 and weighted_fv > 0:
             mos = round(((weighted_fv - cp) / cp) * 100, 1)
-            if mos >= 20:     verdict = "UNDERVALUED"
-            elif mos >= 5:    verdict = "SLIGHTLY_UNDERVALUED"
-            elif mos >= -5:   verdict = "FAIRLY_VALUED"
-            elif mos >= -20:  verdict = "SLIGHTLY_OVERVALUED"
-            else:             verdict = "OVERVALUED"
+            if mos >= 20:
+                verdict = "UNDERVALUED"
+            elif mos >= 5:
+                verdict = "SLIGHTLY_UNDERVALUED"
+            elif mos >= -5:
+                verdict = "FAIRLY_VALUED"
+            elif mos >= -20:
+                verdict = "SLIGHTLY_OVERVALUED"
+            else:
+                verdict = "OVERVALUED"
 
         return {
             "fair_value": weighted_fv,
@@ -552,7 +564,7 @@ class XlsxDataAdapter:
             f"TICKER          : {stats.ticker}",
             f"SEKTOR          : {sektor.upper()}",
             f"HARGA PASAR     : Rp {current_price:,.0f}",
-            f"DATA SOURCE     : xlsx scraping (bukan API real-time)",
+            "DATA SOURCE     : xlsx scraping (bukan API real-time)",
             "",
             "── BREAKDOWN FAIR VALUE ────────────────────────────────────────",
         ]
@@ -589,7 +601,7 @@ class XlsxDataAdapter:
                 f"= Rp {int(ddm_fv):,}"
             )
         else:
-            reason = "DPS=0" if stats.dps <= 0 else f"spread ke−g terlalu kecil atau outlier"
+            reason = "DPS=0" if stats.dps <= 0 else "spread ke−g terlalu kecil atau outlier"
             lines.append(f"  Metode 3 DDM        : TIDAK VALID ({reason})")
 
         # Metode 4: EV/EBITDA
@@ -774,8 +786,6 @@ class XlsxDataAdapter:
         Ini menggantikan scan_exdate() dari exdate_scanner.py untuk ticker
         yang ada di xlsx, menghilangkan satu yfinance API call per ticker.
         """
-        from utils.exdate_scanner import ExDateInfo
-
         _CLEAR: ExDateInfo = {
             "has_upcoming_exdate": False,
             "ex_date":             None,

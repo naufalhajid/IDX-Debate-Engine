@@ -1,16 +1,17 @@
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal, Optional
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pathlib import Path
 
-BASE_PATH = Path(__file__).resolve().parent
+ROOT_PATH = Path(__file__).resolve().parents[1]
+BASE_PATH = ROOT_PATH
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=f"{BASE_PATH}/.env",
+        env_file=ROOT_PATH / ".env",
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=True,
@@ -20,11 +21,13 @@ class Settings(BaseSettings):
     ENVIRONMENT: Literal["dev", "prod"] = "dev"
 
     # .env
-    DATABASE_TYPE: Literal["sqlite", "postgresql"] = "sqlite"
-    DATABASE_HOST: Optional[str] = "localhost"
+    DATABASE_TYPE: str = "sqlite"
+    DATABASE_PATH: str = "db/idx-fundamental.db"
+    # Compatibility placeholders. Runtime database support is SQLite-only.
+    DATABASE_HOST: Optional[str] = None
     DATABASE_PORT: int = 5432
-    DATABASE_USER: str = "db_user"
-    DATABASE_PASSWORD: str = "db_password"
+    DATABASE_USER: str = ""
+    DATABASE_PASSWORD: str = ""
     DATABASE_ECHO: bool | Literal["debug"] = False
     DATABASE_POOL_ECHO: bool | Literal["debug"] = False
     DATABASE_SETUP_DROP_TABLE: bool = False
@@ -73,6 +76,32 @@ class Settings(BaseSettings):
     # PORTFOLIO_MIN_CONVICTION: minimum conviction score agar eligible masuk top N
     PORTFOLIO_MAX_PER_SECTOR: int = 2
     PORTFOLIO_MIN_CONVICTION: float = 0.30
+
+    @property
+    def database_path(self) -> Path:
+        path = Path(self.DATABASE_PATH)
+        if path.is_absolute():
+            return path
+        return ROOT_PATH / path
+
+    @property
+    def sqlite_sync_url(self) -> str:
+        return f"sqlite:///{self.database_path.as_posix()}"
+
+    @property
+    def sqlite_async_url(self) -> str:
+        return f"sqlite+aiosqlite:///{self.database_path.as_posix()}"
+
+    @model_validator(mode="after")
+    def validate_database_config(self) -> "Settings":
+        database_type = str(self.DATABASE_TYPE or "sqlite").lower().strip() or "sqlite"
+        if database_type != "sqlite":
+            raise ValueError(
+                "Only SQLite is supported by the current DB engine. "
+                "Set DATABASE_TYPE=sqlite."
+            )
+        self.DATABASE_TYPE = database_type
+        return self
 
     @model_validator(mode="after")
     def validate_conviction_weights(self) -> "Settings":

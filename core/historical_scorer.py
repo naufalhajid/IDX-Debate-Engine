@@ -21,7 +21,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Sequence
 
+from core.backtest_memory import DEFAULT_PATH, BacktestMemory, TradeOutcome
 from utils.logger_config import logger
 
 # \u2500\u2500 Constants \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -29,6 +31,8 @@ from utils.logger_config import logger
 _MIN_RECORDS_FOR_ADJUSTMENT: int = 3
 _WIN_RATE_HIGH_THRESHOLD: float = 0.70
 _WIN_RATE_LOW_THRESHOLD: float = 0.30
+_REALIZED_WIN_RATE_HIGH_THRESHOLD: float = 0.60
+_REALIZED_WIN_RATE_LOW_THRESHOLD: float = 0.40
 _BONUS: float = 0.05
 _PENALTY: float = -0.05
 _MAX_HISTORY_RECORDS_PER_TICKER: int = 20
@@ -114,6 +118,71 @@ def compute_historical_win_rate(ticker: str, records: list[dict]) -> float | Non
         f"win_rate={win_rate:.0%}"
     )
     return win_rate
+
+
+def load_realized_outcomes(memory_path: Path = DEFAULT_PATH) -> list[TradeOutcome]:
+    """Load realized trade outcomes from JSONL memory without raising."""
+    try:
+        return BacktestMemory(memory_path).all_records()
+    except Exception as exc:
+        logger.warning(f"[HistScorer] Gagal baca realized outcomes: {exc}")
+        return []
+
+
+def compute_realized_win_rate(
+    ticker: str,
+    records: Sequence[TradeOutcome],
+) -> float | None:
+    """Return realized win rate for evaluated BUY/STRONG_BUY outcomes."""
+    ticker_upper = ticker.upper()
+    ticker_records = [
+        record
+        for record in records
+        if record.ticker.upper() == ticker_upper
+        and record.verdict_rating.upper() in {"BUY", "STRONG_BUY"}
+        and record.outcome in {"win", "loss"}
+    ]
+
+    if len(ticker_records) < _MIN_RECORDS_FOR_ADJUSTMENT:
+        logger.debug(
+            f"[HistScorer] {ticker}: {len(ticker_records)} realized outcomes "
+            f"(min={_MIN_RECORDS_FOR_ADJUSTMENT}) - fallback to debate history."
+        )
+        return None
+
+    wins = sum(1 for record in ticker_records if record.outcome == "win")
+    win_rate = wins / len(ticker_records)
+    logger.debug(
+        f"[HistScorer] {ticker}: realized {wins}/{len(ticker_records)} wins -> "
+        f"win_rate={win_rate:.0%}"
+    )
+    return win_rate
+
+
+def apply_realized_adjustment(
+    conviction_score: float,
+    win_rate: float | None,
+) -> float:
+    """Adjust conviction score with realized outcome thresholds."""
+    if win_rate is None:
+        return conviction_score
+
+    if win_rate >= _REALIZED_WIN_RATE_HIGH_THRESHOLD:
+        adjusted = conviction_score + _BONUS
+        logger.debug(
+            f"[HistScorer] Realized win rate {win_rate:.0%} >= "
+            f"{_REALIZED_WIN_RATE_HIGH_THRESHOLD:.0%} -> +{_BONUS} bonus"
+        )
+    elif win_rate <= _REALIZED_WIN_RATE_LOW_THRESHOLD:
+        adjusted = conviction_score + _PENALTY
+        logger.debug(
+            f"[HistScorer] Realized win rate {win_rate:.0%} <= "
+            f"{_REALIZED_WIN_RATE_LOW_THRESHOLD:.0%} -> {_PENALTY} penalty"
+        )
+    else:
+        return conviction_score
+
+    return max(0.0, min(adjusted, 1.0))
 
 
 def apply_historical_adjustment(conviction_score: float, win_rate: float | None) -> float:

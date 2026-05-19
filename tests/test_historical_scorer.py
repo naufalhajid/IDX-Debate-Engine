@@ -6,13 +6,19 @@ import pytest
 
 from core.historical_scorer import (
     apply_historical_adjustment,
+    apply_realized_adjustment,
     compute_historical_win_rate,
+    compute_realized_win_rate,
     load_debate_history,
+    load_realized_outcomes,
     _WIN_RATE_HIGH_THRESHOLD,
     _WIN_RATE_LOW_THRESHOLD,
+    _REALIZED_WIN_RATE_HIGH_THRESHOLD,
+    _REALIZED_WIN_RATE_LOW_THRESHOLD,
     _BONUS,
     _PENALTY,
 )
+from core.backtest_memory import BacktestMemory, TradeOutcome
 
 
 def _make_record(ticker: str, rating: str, confidence: float) -> dict:
@@ -21,6 +27,26 @@ def _make_record(ticker: str, rating: str, confidence: float) -> dict:
         "verdict": {"rating": rating, "confidence": confidence},
         "debate_history": [],
     }
+
+
+def _outcome(ticker: str, outcome: str, rating: str = "BUY") -> TradeOutcome:
+    return TradeOutcome(
+        run_id="run-1",
+        ticker=ticker,
+        verdict_rating=rating,
+        entry_price=1000,
+        exit_price=1100 if outcome == "win" else 950,
+        target_price=1100,
+        stop_loss=950,
+        entry_date="2026-05-01",
+        exit_date="2026-05-10",
+        outcome=outcome,
+        pnl_pct=None,
+        hit_target=outcome == "win",
+        hit_stop=outcome == "loss",
+        confidence_at_entry=0.8,
+        notes="Synthetic test outcome.",
+    )
 
 
 # ── load_debate_history ────────────────────────────────────────────────────────
@@ -146,6 +172,49 @@ def test_adjustment_clamps_to_one() -> None:
     """Score tidak bisa di atas 1.0 meski setelah bonus."""
     result = apply_historical_adjustment(0.98, 0.90)  # bonus +0.05
     assert result <= 1.0
+
+
+def test_realized_win_rate_uses_evaluated_buy_outcomes_only() -> None:
+    records = [
+        _outcome("BBCA", "win"),
+        _outcome("BBCA", "loss"),
+        _outcome("BBCA", "win"),
+        _outcome("BBCA", "win", rating="HOLD"),
+        _outcome("TLKM", "loss"),
+    ]
+
+    result = compute_realized_win_rate("BBCA", records)
+
+    assert result == pytest.approx(2 / 3)
+
+
+def test_realized_win_rate_insufficient_data_returns_none() -> None:
+    records = [_outcome("BBCA", "win"), _outcome("BBCA", "loss")]
+
+    result = compute_realized_win_rate("BBCA", records)
+
+    assert result is None
+
+
+def test_realized_adjustment_thresholds() -> None:
+    assert apply_realized_adjustment(
+        0.60, _REALIZED_WIN_RATE_HIGH_THRESHOLD
+    ) == pytest.approx(0.60 + _BONUS)
+    assert apply_realized_adjustment(
+        0.60, _REALIZED_WIN_RATE_LOW_THRESHOLD
+    ) == pytest.approx(0.60 + _PENALTY)
+    assert apply_realized_adjustment(0.60, 0.50) == pytest.approx(0.60)
+
+
+def test_load_realized_outcomes_reads_backtest_memory(tmp_path: Path) -> None:
+    path = tmp_path / "backtest_memory.jsonl"
+    memory = BacktestMemory(path)
+    memory.record(_outcome("BBCA", "win"))
+
+    records = load_realized_outcomes(path)
+
+    assert len(records) == 1
+    assert records[0].ticker == "BBCA"
 
 
 # ── conviction weights validation ─────────────────────────────────────────────

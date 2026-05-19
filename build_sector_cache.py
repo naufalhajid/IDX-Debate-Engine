@@ -21,7 +21,6 @@ import json
 import os
 import time
 import logging
-from datetime import datetime
 
 import pandas as pd
 import yfinance as yf

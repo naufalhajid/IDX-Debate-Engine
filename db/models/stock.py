@@ -1,9 +1,14 @@
-from typing import List
+from typing import TYPE_CHECKING
 
-from sqlalchemy import select
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 
 from db.models import BaseModel, VARCHAR, FLOAT
+
+if TYPE_CHECKING:
+    from db.models.fundamental import Fundamental
+    from db.models.key_analysis import KeyAnalysis
+    from db.models.sentiment import Sentiment
+    from db.models.stock_price import StockPrice
 
 
 class Stock(BaseModel):
@@ -16,7 +21,7 @@ class Stock(BaseModel):
     market_cap: Mapped[FLOAT]
     home_page: Mapped[VARCHAR]
 
-    stock_prices: Mapped[List["StockPrice"]] = relationship(back_populates="stock")
-    fundamentals: Mapped[List["Fundamental"]] = relationship(back_populates="stock")
-    sentiments: Mapped[List["Sentiment"]] = relationship(back_populates="stock")
-    key_analyses: Mapped[List["KeyAnalysis"]] = relationship(back_populates="stock")
+    stock_prices: Mapped[list["StockPrice"]] = relationship(back_populates="stock")
+    fundamentals: Mapped[list["Fundamental"]] = relationship(back_populates="stock")
+    sentiments: Mapped[list["Sentiment"]] = relationship(back_populates="stock")
+    key_analyses: Mapped[list["KeyAnalysis"]] = relationship(back_populates="stock")

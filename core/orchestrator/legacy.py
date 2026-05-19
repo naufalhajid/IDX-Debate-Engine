@@ -92,8 +92,11 @@ from core.dependency_validator import (
 from core.execution_ledger import DEFAULT_LEDGER, EventSeverity, EventType, LedgerEvent
 from core.historical_scorer import (
     apply_historical_adjustment,
+    apply_realized_adjustment,
     compute_historical_win_rate,
+    compute_realized_win_rate,
     load_debate_history,
+    load_realized_outcomes,
 )
 from core.ops_telemetry import DEFAULT_TELEMETRY, TickerMetric
 from core.quant_filter.position_sizer import calculate_positions
@@ -1698,6 +1701,17 @@ _rich_log_sink = RichLogSink(_cli_renderer)
 _CLI_LOGGING_CONFIGURED = False
 
 
+def _normalize_log_level(value: str | None, default: str = "INFO") -> str:
+    level = str(value or "").strip().upper()
+    if not level:
+        return default
+    try:
+        logger.level(level)
+    except ValueError:
+        return default
+    return level
+
+
 def configure_cli_logging(*, verbose: bool = False) -> None:
     """Route Loguru to files and mirror structured Rich output to the console."""
     global _CLI_LOGGING_CONFIGURED
@@ -1705,10 +1719,11 @@ def configure_cli_logging(*, verbose: bool = False) -> None:
     _cli_renderer.verbose = verbose
     logger.remove()
     log_format = "{time:YYYY-MM-DD HH:mm:ss.SSS} {level: <8} {file}:{line} | {message}"
+    log_level = _normalize_log_level(settings.LOG_LEVEL)
     logger.add(
         settings.LOG_APP_FILENAME,
         format=log_format,
-        level=settings.LOG_LEVEL,
+        level=log_level,
         rotation="1 MB",
         retention="10 days",
         compression="zip",
@@ -1717,15 +1732,15 @@ def configure_cli_logging(*, verbose: bool = False) -> None:
     logger.add(
         "pipeline.log",
         format=log_format,
-        level=settings.LOG_LEVEL,
+        level=log_level,
         encoding="utf-8",
     )
-    logger.add(_rich_log_sink, level=settings.LOG_LEVEL)
+    logger.add(_rich_log_sink, level=log_level)
     if verbose:
         logger.add(
             sys.stderr,
             format=settings.LOG_FORMAT,
-            level=settings.LOG_LEVEL,
+            level=log_level,
             colorize=True,
         )
     _CLI_LOGGING_CONFIGURED = True
@@ -3023,6 +3038,7 @@ def compute_conviction_score(
     verdict: dict,
     ticker: str | None = None,
     debate_records: list[dict] | None = None,
+    realized_outcomes: list[TradeOutcome] | None = None,
 ) -> tuple[float, str | None]:
     """
     Hitung Conviction Score = W_confidence Ã— CIO Confidence + W_rr Ã— Normalized R/R.
@@ -3058,6 +3074,12 @@ def compute_conviction_score(
     base_score = (w_confidence * confidence) + (w_rr * rr_score)
 
     # Historical adjustment â€” hanya jika data tersedia dan cukup
+    if ticker and realized_outcomes is not None:
+        realized_win_rate = compute_realized_win_rate(ticker, realized_outcomes)
+        if realized_win_rate is not None:
+            base_score = apply_realized_adjustment(base_score, realized_win_rate)
+            return base_score, warning
+
     if ticker and debate_records is not None:
         win_rate = compute_historical_win_rate(ticker, debate_records)
         base_score = apply_historical_adjustment(base_score, win_rate)
@@ -3068,6 +3090,7 @@ def compute_conviction_score(
 def select_top_n(
     results: list[dict],
     debate_records: list[dict] | None = None,
+    realized_outcomes: list[TradeOutcome] | None = None,
 ) -> list[dict]:
     """
     Rank hasil debate dan kembalikan Top N dengan sector diversification.
@@ -3098,6 +3121,7 @@ def select_top_n(
             verdict,
             ticker=entry.get("ticker"),
             debate_records=debate_records,
+            realized_outcomes=realized_outcomes,
         )
         entry["conviction_score"] = round(score, 4)
         if warning:
@@ -3198,6 +3222,7 @@ def save_individual_debates_versioned(
     results: list[dict],
     timestamp: str,
     output_dir: Path = OUTPUT_DIR,
+    record_backtest_memory: bool = True,
 ) -> None:
     """
     Simpan hasil debate per ticker sebagai snapshot immutable.
@@ -3249,10 +3274,11 @@ def save_individual_debates_versioned(
             ticker=ticker,
             result=payload,
         )
-        _record_backtest_memory(
-            result=payload,
-            run_id=timestamp,
-        )
+        if record_backtest_memory:
+            _record_backtest_memory(
+                result=payload,
+                run_id=timestamp,
+            )
         count += 1
 
     if count > 0:
@@ -4076,7 +4102,12 @@ async def main(
     # Step 3: Score + Rank + Diversify
     _cli_renderer.phase("Scoring and Sizing")
     debate_records = load_debate_history(OUTPUT_DIR)
-    top_n = select_top_n(results, debate_records=debate_records)
+    realized_outcomes = load_realized_outcomes()
+    top_n = select_top_n(
+        results,
+        debate_records=debate_records,
+        realized_outcomes=realized_outcomes,
+    )
     _annotate_risk_governor(top_n)
     sizing_candidates = _build_sizing_candidates(top_n)
     logger.debug(f"[Sizing DEBUG] user_config masuk: {user_config}")
@@ -4116,7 +4147,10 @@ async def main(
         ticker_count=len(results),
     )
     save_individual_debates_versioned(
-        results, timestamp=batch_timestamp, output_dir=OUTPUT_DIR
+        results,
+        timestamp=batch_timestamp,
+        output_dir=OUTPUT_DIR,
+        record_backtest_memory=not dry_run,
     )
     generate_top3_report(top_n, results, TOP3_REPORT_PATH, sizing_result=sizing_result)
     _log_artifact_validation(results)

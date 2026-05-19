@@ -15,6 +15,8 @@ clear in reports and future code changes.
 | `risk_governor.status` | Deterministic actionability status after price, entry, target, and stop checks. |
 | `risk_governor.sizing_allowed` | Whether the candidate may be passed into position sizing. |
 | `wait_and_see` | CIO-level caution flag. It can coexist with a technically valid trade envelope. |
+| `outcome` | Backtest memory state: `open` means not yet evaluable, while `win` / `loss` are auto-evaluated price outcomes. |
+| `evaluation_reason` | Why a backtest record was labeled, such as `target_hit`, `stop_hit`, or `horizon_close_above_entry`. |
 
 ## Reporting Rules
 
@@ -26,4 +28,4 @@ Use these rules when reviewing or changing reports:
 4. `sizing_allowed = true` does not guarantee that a position will be allocated. Lot size, capital, max position cap, and stop-risk budget can still result in zero lots.
 5. If the report shows `BUY` but the CIO summary says `HOLD`, treat it as a report consistency issue to fix before using the output for decisions.
 6. If allocated position is zero, the report should state the portfolio constraint explicitly instead of implying that sizing disappeared.
-
+7. Realized outcome learning should use `win` / `loss` records from backtest memory before falling back to debate-history consistency.

@@ -1,8 +1,8 @@
 from contextlib import contextmanager, asynccontextmanager
 
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker, scoped_session
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from db import DB
 

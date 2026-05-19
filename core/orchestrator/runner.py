@@ -1,9 +1,9 @@
-from core.orchestrator import legacy as _legacy
+from core.orchestrator import pipeline as _pipeline
 
-SafeRateLimiter = _legacy.SafeRateLimiter
-fetch_price_with_retry = _legacy.fetch_price_with_retry
-_empty_result = _legacy._empty_result
-_run_single_debate = _legacy._run_single_debate
-run_batch_debates = _legacy.run_batch_debates
-main = _legacy.main
-_setup_abort_signal = _legacy._setup_abort_signal
+SafeRateLimiter = _pipeline.SafeRateLimiter
+fetch_price_with_retry = _pipeline.fetch_price_with_retry
+_empty_result = _pipeline._empty_result
+_run_single_debate = _pipeline._run_single_debate
+run_batch_debates = _pipeline.run_batch_debates
+main = _pipeline.main
+_setup_abort_signal = _pipeline._setup_abort_signal

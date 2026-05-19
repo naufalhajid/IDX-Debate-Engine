@@ -1,0 +1,80 @@
+[
+  {
+    "ticker": "DEMO",
+    "status": "success",
+    "verdict": {
+      "ticker": "DEMO",
+      "rating": "BUY",
+      "confidence": 0.68,
+      "timeframe": "1-3 months",
+      "current_price": 1000,
+      "entry_price_range": [980, 1020],
+      "target_price": 1150,
+      "stop_loss": 940,
+      "risk_reward_ratio": 1.8,
+      "expected_return": 0.15,
+      "fair_value": 1250,
+      "is_overvalued": false,
+      "wait_and_see": false,
+      "summary": "Sanitized sample verdict for documentation only.",
+      "weighted_reasoning": "This placeholder shows the shape of a final CIO verdict without using live analysis text.",
+      "key_catalysts": [
+        "Improving volume confirmation",
+        "Valuation support near entry range"
+      ],
+      "key_risks": [
+        "Break below stop loss",
+        "Market-wide volatility"
+      ],
+      "critical_risk_factor": "No real market recommendation. Sample data only.",
+      "consensus_reached": true,
+      "consensus_method": "voting",
+      "dissenting_agents": []
+    },
+    "debate_rounds": 2,
+    "consensus_reached": true,
+    "consensus_method": "voting",
+    "dissenting_agents": [],
+    "agent_votes": [
+      {"agent": "fundamental_scout", "vote": "BUY", "confidence": 0.7},
+      {"agent": "chartist", "vote": "BUY", "confidence": 0.65}
+    ],
+    "disagreement_type": null,
+    "debate_history": [],
+    "raw_data_summary": "Sanitized sample. No private source data included.",
+    "metadata": {
+      "sample": true,
+      "run_id": "sample-run",
+      "duration_seconds": 12.3,
+      "prompt_version": "sample",
+      "flash_calls": 0,
+      "pro_calls": 0,
+      "market_data_source": "sample",
+      "market_data_cached": false,
+      "has_breaking_news": false,
+      "news_overall_sentiment": "UNKNOWN",
+      "news_confidence_adjustment": 0.0,
+      "news_brief": "No live news in sample artifact.",
+      "rag_chunks_considered": 0,
+      "rag_chunks_selected": 0,
+      "rag_token_estimate": 0
+    },
+    "error": null,
+    "conviction_score": 0.59,
+    "sector_key": "sample-sector",
+    "news_sentiment": "UNKNOWN",
+    "news_confidence_adjustment": 0.0,
+    "risk_governor": {
+      "ticker": "DEMO",
+      "status": "deployable",
+      "sizing_allowed": true,
+      "message": "Sample setup is inside the entry range.",
+      "reason_codes": [],
+      "current_price": 1000,
+      "entry_low": 980,
+      "entry_high": 1020,
+      "target_price": 1150,
+      "stop_loss": 940
+    }
+  }
+]

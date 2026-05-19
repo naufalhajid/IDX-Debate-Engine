@@ -6,9 +6,11 @@ logs/
 __pycache__/
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
 .uv-cache/
 tmp/
 pipeline.log
+*.log
 
 # AI agent / vibe-coding workspace files
 .agent/
@@ -23,11 +25,18 @@ AGENTS.md
 .env
 .env.*
 !.env.example
-!.env.test
 *.http
 *.xlsx
+*.csv
 *.cache
 *.db
+db/*.db
+*.sqlite
+*.sqlite3
+
+# Scratch runtime artifacts; keep scratch scripts reviewable if needed.
+scratch/**/*.json
+scratch/**/*.md
 
 # Generated runtime artifacts
 /output/**

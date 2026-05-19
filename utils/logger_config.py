@@ -8,7 +8,18 @@ from core.settings import settings
 
 load_dotenv()
 
-level = settings.LOG_LEVEL
+def _normalize_log_level(value: str | None, default: str = "INFO") -> str:
+    candidate = str(value or "").strip().upper()
+    if not candidate:
+        return default
+    try:
+        logger.level(candidate)
+    except ValueError:
+        return default
+    return candidate
+
+
+level = _normalize_log_level(settings.LOG_LEVEL)
 
 # Remove default Loguru sink (stderr, level=DEBUG)
 logger.remove()

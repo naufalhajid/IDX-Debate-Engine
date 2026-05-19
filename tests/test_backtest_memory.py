@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from core.backtest_memory import BacktestMemory, TradeOutcome
@@ -93,3 +94,42 @@ def test_summary_stats_on_empty_store_returns_zeros(tmp_path: Path) -> None:
         "avg_pnl_pct": None,
         "avg_confidence": None,
     }
+
+
+def test_old_jsonl_records_without_evaluation_metadata_still_load(tmp_path: Path) -> None:
+    path = tmp_path / "backtest_memory.jsonl"
+    old_record = {
+        "run_id": "run-1",
+        "ticker": "BBCA",
+        "verdict_rating": "BUY",
+        "entry_price": 1000,
+        "exit_price": None,
+        "target_price": 1100,
+        "stop_loss": 950,
+        "entry_date": "2026-05-01",
+        "exit_date": None,
+        "outcome": "open",
+        "pnl_pct": None,
+        "hit_target": None,
+        "hit_stop": None,
+        "confidence_at_entry": 0.8,
+        "notes": "old schema",
+    }
+    path.write_text(json.dumps(old_record) + "\n", encoding="utf-8")
+
+    records = BacktestMemory(path).all_records()
+
+    assert len(records) == 1
+    assert records[0].evaluation_method is None
+
+
+def test_replace_all_creates_backup_and_preserves_records(tmp_path: Path) -> None:
+    path = tmp_path / "backtest_memory.jsonl"
+    memory = BacktestMemory(path)
+    memory.record(_outcome(ticker="BBCA"))
+
+    backup = memory.replace_all([_outcome(ticker="TLKM")])
+
+    assert backup == path.with_name("backtest_memory.jsonl.bak")
+    assert backup.exists()
+    assert [record.ticker for record in memory.all_records()] == ["TLKM"]

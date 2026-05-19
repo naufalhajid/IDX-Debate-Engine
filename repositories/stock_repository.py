@@ -1,9 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from db.models.stock import Stock
-from db.models.fundamental import Fundamental
 from repositories.base import BaseRepository
 
 

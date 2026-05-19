@@ -4,36 +4,36 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-from core.orchestrator import legacy as _legacy
+from core.orchestrator import pipeline as _pipeline
 
-# Backward-compatible facade: expose all legacy symbols, including private
+# Backward-compatible facade: expose all pipeline symbols, including private
 # helpers that tests or local scripts may import directly from orchestrator.py.
-for _name in dir(_legacy):
+for _name in dir(_pipeline):
     if not _name.startswith("__"):
-        globals()[_name] = getattr(_legacy, _name)
+        globals()[_name] = getattr(_pipeline, _name)
 
 
 def __getattr__(name: str) -> Any:
-    return getattr(_legacy, name)
+    return getattr(_pipeline, name)
 
 
 def _sync_path_globals() -> None:
     for _name in ("OUTPUT_DIR", "JSON_PATH", "FULL_RESULTS_PATH", "TOP3_REPORT_PATH"):
-        globals()[_name] = getattr(_legacy, _name)
+        globals()[_name] = getattr(_pipeline, _name)
 
 
 def configure_output_dir(output_dir: Path) -> None:
-    _legacy.configure_output_dir(output_dir)
+    _pipeline.configure_output_dir(output_dir)
     _sync_path_globals()
 
 
 def _run_cli(argv: list[str] | None = None) -> None:
-    _legacy._ensure_utf8_stdout()
-    args = _legacy._parse_cli_args(argv)
-    _legacy.configure_cli_logging(verbose=args.verbose)
+    _pipeline._ensure_utf8_stdout()
+    args = _pipeline._parse_cli_args(argv)
+    _pipeline.configure_cli_logging(verbose=args.verbose)
     configure_output_dir(Path(args.output_dir))
-    scrape_cmd = _legacy.shlex.split(args.scrape_cmd) if args.scrape_cmd else None
-    _legacy._cli.run(
+    scrape_cmd = _pipeline.shlex.split(args.scrape_cmd) if args.scrape_cmd else None
+    _pipeline._cli.run(
         interactive=not args.no_interactive,
         skip_scraping=args.skip_scraping,
         scrape_cmd=scrape_cmd,
@@ -44,9 +44,9 @@ def _run_cli(argv: list[str] | None = None) -> None:
         else None
     )
     asyncio.run(
-        _legacy.main(
+        _pipeline.main(
             dry_run=args.dry_run,
-            output_dir=_legacy.OUTPUT_DIR,
+            output_dir=_pipeline.OUTPUT_DIR,
             user_config=user_config,
         )
     )

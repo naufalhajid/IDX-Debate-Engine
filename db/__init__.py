@@ -1,24 +1,73 @@
 import logging
-import os
+from pathlib import Path
 
 from sqlalchemy import create_engine
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import create_async_engine
 
-from db.models import Base
-from db.models.fundamental import *
+from core.settings import settings
+from db.models import (
+    Base,
+    BaseModel,
+    FLOAT,
+    INT_PK,
+    TIMESTAMP,
+    UPDATED_TIMESTAMP,
+    VARCHAR,
+)
+from db.models.fundamental import (
+    BalanceSheet,
+    CashFlowStatement,
+    CurrentValuation,
+    Dividend,
+    Fundamental,
+    Growth,
+    IncomeStatement,
+    ManagementEffectiveness,
+    MarketRank,
+    PerShare,
+    PricePerformance,
+    Profitability,
+    Solvency,
+    Stat,
+)
 from db.models.key_analysis import KeyAnalysis
 from db.models.sentiment import Sentiment
 from db.models.stock import Stock
 from db.models.stock_price import StockPrice
-from utils.helpers import get_project_root
 from utils.logger_config import InterceptHandler
-from core.settings import settings
 
-# Set the base directory to the project root
-base_dir = get_project_root()
+db_path = str(settings.database_path)
 
-# Define the path to the database file relative to the project root
-db_path = os.path.join(base_dir, "db/idx-fundamental.db")
+__all__ = [
+    "BalanceSheet",
+    "CashFlowStatement",
+    "CurrentValuation",
+    "DB",
+    "Dividend",
+    "Base",
+    "BaseModel",
+    "FLOAT",
+    "Fundamental",
+    "Growth",
+    "INT_PK",
+    "IncomeStatement",
+    "KeyAnalysis",
+    "ManagementEffectiveness",
+    "MarketRank",
+    "PerShare",
+    "PricePerformance",
+    "Profitability",
+    "Sentiment",
+    "Solvency",
+    "Stat",
+    "Stock",
+    "StockPrice",
+    "TIMESTAMP",
+    "UPDATED_TIMESTAMP",
+    "VARCHAR",
+    "database",
+    "db_path",
+]
 
 logging.basicConfig(handlers=[InterceptHandler()], level=0)
 logging.getLogger("sqlalchemy").setLevel(logging.WARNING)
@@ -28,11 +77,12 @@ logging.getLogger("sqlalchemy.pool").setLevel(logging.WARNING)
 
 class DB:
     def __init__(self):
+        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         self._engine = create_engine(
-            f"sqlite:///{db_path}", echo=settings.DATABASE_ECHO
+            settings.sqlite_sync_url, echo=settings.DATABASE_ECHO
         )
         self._engine_async = create_async_engine(
-            f"sqlite+aiosqlite:///{db_path}", echo=settings.DATABASE_ECHO
+            settings.sqlite_async_url, echo=settings.DATABASE_ECHO
         )
 
     def setup_db(self, is_drop_table: bool = False):

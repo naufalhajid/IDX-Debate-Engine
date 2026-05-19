@@ -6,7 +6,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Sequence
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
@@ -34,6 +34,10 @@ class TradeOutcome(BaseModel):
     hit_stop: bool | None
     confidence_at_entry: float | None
     notes: str
+    evaluation_method: str | None = None
+    evaluation_reason: str | None = None
+    evaluation_date: str | None = None
+    holding_period_days: int | None = None
 
     @model_validator(mode="after")
     def calculate_pnl_pct(self) -> TradeOutcome:
@@ -59,6 +63,33 @@ class BacktestMemory:
         with self.path.open("a", encoding="utf-8") as handle:
             handle.write(outcome.model_dump_json())
             handle.write("\n")
+
+    def all_records(self) -> list[TradeOutcome]:
+        """Return all stored records in file order."""
+        return self._read_all()
+
+    def replace_all(
+        self,
+        records: Sequence[TradeOutcome],
+        *,
+        backup: bool = True,
+    ) -> Path | None:
+        """Atomically replace the memory file, optionally keeping a .bak copy."""
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        backup_path: Path | None = None
+
+        if backup and self.path.exists():
+            backup_path = self.path.with_name(f"{self.path.name}.bak")
+            backup_path.write_text(
+                self.path.read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+
+        tmp_path = self.path.with_name(f"{self.path.name}.tmp")
+        payload = "".join(record.model_dump_json() + "\n" for record in records)
+        tmp_path.write_text(payload, encoding="utf-8")
+        tmp_path.replace(self.path)
+        return backup_path
 
     def query(
         self,
