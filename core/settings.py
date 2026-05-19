@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import Any, Literal, Optional
+from typing import Literal, Optional
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -19,16 +19,6 @@ class Settings(BaseSettings):
     # .env
     ENVIRONMENT: Literal["dev", "prod"] = "dev"
 
-    # FastAPI
-    FASTAPI_APP_VERSION: str = "0.0.1"
-    FASTAPI_API_V1_PATH: str = "/api/v1"
-    FASTAPI_TITLE: str = "IDX-Fundamental API"
-    FASTAPI_DESCRIPTION: str = "IDX-Fundamental API and endpoints"
-    FASTAPI_DOCS_URL: str = "/docs"
-    FASTAPI_REDOC_URL: str = "/redoc"
-    FASTAPI_OPENAPI_URL: str | None = "/openapi"
-    FASTAPI_STATIC_FILES: bool = True
-
     # .env
     DATABASE_TYPE: Literal["sqlite", "postgresql"] = "sqlite"
     DATABASE_HOST: Optional[str] = "localhost"
@@ -38,16 +28,6 @@ class Settings(BaseSettings):
     DATABASE_ECHO: bool | Literal["debug"] = False
     DATABASE_POOL_ECHO: bool | Literal["debug"] = False
     DATABASE_SETUP_DROP_TABLE: bool = False
-
-    # CORS
-    MIDDLEWARE_CORS: bool = True
-    CORS_ALLOWED_ORIGINS: list[str] = [
-        "http://127.0.0.1:8000",
-        "http://localhost:5173",
-    ]
-    CORS_EXPOSE_HEADERS: list[str] = [
-        "X-Request-ID",
-    ]
 
     DATETIME_TIMEZONE: str = "Asia/Jakarta"
     DATETIME_FORMAT: str = "%Y-%m-%d %H:%M:%S"
@@ -93,14 +73,6 @@ class Settings(BaseSettings):
     # PORTFOLIO_MIN_CONVICTION: minimum conviction score agar eligible masuk top N
     PORTFOLIO_MAX_PER_SECTOR: int = 2
     PORTFOLIO_MIN_CONVICTION: float = 0.30
-
-    @model_validator(mode="before")
-    @classmethod
-    def check_env(cls, values: Any) -> Any:
-        if values.get("ENVIRONMENT") == "prod":
-            values["FASTAPI_OPENAPI_URL"] = None
-            values["FASTAPI_STATIC_FILES"] = False
-        return values
 
     @model_validator(mode="after")
     def validate_conviction_weights(self) -> "Settings":

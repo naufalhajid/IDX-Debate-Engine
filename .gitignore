@@ -6,6 +6,15 @@ __pycache__
 .pytest_cache
 tmp
 
+# AI agent / vibe-coding workspace files
+.agent/
+.agents/
+.codex/
+.cursor/
+.windsurf/
+.github/skills/
+AGENTS.md
+
 # exclude files
 .env
 *.http

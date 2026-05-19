@@ -1,29 +1,29 @@
 {
-  "run_id": "20260517_173554",
-  "generated_at": "2026-05-17T10:37:24.298385+00:00",
+  "run_id": "20260519_173029",
+  "generated_at": "2026-05-19T10:33:38.597456+00:00",
   "tickers": [
     "WIIM"
   ],
   "rows": [
     {
       "ticker": "WIIM",
-      "single_rating": null,
-      "single_confidence": null,
-      "single_rr_ratio": null,
-      "multi_rating": null,
-      "multi_confidence": null,
-      "multi_rr_ratio": null,
-      "multi_debate_rounds": 0,
-      "multi_dissent_count": 0,
+      "single_rating": "BUY",
+      "single_confidence": 0.75,
+      "single_rr_ratio": 2.42,
+      "multi_rating": "HOLD",
+      "multi_confidence": 0.42,
+      "multi_rr_ratio": 2.0,
+      "multi_debate_rounds": 2,
+      "multi_dissent_count": 3,
       "ratings_agree": false,
-      "confidence_delta": null,
-      "notes": "Single-agent failed: Error calling model 'gemini-2.5-flash' (RESOURCE_EXHAUSTED): 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap. Learn more at https://ai.google.dev/gemini-api/docs/billing#project-spend-caps. ', 'status': 'RESOURCE_EXHAUSTED'}}"
+      "confidence_delta": -0.33,
+      "notes": "Rating berbeda: single=BUY, multi=HOLD"
     }
   ],
   "total_tickers": 1,
   "agreement_rate": 0.0,
-  "avg_confidence_delta": 0.0,
+  "avg_confidence_delta": -0.33,
   "multi_higher_confidence_count": 0,
-  "single_higher_confidence_count": 0,
-  "summary": "0/1 ticker memiliki rating yang sama; delta confidence rata-rata multi vs single +0.00."
+  "single_higher_confidence_count": 1,
+  "summary": "0/1 ticker memiliki rating yang sama; delta confidence rata-rata multi vs single -0.33."
 }

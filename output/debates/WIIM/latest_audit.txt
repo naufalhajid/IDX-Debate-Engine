@@ -2,34 +2,34 @@
 ║  AUDIT REPORT: WIIM — HOLD       ║
 ╚══════════════════════════════════════════╝
 
-Summary : WIIM→HOLD: soft_hold_rule applied (0.54) after 3 round(s). 3 agent(s) dissented. Absence of a specific, near-term catalyst could lead to price stagnation or further decline.
+Summary : WIIM→HOLD: soft_hold_rule applied (0.42) after 2 round(s). 3 agent(s) dissented. Strong short-term downtrend with price below key moving averages (EMA20, MA50), which now act as resistance.
 Run ID  : unknown
-Generated: 2026-05-17T08:40:38.858060+00:00
+Generated: 2026-05-19T10:33:38.588762+00:00
 
 VERDICT
 ───────
-Rating     : HOLD (confidence: 54%)
+Rating     : HOLD (confidence: 42%)
 Method     : soft_hold
 Consensus  : yes
-Rounds     : 3
+Rounds     : 2
 Dissent    : 60% (3 of 5 agents)
 
 AGENT VOTES
 ───────────
-  bull                   BUY      conf= 0.65  ❌
-  bear                   AVOID    conf= 0.90  ❌
   bull                   BUY      conf= 0.75  ❌
-  bear                   AVOID    conf= 0.95  ❌
+  bear                   AVOID    conf= 0.60  ❌
   bull                   BUY      conf= 0.85  ❌
-  bear                   AVOID    conf= 0.90  ❌
-  devils_advocate        HOLD     conf= 0.00  ✅
+  bear                   AVOID    conf= 0.75  ❌
+  devils_advocate        UNKNOWN  conf= 1.00  ❌
 
 KEY ARGUMENTS
 ─────────────
-Bull  : The Bear's dismissal of the intrinsic value gap as irrelevant for short-term swing risk misinterprets its function. While immediate volatility is a factor, the substantial difference between the current market price and its calculated intrinsic worth provides a robust underlying support and signific
-Bear  : The Bull's swing setup for WIIM is critically flawed, misinterpreting immediate technical signals and the relevance of long-term fundamentals for a short-term trade. The proposed entry zone of Rp 1,870 – Rp 1,881, which the Bull claims is an area for "retest or consolidation" around the EMA20 (Rp 1,
-Devil : **Question 1: MACRO/COMPANY RISK & FOREIGN FLOW**
-Given the current price of Rp 1,870 is already below EMA20/MA50 (Rp 1,880/1,881) and no immediate catalysts are identified, could sustained foreign net selling pressure on the broader market, or even a sector-specific rotation, cause WIIM to decisive
+Bull  : The Bear's focus on the breach of short-term moving averages (EMA20 and MA50) misinterprets the broader market context. While these levels have indeed been penetrated, this signifies a deeper pullback *within* a confirmed structural uptrend, not a reversal of the trend itself. The stock remains firm
+Bear  : The Bull's reliance on the MA200 at Rp 1,499 as a "robust foundational support" is premature. The price has already decisively broken below the EMA20 (Rp 1,855) and MA50 (Rp 1,872), which were previously considered support levels. This indicates a significant loss of buying conviction, suggesting th
+Devil : Agent Confidence: HIGH
+
+**1. MACRO/COMPANY RISK & FOREIGN FLOW:**
+Jika sentimen pasar global memburuk atau terjadi akselerasi net foreign sell-off di IHSG, ditambah dengan tidak adanya katalis positif spesifik untuk WIIM dalam 1-3 bulan ke depan, mungkinkah support MA200 di Rp 1,499 (dan stop loss R
 
 DATA QUALITY
 ────────────
