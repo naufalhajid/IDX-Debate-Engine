@@ -1,4 +1,0 @@
-interface:
-  display_name: "Debate Chamber"
-  short_description: "Run and tune the stock debate workflow"
-  default_prompt: "Use $debate-chamber to modify or run the multi-agent debate workflow for selected IDX tickers."
