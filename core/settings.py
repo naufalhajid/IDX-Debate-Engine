@@ -48,8 +48,8 @@ class Settings(BaseSettings):
 
     # Gemini AI
     GEMINI_API_KEY: str = ""
-    GEMINI_FLASH_MODEL: str = "gemini-2.5-flash"
-    GEMINI_PRO_MODEL: str = "gemini-2.5-pro"
+    GEMINI_FLASH_MODEL: str = "gemini-3.1-flash-lite"
+    GEMINI_PRO_MODEL: str = "gemini-3.1-pro-preview"
 
     # ── Conviction Scoring Weights (must sum to 1.0) ─────────────────────────
     # Override via: CONVICTION_WEIGHT_CONFIDENCE=0.6 CONVICTION_WEIGHT_RR_RATIO=0.4

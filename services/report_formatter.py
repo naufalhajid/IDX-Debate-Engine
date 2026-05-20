@@ -81,6 +81,22 @@ def _winner_missing(value: Any) -> bool:
     return token in {"", "none", "null", "unknown", "n/a", "data_tidak_tersedia"}
 
 
+def _soft_hold_label() -> str:
+    return "Soft Hold Rule\n(tidak ada konsensus)"
+
+
+def _is_soft_hold_winner(method: Any, winner: Any = None) -> bool:
+    try:
+        method_token = _canonical(method)
+        winner_token = _canonical(winner)
+        return "soft_hold" in method_token or winner_token in {
+            "soft_rule",
+            "soft_hold_rule",
+        }
+    except Exception:
+        return False
+
+
 def _safe_float(value: Any) -> float | None:
     if value is None or value == "":
         return None
@@ -410,6 +426,9 @@ def _votes_by_agent(votes: list[Any]) -> dict[str, Any]:
 def _winner_agent(result: dict[str, Any], packet: AuditPacket | None = None) -> str:
     verdict = _verdict(result)
     method = result.get("consensus_method") or verdict.get("consensus_method")
+    packet_winner = packet.winner_agent if packet else None
+    if _is_soft_hold_winner(method, packet_winner):
+        return _soft_hold_label()
     if packet and packet.winner_agent and not _winner_missing(packet.winner_agent):
         return packet.winner_agent
     winner = (
@@ -418,6 +437,8 @@ def _winner_agent(result: dict[str, Any], packet: AuditPacket | None = None) -> 
         or verdict.get("winner_agent")
         or verdict.get("consensus_winner")
     )
+    if _is_soft_hold_winner(method, winner):
+        return _soft_hold_label()
     if not _winner_missing(winner):
         return str(winner)
     if _canonical(method) == "voting":
@@ -425,7 +446,7 @@ def _winner_agent(result: dict[str, Any], packet: AuditPacket | None = None) -> 
         if voting_winners:
             return f"{', '.join(voting_winners)} (voting)"
         return "Voting majority"
-    return "soft rule" if method == "soft_hold" else "Data tidak tersedia"
+    return _soft_hold_label() if _is_soft_hold_winner(method) else "Data tidak tersedia"
 
 
 def _voting_winner_agents(

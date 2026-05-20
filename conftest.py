@@ -26,6 +26,15 @@ from db.models.stock import Stock as StockModel
 from db.models.stock_price import StockPrice as StockPriceModel
 
 
+@pytest.fixture(autouse=True)
+def reset_budget_state():
+    from core.budget import reset_budget
+
+    reset_budget()
+    yield
+    reset_budget()
+
+
 @pytest.fixture
 def stock_factory() -> Callable[..., StockModel]:
     def _create_stock(

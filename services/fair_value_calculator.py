@@ -1,15 +1,5 @@
 """
 fair_value_calculator.py — Pure-Python fair value engine untuk saham IHSG.
-
-MASALAH YANG DI-SOLVE:
-  Sebelumnya fair value dihitung oleh LLM (Flash) dari teks JSON mentah.
-  Ini menyebabkan LLM membuat kesalahan aritmatika — misalnya BBCA menghasilkan
-  Rp 1.770 padahal range sebenarnya Rp 4.500–Rp 11.375.
-
-SOLUSI:
-  Semua kalkulasi dilakukan di Python murni dari data API yang sudah terstruktur.
-  Hasilnya (string teks) diinjeksi ke raw_data SEBELUM dikirim ke LLM.
-  LLM hanya perlu membaca dan menginterpretasikan angka — bukan menghitungnya.
 """
 
 from __future__ import annotations
@@ -522,8 +512,7 @@ class FairValueCalculator:
 
         lines = [
             "╔══════════════════════════════════════════════════════════════╗",
-            "║  FAIR VALUE REPORT — Dihitung Python (Bukan LLM)            ║",
-            "║  Gunakan angka ini VERBATIM. Jangan menghitung ulang.        ║",
+            "║  FAIR VALUE REPORT                                           ║",
             "╚══════════════════════════════════════════════════════════════╝",
             "",
             f"TICKER          : {self.stats.ticker}",

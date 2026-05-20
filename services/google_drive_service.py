@@ -36,7 +36,19 @@ class GoogleDriveService:
         """
         Initializes the GoogleDriveService with credentials from environment variables.
         """
-        service_account_info = json.loads(os.getenv("GOOGLE_SERVICE_ACCOUNT"))
+        raw_service_account = os.getenv("GOOGLE_SERVICE_ACCOUNT") or "{}"
+        try:
+            service_account_info = json.loads(raw_service_account)
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                "GOOGLE_SERVICE_ACCOUNT is not valid JSON. "
+                "Set a valid service account JSON in .env."
+            ) from exc
+        if not service_account_info:
+            raise ValueError(
+                "GOOGLE_SERVICE_ACCOUNT is empty. "
+                "Set service account JSON or use output format 'excel'."
+            )
         self.creds = service_account.Credentials.from_service_account_info(
             service_account_info
         )

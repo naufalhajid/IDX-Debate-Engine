@@ -1,3 +1,5 @@
+# ruff: noqa: E402
+
 import argparse
 import asyncio
 import json
@@ -9,6 +11,9 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
+
+load_dotenv()
+
 from rich.console import Console
 
 from core.adaptive_planner import (
@@ -28,8 +33,6 @@ from core.settings import settings
 from services.explainability_auditor import DEFAULT_AUDITOR
 from services.report_formatter import DEFAULT_MD, RichFormatter
 from utils.logger_config import logger
-
-load_dotenv()
 
 PROMPT_MANIFEST_PATH = Path(__file__).resolve().parent / "services" / "debate_prompts" / "manifest.json"
 _batch_failed_count: int = 0

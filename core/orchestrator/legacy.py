@@ -44,6 +44,7 @@ import subprocess
 import sys
 import time
 import traceback
+import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
@@ -483,6 +484,7 @@ class CliRenderer:
     def reset_run(self) -> None:
         self.warning_count = 0
         self.error_count = 0
+        self.batch_error_count = 0
         self.audit_entries: list[tuple[str, str, str]] = []
         self.output_files: list[str] = []
         self.budget_usage: dict[str, Any] | None = None
@@ -491,6 +493,7 @@ class CliRenderer:
         self.regime_events: list[tuple[str, str, str]] = []
         self.dry_run_events: list[tuple[str, str, str]] = []
         self.rank_events: list[tuple[str, str, str]] = []
+        self.portfolio_threshold_note: str | None = None
         self.persistence_events: list[tuple[str, str, str]] = []
         self.lifecycle_events: list[tuple[str, str, str]] = []
         self.pipeline_status: dict[str, tuple[str, str]] = {}
@@ -593,6 +596,9 @@ class CliRenderer:
         level = record["level"].name
         message = _clean_cli_text(record["message"])
         if not message or set(message) <= {"="}:
+            return
+
+        if self._capture_non_counted_event(message, level):
             return
 
         if level == "WARNING" and self._is_duplicate_single_agent_warning(message):
@@ -708,6 +714,35 @@ class CliRenderer:
                 ) if level == "WARNING" else self.render_error(message)
             return True
 
+        return False
+
+    def _capture_non_counted_event(self, message: str, level: str) -> bool:
+        try:
+            prefix, body = _split_log_prefix(message)
+            if prefix == "BacktestEval":
+                self.lifecycle_events.append((self._event_status(level), prefix, body))
+                return True
+            if (
+                prefix == "Portfolio"
+                and level == "WARNING"
+                and body.startswith("Tidak ada kandidat dengan conviction >=")
+            ):
+                try:
+                    threshold = ORCHESTRATOR_CONFIG.get("min_conviction_override")
+                    if threshold is None:
+                        threshold = settings.PORTFOLIO_MIN_CONVICTION
+                    self.portfolio_threshold_note = (
+                        "Catatan: Tidak ada kandidat memenuhi conviction "
+                        f"threshold (>= {float(threshold):.0%})"
+                    )
+                except Exception:
+                    self.portfolio_threshold_note = (
+                        "Catatan: Tidak ada kandidat memenuhi conviction threshold"
+                    )
+                self.rank_events.append((self._event_status(level), prefix, body))
+                return True
+        except Exception:
+            return False
         return False
 
     def _store_audit(self, message: str, level: str) -> None:
@@ -1276,6 +1311,10 @@ class CliRenderer:
         results: list[dict[str, Any]],
         top_n: list[dict[str, Any]],
     ) -> None:
+        try:
+            self.batch_error_count = sum(1 for result in results if result.get("error"))
+        except Exception:
+            self.batch_error_count = 0
         selected = {str(entry.get("ticker") or "").upper() for entry in top_n}
         table = Table(
             title="Final Results",
@@ -1329,6 +1368,12 @@ class CliRenderer:
                     (_short_err(_exclusion_reason(result)), "muted"),
                 )
             )
+            try:
+                selected_text = _final_selection_label(
+                    result, selected=ticker in selected
+                )
+            except Exception:
+                pass
             # TODO: Current verdict schema exposes expected_return as display text;
             # if a future schema separates gross/net return, map that explicit field here.
             table.add_row(
@@ -1418,6 +1463,30 @@ class CliRenderer:
         if path_text not in self.output_files:
             self.output_files.append(path_text)
 
+    def _portfolio_threshold_note(
+        self, sizing_result: dict[str, Any] | None
+    ) -> str | None:
+        try:
+            if self.portfolio_threshold_note:
+                return self.portfolio_threshold_note
+            for _status, source, message in self.rank_events:
+                if (
+                    source == "Portfolio"
+                    and str(message).startswith(
+                        "Tidak ada kandidat dengan conviction >="
+                    )
+                ):
+                    threshold = ORCHESTRATOR_CONFIG.get("min_conviction_override")
+                    if threshold is None:
+                        threshold = settings.PORTFOLIO_MIN_CONVICTION
+                    return (
+                        "Catatan: Tidak ada kandidat memenuhi conviction "
+                        f"threshold (>= {float(threshold):.0%})"
+                    )
+        except Exception:
+            return None
+        return None
+
     def render_summary_footer(
         self,
         *,
@@ -1439,6 +1508,7 @@ class CliRenderer:
         flash_calls = int(self.budget_usage.get("flash_calls", 0))
         flash_budget = int(self.budget_usage.get("flash_budget", 0))
         estimated_tokens = pro_calls * 2000 + flash_calls * 800
+        portfolio_note = self._portfolio_threshold_note(sizing_result)
 
         if self.verbose:
             table = Table(
@@ -1461,8 +1531,10 @@ class CliRenderer:
                     f"{float(summary.get('deployed_pct') or 0.0) * 100:.1f}%",
                 )
             table.add_row("Warnings", str(self.warning_count))
-            if self.error_count:
-                table.add_row("Errors", str(self.error_count))
+            if self.batch_error_count:
+                table.add_row("Errors", str(self.batch_error_count))
+            if portfolio_note:
+                table.add_row("Catatan", portfolio_note)
             output_detail = "\n".join(output_file_strings) or "-"
             table.add_row("Output files", output_detail)
         else:
@@ -1493,9 +1565,11 @@ class CliRenderer:
                 f"{_format_cli_money(summary.get('total_deployed'))} ({deployed_pct})",
             )
             warning_text = str(self.warning_count)
-            if self.error_count:
-                warning_text = f"{warning_text} warn / {self.error_count} err"
+            if self.batch_error_count:
+                warning_text = f"{warning_text} warn / {self.batch_error_count} err"
             table.add_row("Warnings", warning_text, "Output files", output_detail)
+            if portfolio_note:
+                table.add_row("Catatan", portfolio_note, "", "")
         self.con.print(Panel(table, title="Summary Footer", border_style="green"))
 
 
@@ -1694,6 +1768,38 @@ def _exclusion_reason(result: dict[str, Any]) -> str:
     if risk.get("sizing_allowed") is False:
         return str(risk.get("status") or "risk hold")
     return "not selected after ranking"
+
+
+def _final_selection_label(result: dict[str, Any], *, selected: bool) -> Text:
+    try:
+        if result.get("error"):
+            return Text("❌ Gagal analisis", style="danger")
+        verdict = result.get("verdict") if isinstance(result.get("verdict"), dict) else {}
+        rating = str(verdict.get("rating") or "").upper()
+        risk = (
+            result.get("risk_governor")
+            if isinstance(result.get("risk_governor"), dict)
+            else {}
+        )
+        risk_status = str(risk.get("status") or "").lower()
+        if rating == "HOLD":
+            return Text("👁️ Watchlist", style="warn")
+        if rating in {"AVOID", "SELL"}:
+            return Text("🚫 Hindari", style="danger")
+        if rating in {"BUY", "STRONG_BUY"}:
+            if risk_status == "deployable":
+                return Text("✅ Siap masuk", style="ok")
+            if risk_status == "wait_for_pullback":
+                return Text("⏳ Tunggu entry", style="warn")
+            if risk_status == "watchlist_only":
+                return Text("👁️ Pantau", style="warn")
+            if selected:
+                return Text("✅ Siap masuk", style="ok")
+        if selected:
+            return Text("✅ Siap masuk", style="ok")
+        return Text(_short_err(_exclusion_reason(result)), style="muted")
+    except Exception:
+        return Text(_short_err(_exclusion_reason(result)), style="muted")
 
 
 def _format_overrides(regime_params: dict[str, Any]) -> str:
@@ -2400,6 +2506,16 @@ def _parse_price_value(value: Any) -> float | None:
 def _parse_entry_low(entry_price_range: Any) -> float | None:
     entry_low = str(entry_price_range or "").split("-", maxsplit=1)[0].strip()
     return _parse_price_value(entry_low)
+
+
+def _parse_entry_bounds(entry_price_range: Any) -> tuple[float | None, float | None]:
+    try:
+        parts = str(entry_price_range or "").replace("–", "-").split("-", maxsplit=1)
+        low = _parse_price_value(parts[0].strip()) if parts else None
+        high = _parse_price_value(parts[1].strip()) if len(parts) > 1 else low
+        return low, high
+    except Exception:
+        return None, None
 
 
 def _coerce_confidence(value: Any) -> float | None:
@@ -3946,7 +4062,9 @@ async def main(
         "OK" if prompt_pack_ok else "linter unavailable",
     )
     try:
-        eval_summary = evaluate_memory(write=True)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            eval_summary = evaluate_memory(write=True)
         if eval_summary.updated_records > 0:
             logger.info(
                 f"[BacktestEval] Auto-evaluated "
@@ -4276,7 +4394,7 @@ async def main(
     # Tampilkan error summary dan top picks langsung di terminal (bukan raw markdown).
     _print_error_summary(results)
     if run_mode != "compare":
-        _print_top3_summary(top_n)
+        _print_top3_summary(top_n, results)
 
     _cli_renderer.phase("Summary Footer")
     _cli_renderer.render_summary_footer(
@@ -4362,11 +4480,75 @@ def _print_error_summary(results: list[dict]) -> None:
     console.print()
 
 
-def _print_top3_summary(top_n: list[dict]) -> None:
+def _watchlist_rows(results: list[dict]) -> list[dict[str, Any]]:
+    try:
+        rows: list[dict[str, Any]] = []
+        for entry in results:
+            if entry.get("error"):
+                continue
+            verdict = (
+                entry.get("verdict") if isinstance(entry.get("verdict"), dict) else {}
+            )
+            rating = str(verdict.get("rating") or "").upper()
+            if rating != "HOLD":
+                continue
+            low, high = _parse_entry_bounds(verdict.get("entry_price_range"))
+            rows.append(
+                {
+                    "ticker": str(entry.get("ticker") or "-").upper(),
+                    "rating": rating,
+                    "confidence": _coerce_confidence(verdict.get("confidence")) or 0.0,
+                    "entry_low": low,
+                    "entry_high": high,
+                }
+            )
+        return rows
+    except Exception:
+        return []
+
+
+def _print_watchlist_summary(watchlist_rows: list[dict[str, Any]]) -> None:
+    try:
+        body = Table.grid(padding=(0, 1))
+        body.add_column()
+        body.add_row("Tidak ada BUY yang siap dieksekusi.")
+        body.add_row("")
+        body.add_row("📋 WATCHLIST HARI INI:")
+        body.add_row("")
+        for row in watchlist_rows:
+            low = row.get("entry_low")
+            high = row.get("entry_high")
+            if low is not None and high is not None:
+                entry_text = f"Rp {float(low):,.0f}–{float(high):,.0f}"
+            else:
+                entry_text = "N/A"
+            body.add_row(
+                f"👁️ {row.get('ticker', '-')} — "
+                f"{row.get('rating', '-')} ({float(row.get('confidence') or 0):.0%})"
+            )
+            body.add_row(f"   Entry jika koreksi ke {entry_text}")
+        console.print()
+        console.print(
+            Panel(
+                body,
+                title="[ok]Top Swing Trade Picks[/ok]",
+                subtitle=f"[muted]{TOP3_REPORT_PATH}[/muted]",
+                border_style="yellow",
+            )
+        )
+    except Exception as exc:
+        logger.warning(f"[Formatter] Watchlist panel failed: {exc}")
+
+
+def _print_top3_summary(top_n: list[dict], all_results: list[dict] | None = None) -> None:
     """
     Tampilkan ringkasan Top N hasil debate sebagai panel statis.
     """
     if not top_n:
+        watchlist_rows = _watchlist_rows(all_results or [])
+        if watchlist_rows:
+            _print_watchlist_summary(watchlist_rows)
+            return
         console.print()
         console.print(
             Panel(

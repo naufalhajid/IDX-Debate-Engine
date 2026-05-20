@@ -1,8 +1,12 @@
+# ruff: noqa: E402
+
 import argparse
 import time
 from datetime import date
 
 from dotenv import load_dotenv
+
+load_dotenv()
 
 from builders.analysers import Analyser
 from builders.database_builder import DatabaseBuilder
@@ -11,8 +15,6 @@ from providers.idx import IDX
 from providers.stockbit import StockBit
 from schemas.builder import BuilderOutputType
 from utils.logger_config import logger
-
-load_dotenv()
 
 
 def parse_arguments():

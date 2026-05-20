@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+import io
 import json
+import logging
 from pathlib import Path
 from typing import Callable, Iterable, Literal
 
@@ -176,6 +179,9 @@ def evaluate_memory(
 
         try:
             entry_date = _parse_date(record.entry_date)
+            if entry_date >= evaluation_day:
+                details.append(_detail(record, "skipped", "too_early_to_evaluate"))
+                continue
             bars = fetcher(record.ticker, entry_date + timedelta(days=1), evaluation_day)
         except Exception as exc:
             logger.warning(f"[BacktestEval] {record.ticker}: price fetch failed: {exc}")
@@ -226,14 +232,24 @@ def fetch_yfinance_price_bars(ticker: str, start: date, end: date) -> list[Price
     if not symbol.endswith(".JK"):
         symbol = f"{symbol}.JK"
 
-    frame = yf.download(
-        symbol,
-        start=start.isoformat(),
-        end=(end + timedelta(days=1)).isoformat(),
-        progress=False,
-        auto_adjust=False,
-        threads=False,
-    )
+    yf_logger = logging.getLogger("yfinance")
+    previous_disabled = yf_logger.disabled
+    try:
+        yf_logger.disabled = True
+        with (
+            contextlib.redirect_stderr(io.StringIO()),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            frame = yf.download(
+                symbol,
+                start=start.isoformat(),
+                end=(end + timedelta(days=1)).isoformat(),
+                progress=False,
+                auto_adjust=False,
+                threads=False,
+            )
+    finally:
+        yf_logger.disabled = previous_disabled
     if frame is None or frame.empty:
         return []
 

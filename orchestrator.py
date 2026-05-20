@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+# ruff: noqa: E402
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import asyncio
 from pathlib import Path
 from typing import Any
