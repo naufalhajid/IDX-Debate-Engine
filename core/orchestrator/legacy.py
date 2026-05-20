@@ -74,6 +74,7 @@ from rich.theme import Theme
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from core.backtest_memory import BacktestMemory, DEFAULT_MEMORY, TradeOutcome
+from core.backtest_outcome_evaluator import evaluate_memory
 from core.budget import BudgetExhaustedError, get_usage, reset_budget
 from core.adaptive_planner import (
     DEFAULT_PLANNER,
@@ -117,6 +118,7 @@ from core.comparison_reporter import DEFAULT_REPORTER, ComparisonReporter
 from services.debate_prompt_registry import PROMPT_VERSION
 from services.explainability_auditor import DEFAULT_AUDITOR
 from services.news_fetcher import DEFAULT_FETCHER
+from services.report_formatter import DEFAULT_MD, MarkdownFormatter, RichFormatter
 from services.single_agent_analyzer import SingleAgentAnalyzer
 from utils.logger_config import logger
 from utils.price_fetcher import fetch_current_price
@@ -1184,6 +1186,7 @@ class CliRenderer:
                 self.con.print(
                     Panel(table, title=f"{ticker} Summary", border_style="green")
                 )
+                self._render_formatter_ticker_panel(result, ticker)
                 continue
 
             table = Table.grid(padding=(0, 2))
@@ -1227,6 +1230,18 @@ class CliRenderer:
                     border_style=border,
                 )
             )
+            self._render_formatter_ticker_panel(result, ticker)
+
+    def _render_formatter_ticker_panel(
+        self,
+        result: dict[str, Any],
+        ticker: str,
+    ) -> None:
+        try:
+            formatter = RichFormatter(console=self.con)
+            formatter.render_ticker_panel(result)
+        except Exception as e:
+            logger.warning(f"[Formatter] Rich panel failed for {ticker}: {e}")
 
     def _failure_detail_text(self, failure_detail: str | None, error: Any) -> str:
         if self.verbose:
@@ -2644,6 +2659,41 @@ def _write_batch_telemetry_report(
         logger.warning(f"[Telemetry] Batch report failed: {e}")
 
 
+def _write_formatter_reports(
+    *,
+    results: list[dict[str, Any]],
+    run_id: str,
+    output_dir: Path,
+    formatter: MarkdownFormatter = DEFAULT_MD,
+) -> None:
+    for result in results:
+        verdict = _dict_or_empty(result.get("verdict"))
+        ticker = str(
+            result.get("ticker") or verdict.get("ticker") or "UNKNOWN"
+        ).upper()
+        try:
+            payload = dict(result)
+            metadata = _dict_or_empty(payload.get("metadata"))
+            if str(metadata.get("run_id") or "").lower() in {"", "unknown"}:
+                metadata = {**metadata, "run_id": run_id}
+                payload["metadata"] = metadata
+            md_content = formatter.generate_ticker_report(payload)
+            md_path = output_dir / "debates" / ticker / "latest_report.md"
+            md_path.parent.mkdir(parents=True, exist_ok=True)
+            md_path.write_text(md_content, encoding="utf-8")
+            logger.info(f"[Formatter] Markdown report saved: {md_path}")
+        except Exception as e:
+            logger.warning(f"[Formatter] Markdown failed for {ticker}: {e}")
+
+    try:
+        batch_md = formatter.generate_batch_summary(results=results, run_id=run_id)
+        batch_md_path = output_dir / "latest_batch_report.md"
+        batch_md_path.write_text(batch_md, encoding="utf-8")
+        logger.info(f"[Formatter] Batch summary saved: {batch_md_path}")
+    except Exception as e:
+        logger.warning(f"[Formatter] Batch summary failed: {e}")
+
+
 def _check_report_consistency(
     *,
     batch_json_path: Path,
@@ -3895,6 +3945,19 @@ async def main(
         "✓" if prompt_pack_ok else "!",
         "OK" if prompt_pack_ok else "linter unavailable",
     )
+    try:
+        eval_summary = evaluate_memory(write=True)
+        if eval_summary.updated_records > 0:
+            logger.info(
+                f"[BacktestEval] Auto-evaluated "
+                f"{eval_summary.updated_records} "
+                f"open trade(s) from history"
+            )
+        else:
+            logger.info("[BacktestEval] No open trades to evaluate")
+    except Exception as e:
+        logger.warning(f"[BacktestEval] Auto-eval failed: {e}")
+
     ticker_override = list(CLI_TICKERS_OVERRIDE or [])
 
     reset_budget()
@@ -4152,6 +4215,11 @@ async def main(
         output_dir=OUTPUT_DIR,
         record_backtest_memory=not dry_run,
     )
+    _write_formatter_reports(
+        results=results,
+        run_id=ledger_run_id,
+        output_dir=OUTPUT_DIR,
+    )
     generate_top3_report(top_n, results, TOP3_REPORT_PATH, sizing_result=sizing_result)
     _log_artifact_validation(results)
     _write_batch_telemetry_report(
@@ -4182,6 +4250,7 @@ async def main(
     persistence_outputs = [
         FULL_RESULTS_PATH,
         TOP3_REPORT_PATH,
+        OUTPUT_DIR / "latest_batch_report.md",
         OUTPUT_DIR / "debates",
         OUTPUT_DIR / "telemetry" / "latest_batch_report.txt",
         OUTPUT_DIR / "telemetry" / f"{ledger_run_id}_report.txt",

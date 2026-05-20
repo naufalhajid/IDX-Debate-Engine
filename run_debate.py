@@ -9,6 +9,7 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
+from rich.console import Console
 
 from core.adaptive_planner import (
     DEFAULT_PLANNER,
@@ -25,6 +26,7 @@ from core.report_consistency import InconsistencyType, check_consistency
 from core.risk_governor import annotate_risk
 from core.settings import settings
 from services.explainability_auditor import DEFAULT_AUDITOR
+from services.report_formatter import DEFAULT_MD, RichFormatter
 from utils.logger_config import logger
 
 load_dotenv()
@@ -380,6 +382,34 @@ def _write_audit_report(
         logger.info(f"[Audit] {ticker}: {packet.one_line_summary}")
     except Exception as exc:
         logger.warning(f"[Audit] Failed to build audit report for {ticker}: {exc}")
+
+
+def _write_formatter_report(
+    *,
+    output_dir: Path,
+    ticker: str,
+    result: dict[str, Any],
+    run_timestamp: str,
+) -> None:
+    payload = dict(result)
+    metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+    if str(metadata.get("run_id") or "").lower() in {"", "unknown"}:
+        metadata = {**metadata, "run_id": run_timestamp}
+        payload["metadata"] = metadata
+    try:
+        formatter = RichFormatter(console=Console())
+        formatter.render_ticker_panel(payload)
+    except Exception as e:
+        logger.warning(f"[Formatter] {ticker}: {e}")
+
+    try:
+        md = DEFAULT_MD.generate_ticker_report(payload)
+        md_path = output_dir / ticker / "latest_report.md"
+        md_path.parent.mkdir(parents=True, exist_ok=True)
+        md_path.write_text(md, encoding="utf-8")
+        logger.info(f"[Formatter] Report: {md_path}")
+    except Exception as e:
+        logger.warning(f"[Formatter] MD failed: {e}")
 
 
 def _status_from_error(error: str | None) -> str:
@@ -948,6 +978,12 @@ async def _debate_one(
         _write_audit_report(
             output_dir=output_dir,
             ticker=ticker,
+            run_timestamp=run_timestamp,
+        )
+        _write_formatter_report(
+            output_dir=output_dir,
+            ticker=ticker,
+            result=report,
             run_timestamp=run_timestamp,
         )
         _record_ticker_telemetry(
