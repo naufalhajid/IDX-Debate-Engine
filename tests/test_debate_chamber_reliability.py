@@ -551,6 +551,95 @@ def test_sanitize_json_preserves_url_and_hash_inside_strings():
     assert parsed["weighted_reasoning"] == "#1 catalyst is contract renewal"
 
 
+def test_llm_content_to_text_extracts_text_parts():
+    content = [
+        {"type": "text", "text": "First paragraph."},
+        {"content": "Second paragraph."},
+        SimpleNamespace(text="Third paragraph."),
+    ]
+
+    normalized = DebateChamber._llm_content_to_text(content)
+
+    assert normalized == "First paragraph.\nSecond paragraph.\nThird paragraph."
+    assert "[{'type': 'text'" not in normalized
+
+
+@pytest.mark.asyncio
+async def test_cio_parses_list_content_response_and_keeps_consensus_override(monkeypatch):
+    chamber = _chamber()
+    chamber.pro_llm = FakeLLM(model="gemini-2.5-pro")
+
+    payload = {
+        "ticker": "ADRO",
+        "rating": "BUY",
+        "confidence": 0.83,
+        "summary": "Parsed list content without fallback.",
+        "weighted_reasoning": "Signals are constructive but timing remains mixed.",
+        "key_catalysts": ["earnings"],
+        "key_risks": ["support break"],
+        "timeframe": "1-3 Months",
+        "entry_price_range": "1 - 2",
+        "target_price": 3,
+        "stop_loss": 1,
+        "current_price": 1000,
+        "fair_value": 1300,
+        "expected_return": "+8.0%",
+        "risk_reward_ratio": 2.0,
+        "consensus_reached": True,
+        "consensus_method": "soft_hold",
+        "dissenting_agents": ["bear"],
+    }
+
+    async def fake_invoke(llm, messages, inject_rules=True):
+        return SimpleNamespace(
+            content=[
+                {
+                    "type": "text",
+                    "text": json.dumps(payload),
+                }
+            ]
+        )
+
+    monkeypatch.setattr(chamber, "_invoke_llm", fake_invoke)
+
+    result = await chamber._cio_judge_node(
+        {
+            "ticker": "ADRO",
+            "current_price": 1000.0,
+            "technical_indicators": {"ma50": 990.0, "sma20": 1000.0, "atr14": 30.0},
+            "fair_value_estimate": 1300.0,
+            "debate_history": [
+                DebateMessage(
+                    role="bull",
+                    content="Position: BUY\nAgent Confidence: 0.82",
+                    round_num=2,
+                ),
+                DebateMessage(
+                    role="bear",
+                    content="Position: AVOID\nAgent Confidence: 0.88",
+                    round_num=2,
+                ),
+            ],
+            "raw_data": "compact raw",
+            "decision_brief": "compact brief",
+            "devils_advocate_question": "What if support breaks?",
+            "consensus_reached": True,
+            "consensus_method": "soft_hold",
+            "dissenting_agents": ["bull", "bear"],
+            "agent_votes": [],
+            "disagreement_type": "timing",
+        }
+    )
+
+    verdict = json.loads(result["final_verdict"])
+
+    assert "CIO parse error" not in verdict["summary"]
+    assert verdict["summary"] == "Parsed list content without fallback."
+    assert verdict["rating"] == "HOLD"
+    assert verdict["confidence"] == 0.55
+    assert verdict["consensus_method"] == "soft_hold"
+
+
 def test_cio_prompt_contains_confidence_calibration_rubric():
     prompt = dc.CIO_SYSTEM_PROMPT
 

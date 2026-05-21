@@ -22,7 +22,7 @@ from collections import Counter
 import json
 import re
 from time import perf_counter
-from typing import Literal
+from typing import Any, Literal
 
 import pandas as pd
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -33,7 +33,7 @@ from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponen
 try:
     import pytz
     _TZ_WIB = pytz.timezone("Asia/Jakarta")
-except ImportError:
+except Exception:
     from datetime import timezone, timedelta
     _TZ_WIB = timezone(timedelta(hours=7))
 
@@ -54,13 +54,11 @@ from core.handoff_envelope import make_envelope
 from core.observation_store import AgentObservation, DEFAULT_STORE
 from providers.gemini import get_flash_llm, get_pro_llm
 from schemas.debate import CIOVerdict, DebateChamberState, DebateMessage, validate_swing_targets
-from services.stockbit_api_client import StockbitApiClient
 from services.context_pack_builder import build_context_pack, pack_to_prompt_string
 from services.rag_evidence_store import DEFAULT_STORE as rag_store
 from services.fair_value_calculator import build_fair_value_report
 from services.debate_prompt_registry import PROMPT_REGISTRY, PROMPT_VERSION
 from services.debate_run_guard import run_with_guard
-from services.news_fetcher import DEFAULT_FETCHER
 from utils.logger_config import logger
 from utils.market_data_cache import (
     derive_current_price,
@@ -231,6 +229,8 @@ def _ledger_stage_partial(
 
 def _news_context_for_state(state: DebateChamberState, ticker: str) -> dict[str, object]:
     try:
+        from services.news_fetcher import DEFAULT_FETCHER
+
         news_bundle = DEFAULT_FETCHER.build_bundle(ticker)
         news_str = DEFAULT_FETCHER.bundle_to_prompt_string(news_bundle)
         if news_bundle.confidence_adjustment != 0:
@@ -473,7 +473,11 @@ class DebateChamber:
     def __init__(self, flash_llm=None, pro_llm=None, stockbit_client=None):
         self.flash_llm = flash_llm or get_flash_llm()
         self.pro_llm = pro_llm or get_pro_llm()
-        self.stockbit_client = stockbit_client or StockbitApiClient()
+        if stockbit_client is None:
+            from services.stockbit_api_client import StockbitApiClient
+
+            stockbit_client = StockbitApiClient()
+        self.stockbit_client = stockbit_client
         self.app = self._build_graph()
         self.prompt_version = PROMPT_VERSION
         self._llm_call_counts: dict[tuple[str, str], dict[str, int]] = {}
@@ -510,6 +514,31 @@ class DebateChamber:
         if len(clean) <= limit:
             return clean
         return clean[:limit].rstrip() + "..."
+
+    @classmethod
+    def _llm_content_to_text(cls, content: Any) -> str:
+        """Normalize LangChain/Gemini message content parts into plain text."""
+        if content is None:
+            return ""
+        if isinstance(content, str):
+            return content
+        if isinstance(content, dict):
+            if "text" in content:
+                return cls._llm_content_to_text(content.get("text"))
+            if "content" in content:
+                return cls._llm_content_to_text(content.get("content"))
+            return json.dumps(content, ensure_ascii=False)
+        if isinstance(content, list | tuple):
+            parts = [
+                cls._llm_content_to_text(item).strip()
+                for item in content
+            ]
+            return "\n".join(part for part in parts if part)
+        for attr in ("text", "content"):
+            value = getattr(content, attr, None)
+            if value is not None:
+                return cls._llm_content_to_text(value)
+        return str(content)
 
     @classmethod
     def _redact_debate_prices(cls, text: str) -> str:
@@ -607,8 +636,9 @@ class DebateChamber:
             "confidence": None if confidence is None else round(confidence, 2),
         }
 
-    def _ensure_signal_footer(self, content: str, role: str) -> tuple[str, dict[str, object]]:
-        signal = self._extract_agent_signal(content, role)
+    def _ensure_signal_footer(self, content: Any, role: str) -> tuple[str, dict[str, object]]:
+        text = self._llm_content_to_text(content).strip()
+        signal = self._extract_agent_signal(text, role)
         confidence = signal.get("confidence")
         if confidence is None:
             confidence = 0.0
@@ -616,7 +646,6 @@ class DebateChamber:
         if signal.get("position") == "UNKNOWN":
             signal["position"] = "HOLD" if confidence == 0.0 else "UNKNOWN"
 
-        text = str(content or "").strip()
         if "agent confidence" not in text.lower() or "position:" not in text.lower():
             text = (
                 f"{text}\n\n"
@@ -950,8 +979,8 @@ Current Date (Asia/Jakarta): {current_date}
         # NOT raise an exception in these cases, so without this check the
         # empty string silently propagates into DebateMessage.content and the
         # CIO receives a debate with no arguments — producing confidence=0.0.
-        content = getattr(resp, "content", None)
-        if not content or not str(content).strip():
+        content = self._llm_content_to_text(getattr(resp, "content", None))
+        if not content.strip():
             logger.warning(
                 f"LLM returned empty response for {llm.model_name if hasattr(llm, 'model_name') else 'unknown'}. "
                 "Retrying..."
@@ -1561,7 +1590,7 @@ Current Date (Asia/Jakarta): {current_date}
             HumanMessage(content="\n".join(content_parts)),
         ]
         resp = await self._invoke_llm_for_state(state, self.flash_llm, messages)
-        content, signal = self._ensure_signal_footer(str(resp.content), "bull")
+        content, signal = self._ensure_signal_footer(resp.content, "bull")
         if len(content) < 50:
             logger.warning(
                 f"[Bull] Suspiciously short response for {ticker} R{rc+1} "
@@ -1610,7 +1639,7 @@ Current Date (Asia/Jakarta): {current_date}
         ]
         resp = await self._invoke_llm_for_state(state, self.flash_llm, messages)  # Use Flash for Bear opening/rebuttal rounds
         new_rc = rc + 1
-        content, signal = self._ensure_signal_footer(str(resp.content), "bear")
+        content, signal = self._ensure_signal_footer(resp.content, "bear")
         if len(content) < 50:
             logger.warning(
                 f"[Bear] Suspiciously short response for {ticker} R{new_rc} "
@@ -1731,7 +1760,7 @@ Current Date (Asia/Jakarta): {current_date}
             HumanMessage(content=f"Decision Brief:\n{decision_context}\n\nDebate:\n{hist}"),
         ]
         resp = await self._invoke_llm_for_state(state, self.flash_llm, messages)
-        content, signal = self._ensure_signal_footer(str(resp.content), "devils_advocate")
+        content, signal = self._ensure_signal_footer(resp.content, "devils_advocate")
         msg = DebateMessage(
             role="devils_advocate",
             content=content,
@@ -2341,7 +2370,9 @@ Start your response with '{' and end with '}'. Nothing else."""
                 messages,
                 inject_rules=False,
             )
-            parsed = json.loads(self._sanitize_json(resp.content))
+            parsed = json.loads(
+                self._sanitize_json(self._llm_content_to_text(resp.content))
+            )
             parsed = _apply_envelope(parsed)
             parsed = self._apply_consensus_override(parsed, state)
             parsed = _apply_news_adjustment(parsed)
