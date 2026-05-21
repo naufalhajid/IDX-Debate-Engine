@@ -1,10 +1,30 @@
 import os
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from core.failure_taxonomy import classify_exception
 from core.settings import settings
 from utils.logger_config import logger
+
+
+_gemini_api_key_override: ContextVar[str | None] = ContextVar(
+    "gemini_api_key_override",
+    default=None,
+)
+
+
+@contextmanager
+def gemini_api_key_override(api_key: str) -> Iterator[None]:
+    """Temporarily prefer a request-scoped Gemini key over .env settings."""
+
+    token = _gemini_api_key_override.set(api_key)
+    try:
+        yield
+    finally:
+        _gemini_api_key_override.reset(token)
 
 
 def _get_api_key() -> str:
@@ -15,7 +35,11 @@ def _get_api_key() -> str:
     by the time factory functions are called at runtime.
     """
 
-    return settings.GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY", "")
+    return (
+        _gemini_api_key_override.get()
+        or settings.GEMINI_API_KEY
+        or os.environ.get("GEMINI_API_KEY", "")
+    )
 
 
 def get_flash_llm() -> ChatGoogleGenerativeAI:

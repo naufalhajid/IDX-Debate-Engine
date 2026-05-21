@@ -54,6 +54,8 @@ node_modules/
 .wrangler
 /.svelte-kit
 /build
+app/ui/.svelte-kit/
+app/ui/build/
 
 # OS
 .DS_Store

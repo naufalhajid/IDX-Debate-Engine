@@ -19,6 +19,7 @@ Refactored (audit fixes):
 
 import asyncio
 from collections import Counter
+from collections.abc import AsyncGenerator
 import json
 import re
 from time import perf_counter
@@ -53,7 +54,13 @@ from core.failure_taxonomy import classify_exception
 from core.handoff_envelope import make_envelope
 from core.observation_store import AgentObservation, DEFAULT_STORE
 from providers.gemini import get_flash_llm, get_pro_llm
-from schemas.debate import CIOVerdict, DebateChamberState, DebateMessage, validate_swing_targets
+from schemas.debate import (
+    CIOVerdict,
+    DebateChamberState,
+    DebateMessage,
+    history_updater,
+    validate_swing_targets,
+)
 from services.context_pack_builder import build_context_pack, pack_to_prompt_string
 from services.rag_evidence_store import DEFAULT_STORE as rag_store
 from services.fair_value_calculator import build_fair_value_report
@@ -903,6 +910,110 @@ class DebateChamber:
         except Exception as exc:
             logger.warning(f"[Telemetry] Failed to merge LLM counters: {exc}")
         return result
+
+    @staticmethod
+    def _merge_node_update(
+        state: DebateChamberState,
+        update: dict[str, Any] | None,
+    ) -> DebateChamberState:
+        """Merge a node result into state using the debate-history reducer."""
+
+        if not update:
+            return state
+        for key, value in update.items():
+            if key == "debate_history":
+                state["debate_history"] = history_updater(
+                    state.get("debate_history", []),
+                    value,
+                )
+            else:
+                state[key] = value
+        return state
+
+    def _new_initial_state(
+        self,
+        *,
+        ticker: str,
+        current_price: float,
+        market_data: dict[str, Any],
+        run_id: str,
+    ) -> DebateChamberState:
+        """Create the canonical initial debate state."""
+
+        return {
+            "ticker": ticker,
+            "current_price": current_price,
+            "market_data": market_data,
+            "fundamental_data": "",
+            "technical_data": "",
+            "sentiment_data": "",
+            "news_brief": "",
+            "news_confidence_adjustment": 0.0,
+            "raw_data": "",
+            "decision_brief": "",
+            "technical_indicators": {},
+            "fair_value_estimate": 0.0,
+            "debate_history": [],
+            "round_count": 0,
+            "consensus_reached": False,
+            "consensus_method": None,
+            "dissenting_agents": [],
+            "agent_votes": [],
+            "consensus_winner": None,
+            "disagreement_type": None,
+            "devils_advocate_question": "",
+            "final_verdict": "",
+            "metadata": {
+                "prompt_version": getattr(self, "prompt_version", PROMPT_VERSION),
+                "run_id": run_id,
+                "market_data_source": market_data.get("source", "unknown"),
+                "market_data_cached": True,
+                "flash_calls": 0,
+                "pro_calls": 0,
+            },
+            "error": None,
+        }
+
+    @staticmethod
+    def _message_field(message: Any, field: str, default: Any = None) -> Any:
+        """Read a DebateMessage or dict field."""
+
+        if isinstance(message, dict):
+            if field == "round_num" and field not in message:
+                return message.get("round", default)
+            return message.get(field, default)
+        if field == "round_num" and not hasattr(message, field):
+            return getattr(message, "round", default)
+        return getattr(message, field, default)
+
+    def _public_scout_metrics(
+        self,
+        state: DebateChamberState,
+    ) -> dict[str, dict[str, Any]]:
+        """Format scout state into UI-safe metrics."""
+
+        metadata = state.get("metadata") or {}
+        return {
+            "technical": {
+                **(state.get("technical_indicators") or {}),
+                "current_price": state.get("current_price", 0.0),
+            },
+            "fundamental": {
+                "fair_value": state.get("fair_value_estimate", 0.0),
+                "position": self._extract_agent_signal(
+                    str(state.get("fundamental_data", "")),
+                    "fundamental_scout",
+                ).get("position", "UNKNOWN"),
+            },
+            "sentiment": {
+                "news": metadata.get("news_overall_sentiment", "UNKNOWN"),
+                "adjustment": state.get("news_confidence_adjustment", 0.0),
+                "position": self._extract_agent_signal(
+                    str(state.get("sentiment_data", "")),
+                    "sentiment_specialist",
+                ).get("position", "UNKNOWN"),
+            },
+        }
 
     async def _invoke_llm(self, llm, messages, inject_rules: bool = True):
         """
@@ -2452,6 +2563,227 @@ Start your response with '{' and end with '}'. Nothing else."""
         graph.add_edge("cio_judge",       END)
 
         return graph.compile()
+
+    async def _run_scouts(self, ticker: str) -> dict[str, Any]:
+        """
+        Run specialist scouts and return technical/fundamental/sentiment metrics.
+        """
+
+        market_data = await self._fetch_market_data(ticker)
+        current_price = derive_current_price(market_data)
+        state = self._new_initial_state(
+            ticker=ticker,
+            current_price=current_price,
+            market_data=market_data,
+            run_id=getattr(self, "run_id", "unknown"),
+        )
+        self._reset_llm_counters(state)
+
+        scout_states = [dict(state), dict(state), dict(state)]
+        updates = await asyncio.gather(
+            self._fundamental_node(scout_states[0]),
+            self._chartist_node(scout_states[1]),
+            self._sentiment_node(scout_states[2]),
+        )
+        for update in updates:
+            self._merge_node_update(state, update)
+
+        metrics = self._public_scout_metrics(state)
+        metrics["_state"] = state
+        return metrics
+
+    async def _run_single_round(
+        self,
+        state: dict[str, Any],
+        round_num: int,
+    ) -> dict[str, Any]:
+        """
+        Run one bull-vs-bear debate round and return arguments plus state.
+        """
+
+        debate_state = state
+        if round_num > 1:
+            self._merge_node_update(
+                debate_state,
+                await self._state_cleaner_node(debate_state),
+            )
+
+        self._merge_node_update(
+            debate_state,
+            await self._bullish_node(debate_state),
+        )
+        self._merge_node_update(
+            debate_state,
+            await self._bearish_node(debate_state),
+        )
+        self._merge_node_update(
+            debate_state,
+            await self._consensus_evaluator_node(debate_state),
+        )
+
+        bull_msg = self._latest_message(debate_state, "bull")
+        bear_msg = self._latest_message(debate_state, "bear")
+        bull_conf = float(getattr(bull_msg, "confidence", 0.0) or 0.0)
+        bear_conf = float(getattr(bear_msg, "confidence", 0.0) or 0.0)
+        return {
+            "bull": getattr(bull_msg, "content", "") if bull_msg else "",
+            "bear": getattr(bear_msg, "content", "") if bear_msg else "",
+            "score_delta": round((bull_conf - bear_conf) * 100),
+            "state": debate_state,
+        }
+
+    async def _build_verdict(self, state: dict[str, Any]) -> dict[str, Any]:
+        """Build the raw final verdict state."""
+
+        debate_state = state
+        self._merge_node_update(
+            debate_state,
+            await self._cio_judge_node(debate_state),
+        )
+        return self._merge_llm_counters(
+            debate_state,
+            str((debate_state.get("metadata") or {}).get("run_id", "unknown")),
+            str(debate_state.get("ticker", "unknown")),
+        )
+
+    def _is_consensus(self, state: dict[str, Any]) -> bool:
+        """Return True when the existing consensus threshold has been crossed."""
+
+        if state.get("consensus_reached"):
+            return True
+        if state.get("consensus_method") in {"soft_hold", "confidence_winner"}:
+            return True
+
+        bull_msg = self._latest_message(state, "bull")
+        bear_msg = self._latest_message(state, "bear")
+        if bull_msg is None or bear_msg is None:
+            return False
+        bull_conf = getattr(bull_msg, "confidence", None)
+        bear_conf = getattr(bear_msg, "confidence", None)
+        if bull_conf is None or bear_conf is None:
+            return False
+        threshold = getattr(self, "consensus_threshold", CONSENSUS_THRESHOLD)
+        return abs(float(bull_conf) - float(bear_conf)) >= threshold
+
+    def _init_state(
+        self,
+        ticker: str,
+        scout_metrics: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Initialize debate state from scout metrics."""
+
+        state = scout_metrics.get("_state")
+        if isinstance(state, dict):
+            return state
+        return self._new_initial_state(
+            ticker=ticker,
+            current_price=float(
+                (scout_metrics.get("technical") or {}).get("current_price", 0.0)
+            ),
+            market_data={},
+            run_id=getattr(self, "run_id", "unknown"),
+        )
+
+    async def stream_run(
+        self,
+        ticker: str,
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """
+        Stream the debate pipeline node-by-node as SSE-friendly event dicts.
+        """
+
+        ticker = ticker.strip().upper()
+        try:
+            yield {
+                "type": "progress",
+                "ticker": ticker,
+                "phase": "scouting",
+                "pct": 10,
+            }
+            await asyncio.sleep(0)
+
+            scout_metrics = await self._run_scouts(ticker)
+            public_scout_metrics = {
+                key: value
+                for key, value in scout_metrics.items()
+                if not key.startswith("_")
+            }
+            yield {
+                "type": "scout",
+                "ticker": ticker,
+                "metrics": public_scout_metrics,
+            }
+            await asyncio.sleep(0)
+
+            state = self._init_state(ticker, scout_metrics)
+            yield {
+                "type": "progress",
+                "ticker": ticker,
+                "phase": "context",
+                "pct": 20,
+            }
+            await asyncio.sleep(0)
+            self._merge_node_update(state, await self._synthesizer_node(state))
+
+            total_round_slots = max(MAX_DEBATE_ROUNDS, 1)
+            while True:
+                next_round = int(state.get("round_count", 0) or 0) + 1
+                round_pct = 20 + int((next_round / total_round_slots) * 60)
+                yield {
+                    "type": "progress",
+                    "ticker": ticker,
+                    "phase": f"round_{next_round}",
+                    "pct": min(round_pct, 80),
+                }
+                await asyncio.sleep(0)
+
+                round_result = await self._run_single_round(state, next_round)
+                state = round_result["state"]
+                yield {
+                    "type": "round",
+                    "ticker": ticker,
+                    "data": {
+                        "round": next_round,
+                        "bull_argument": round_result["bull"],
+                        "bear_argument": round_result["bear"],
+                        "score_delta": round_result["score_delta"],
+                    },
+                }
+                await asyncio.sleep(0)
+
+                if post_evaluator_router(state) == "devils_advocate":
+                    break
+
+            self._merge_node_update(
+                state,
+                await self._devils_advocate_node(state),
+            )
+            yield {"type": "devil_advocate", "ticker": ticker}
+            await asyncio.sleep(0)
+
+            yield {
+                "type": "progress",
+                "ticker": ticker,
+                "phase": "verdict",
+                "pct": 90,
+            }
+            await asyncio.sleep(0)
+
+            raw_result = await self._build_verdict(state)
+            from app.api.result_adapter import adapt_result
+
+            yield {
+                "type": "verdict",
+                "ticker": ticker,
+                "result": adapt_result(ticker, raw_result),
+            }
+            await asyncio.sleep(0)
+
+            yield {"type": "done", "ticker": ticker}
+            await asyncio.sleep(0)
+        except Exception as exc:
+            yield {"type": "error", "ticker": ticker, "message": str(exc)}
+            await asyncio.sleep(0)
 
     # ── Public API ───────────────────────────────────────────────────────────
 
