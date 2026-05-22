@@ -182,7 +182,7 @@ def _clean_cli_text(value: Any) -> str:
         "â€“": "–",
         "â†’": "->",
         "Ã—": "x",
-        "âœ…": "✓",
+        "âœ…": "OK",
         "âš ï¸": "WARNING",
         "ðŸ›‘": "STOP",
         "ðŸš¨": "ERROR",
@@ -196,6 +196,13 @@ def _clean_cli_text(value: Any) -> str:
 
 def _short_err(msg: str, max_len: int = 60) -> str:
     return msg if len(msg) <= max_len else msg[: max_len - 1] + "…"
+
+
+def _is_compact_console(con: Console, threshold: int = 140) -> bool:
+    try:
+        return int(con.size.width) < threshold
+    except Exception:
+        return True
 
 
 def _format_cli_pct(value: Any) -> str:
@@ -382,7 +389,6 @@ class BatchProgressView:
         error = result.get("error")
         rating = str(verdict.get("rating") or ("ERROR" if error else "-"))
         confidence = _format_cli_pct(verdict.get("confidence"))
-        warnings = _result_warning_notes(result)
         row_state = _progress_row_state(result)
         self.update(
             ticker,
@@ -398,7 +404,7 @@ class BatchProgressView:
             active=None,
             rating=rating,
             confidence=confidence,
-            status=_short_err(str(error or "; ".join(warnings) or "Complete")),
+            status=_live_result_note(result),
             row_state=row_state,
         )
 
@@ -418,29 +424,63 @@ class BatchProgressView:
         )
 
     def _build_table(self) -> Table:
+        is_compact = _is_compact_console(self.con)
         table = Table(
             title="Live Batch Progress",
             box=box.SIMPLE,
-            expand=True,
+            expand=not is_compact,
             show_edge=False,
             pad_edge=False,
         )
-        for column in (
-            "Ticker",
-            "Fetching",
-            "Analysis",
-            "Risk",
-            "Debating",
-            "Done",
-            "Rating",
-            "Confidence",
-            "Status",
-        ):
-            justify = "center" if column not in {"Ticker", "Status"} else "left"
-            column_options: dict[str, Any] = {"justify": justify, "no_wrap": True}
-            if column == "Status":
-                column_options.update({"overflow": "ellipsis", "max_width": 60})
-            table.add_column(column, **column_options)
+        columns = (
+            ("Ticker", "ticker", {"style": "bold", "no_wrap": True, "width": 6}),
+            (
+                "D" if is_compact else "Data",
+                "fetching",
+                {"justify": "center", "no_wrap": True},
+            ),
+            (
+                "A" if is_compact else "FA/TA",
+                "analysis",
+                {"justify": "center", "no_wrap": True},
+            ),
+            (
+                "R" if is_compact else "Risk",
+                "risk",
+                {"justify": "center", "no_wrap": True},
+            ),
+            (
+                "B" if is_compact else "Debate",
+                "debating",
+                {"justify": "center", "no_wrap": True},
+            ),
+            (
+                "OK" if is_compact else "Done",
+                "done",
+                {"justify": "center", "no_wrap": True},
+            ),
+            (
+                "Rating",
+                "rating",
+                {"justify": "center", "no_wrap": True, "max_width": 10},
+            ),
+            (
+                "Conf",
+                "confidence",
+                {"justify": "right", "no_wrap": True, "width": 6},
+            ),
+            (
+                "Note",
+                "status",
+                {
+                    "overflow": "fold",
+                    "max_width": 28 if is_compact else 48,
+                    "ratio": 1,
+                },
+            ),
+        )
+        for header, _key, options in columns:
+            table.add_column(header, **options)
         for ticker, row in self._rows.items():
             style = _progress_row_style(str(row.get("row_state") or "pending"))
             table.add_row(
@@ -455,7 +495,7 @@ class BatchProgressView:
                     style=_rating_cell_style(str(row.get("rating") or "")),
                 ),
                 str(row.get("confidence") or "-"),
-                Text(_short_err(str(row.get("status") or "-"))),
+                Text(str(row.get("status") or "-")),
                 style=style,
             )
         return table
@@ -465,12 +505,12 @@ class BatchProgressView:
             return Spinner("dots", style="cyan")
         state = row.get(step)
         if state == "done":
-            return Text("✓", style="ok")
+            return Text("OK", style="ok")
         if state == "failed":
-            return Text("✗", style="danger")
+            return Text("FAIL", style="danger")
         if state == "warning":
-            return Text("!", style="warn")
-        return Text("–", style="muted")
+            return Text("WARN", style="warn")
+        return Text("-", style="muted")
 
 
 class CliRenderer:
@@ -565,11 +605,34 @@ class CliRenderer:
     def flush_buffered_alerts(self) -> None:
         pending = self._buffered_alerts
         self._buffered_alerts = []
+        if not pending:
+            return
+        table = Table(box=box.SIMPLE, expand=True, show_edge=False, pad_edge=False)
+        table.add_column("Level", style="bold", no_wrap=True)
+        table.add_column("Message", overflow="fold")
+        seen: set[tuple[str, str]] = set()
+        has_error = False
         for kind, message in pending:
-            if kind == "warning":
-                self._print_warning(message)
-            else:
-                self._print_error(message)
+            cleaned = _clean_cli_text(str(message)).strip()
+            if not cleaned:
+                continue
+            key = (kind, cleaned)
+            if key in seen:
+                continue
+            seen.add(key)
+            level = "ERROR" if kind == "error" else "WARNING"
+            has_error = has_error or kind == "error"
+            table.add_row(Text(level, style="danger" if kind == "error" else "warn"), cleaned)
+        if not seen:
+            return
+        self.con.print(
+            Panel(
+                table,
+                title="Execution Warnings",
+                border_style="red" if has_error else "yellow",
+                title_align="left",
+            )
+        )
 
     def has_single_agent_warning(self, ticker: str) -> bool:
         return str(ticker or "").upper() in self._single_agent_warning_seen
@@ -858,27 +921,26 @@ class CliRenderer:
 
     def _event_status(self, level: str) -> str:
         if level in {"ERROR", "CRITICAL"}:
-            return "x"
+            return "FAIL"
         if level == "WARNING":
-            return "!"
-        return "✓"
+            return "WARN"
+        return "OK"
 
     def _marker_status(self, marker: str) -> str:
         if marker in {"✓", "OK"}:
-            return "✓"
-        if marker in {"x", "X"}:
-            return "x"
-        if marker in {"!", "WARNING"}:
-            return "!"
+            return "OK"
+        if marker in {"x", "X", "FAIL", "ERROR"}:
+            return "FAIL"
+        if marker in {"!", "WARNING", "WARN"}:
+            return "WARN"
         if marker in {"·", "•"}:
-            return "✓"
-        return "✓"
+            return "OK"
+        return "OK"
 
     def render_warning(self, message: str) -> None:
-        if self._alert_buffer_depth:
-            self._buffered_alerts.append(("warning", message))
-            return
-        self._print_warning(message)
+        item = ("warning", message)
+        if item not in self._buffered_alerts:
+            self._buffered_alerts.append(item)
 
     def _print_warning(self, message: str) -> None:
         self.con.print(
@@ -891,10 +953,9 @@ class CliRenderer:
         )
 
     def render_error(self, message: str) -> None:
-        if self._alert_buffer_depth:
-            self._buffered_alerts.append(("error", message))
-            return
-        self._print_error(message)
+        item = ("error", message)
+        if item not in self._buffered_alerts:
+            self._buffered_alerts.append(item)
 
     def _print_error(self, message: str) -> None:
         self.con.print(
@@ -911,13 +972,13 @@ class CliRenderer:
         if hasattr(provider_health, "model_dump"):
             data = provider_health.model_dump()
         if not isinstance(data, dict):
-            self.set_pipeline_status("Provider health", "!", _short_err(str(data)))
+            self.set_pipeline_status("Provider health", "WARN", _short_err(str(data)))
             if not self.verbose:
                 return
             table = Table(box=box.SIMPLE, show_edge=False, pad_edge=False)
             table.add_column("Status", justify="center")
             table.add_column("Message")
-            table.add_row("!", Text(str(data)))
+            table.add_row("WARN", Text(str(data)))
             self.con.print(Panel(table, title="Provider Health", border_style="yellow"))
             return
 
@@ -936,12 +997,12 @@ class CliRenderer:
         can_proceed = bool(data.get("can_proceed"))
         self.set_pipeline_status(
             "Stockbit",
-            "✓" if stockbit_ok else "x",
+            "OK" if stockbit_ok else "FAIL",
             "OK" if stockbit_ok else _short_err(_provider_failure(failures, "stockbit")),
         )
         self.set_pipeline_status(
             "yfinance",
-            "✓" if yfinance_ok else "x",
+            "OK" if yfinance_ok else "FAIL",
             "OK" if yfinance_ok else _short_err(_provider_failure(failures, "yfinance")),
         )
         if not self.verbose:
@@ -980,7 +1041,7 @@ class CliRenderer:
         detail = f"{regime} ({vol_text})"
         if regime_params:
             detail = f"{detail}; {override_text}"
-        self.set_pipeline_status("Market regime", "✓", detail)
+        self.set_pipeline_status("Market regime", "OK", detail)
         if not self.verbose:
             self.regime_events = []
             return
@@ -998,7 +1059,7 @@ class CliRenderer:
         diagnostics = [
             message
             for status, _, message in self.regime_events
-            if status != "✓"
+            if status != "OK"
             or any(
                 token in message.lower()
                 for token in (
@@ -1053,17 +1114,17 @@ class CliRenderer:
                 else {}
             )
             error = result.get("error")
-            completed = "x" if error else "✓"
-            risk_status = "!" if risk.get("sizing_allowed") is False else "✓"
+            completed = "FAIL" if error else "OK"
+            risk_status = "WARN" if risk.get("sizing_allowed") is False else "OK"
             rows = [
                 (
                     "Fetching data",
-                    "✓",
+                    "OK",
                     "Mock context loaded" if dry_run else "Provider context requested",
                 ),
                 (
                     "Running analysis",
-                    "✓",
+                    "OK",
                     "Mock analysis generated" if dry_run else "Analysis completed",
                 ),
                 (
@@ -1164,8 +1225,9 @@ class CliRenderer:
     def render_debate_summaries(self, results: list[dict[str, Any]]) -> None:
         if not results:
             return
-        if self.verbose:
-            self.phase("Per-Ticker Detail Panels")
+        if not self.verbose:
+            return
+        self.phase("Per-Ticker Detail Panels")
         audit_by_ticker: dict[str, list[str]] = {}
         for ticker, summary, _level in self.audit_entries:
             audit_by_ticker.setdefault(str(ticker).upper(), []).append(summary)
@@ -1320,36 +1382,48 @@ class CliRenderer:
         except Exception:
             self.batch_error_count = 0
         selected = {str(entry.get("ticker") or "").upper() for entry in top_n}
-        table = Table(
-            title="Final Results",
+        is_compact = _is_compact_console(self.con)
+        setup_table = Table(
+            title="Final Results - Trading Setup",
             box=box.SIMPLE,
-            expand=True,
+            expand=False,
             show_edge=False,
             pad_edge=False,
         )
-        for column in (
-            "Ticker",
-            "Rating",
-            "Conf",
-            "R/R",
-            "Exp.Return",
+        setup_table.add_column("Ticker", style="bold", no_wrap=True, width=6)
+        setup_table.add_column("Rating", no_wrap=True, max_width=10)
+        setup_table.add_column("Conf", justify="right", no_wrap=True, width=6)
+        setup_table.add_column("Current", justify="right", no_wrap=True, width=10)
+        setup_table.add_column(
             "Entry",
-            "Target",
-            "Stop Loss",
+            no_wrap=True,
+            max_width=16 if is_compact else 20,
+        )
+        setup_table.add_column("Target", justify="right", no_wrap=True, width=10)
+        setup_table.add_column("Stop", justify="right", no_wrap=True, width=10)
+        setup_table.add_column("R/R", justify="right", no_wrap=True, width=6)
+
+        validation_table = Table(
+            title="Final Results - Validation",
+            box=box.SIMPLE,
+            expand=False,
+            show_edge=False,
+            pad_edge=False,
+        )
+        validation_table.add_column("Ticker", style="bold", no_wrap=True, width=6)
+        validation_table.add_column(
             "Risk Gov",
-            "Selected",
-        ):
-            justify = (
-                "right" if column in {"Conf", "R/R", "Target", "Stop Loss"} else "left"
-            )
-            column_options: dict[str, Any] = {"justify": justify}
-            if column == "Selected":
-                column_options.update(
-                    {"no_wrap": True, "overflow": "ellipsis", "max_width": 60}
-                )
-            column_options.setdefault("no_wrap", True)
-            column_options.setdefault("overflow", "ellipsis")
-            table.add_column(column, **column_options)
+            no_wrap=True,
+            overflow="fold",
+            max_width=18 if is_compact else 24,
+        )
+        validation_table.add_column("Sizing", no_wrap=True, max_width=16)
+        validation_table.add_column(
+            "Reason",
+            overflow="fold",
+            max_width=36 if is_compact else 56,
+            ratio=1,
+        )
 
         for result in results:
             ticker = str(result.get("ticker") or "-").upper()
@@ -1364,36 +1438,48 @@ class CliRenderer:
             rating = str(
                 verdict.get("rating") or ("ERROR" if result.get("error") else "-")
             )
-            selected_text = (
-                Text("✓ TOP PICK", style="ok")
+            sizing_text = (
+                Text("TOP PICK", style="ok")
                 if ticker in selected
-                else Text.assemble(
-                    "– EXCLUDED ",
-                    (_short_err(_exclusion_reason(result)), "muted"),
-                )
+                else Text("Excluded", style="muted")
             )
             try:
-                selected_text = _final_selection_label(
+                sizing_text = _final_selection_label(
                     result, selected=ticker in selected
                 )
             except Exception as exc:
                 logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
-            # TODO: Current verdict schema exposes expected_return as display text;
-            # if a future schema separates gross/net return, map that explicit field here.
-            table.add_row(
+            current_price = _result_current_price(verdict, risk)
+            target_price = _parse_price_value(verdict.get("target_price"))
+            row_style = _final_row_style(result, ticker in selected)
+            setup_table.add_row(
                 ticker,
                 Text(rating, style=_rating_cell_style(rating)),
                 _format_cli_pct(verdict.get("confidence")),
-                _format_cli_ratio(verdict.get("risk_reward_ratio")),
-                str(verdict.get("expected_return") or "–"),
-                str(verdict.get("entry_price_range") or "–"),
+                _format_cli_money(current_price),
+                str(verdict.get("entry_price_range") or "-"),
                 _format_cli_money(verdict.get("target_price")),
                 _format_cli_money(verdict.get("stop_loss")),
-                str(risk.get("status") or "–"),
-                selected_text,
-                style=_final_row_style(result, ticker in selected),
+                _format_cli_ratio(verdict.get("risk_reward_ratio")),
+                style=row_style,
             )
-        self.con.print(table)
+            validation_table.add_row(
+                ticker,
+                str(risk.get("status") or "-"),
+                sizing_text,
+                Text(
+                    _validation_reason_summary(
+                        result,
+                        verdict,
+                        risk,
+                        current_price,
+                        target_price,
+                    )
+                ),
+                style=row_style,
+            )
+        self.con.print(setup_table)
+        self.con.print(validation_table)
 
     def render_audit_trail(self) -> None:
         if not self.audit_entries:
@@ -1543,11 +1629,11 @@ class CliRenderer:
             output_detail = "\n".join(output_file_strings) or "-"
             table.add_row("Output files", output_detail)
         else:
-            table = Table(box=box.SIMPLE, expand=True, show_edge=False, pad_edge=False)
-            table.add_column("Metric", style="bold", no_wrap=True)
-            table.add_column("Value", no_wrap=True, overflow="ellipsis")
-            table.add_column("Metric", style="bold", no_wrap=True)
-            table.add_column("Value", no_wrap=True, overflow="ellipsis")
+            table = Table.grid(expand=True, padding=(0, 2))
+            table.add_column(style="bold", no_wrap=True)
+            table.add_column(no_wrap=True, overflow="ellipsis")
+            table.add_column(style="bold", no_wrap=True)
+            table.add_column(no_wrap=True, overflow="ellipsis")
             names = [Path(path).name for path in output_file_strings]
             preview = ", ".join(names[:2])
             if len(names) > 2:
@@ -1556,23 +1642,23 @@ class CliRenderer:
             deployed_pct = "-"
             if "deployed_pct" in summary:
                 deployed_pct = f"{float(summary.get('deployed_pct') or 0.0) * 100:.1f}%"
-            table.add_row("Status", "Completed", "Runtime", f"{elapsed:.1f}s")
+            table.add_row("Status", "Completed", "Duration", f"{elapsed:.1f}s")
             table.add_row(
-                "Token budget",
-                f"~{estimated_tokens:,}",
-                "Pro / Flash",
-                f"{pro_calls}/{pro_budget} | {flash_calls}/{flash_budget}",
+                "Tokens Used",
+                f"~{estimated_tokens:,} estimated",
+                "API Quota",
+                f"Pro {pro_calls}/{pro_budget}; Flash {flash_calls}/{flash_budget}",
             )
             table.add_row(
-                "Regime",
+                "Market Regime",
                 regime,
-                "Deployed",
+                "Capital Deployed",
                 f"{_format_cli_money(summary.get('total_deployed'))} ({deployed_pct})",
             )
-            warning_text = str(self.warning_count)
+            warning_text = f"{self.warning_count} warning(s)"
             if self.batch_error_count:
-                warning_text = f"{warning_text} warn / {self.batch_error_count} err"
-            table.add_row("Warnings", warning_text, "Output files", output_detail)
+                warning_text = f"{warning_text}, {self.batch_error_count} error(s)"
+            table.add_row("Warnings", warning_text, "Output Files", output_detail)
             if portfolio_note:
                 table.add_row("Catatan", portfolio_note, "", "")
         self.con.print(Panel(table, title="Summary Footer", border_style="green"))
@@ -1642,11 +1728,12 @@ def _agreement_style(value: str) -> str:
 
 
 def _status_style(status: str) -> str:
-    if status == "✓":
+    normalized = str(status or "").upper()
+    if normalized in {"OK", "PASS", "DONE", "✓"}:
         return "ok"
-    if status == "!":
+    if normalized in {"WARN", "WARNING", "!"}:
         return "warn"
-    if status == "x":
+    if normalized in {"FAIL", "FAILED", "ERROR", "X"}:
         return "danger"
     return "muted"
 
@@ -1729,9 +1816,13 @@ def _result_warning_notes(result: dict[str, Any]) -> list[str]:
         else {}
     )
     if risk.get("sizing_allowed") is False:
-        notes.append(
-            str(risk.get("message") or risk.get("status") or "Risk governor hold")
-        )
+        reason_codes = risk.get("reason_codes")
+        if isinstance(reason_codes, list) and reason_codes:
+            notes.extend(str(code) for code in reason_codes if str(code))
+        else:
+            notes.append(
+                str(risk.get("message") or risk.get("status") or "Risk governor hold")
+            )
     if result.get("rr_warning"):
         notes.append(str(result["rr_warning"]))
     if result.get("error"):
@@ -1776,10 +1867,156 @@ def _exclusion_reason(result: dict[str, Any]) -> str:
     return "not selected after ranking"
 
 
+def _result_current_price(verdict: dict[str, Any], risk: dict[str, Any]) -> float | None:
+    price = _parse_price_value(verdict.get("current_price"))
+    if price is not None:
+        return price
+    return _parse_price_value(risk.get("current_price"))
+
+
+def _risk_entry_bounds(
+    verdict: dict[str, Any],
+    risk: dict[str, Any],
+) -> tuple[float | None, float | None]:
+    low = _parse_price_value(risk.get("entry_low"))
+    high = _parse_price_value(risk.get("entry_high"))
+    if low is not None or high is not None:
+        return low, high if high is not None else low
+    return _parse_entry_bounds(verdict.get("entry_price_range"))
+
+
+def _format_entry_gap(
+    current_price: float | None,
+    verdict: dict[str, Any],
+    risk: dict[str, Any],
+) -> str:
+    if current_price is None or current_price <= 0:
+        return "-"
+    low, high = _risk_entry_bounds(verdict, risk)
+    if low is None and high is None:
+        return "-"
+    low = low if low is not None else high
+    high = high if high is not None else low
+    if low is None or high is None or low <= 0 or high <= 0:
+        return "-"
+    if low <= current_price <= high:
+        return "inside entry"
+    if current_price > high:
+        gap = ((current_price - high) / high) * 100.0
+        return f"+{gap:.1f}% above entry"
+    gap = ((current_price - low) / low) * 100.0
+    return f"{gap:.1f}% below entry"
+
+
+def _format_target_vs_current(
+    target_price: float | None,
+    current_price: float | None,
+) -> str:
+    if target_price is None or current_price is None or current_price <= 0:
+        return "-"
+    delta = ((target_price - current_price) / current_price) * 100.0
+    return f"{delta:+.1f}%"
+
+
+_REASON_LABELS = {
+    "rating_hold": "HOLD",
+    "hold/wait_and_see_verdict": "HOLD",
+    "low_confidence": "low conf",
+    "counter_trend_setup": "counter-trend",
+    "price_inside_entry_range": "inside entry",
+    "upside_exhausted": "upside exhausted",
+    "wait_for_pullback": "wait pullback",
+    "watchlist_only": "watchlist",
+    "conditional_deployable": "conditional",
+    "deployable": "deployable",
+    "reject": "reject",
+}
+
+
+def _reason_token_label(token: str) -> str:
+    normalized = str(token or "").strip()
+    key = normalized.lower().replace(" ", "_").replace("-", "_")
+    if key in _REASON_LABELS:
+        return _REASON_LABELS[key]
+    lowered = normalized.lower()
+    if lowered.startswith("hold/wait"):
+        return "HOLD"
+    if lowered.startswith("low confidence"):
+        return "low conf"
+    if lowered.startswith("rating "):
+        return normalized.replace("rating ", "").upper()
+    return normalized.replace("_", " ")
+
+
+def _compact_note(parts: list[str], *, max_items: int = 3, max_len: int = 42) -> str:
+    labels: list[str] = []
+    seen: set[str] = set()
+    for part in parts:
+        for raw_token in str(part or "").replace(";", ",").split(","):
+            label = _reason_token_label(raw_token)
+            if not label or label == "-":
+                continue
+            key = label.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            labels.append(label)
+            if len(labels) >= max_items:
+                break
+        if len(labels) >= max_items:
+            break
+    return _short_err(" / ".join(labels) or "-", max_len)
+
+
+def _validator_reason_full(risk: dict[str, Any]) -> str:
+    reason_codes = risk.get("reason_codes")
+    if isinstance(reason_codes, list):
+        reasons = [str(code) for code in reason_codes if str(code)]
+        if reasons:
+            return ", ".join(reasons)
+    for key in ("status", "message", "error"):
+        value = risk.get(key)
+        if value:
+            return str(value)
+    return "-"
+
+
+def _validator_reason(risk: dict[str, Any]) -> str:
+    return _short_err(_validator_reason_full(risk), 60)
+
+
+def _live_result_note(result: dict[str, Any]) -> str:
+    if result.get("error"):
+        return _compact_note([str(result.get("error"))], max_items=2, max_len=36)
+    warnings = _result_warning_notes(result)
+    if not warnings:
+        return "OK"
+    return _compact_note(warnings, max_items=3, max_len=36)
+
+
+def _validation_reason_summary(
+    result: dict[str, Any],
+    verdict: dict[str, Any],
+    risk: dict[str, Any],
+    current_price: float | None,
+    target_price: float | None,
+) -> str:
+    parts = [_validator_reason_full(risk)]
+    entry_gap = _format_entry_gap(current_price, verdict, risk)
+    if entry_gap != "-":
+        parts.append(entry_gap)
+    target_gap = _format_target_vs_current(target_price, current_price)
+    if target_gap != "-":
+        parts.append(f"target {target_gap}")
+    if result.get("error"):
+        parts.append(str(result.get("error")))
+    return "; ".join(part for part in parts if part and part != "-") or "-"
+
+
 def _final_selection_label(result: dict[str, Any], *, selected: bool) -> Text:
     try:
         if result.get("error"):
-            return Text("❌ Gagal analisis", style="danger")
+            return Text("Gagal analisis", style="danger")
         verdict = result.get("verdict") if isinstance(result.get("verdict"), dict) else {}
         rating = str(verdict.get("rating") or "").upper()
         risk = (
@@ -1788,22 +2025,24 @@ def _final_selection_label(result: dict[str, Any], *, selected: bool) -> Text:
             else {}
         )
         risk_status = str(risk.get("status") or "").lower()
+        if risk_status == "conditional_deployable":
+            return Text("Conditional", style="warn")
         if rating == "HOLD":
-            return Text("👁️ Watchlist", style="warn")
+            return Text("Watchlist", style="warn")
         if rating in {"AVOID", "SELL"}:
-            return Text("🚫 Hindari", style="danger")
+            return Text("Hindari", style="danger")
         if rating in {"BUY", "STRONG_BUY"}:
             if risk_status == "deployable":
-                return Text("✅ Siap masuk", style="ok")
+                return Text("Siap masuk", style="ok")
             if risk_status == "wait_for_pullback":
-                return Text("⏳ Tunggu entry", style="warn")
+                return Text("Tunggu entry", style="warn")
             if risk_status == "watchlist_only":
-                return Text("👁️ Pantau", style="warn")
+                return Text("Pantau", style="warn")
             if selected:
-                return Text("✅ Siap masuk", style="ok")
+                return Text("Siap masuk", style="ok")
         if selected:
-            return Text("✅ Siap masuk", style="ok")
-        return Text(_short_err(_exclusion_reason(result)), style="muted")
+            return Text("Siap masuk", style="ok")
+        return Text("Excluded", style="muted")
     except Exception as exc:
         logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
         return Text(_short_err(_exclusion_reason(result)), style="muted")
@@ -2121,7 +2360,7 @@ def _prompt_user_config() -> dict:
             console.print("[warn]Masukkan angka bulat, contoh: 5[/warn]")
 
     console.print(
-        f"[ok]✓[/ok] Modal: Rp {capital:,.0f} | "
+        f"[ok]OK[/ok] Modal: Rp {capital:,.0f} | "
         f"Max loss: {max_loss * 100:.1f}% | Max posisi: {max_pos}"
     )
 
@@ -2588,13 +2827,23 @@ def _attach_risk_governor_to_result(
             or metadata.get("avg_volume_20d")
             or technicals.get("avg_volume_20d")
         )
+        ma200_context = (
+            raw_data.get("ma200_context")
+            or metadata.get("ma200_context")
+            or technicals.get("ma200_context")
+        )
         risk_entry = {
             "ticker": ticker,
             "verdict": verdict,
             "current_price": verdict.get("current_price"),
+            "raw_data": raw_data,
+            "raw_data_summary": result.get("raw_data_summary"),
+            "metadata": metadata,
+            "technical_indicators": technicals,
             "risk_context": {
                 "atr14": atr14,
                 "avg_volume": avg_volume,
+                "ma200_context": ma200_context,
                 "exdate_days": None,
                 "sector": result.get("sector_key"),
                 "run_id": run_id,
@@ -2865,7 +3114,7 @@ async def _run_single_debate(ticker: str, chamber: Any) -> dict:
                 logger.error(f"[Debate] JSON rusak untuk {ticker}: {e}")
                 return _empty_result(ticker, f"JSON decode error: {e}")
 
-        logger.info(f"[Debate] ✓ Selesai: {ticker}")
+        logger.info(f"[Debate] OK Selesai: {ticker}")
         disagreement_type = result.get("disagreement_type")
         if disagreement_type:
             logger.info(f"[Debate] {ticker} disagreement_type={disagreement_type}")
@@ -3760,7 +4009,7 @@ def get_local_timestamp() -> str:
     """
     utc_now = datetime.now(timezone.utc)
     local_tz = ZoneInfo(settings.DATETIME_TIMEZONE)
-    return utc_now.astimezone(local_tz).strftime("%Y-%m-%d %H:%M %Z")
+    return utc_now.astimezone(local_tz).strftime("%Y-%m-%d %H:%M:%S %Z")
 
 
 def _extract_winning_argument(entry: dict) -> str:
@@ -4068,7 +4317,7 @@ async def main(
     prompt_pack_ok = _run_prompt_pack_linter()
     _cli_renderer.set_pipeline_status(
         "Prompt pack",
-        "✓" if prompt_pack_ok else "!",
+        "OK" if prompt_pack_ok else "WARN",
         "OK" if prompt_pack_ok else "linter unavailable",
     )
     try:
@@ -4107,7 +4356,8 @@ async def main(
     _cli._print_dependency_report(deps)
     if not deps.is_valid:
         logger.error("[Dependencies] Blocking issue ditemukan. Pipeline dihentikan.")
-        return
+        _cli_renderer.flush_buffered_alerts()
+        raise SystemExit(1)
 
     # Step 0a: Dependency Validation
     _cli_renderer.phase("Candidate Validation")
@@ -4123,12 +4373,14 @@ async def main(
             if settings.CANDIDATES_AUTO_RERUN:
                 if not maybe_rerun_quant_filter():
                     logger.error("[Validator] Auto-rerun gagal. Pipeline dihentikan.")
+                    _cli_renderer.flush_buffered_alerts()
                     return
             else:
                 logger.error(
                     "[Validator] Set CANDIDATES_AUTO_RERUN=true untuk auto-rerun, "
                     "atau jalankan run_quant_filter.py secara manual."
                 )
+                _cli_renderer.flush_buffered_alerts()
                 return
         else:
             logger.info(f"[Validator] {validation.message}")
@@ -4174,10 +4426,11 @@ async def main(
             sector_map = parse_sector_map(candidates=candidates)
     except (FileNotFoundError, ValueError) as e:
         logger.error(f"[Orchestrator] {e}")
+        _cli_renderer.flush_buffered_alerts()
         return
     _cli_renderer.set_pipeline_status(
         "Candidates",
-        "✓",
+        "OK",
         (
             f"{len(tickers)} ticker"
             f"{'' if len(tickers) == 1 else 's'} (--tickers override)"
@@ -4226,14 +4479,15 @@ async def main(
                 logger.error(
                     "[ProviderHealth] No price provider available. Pipeline dihentikan."
                 )
+                _cli_renderer.flush_buffered_alerts()
                 return
             logger.warning(
                 "[ProviderHealth] Planner allowed degraded mode despite provider "
                 "health failure; continuing."
             )
     else:
-        _cli_renderer.set_pipeline_status("Stockbit", "–", "skipped (dry-run)")
-        _cli_renderer.set_pipeline_status("yfinance", "–", "skipped (dry-run)")
+        _cli_renderer.set_pipeline_status("Stockbit", "SKIP", "skipped (dry-run)")
+        _cli_renderer.set_pipeline_status("yfinance", "SKIP", "skipped (dry-run)")
 
     # Step 2: Batch Debates
     _cli_renderer.render_pipeline_status()
@@ -4288,7 +4542,6 @@ async def main(
     finally:
         _cli_renderer.stop_batch_progress()
         _cli_renderer.flush_deferred_logs()
-        _cli_renderer.flush_buffered_alerts()
 
     # Step 3: Score + Rank + Diversify
     _cli_renderer.phase("Scoring and Sizing")
@@ -4413,6 +4666,7 @@ async def main(
         sizing_result=sizing_result,
         output_files=persistence_outputs,
     )
+    _cli_renderer.flush_buffered_alerts()
 
 
 # ---------------------------------------------------------------------------
@@ -4524,17 +4778,17 @@ def _print_watchlist_summary(watchlist_rows: list[dict[str, Any]]) -> None:
         body.add_column()
         body.add_row("Tidak ada BUY yang siap dieksekusi.")
         body.add_row("")
-        body.add_row("📋 WATCHLIST HARI INI:")
+        body.add_row(Text("WATCHLIST HARI INI:", style="bold"))
         body.add_row("")
         for row in watchlist_rows:
             low = row.get("entry_low")
             high = row.get("entry_high")
             if low is not None and high is not None:
-                entry_text = f"Rp {float(low):,.0f}–{float(high):,.0f}"
+                entry_text = f"Rp {float(low):,.0f}-{float(high):,.0f}"
             else:
                 entry_text = "N/A"
             body.add_row(
-                f"👁️ {row.get('ticker', '-')} — "
+                f"{row.get('ticker', '-')} - "
                 f"{row.get('rating', '-')} ({float(row.get('confidence') or 0):.0%})"
             )
             body.add_row(f"   Entry jika koreksi ke {entry_text}")
@@ -4542,7 +4796,7 @@ def _print_watchlist_summary(watchlist_rows: list[dict[str, Any]]) -> None:
         console.print(
             Panel(
                 body,
-                title="[ok]Top Swing Trade Picks[/ok]",
+                title="[bold]Top Swing Trade Picks[/bold]",
                 subtitle=f"[muted]{TOP3_REPORT_PATH}[/muted]",
                 border_style="yellow",
             )
@@ -4564,7 +4818,7 @@ def _print_top3_summary(top_n: list[dict], all_results: list[dict] | None = None
         console.print(
             Panel(
                 "[warn]Tidak ada saham yang memenuhi syarat (semua HOLD/AVOID/SELL).[/warn]",
-                title="[ok]Top Swing Trade Picks[/ok]",
+                title="[bold]Top Swing Trade Picks[/bold]",
                 subtitle=f"[muted]{TOP3_REPORT_PATH}[/muted]",
                 border_style="yellow",
             )
@@ -4633,7 +4887,7 @@ def _print_top3_summary(top_n: list[dict], all_results: list[dict] | None = None
     console.print(
         Panel(
             table,
-            title="[ok]Top Swing Trade Picks[/ok]",
+            title="[bold]Top Swing Trade Picks[/bold]",
             subtitle=f"[muted]{TOP3_REPORT_PATH}[/muted]",
             border_style="green",
         )
@@ -4659,7 +4913,6 @@ class InteractiveCLI:
     # â”€â”€ Teks & konstanta tampilan â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     _BRAND_TITLE = "IDX Fundamental Analysis"
     _BRAND_SUB = "Quant Scouting  ->  Multi-Agent Debate  ->  CIO Verdict"
-    _VALID_INPUTS = {"y", "n"}
 
     def __init__(self, con: Console = console) -> None:
         self.con = con
@@ -4699,10 +4952,14 @@ class InteractiveCLI:
 
     def _prompt_scraping(self) -> str:
         """
-        Tampilkan prompt terminal dan validasi input pengguna.
+        Tampilkan prompt terminal dan kembalikan pilihan user.
 
-        Loop berlanjut sampai pengguna memasukkan 'y' atau 'n'.
-        Input yang tidak valid ditampilkan sebagai pesan peringatan, bukan exception.
+        Pertanyaan: apakah scraping perlu dijalankan?
+        - 'y'       -> jalankan scraping (data belum siap)
+        - 'n'/Enter -> lewati scraping, asumsikan data sudah siap
+
+        Rich Prompt.ask() dengan choices=["y", "n"] menangani validasi dan
+        re-prompt secara internal. while-loop manual tidak diperlukan.
         """
         self.con.print()
         self.con.print(Rule("[step]Persiapan Pipeline[/step]"))
@@ -4711,24 +4968,18 @@ class InteractiveCLI:
         )
         self.con.print()
 
-        while True:
-            # Rich Prompt menampilkan tanda tanya berwarna secara otomatis.
-            jawaban = (
-                Prompt.ask(
-                    "  [prompt]Apakah data scraping sudah tersedia?[/prompt]",
-                    choices=["y", "n"],
-                    show_choices=True,
-                    console=self.con,
-                )
-                .strip()
-                .lower()
+        return (
+            Prompt.ask(
+                "  [prompt]Jalankan scraping data terlebih dahulu?[/prompt]",
+                choices=["y", "n"],
+                default="n",
+                show_choices=True,
+                show_default=True,
+                console=self.con,
             )
-
-            if jawaban in self._VALID_INPUTS:
-                return jawaban
-
-            # Guard: tetap dipertahankan untuk kejelasan jika input tidak sesuai.
-            self.con.print("  [warn]Input tidak valid. Masukkan 'y' atau 'n'.[/warn]")
+            .strip()
+            .lower()
+        )
 
     def _run_scraping(self, scrape_cmd: list[str] | None = None) -> bool:
         """
@@ -4759,21 +5010,25 @@ class InteractiveCLI:
             )
 
         for line in (result.stdout or "").splitlines():
-            _cli_renderer.render_status(f"[Scraping] {_clean_cli_text(line)}")
+            cleaned = _clean_cli_text(line)
+            if cleaned:
+                self.con.print(f"  [step][Scraping][/step] {cleaned}")
         for line in (result.stderr or "").splitlines():
             cleaned = _clean_cli_text(line)
+            if not cleaned:
+                continue
             if "WARNING" in cleaned.upper() or "WARN" in cleaned.upper():
-                _cli_renderer.render_warning(f"[Scraping] {cleaned}")
+                self.con.print(f"  [warn]WARN [Scraping] {cleaned}[/warn]")
             else:
-                _cli_renderer.render_status(f"[Scraping] {cleaned}", style="muted")
+                self.con.print(f"  [muted][Scraping] {cleaned}[/muted]")
 
         if result.returncode == 0:
             self.con.print("  [ok]OK  Scraping selesai.[/ok]")
             return True
         else:
             self.con.print(
-                f"  [danger]FAIL  Scraping selesai dengan exit code {result.returncode}. "
-                "Pipeline tetap dilanjutkan - periksa log di atas untuk detail.[/danger]"
+                f"  [danger]FAIL  Scraping gagal (exit code {result.returncode}). "
+                "Periksa output di atas untuk detail.[/danger]"
             )
             return False
 
@@ -4787,15 +5042,20 @@ class InteractiveCLI:
 
     def _print_dependency_report(self, deps: DependencyCheckResult) -> None:
         """Tampilkan hasil pemeriksaan awal sebelum pipeline berjalan."""
+        show_hint = any((check.hint or "").strip() for check in deps.checks.values())
         table = Table(title="Pre-flight Checks", show_lines=False)
         table.add_column("Check", style="bold")
         table.add_column("Status")
         table.add_column("Message")
-        table.add_column("Hint", style="muted")
+        if show_hint:
+            table.add_column("Hint", style="muted")
 
         for check in deps.checks.values():
             status = "[ok]OK[/ok]" if check.is_valid else "[danger]FAIL[/danger]"
-            table.add_row(check.name, status, check.message, check.hint or "-")
+            row = [check.name, status, check.message]
+            if show_hint:
+                row.append(check.hint or "-")
+            table.add_row(*row)
 
         self.con.print(table)
         if deps.blocking_issues:
@@ -4809,15 +5069,20 @@ class InteractiveCLI:
         interactive: bool = True,
         skip_scraping: bool = False,
         scrape_cmd: list[str] | None = None,
-    ) -> None:
+    ) -> bool:
         """
         Titik masuk CLI: banner â†’ prompt â†’ (opsional) scraping â†’ pipeline start.
+
+        Returns:
+            True jika pipeline boleh dilanjutkan.
+            False jika pipeline harus dibatalkan (scraping gagal dan user
+            memilih tidak melanjutkan).
 
         Method ini dipisah dari asyncio.run(main()) agar CLI layer dan
         pipeline layer tetap independen â€” mudah di-test secara terpisah.
         """
         if not interactive:
-            return
+            return True
 
         self._render_banner()
         if skip_scraping:
@@ -4825,20 +5090,44 @@ class InteractiveCLI:
                 "  [ok]OK  Langkah scraping dilewati melalui `--skip-scraping`.[/ok]"
             )
             self._print_pipeline_start()
-            return
+            return True
 
         jawaban = self._prompt_scraping()
 
-        if jawaban == "n":
-            # Pengguna belum menyiapkan data: jalankan scraping terlebih dahulu.
-            self._run_scraping(scrape_cmd=scrape_cmd)
+        if jawaban == "y":
+            # User meminta scraping dijalankan terlebih dahulu.
+            scraping_ok = self._run_scraping(scrape_cmd=scrape_cmd)
+            if not scraping_ok:
+                # Scraping gagal. Tanya apakah pipeline tetap ingin dijalankan
+                # dengan data yang mungkin tidak lengkap atau stale.
+                self.con.print()
+                konfirmasi = (
+                    Prompt.ask(
+                        "  [warn]Data scraping mungkin tidak lengkap. "
+                        "Tetap lanjutkan pipeline?[/warn]",
+                        choices=["y", "n"],
+                        default="n",
+                        show_choices=True,
+                        show_default=True,
+                        console=self.con,
+                    )
+                    .strip()
+                    .lower()
+                )
+                if konfirmasi != "y":
+                    self.con.print("  [muted]Pipeline dibatalkan oleh user.[/muted]")
+                    return False
+                self.con.print(
+                    "  [warn]WARN Melanjutkan dengan data yang mungkin tidak lengkap.[/warn]"
+                )
         else:
-            # Data sudah tersedia, lanjut ke pipeline utama.
+            # User memilih 'n' (atau tekan Enter): asumsikan data sudah siap.
             self.con.print(
-                "  [ok]OK  Data scraping sudah tersedia. Pipeline akan dilanjutkan.[/ok]"
+                "  [ok]OK  Scraping dilewati. Pipeline akan dilanjutkan.[/ok]"
             )
 
         self._print_pipeline_start()
+        return True
 
 
 # Singleton CLI yang digunakan di __main__.
@@ -4881,12 +5170,20 @@ def _parse_cli_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--verbose",
         action="store_true",
-        help="Show raw Loguru lines alongside structured Rich output.",
+        help=(
+            "Tampilkan baris log DEBUG lengkap di stderr, berguna untuk "
+            "mendiagnosis error API, rate-limit, atau kegagalan parsing. "
+            "Tanpa flag ini, hanya summary terstruktur yang ditampilkan."
+        ),
     )
     parser.add_argument(
         "--tickers",
         nargs="+",
-        help="Override candidate list with specific tickers e.g. --tickers BBCA ADRO TLKM",
+        help=(
+            "Override daftar kandidat dengan ticker spesifik, "
+            "contoh: --tickers BBCA ADRO TLKM. "
+            "Secara otomatis mengaktifkan --no-interactive dan --skip-scraping."
+        ),
     )
     parser.add_argument(
         "--mode",
@@ -4909,6 +5206,13 @@ def _parse_cli_args(argv: list[str] | None = None) -> argparse.Namespace:
         CLI_TICKERS_OVERRIDE = args.tickers
         args.no_interactive = True
         args.skip_scraping = True
+        # Informasikan perubahan mode secara eksplisit agar tidak mengejutkan.
+        # console tersedia di module level sebelum configure_cli_logging() dipanggil.
+        console.print(
+            f"  [muted]--tickers: headless mode aktif "
+            f"(no-interactive + skip-scraping). "
+            f"Ticker: {', '.join(args.tickers)}[/muted]"
+        )
     return args
 
 
@@ -4926,11 +5230,16 @@ if __name__ == "__main__":
     # Jalankan antarmuka interaktif sebelum pipeline async dimulai.
     # InteractiveCLI.run() bersifat blocking dan sinkron secara sengaja:
     # input user tidak boleh bersaing dengan event loop asyncio.
-    _cli.run(
+    pipeline_ok = _cli.run(
         interactive=not args.no_interactive,
         skip_scraping=args.skip_scraping,
         scrape_cmd=scrape_cmd,
     )
+    if not pipeline_ok:
+        # User membatalkan setelah scraping gagal. Exit dengan kode non-zero
+        # agar CI/CD atau skrip wrapper bisa mendeteksi kegagalan.
+        sys.exit(1)
+
     user_config = (
         {"total_capital": 1_000_000.0, "max_loss_pct": 0.02, "max_positions": 5}
         if args.no_interactive

@@ -130,12 +130,12 @@ def _mock_packet() -> AuditPacket:
     )
 
 
-def test_rating_emoji_maps_core_ratings() -> None:
+def test_rating_label_maps_core_ratings() -> None:
     formatter = RichFormatter()
 
-    assert formatter._rating_emoji("BUY") == "🟢"
-    assert formatter._rating_emoji("HOLD") == "🟡"
-    assert formatter._rating_emoji("AVOID") == "🔴"
+    assert formatter._rating_emoji("BUY") == "BUY"
+    assert formatter._rating_emoji("HOLD") == "HOLD"
+    assert formatter._rating_emoji("AVOID") == "AVOID"
 
 
 def test_confidence_bar_mixed_fill() -> None:
@@ -163,6 +163,12 @@ def test_risk_governor_reject_line() -> None:
     line = RichFormatter()._risk_governor_line({"status": "reject"})
 
     assert "Ditolak" in line
+
+
+def test_risk_governor_conditional_line() -> None:
+    line = RichFormatter()._risk_governor_line({"status": "conditional_deployable"})
+
+    assert "Conditional" in line
 
 
 def test_generate_ticker_report_contains_title_and_ticker(tmp_path) -> None:
@@ -217,7 +223,18 @@ def test_generate_batch_summary_contains_buy_ticker_in_results_table() -> None:
     report = MarkdownFormatter().generate_batch_summary([_mock_result()], "run-123")
 
     assert "BBCA" in report
-    assert "🟢 BUY" in report
+    assert "| BUY |" in report
+
+
+def test_vote_table_soft_hold_uses_override_note() -> None:
+    result = _mock_result("HOLD")
+    result["consensus_method"] = "soft_hold"
+
+    report = MarkdownFormatter().generate_ticker_report(result)
+
+    assert "| Agent | Posisi | Keyakinan |" in report
+    assert "| Agent | Posisi | Keyakinan | Hasil |" not in report
+    assert "di-override oleh soft_hold_rule" in report
 
 
 def test_render_ticker_panel_handles_minimal_result() -> None:

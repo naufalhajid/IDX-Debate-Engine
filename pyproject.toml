@@ -36,6 +36,7 @@ dependencies = [
     "numpy>=1.26.0",
     "pytz>=2024.2",
     "rich>=15.0.0",
+    "typer>=0.21.1",
     "typing-extensions>=4.12.0",
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
@@ -43,6 +44,38 @@ dependencies = [
     "cachetools>=5.3.0",
     "aiofiles>=25.1.0",
 ]
+
+[project.scripts]
+idx = "app.cli.main:app"
+
+[build-system]
+requires = ["setuptools>=80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = [
+    "build_sector_cache",
+    "main",
+    "orchestrator",
+    "run_api",
+    "run_debate",
+    "run_quant_filter",
+]
+
+[tool.setuptools.packages.find]
+include = [
+    "app*",
+    "builders*",
+    "core*",
+    "db*",
+    "providers*",
+    "repositories*",
+    "schemas*",
+    "services*",
+    "utils*",
+]
+exclude = ["scratch*", "tests*"]
+namespaces = true
 
 [project.optional-dependencies]
 crawler = [

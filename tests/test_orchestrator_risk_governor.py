@@ -1,4 +1,13 @@
-from core.orchestrator.legacy import _annotate_risk_governor, _build_sizing_candidates
+import importlib
+import sys
+import types
+
+sys.modules.setdefault("yfinance", types.SimpleNamespace())
+sys.modules.setdefault("undetected_chromedriver", types.SimpleNamespace())
+
+legacy = importlib.import_module("core.orchestrator.legacy")
+_annotate_risk_governor = legacy._annotate_risk_governor
+_build_sizing_candidates = legacy._build_sizing_candidates
 
 
 def _entry(ticker: str, *, current_price: float, entry_range: str, target: float) -> dict:
@@ -48,3 +57,23 @@ def test_deployable_top_pick_keeps_legacy_sizing_candidate_shape() -> None:
             "expected_return": "+10.0%",
         }
     ]
+
+
+def test_conditional_top_pick_is_not_sized() -> None:
+    top_n = [
+        _entry("MYOR", current_price=1000, entry_range="950 - 1050", target=1150)
+    ]
+    top_n[0]["verdict"].update(
+        {
+            "rating": "HOLD",
+            "confidence": 0.41,
+            "weighted_reasoning": "Counter-trend bounce below MA200.",
+        }
+    )
+
+    _annotate_risk_governor(top_n)
+    candidates = _build_sizing_candidates(top_n)
+
+    assert top_n[0]["risk_governor"]["status"] == "conditional_deployable"
+    assert top_n[0]["risk_governor"]["sizing_allowed"] is False
+    assert candidates == []

@@ -1193,7 +1193,7 @@ wheels = [
 [[package]]
 name = "idx-fundamental"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
     { name = "aiosqlite" },
@@ -1226,6 +1226,7 @@ dependencies = [
     { name = "setuptools" },
     { name = "sqlalchemy" },
     { name = "tenacity" },
+    { name = "typer" },
     { name = "typing-extensions" },
     { name = "undetected-chromedriver" },
     { name = "uvicorn", extra = ["standard"] },
@@ -1280,6 +1281,7 @@ requires-dist = [
     { name = "setuptools", specifier = ">=80.9.0" },
     { name = "sqlalchemy", specifier = ">=2.0.35" },
     { name = "tenacity", specifier = ">=9.0.0" },
+    { name = "typer", specifier = ">=0.21.1" },
     { name = "typing-extensions", specifier = ">=4.12.0" },
     { name = "undetected-chromedriver", specifier = ">=3.5.5" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30.0" },

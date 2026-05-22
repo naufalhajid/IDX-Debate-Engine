@@ -6,10 +6,14 @@ def _candidate(**overrides):
         "ticker": "BBCA",
         "verdict": {
             "ticker": "BBCA",
+            "rating": "BUY",
+            "confidence": 0.75,
             "current_price": 1000,
             "entry_price_range": "950 - 1050",
             "target_price": 1150,
             "stop_loss": 930,
+            "is_overvalued": False,
+            "risk_reward_ratio": 2.0,
         },
     }
     verdict_overrides = overrides.pop("verdict", None)
@@ -64,8 +68,68 @@ def test_stop_loss_at_or_above_current_price_rejects() -> None:
 
 
 def test_current_price_below_entry_low_is_watchlist_only() -> None:
-    decision = evaluate_risk(_candidate(verdict={"current_price": 900, "stop_loss": 850}))
+    decision = evaluate_risk(
+        _candidate(verdict={"current_price": 900, "stop_loss": 850})
+    )
 
     assert decision.status == "watchlist_only"
     assert decision.sizing_allowed is False
     assert "price_below_entry_range" in decision.reason_codes
+
+
+def test_avoid_verdict_rejects_even_inside_entry_range() -> None:
+    decision = evaluate_risk(
+        _candidate(
+            verdict={
+                "rating": "AVOID",
+                "confidence": 0.22,
+                "is_overvalued": True,
+                "risk_reward_ratio": 0.56,
+                "weighted_reasoning": (
+                    "Absence of technical indicators (INSUFFICIENT_DATA)."
+                ),
+            }
+        )
+    )
+
+    assert decision.status == "reject"
+    assert decision.sizing_allowed is False
+    assert "rating_not_buyable" in decision.reason_codes
+    assert "low_confidence" in decision.reason_codes
+    assert "overvalued" in decision.reason_codes
+    assert "rr_too_low" in decision.reason_codes
+    assert "insufficient_technical_data" in decision.reason_codes
+
+
+def test_hold_low_confidence_inside_entry_is_conditional_not_sized() -> None:
+    decision = evaluate_risk(
+        _candidate(
+            verdict={
+                "rating": "HOLD",
+                "confidence": 0.41,
+                "weighted_reasoning": "Counter-trend bounce below MA200.",
+            }
+        )
+    )
+
+    assert decision.status == "conditional_deployable"
+    assert decision.sizing_allowed is False
+    assert "rating_hold" in decision.reason_codes
+    assert "low_confidence" in decision.reason_codes
+    assert "counter_trend_setup" in decision.reason_codes
+    assert "price_inside_entry_range" in decision.reason_codes
+
+
+def test_sentiment_insufficient_data_does_not_reject_when_technicals_exist() -> None:
+    decision = evaluate_risk(
+        _candidate(
+            verdict={
+                "weighted_reasoning": (
+                    "Technicals are constructive, but sentiment is INSUFFICIENT_DATA."
+                )
+            }
+        )
+    )
+
+    assert decision.status == "deployable"
+    assert "insufficient_technical_data" not in decision.reason_codes

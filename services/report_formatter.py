@@ -180,7 +180,7 @@ def _now_wib() -> datetime:
 
 
 def _date_wib() -> str:
-    return _now_wib().strftime("%Y-%m-%d %H:%M WIB")
+    return _now_wib().strftime("%Y-%m-%d %H:%M:%S WIB")
 
 
 def _verdict(result: dict[str, Any]) -> dict[str, Any]:
@@ -479,11 +479,33 @@ def _support_mark(
 ) -> str:
     explicit = _vote_value(vote, "supporting_winner")
     if explicit is True:
-        return "✅ MENANG" if _canonical(winner) == agent_key else "✅"
+        return "WINNER" if _canonical(winner) == agent_key else "SUPPORTS"
     if _canonical(winner) == agent_key:
-        return "✅ MENANG"
+        return "WINNER"
     position = _canonical_position(_vote_value(vote, "position"))
-    return "✅" if position == _canonical_position(rating) else "❌"
+    return "SUPPORTS" if position == _canonical_position(rating) else "DIFFERS"
+
+
+def _soft_hold_override_note(
+    result: dict[str, Any],
+    packet: AuditPacket | None = None,
+) -> str | None:
+    verdict = _verdict(result)
+    method = (
+        result.get("consensus_method")
+        or verdict.get("consensus_method")
+        or (packet.consensus_method if packet else None)
+    )
+    winner = (
+        result.get("winner_agent")
+        or result.get("confidence_winner")
+        or verdict.get("winner_agent")
+        or verdict.get("consensus_winner")
+        or (packet.winner_agent if packet else None)
+    )
+    if _is_soft_hold_winner(method, winner):
+        return "Semua agen di-override oleh soft_hold_rule karena tidak ada konsensus."
+    return None
 
 
 def _agent_rows(
@@ -513,7 +535,7 @@ def _agent_rows(
                     None,
                 )
         if vote is None:
-            result_text = "N/A" if is_adversarial else "❌"
+            result_text = "N/A" if is_adversarial else "NO VOTE"
             style = "dim" if is_adversarial else None
             rows.append((agent_label, "--", "--", result_text, style))
             continue
@@ -558,13 +580,9 @@ class RichFormatter:
 
     def _rating_emoji(self, rating: str) -> str:
         normalized = str(rating or "").upper()
-        if normalized == "BUY":
-            return "🟢"
-        if normalized == "HOLD":
-            return "🟡"
-        if normalized == "AVOID":
-            return "🔴"
-        return "⚪"
+        if normalized in {"BUY", "HOLD", "AVOID", "STRONG_BUY", "SELL"}:
+            return normalized
+        return "UNKNOWN"
 
     def _confidence_bar(self, confidence: float, width: int = 20) -> str:
         try:
@@ -589,21 +607,17 @@ class RichFormatter:
     def _risk_governor_line(self, risk: dict) -> str:
         status = _dict_or_empty(risk).get("status", "unknown")
         labels = {
-            "deployable": "✅ Siap dieksekusi",
-            "wait_for_pullback": "⏳ Tunggu pullback",
-            "watchlist_only": "👁️  Pantau saja",
-            "reject": "🚫 Ditolak sistem",
+            "deployable": "Siap dieksekusi",
+            "conditional_deployable": "Conditional watchlist",
+            "wait_for_pullback": "Tunggu pullback",
+            "watchlist_only": "Pantau saja",
+            "reject": "Ditolak sistem",
         }
         return labels.get(str(status), str(status))
 
     def _terminal_emoji(self, rating: str) -> str:
-        if self._console_supports_unicode():
-            return self._rating_emoji(rating)
         normalized = str(rating or "").upper()
-        return {"BUY": "[BUY]", "HOLD": "[HOLD]", "AVOID": "[AVOID]"}.get(
-            normalized,
-            "[?]",
-        )
+        return normalized if normalized else "UNKNOWN"
 
     def _terminal_risk_governor_line(self, risk: dict) -> str:
         if self._console_supports_unicode():
@@ -611,6 +625,7 @@ class RichFormatter:
         status = _dict_or_empty(risk).get("status", "unknown")
         labels = {
             "deployable": "Siap dieksekusi",
+            "conditional_deployable": "Conditional watchlist",
             "wait_for_pullback": "Tunggu pullback",
             "watchlist_only": "Pantau saja",
             "reject": "Ditolak sistem",
@@ -622,19 +637,15 @@ class RichFormatter:
         return "utf" in encoding.lower()
 
     def _warning_marker(self) -> str:
-        return "⚠️ " if self._console_supports_unicode() else "! "
+        return "- "
 
     def _sparkle_marker(self) -> str:
-        return "✨ " if self._console_supports_unicode() else "* "
+        return "- "
 
     def _support_symbol(self, value: str) -> str:
         if value == "N/A":
             return "N/A"
-        if self._console_supports_unicode():
-            return value
-        if "MENANG" in value:
-            return "YA MENANG"
-        return "YA" if value.startswith("✅") else "TIDAK"
+        return value
 
     def render_ticker_panel(
         self,
@@ -675,7 +686,7 @@ class RichFormatter:
             table.add_row(
                 "Rekomendasi",
                 Text(
-                    f"{self._terminal_emoji(rating)} {rating}",
+                    rating,
                     style=rating_style,
                 ),
             )
@@ -814,9 +825,7 @@ class RichFormatter:
             body.add_row(Rule(style="dim"))
             if waiting:
                 for row in waiting:
-                    body.add_row(
-                        f"⏳ {_ticker(row)} — tunggu pullback ke zona entry"
-                    )
+                    body.add_row(f"{_ticker(row)} - tunggu pullback ke zona entry")
             else:
                 body.add_row("Tidak ada")
 
@@ -841,7 +850,7 @@ class RichFormatter:
         self,
         result: dict[str, Any],
         packet: AuditPacket | None,
-    ) -> Table | Text:
+    ) -> Table | Text | Group:
         rows = _agent_rows(result, packet)
         if not rows:
             return Text("Tidak ada data voting", style="dim")
@@ -849,15 +858,16 @@ class RichFormatter:
         table.add_column("Agent")
         table.add_column("Posisi")
         table.add_column("Keyakinan", justify="right")
-        table.add_column("Hasil")
-        for agent, position, confidence, result_text, style in rows:
+        for agent, position, confidence, _result_text, style in rows:
             table.add_row(
                 agent,
                 position,
                 confidence,
-                self._support_symbol(result_text),
                 style=style,
             )
+        override_note = _soft_hold_override_note(result, packet)
+        if override_note:
+            return Group(table, Text(override_note, style="dim"))
         return table
 
     def _batch_recommendation_line(self, result: dict[str, Any], rating: str) -> Group:
@@ -871,11 +881,11 @@ class RichFormatter:
             verdict.get("summary") or verdict.get("weighted_reasoning"),
             60,
         )
-        first = f"{self._rating_emoji(rating)} {rating:<5} — {ticker}"
+        first = f"{rating:<5} - {ticker}"
         if rating == "BUY":
             second = (
                 f"   conf={confidence}  R/R={rr}\n"
-                f"   Entry: {_money(low)}–{_money(high)}\n"
+                f"   Entry: {_money(low)}-{_money(high)}\n"
                 f"   Target: {target}"
             )
         else:
@@ -886,8 +896,8 @@ class RichFormatter:
         verdict = _verdict(result)
         low, high = _entry_bounds(verdict)
         return (
-            f"✅ {_ticker(result)} — harga di zona entry\n"
-            f"   Entry: {_money(low)}–{_money(high)}  "
+            f"{_ticker(result)} - harga di zona entry\n"
+            f"   Entry: {_money(low)}-{_money(high)}  "
             f"Target: {_money(verdict.get('target_price'))}  "
             f"Stop: {_money(verdict.get('stop_loss'))}"
         )
@@ -940,7 +950,7 @@ class MarkdownFormatter:
                 "",
                 "| Item | Detail |",
                 "|------|--------|",
-                f"| **Rekomendasi** | {RichFormatter()._rating_emoji(rating)} **{rating}** |",
+                f"| **Rekomendasi** | **{rating}** |",
                 f"| **Keyakinan** | {confidence_text} |",
                 f"| **Harga Saat Ini** | {_money(current_price)} |",
                 f"| **Nilai Wajar** | {_money(fair_value)} |",
@@ -954,7 +964,7 @@ class MarkdownFormatter:
                 "",
                 "| Parameter | Nilai |",
                 "|-----------|-------|",
-                f"| **Zona Entry** | {_money(low)} – {_money(high)} |",
+                f"| **Zona Entry** | {_money(low)} - {_money(high)} |",
                 f"| **Target Harga** | {_money(target)} ({_signed_pct(upside)}) |",
                 f"| **Stop Loss** | {_money(stop)} ({_signed_pct(-downside if downside is not None else None)}) |",
                 f"| **Risk/Reward** | {_ratio(verdict.get('risk_reward_ratio'))} |",
@@ -990,7 +1000,7 @@ class MarkdownFormatter:
             ]
             risks = _key_risks(data)
             if risks:
-                lines.extend(f"- ⚠️ {item}" for item in risks)
+                lines.extend(f"- {item}" for item in risks)
             else:
                 lines.append("Data risiko tidak tersedia.")
             lines.append("")
@@ -999,7 +1009,7 @@ class MarkdownFormatter:
                 lines.extend(["## Katalis Potensial", ""])
                 catalysts = _catalysts(data)
                 if catalysts:
-                    lines.extend(f"- ✨ {item}" for item in catalysts)
+                    lines.extend(f"- {item}" for item in catalysts)
                 else:
                     lines.append("Data katalis tidak tersedia.")
                 lines.append("")
@@ -1083,9 +1093,9 @@ class MarkdownFormatter:
                 "",
                 "| Rating | Jumlah | Saham |",
                 "|--------|--------|-------|",
-                self._rating_summary_row("🟢 BUY", grouped.get("BUY", [])),
-                self._rating_summary_row("🟡 HOLD", grouped.get("HOLD", [])),
-                self._rating_summary_row("🔴 AVOID", grouped.get("AVOID", [])),
+                self._rating_summary_row("BUY", grouped.get("BUY", [])),
+                self._rating_summary_row("HOLD", grouped.get("HOLD", [])),
+                self._rating_summary_row("AVOID", grouped.get("AVOID", [])),
                 "",
                 "## Saham yang Dapat Dieksekusi",
                 "",
@@ -1104,8 +1114,8 @@ class MarkdownFormatter:
                     low, high = _entry_bounds(verdict)
                     lines.extend(
                         [
-                            f"### ⏳ {_ticker(row)}",
-                            f"- Tunggu pullback ke: {_money(low)} – {_money(high)}",
+                            f"### {_ticker(row)}",
+                            f"- Tunggu pullback ke: {_money(low)} - {_money(high)}",
                             "",
                         ]
                     )
@@ -1137,11 +1147,14 @@ class MarkdownFormatter:
         if not rows:
             return ["Tidak ada data voting"]
         lines = [
-            "| Agent | Posisi | Keyakinan | Hasil |",
-            "|-------|--------|-----------|-------|",
+            "| Agent | Posisi | Keyakinan |",
+            "|-------|--------|-----------|",
         ]
-        for agent, position, confidence, outcome, _style in rows:
-            lines.append(f"| {agent} | {position} | {confidence} | {outcome} |")
+        for agent, position, confidence, _outcome, _style in rows:
+            lines.append(f"| {agent} | {position} | {confidence} |")
+        override_note = _soft_hold_override_note(result, packet)
+        if override_note:
+            lines.extend(["", f"*{override_note}*"])
         return lines
 
     def _rating_summary_row(self, label: str, rows: list[dict[str, Any]]) -> str:
@@ -1154,8 +1167,8 @@ class MarkdownFormatter:
         target = verdict.get("target_price")
         current = verdict.get("current_price")
         return [
-            f"### ✅ {_ticker(result)}",
-            f"- Entry: {_money(low)} – {_money(high)}",
+            f"### {_ticker(result)}",
+            f"- Entry: {_money(low)} - {_money(high)}",
             f"- Target: {_money(target)} ({_signed_pct(_move_pct(target, current))})",
             f"- Stop: {_money(verdict.get('stop_loss'))}",
             (
