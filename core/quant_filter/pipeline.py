@@ -24,6 +24,7 @@ from utils.exdate_scanner import (
     WARNING_WINDOW_DAYS,
     scan_exdate,
 )
+from utils.logger_config import logger
 from utils.technicals import compute_atr, compute_rsi, snap_to_tick
 
 try:
@@ -148,8 +149,8 @@ def _resolve_exdate(
             info = adapter.get_exdate_info(ticker, current_px)
             if info["source"] == "xlsx":
                 return info
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
 
     # Lapis 2: parse langsung kolom 'Latest Dividend Ex-Date' dari row
     exdate_str = str(row.get("Latest Dividend Ex-Date", "")).strip()

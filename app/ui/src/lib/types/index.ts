@@ -31,9 +31,10 @@ export interface ScoutMetrics {
 }
 
 export type DebateEvent =
-  | { type: 'start'; ticker: string }
+  | { type: 'progress'; ticker: string; phase: string; pct: number }
   | { type: 'scout'; ticker: string; metrics: ScoutMetrics }
   | { type: 'round'; ticker: string; data: DebateRound }
+  | { type: 'devil_advocate'; ticker: string }
   | { type: 'verdict'; ticker: string; result: StockResult }
   | { type: 'done'; ticker: string }
   | { type: 'error'; ticker: string; message: string };

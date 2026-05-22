@@ -166,12 +166,12 @@ def _ensure_utf8_stdout() -> None:
     """Best-effort UTF-8 console output for Windows terminals."""
     try:
         sys.stdout.reconfigure(encoding="utf-8")
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
     try:
         sys.stderr.reconfigure(encoding="utf-8")
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
 
 
 def _clean_cli_text(value: Any) -> str:
@@ -735,13 +735,17 @@ class CliRenderer:
                         "Catatan: Tidak ada kandidat memenuhi conviction "
                         f"threshold (>= {float(threshold):.0%})"
                     )
-                except Exception:
+                except Exception as exc:
+                    logger.error(
+                        f"[{__name__}] Unexpected error: {exc}", exc_info=True
+                    )
                     self.portfolio_threshold_note = (
                         "Catatan: Tidak ada kandidat memenuhi conviction threshold"
                     )
                 self.rank_events.append((self._event_status(level), prefix, body))
                 return True
-        except Exception:
+        except Exception as exc:
+            logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
             return False
         return False
 
@@ -1372,8 +1376,8 @@ class CliRenderer:
                 selected_text = _final_selection_label(
                     result, selected=ticker in selected
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
             # TODO: Current verdict schema exposes expected_return as display text;
             # if a future schema separates gross/net return, map that explicit field here.
             table.add_row(
@@ -1483,7 +1487,8 @@ class CliRenderer:
                         "Catatan: Tidak ada kandidat memenuhi conviction "
                         f"threshold (>= {float(threshold):.0%})"
                     )
-        except Exception:
+        except Exception as exc:
+            logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
             return None
         return None
 
@@ -1584,7 +1589,8 @@ class RichLogSink:
 def _literal_dict(raw: str) -> dict[str, Any]:
     try:
         value = ast.literal_eval(raw)
-    except Exception:
+    except Exception as exc:
+        logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
         return {}
     return value if isinstance(value, dict) else {}
 
@@ -1798,7 +1804,8 @@ def _final_selection_label(result: dict[str, Any], *, selected: bool) -> Text:
         if selected:
             return Text("✅ Siap masuk", style="ok")
         return Text(_short_err(_exclusion_reason(result)), style="muted")
-    except Exception:
+    except Exception as exc:
+        logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
         return Text(_short_err(_exclusion_reason(result)), style="muted")
 
 
@@ -2514,7 +2521,8 @@ def _parse_entry_bounds(entry_price_range: Any) -> tuple[float | None, float | N
         low = _parse_price_value(parts[0].strip()) if parts else None
         high = _parse_price_value(parts[1].strip()) if len(parts) > 1 else low
         return low, high
-    except Exception:
+    except Exception as exc:
+        logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
         return None, None
 
 
@@ -3761,7 +3769,8 @@ def _extract_winning_argument(entry: dict) -> str:
     for raw in entry.get("debate_history", []):
         try:
             msg = _as_debate_message(raw)
-        except Exception:
+        except Exception as exc:
+            logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
             continue
         if msg.role == "bull":
             bull_args.append(msg.content)
@@ -3777,7 +3786,8 @@ def _extract_devils_warning(entry: dict) -> str:
     for raw in entry.get("debate_history", []):
         try:
             msg = _as_debate_message(raw)
-        except Exception:
+        except Exception as exc:
+            logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
             continue
         if msg.role == "devils_advocate":
             da_args.append(msg.content)
@@ -4503,7 +4513,8 @@ def _watchlist_rows(results: list[dict]) -> list[dict[str, Any]]:
                 }
             )
         return rows
-    except Exception:
+    except Exception as exc:
+        logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
         return []
 
 

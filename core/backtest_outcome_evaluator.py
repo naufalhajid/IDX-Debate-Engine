@@ -15,6 +15,7 @@ from typing import Callable, Iterable, Literal
 import yfinance as yf
 
 from core.backtest_memory import BacktestMemory, DEFAULT_PATH, TradeOutcome
+from core.settings import settings
 from utils.logger_config import logger
 
 
@@ -146,7 +147,7 @@ def evaluate_trade_outcome(
 def evaluate_memory(
     *,
     memory_path: Path = DEFAULT_PATH,
-    debates_dir: Path = Path("output/debates"),
+    debates_dir: Path = settings.debates_dir,
     write: bool = False,
     horizon_trading_days: int = DEFAULT_HORIZON_TRADING_DAYS,
     price_fetcher: PriceFetcher | None = None,

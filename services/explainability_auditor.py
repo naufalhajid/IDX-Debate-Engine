@@ -11,8 +11,11 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from core.settings import settings
+from utils.logger_config import logger
 
-DEFAULT_PATH = Path("output/audit/audit_log.jsonl")
+
+DEFAULT_PATH = settings.audit_log_path
 
 AGENT_ROLES = {
     "bull",
@@ -201,7 +204,8 @@ class ExplainabilityAuditor:
         try:
             with self.storage_path.open("a", encoding="utf-8") as handle:
                 handle.write(packet.model_dump_json() + "\n")
-        except Exception:
+        except Exception as exc:
+            logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
             return
 
     def audit_from_file(self, debate_json_path: str | Path) -> AuditPacket:
@@ -585,7 +589,7 @@ def main() -> None:
     args = parser.parse_args()
 
     ticker = args.ticker.upper()
-    debate_path = Path("output") / "debates" / ticker / "latest_debate.json"
+    debate_path = settings.debates_dir / ticker / "latest_debate.json"
     packet = DEFAULT_AUDITOR.audit_from_file(debate_path)
     print(DEFAULT_AUDITOR.format_report(packet))
 

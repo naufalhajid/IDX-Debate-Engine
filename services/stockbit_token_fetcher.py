@@ -114,8 +114,8 @@ class StockbitTokenFetcher:
     def close(self):
         try:
             self.driver.quit()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
 
     def _detect_chrome_major_version(self) -> int | None:
         """
@@ -151,7 +151,8 @@ class StockbitTokenFetcher:
                 match = version_pattern.search(output)
                 if match:
                     return int(match.group(1))
-            except Exception:
+            except Exception as exc:
+                logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
                 continue
 
         return None

@@ -11,6 +11,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from core.settings import settings
+
 
 class ValidationReport(BaseModel):
     """Validation result for generated debate artifacts."""
@@ -55,9 +57,9 @@ _TOP_PICK_HEADING = re.compile(
     r"^##\s+.*?#\d+\s*[-\u2013\u2014]\s*([A-Z][A-Z0-9]{1,5})\b",
     re.MULTILINE,
 )
-DEFAULT_AUDIT_LOG_PATH = Path("output/audit/audit_log.jsonl")
-DEFAULT_TELEMETRY_LOG_PATH = Path("output/telemetry/telemetry_log.jsonl")
-DEFAULT_RAG_EVIDENCE_LOG_PATH = Path("output/rag_evidence/evidence_log.jsonl")
+DEFAULT_AUDIT_LOG_PATH = settings.audit_log_path
+DEFAULT_TELEMETRY_LOG_PATH = settings.ops_telemetry_path
+DEFAULT_RAG_EVIDENCE_LOG_PATH = settings.rag_evidence_log_path
 
 
 def validate_artifacts(

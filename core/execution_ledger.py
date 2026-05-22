@@ -13,8 +13,11 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from core.settings import settings
+from utils.logger_config import logger
 
-DEFAULT_PATH = Path("output/ledger/execution_ledger.jsonl")
+
+DEFAULT_PATH = settings.execution_ledger_path
 
 
 class EventType(str, Enum):
@@ -114,8 +117,8 @@ class ExecutionLedger:
         self.storage_path = Path(storage_path)
         try:
             self.storage_path.parent.mkdir(parents=True, exist_ok=True)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
 
     def emit(self, event: LedgerEvent) -> None:
         """Append one event to JSONL without ever crashing the caller."""
@@ -124,7 +127,8 @@ class ExecutionLedger:
             with self.storage_path.open("a", encoding="utf-8") as handle:
                 handle.write(event.model_dump_json())
                 handle.write("\n")
-        except Exception:
+        except Exception as exc:
+            logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
             return
 
     def batch_start(self, run_id: str, ticker_count: int, tickers: list[str]) -> None:
@@ -532,14 +536,16 @@ class ExecutionLedger:
         events: list[LedgerEvent] = []
         try:
             lines = self.storage_path.read_text(encoding="utf-8").splitlines()
-        except Exception:
+        except Exception as exc:
+            logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
             return []
         for line in lines:
             if not line.strip():
                 continue
             try:
                 events.append(LedgerEvent.model_validate_json(line))
-            except Exception:
+            except Exception as exc:
+                logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
                 continue
         return events
 

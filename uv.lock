@@ -1195,6 +1195,7 @@ name = "idx-fundamental"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "aiofiles" },
     { name = "aiosqlite" },
     { name = "babel" },
     { name = "beautifulsoup4" },
@@ -1247,6 +1248,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aiofiles", specifier = ">=25.1.0" },
     { name = "aiosqlite", specifier = ">=0.21.0" },
     { name = "babel", specifier = ">=2.15.0" },
     { name = "beautifulsoup4", specifier = ">=4.12.3" },

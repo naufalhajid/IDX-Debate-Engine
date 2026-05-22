@@ -12,6 +12,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from core.settings import settings
 from services.context_pack_builder import ContextPack, build_context_pack
 
 
@@ -19,7 +20,7 @@ STALE_THRESHOLD_SECONDS = 86_400
 MAX_CHUNKS_PER_BUNDLE = 12
 MAX_BUNDLE_CHARS = 2_400
 CHARS_PER_TOKEN = 4
-DEFAULT_PATH = Path("output/rag_evidence/evidence_log.jsonl")
+DEFAULT_PATH = settings.rag_evidence_log_path
 
 CATEGORY_WEIGHTS = {
     "fair_value": 1.0,
@@ -468,7 +469,7 @@ def _clamp_score(score: float) -> float:
 
 
 def _load_debate_payload(ticker: str) -> dict[str, Any]:
-    path = Path("output") / "debates" / ticker.upper() / "latest_debate.json"
+    path = settings.debates_dir / ticker.upper() / "latest_debate.json"
     if not path.exists():
         raise FileNotFoundError(f"No latest_debate.json found at {path}")
     return json.loads(path.read_text(encoding="utf-8"))

@@ -14,14 +14,19 @@ async def get_gemini_api_key(
                 ),
             },
         )
-    if not x_gemini_api_key.startswith("AIza"):
+    
+    # Strip whitespace and quotes from copy-paste
+    clean_key = x_gemini_api_key.strip().strip("'").strip('"')
+    
+    if not clean_key:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
-                "code": "INVALID_API_KEY_FORMAT",
+                "code": "MISSING_API_KEY",
                 "message": (
-                    "Format API Key tidak valid. Key harus diawali dengan 'AIza'."
+                    "Gemini API Key tidak ditemukan. Masukkan key di panel Settings."
                 ),
             },
         )
-    return x_gemini_api_key
+    return clean_key
+

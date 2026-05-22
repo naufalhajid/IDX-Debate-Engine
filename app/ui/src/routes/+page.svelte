@@ -14,6 +14,7 @@
     debateStream,
     isStreaming
   } from '$lib/stores/dashboard';
+  import { stockList } from '$lib/stores/metadata';
   import { toast } from '$lib/stores/toast';
   import type { DebateEvent, StockResult } from '$lib/types';
 
@@ -35,8 +36,22 @@
 
   async function loadData() {
     try {
-      const [health, results] = await Promise.allSettled([api.health(), api.results()]);
+      const [health, results, stocks] = await Promise.allSettled([
+        api.health(),
+        api.results(),
+        api.stocks()
+      ]);
       serverOnline = health.status === 'fulfilled';
+      if (stocks.status === 'fulfilled') {
+        stockList.set(
+          stocks.value.map((s: Record<string, unknown>) => ({
+            ticker: String(s.ticker ?? ''),
+            name: String(s.name ?? ''),
+            market_cap: typeof s.market_cap === 'number' ? s.market_cap : null,
+            home_page: typeof s.home_page === 'string' ? s.home_page : null
+          }))
+        );
+      }
       if (results.status === 'fulfilled') {
         allResults.set(results.value);
         if (!get(activeTicker) && results.value[0]) activeTicker.set(results.value[0].ticker);
@@ -54,9 +69,14 @@
 
   function handleStreamEvent(event: DebateEvent) {
     debateStream.update((items) => [...items, event]);
-    if ('ticker' in event) activeTicker.set(event.ticker);
+    activeTicker.set(event.ticker);
     if (event.type === 'verdict') upsertResult(event.result);
-    if (event.type === 'error') toast('error', `${event.ticker}: ${event.message}`);
+    if (event.type === 'done' || event.type === 'error') {
+      isStreaming.set(false);
+    }
+    if (event.type === 'error') {
+      toast('error', `${event.ticker}: ${event.message}`);
+    }
   }
 
   function startDebate(tickers: string[]) {
@@ -91,95 +111,118 @@
   });
 </script>
 
-<div class="page">
-  <Sidebar />
+<div class="page-viewport">
+  <div class="terminal-shell">
+    <Sidebar />
 
-  <main class="main">
-    <ServerStatusBar online={serverOnline} {loading} {lastUpdated} />
+    <main class="terminal-main">
+      <ServerStatusBar online={serverOnline} {loading} {lastUpdated} />
 
-    <div class="content-grid">
-      <section class="col-table">
-        {#if loading}
-          <SkeletonLoader rows={12} />
-        {:else}
-          <CandidatesTable onDebate={startDebate} />
-        {/if}
-      </section>
-
-      <div class="col-detail">
-        <section class="detail-top">
-          <TradeBox />
+      <div class="workspace-grid">
+        <section class="candidates-area">
+          {#if loading}
+            <SkeletonLoader rows={10} />
+          {:else}
+            <CandidatesTable onDebate={startDebate} />
+          {/if}
         </section>
-        <section class="detail-bottom">
-          <DebateTimeline />
-        </section>
+
+        <aside class="right-rail">
+          <section class="debate-area">
+            <DebateTimeline />
+          </section>
+          <section class="trade-area">
+            <TradeBox />
+          </section>
+        </aside>
       </div>
-    </div>
-  </main>
+    </main>
+  </div>
 </div>
 
 <style>
-  .page {
+  .page-viewport {
+    width: 100vw;
+    height: 100vh;
     display: flex;
-    min-height: 100vh;
-    background: var(--surface-base);
-    color: var(--text-primary);
+    align-items: center;
+    justify-content: center;
+    padding: clamp(16px, 5vw, 56px);
+    background:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.045), transparent 36%),
+      linear-gradient(180deg, #26323f 0%, #17212b 100%);
   }
 
-  .main {
+  .terminal-shell {
+    width: min(1180px, 100%);
+    height: min(760px, 100%);
+    min-height: 620px;
+    display: flex;
+    overflow: hidden;
+    border: 1px solid rgba(118, 139, 164, 0.16);
+    border-radius: var(--radius-shell);
+    background: var(--surface-frame);
+    box-shadow: var(--shadow-shell);
+  }
+
+  .terminal-main {
     flex: 1;
     min-width: 0;
     display: flex;
     flex-direction: column;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 22%),
+      #071019;
   }
 
-  .content-grid {
+  .workspace-grid {
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 400px;
+    grid-template-columns: minmax(520px, 1fr) 318px;
+    gap: var(--sp-3);
+    padding: var(--sp-3);
   }
 
-  .col-table {
+  .candidates-area,
+  .debate-area,
+  .trade-area {
     min-width: 0;
     min-height: 0;
-    display: flex;
-    flex-direction: column;
-    border-right: 1px solid var(--surface-border);
-    overflow: hidden;
   }
 
-  .col-detail {
+  .right-rail {
+    min-width: 0;
     min-height: 0;
-    display: flex;
-    flex-direction: column;
-    background: var(--surface-base);
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) 174px;
+    gap: var(--sp-3);
   }
 
-  .detail-top {
-    border-bottom: 1px solid var(--surface-border);
-    padding: var(--sp-4);
-  }
-
-  .detail-bottom {
-    flex: 1;
-    min-height: 0;
-    padding: var(--sp-4);
-    overflow: hidden;
-  }
-
-  @media (max-width: 1120px) {
-    .page {
-      display: block;
+  @media (max-width: 1040px) {
+    :global(body) {
       overflow: auto;
     }
 
-    .content-grid {
+    .page-viewport {
+      height: auto;
+      min-height: 100vh;
+      align-items: flex-start;
+      padding: var(--sp-3);
+    }
+
+    .terminal-shell {
+      height: auto;
+      min-height: 0;
+      flex-direction: column;
+    }
+
+    .workspace-grid {
       grid-template-columns: 1fr;
     }
 
-    .col-detail {
-      min-height: 720px;
+    .right-rail {
+      grid-template-rows: 520px auto;
     }
   }
 </style>

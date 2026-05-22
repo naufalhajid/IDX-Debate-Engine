@@ -178,8 +178,10 @@ class StockbitApiClient:
             if fetcher is not None:
                 try:
                     fetcher.close()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.error(
+                        f"[{__name__}] Unexpected error: {exc}", exc_info=True
+                    )
 
         if token:
             logger.info("Logged in successfully via StockbitTokenFetcher!")

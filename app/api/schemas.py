@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class DebateStreamRequest(BaseModel):
@@ -11,3 +11,12 @@ class DebateStreamRequest(BaseModel):
         if not cleaned:
             raise ValueError("Pilih minimal satu ticker untuk menjalankan debate.")
         return cleaned
+
+
+class StockSchema(BaseModel):  # QW-FIX-5
+    model_config = ConfigDict(from_attributes=True)
+
+    ticker: str
+    name: str | None = None
+    market_cap: float | None = None
+    home_page: str | None = None

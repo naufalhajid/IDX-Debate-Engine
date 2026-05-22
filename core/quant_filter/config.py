@@ -4,6 +4,8 @@ import glob
 import os
 from pathlib import Path
 
+from core.settings import settings
+
 def _find_latest_xlsx(output_dir: str = "output") -> str:
     """
     Auto-detect file xlsx IDX terbaru di folder output/.
@@ -40,7 +42,7 @@ CONFIG = {
     "input_file":        None,
     "output_dir":        "output",
     "scratch_dir":       "scratch",
-    "sector_cache_file": str(Path("output") / "sector_cache.json"),
+    "sector_cache_file": str(settings.sector_cache_path),
 
     # ── Static Filter
     "min_close_price":        100,        # Rp — buang penny stocks

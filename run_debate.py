@@ -480,9 +480,11 @@ def _record_ticker_telemetry(
 
 def _print_report(report_text: str) -> None:
     try:
-        print(report_text)
+        logger.info(str(report_text))
     except UnicodeEncodeError:
-        print(report_text.encode("ascii", errors="replace").decode("ascii"))
+        logger.info(
+            str(report_text.encode("ascii", errors="replace").decode("ascii"))
+        )
 
 
 def _write_batch_telemetry_report(

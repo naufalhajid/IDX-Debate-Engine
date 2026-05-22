@@ -10,8 +10,10 @@ from typing import Literal, Sequence
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
+from core.settings import settings
 
-DEFAULT_PATH = Path("output/backtest/backtest_memory.jsonl")
+
+DEFAULT_PATH = settings.backtest_memory_path
 
 
 class TradeOutcome(BaseModel):

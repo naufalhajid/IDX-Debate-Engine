@@ -9,8 +9,10 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
+from core.settings import settings
 
-DEFAULT_PATH = Path("output/observations/observations.jsonl")
+
+DEFAULT_PATH = settings.observations_path
 
 
 class AgentObservation(BaseModel):

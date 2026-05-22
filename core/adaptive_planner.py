@@ -13,12 +13,14 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from core.failure_taxonomy import ErrorCode, FailureAction, FailureRecord, route_failure
+from core.settings import settings
+from utils.logger_config import logger
 
 
 MAX_RETRY_ATTEMPTS = 2
 RETRY_DELAY_SECONDS = 30
 PARTIAL_DATA_CONFIDENCE_PENALTY = 0.15
-DEFAULT_PATH = Path("output/planner/plan_log.jsonl")
+DEFAULT_PATH = settings.adaptive_planner_path
 
 
 class PipelineStage(str, Enum):
@@ -247,7 +249,8 @@ class AdaptivePlanner:
             with self.storage_path.open("a", encoding="utf-8") as handle:
                 handle.write(decision.model_dump_json())
                 handle.write("\n")
-        except Exception:
+        except Exception as exc:
+            logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
             return
 
     def format_decision(self, decision: PlanDecision) -> str:
@@ -326,7 +329,8 @@ class AdaptivePlanner:
                 continue
             try:
                 decisions.append(PlanDecision.model_validate_json(line))
-            except Exception:
+            except Exception as exc:
+                logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
                 continue
         return decisions
 
@@ -355,7 +359,8 @@ def _failure_from_context(ctx: PlannerContext) -> FailureRecord | None:
         data["code"] = data["error_code"]
     try:
         return FailureRecord.model_validate(data)
-    except Exception:
+    except Exception as exc:
+        logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
         return None
 
 
@@ -371,7 +376,8 @@ def _route_for_retry(
             attempt=attempt + 1,
             max_attempts=MAX_RETRY_ATTEMPTS + 1,
         )
-    except Exception:
+    except Exception as exc:
+        logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
         return None
 
 
@@ -394,7 +400,8 @@ def _latest_run_id(path: Path) -> str | None:
             continue
         try:
             return PlanDecision.model_validate_json(line).run_id
-        except Exception:
+        except Exception as exc:
+            logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
             continue
     return None
 
@@ -417,7 +424,7 @@ def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     planner = AdaptivePlanner(args.path)
     run_id = args.run_id or _latest_run_id(planner.storage_path) or ""
-    print(json.dumps(planner.summary_stats(run_id), indent=2))
+    logger.info(str(json.dumps(planner.summary_stats(run_id), indent=2)))
     return 0
 
 

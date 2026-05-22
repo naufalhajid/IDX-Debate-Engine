@@ -43,6 +43,19 @@ class Settings(BaseSettings):
     LOG_ERROR_FILENAME: str = "logs/error.log"
     LOG_APP_FILENAME: str = "logs/app.log"
 
+    # Output artifact paths
+    output_dir: Path = Path("output")
+    results_path: Path = Path("output/full_batch_results.json")
+    sector_cache_path: Path = Path("output/sector_cache.json")
+    adaptive_planner_path: Path = Path("output/planner/plan_log.jsonl")
+    execution_ledger_path: Path = Path("output/ledger/execution_ledger.jsonl")
+    ops_telemetry_path: Path = Path("output/telemetry/telemetry_log.jsonl")
+    audit_log_path: Path = Path("output/audit/audit_log.jsonl")
+    rag_evidence_log_path: Path = Path("output/rag_evidence/evidence_log.jsonl")
+    backtest_memory_path: Path = Path("output/backtest/backtest_memory.jsonl")
+    observations_path: Path = Path("output/observations/observations.jsonl")
+    debates_dir: Path = Path("output/debates")
+
     GOOGLE_SERVICE_ACCOUNT: str = "{}"
     GOOGLE_DRIVE_EMAILS: str = '["example@gmail.com"]'
 

@@ -11,6 +11,14 @@
   let serverOnline = false;
   let validating = false;
 
+  const navItems = [
+    { label: 'Dashboard', icon: 'grid', active: true },
+    { label: 'Markets', icon: 'trend', active: false },
+    { label: 'Watchlists', icon: 'star', active: false },
+    { label: 'Debate Hub', icon: 'chat', active: false },
+    { label: 'Analytics', icon: 'bars', active: false }
+  ];
+
   onMount(async () => {
     keyInput = get(apiKey);
     try {
@@ -22,13 +30,17 @@
   });
 
   async function saveKey() {
-    if (!keyInput.startsWith('AIza')) {
-      toast('error', 'Format API Key tidak valid');
+    // Clean key input from potential copy-paste spaces/quotes
+    const cleanedKey = keyInput.trim().replace(/^['"]|['"]$/g, '');
+    keyInput = cleanedKey; // Update input field value
+    
+    if (!cleanedKey) {
+      toast('error', 'API Key tidak boleh kosong');
       return;
     }
     validating = true;
     try {
-      apiKey.set(keyInput);
+      apiKey.set(cleanedKey);
       await api.validateKey();
       toast('success', 'API Key tersimpan dan valid');
     } catch (error: unknown) {
@@ -40,50 +52,48 @@
 </script>
 
 <aside class="sidebar">
-  <header class="sidebar__header">
-    <div class="logo">
-      <span class="logo__mark">IDX</span>
-      <div>
-        <div class="logo__title">IDX Analyst</div>
-        <div class="logo__sub">Fundamental v2</div>
-      </div>
+  <header class="brand">
+    <span class="brand__mark"></span>
+    <div class="brand__copy">
+      <strong>IDX DEBATE</strong>
+      <strong>ENGINE</strong>
     </div>
-    <div
-      class="conn-dot"
-      class:conn-dot--online={serverOnline}
+    <span
+      class="brand__status"
+      class:brand__status--online={serverOnline}
       title={serverOnline ? 'Server Online' : 'Server Offline'}
-    ></div>
+    ></span>
   </header>
 
-  <div class="stats-bar">
-    <div class="stat">
-      <span class="stat__label">Strong Buy</span>
-      <span class="stat__val stat__val--bull">{$summaryStats.strongBuy}</span>
+  <nav class="nav-list" aria-label="Primary navigation">
+    {#each navItems as item}
+      <button class="nav-item" class:nav-item--active={item.active} type="button">
+        <span class="nav-icon nav-icon--{item.icon}"></span>
+        <span>{item.label}</span>
+      </button>
+    {/each}
+  </nav>
+
+  <div class="side-metrics">
+    <div>
+      <span>BUY</span>
+      <strong>{$summaryStats.buy + $summaryStats.strongBuy}</strong>
     </div>
-    <div class="stat">
-      <span class="stat__label">Buy</span>
-      <span class="stat__val stat__val--bull">{$summaryStats.buy}</span>
-    </div>
-    <div class="stat">
-      <span class="stat__label">Avoid</span>
-      <span class="stat__val stat__val--bear">{$summaryStats.avoid}</span>
-    </div>
-    <div class="stat">
-      <span class="stat__label">Avg Conv.</span>
-      <span class="stat__val">{$summaryStats.avgConviction}</span>
+    <div>
+      <span>AVOID</span>
+      <strong class="bear">{$summaryStats.avoid}</strong>
     </div>
   </div>
 
-  <section class="sidebar__section">
-    <h3 class="sidebar__label">Settings</h3>
-
-    <label class="field-label" for="api-key">Gemini API Key</label>
+  <section class="key-panel" aria-label="Settings">
+    <div class="key-panel__title">Settings</div>
+    <label class="field-label" for="api-key">Gemini Key</label>
     <div class="key-row">
       <input
         id="api-key"
         class="input"
         type={showKey ? 'text' : 'password'}
-        placeholder="AIza..."
+        placeholder="API Key..."
         bind:value={keyInput}
         onkeydown={(event) => event.key === 'Enter' && saveKey()}
       />
@@ -93,14 +103,14 @@
         title="Toggle visibility"
         type="button"
       >
-        {showKey ? 'Hide' : 'Show'}
+        {showKey ? 'H' : 'S'}
       </button>
     </div>
     <button class="btn btn--primary" onclick={saveKey} disabled={validating} type="button">
-      {validating ? 'Validating' : 'Save Key'}
+      {validating ? 'Check' : 'Save'}
     </button>
 
-    <label class="field-label field-label--spaced" for="equity">Portfolio Equity</label>
+    <label class="field-label field-label--spaced" for="equity">Equity</label>
     <input
       id="equity"
       class="input mono"
@@ -109,169 +119,240 @@
       bind:value={$portfolioEquity}
     />
   </section>
-
-  <footer class="sidebar__footer">
-    <span><kbd>K</kbd> Search</span>
-    <span><kbd>D</kbd> Debate</span>
-    <span><kbd>E</kbd> Export</span>
-  </footer>
 </aside>
 
 <style>
   .sidebar {
-    width: 248px;
-    min-height: 100vh;
-    position: sticky;
-    top: 0;
-    z-index: var(--z-sidebar);
+    width: 142px;
+    min-height: 100%;
     display: flex;
     flex-direction: column;
-    gap: var(--sp-6);
-    border-right: 1px solid var(--surface-border);
-    padding: var(--sp-4);
-    background: var(--surface-1);
-  }
-
-  .sidebar__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
     gap: var(--sp-4);
+    border-right: 1px solid rgba(118, 139, 164, 0.13);
+    padding: var(--sp-3) var(--sp-2);
+    background: linear-gradient(180deg, rgba(15, 24, 35, 0.94), rgba(8, 14, 21, 0.96));
   }
 
-  .logo {
-    display: flex;
+  .brand {
+    min-height: 54px;
+    display: grid;
+    grid-template-columns: 32px 1fr 10px;
     align-items: center;
-    gap: var(--sp-3);
+    gap: var(--sp-2);
+    padding: 0 var(--sp-1);
+  }
+
+  .brand__mark {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 95, 102, 0.6);
+    background:
+      repeating-linear-gradient(135deg, rgba(255, 95, 102, 0.85) 0 2px, transparent 2px 5px),
+      rgba(255, 95, 102, 0.13);
+    box-shadow: 0 0 18px rgba(255, 95, 102, 0.18);
+  }
+
+  .brand__copy {
     min-width: 0;
+    display: grid;
+    line-height: 1.05;
   }
 
-  .logo__mark {
-    width: 36px;
-    height: 36px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--accent-cyan);
-    border-radius: var(--radius-sm);
-    color: var(--accent-cyan);
-    background: var(--accent-cyan-dim);
-    font-family: var(--font-mono);
-    font-size: 11px;
-    font-weight: 600;
-  }
-
-  .logo__title {
+  .brand__copy strong {
+    overflow: hidden;
     color: var(--text-primary);
-    font-weight: 600;
-  }
-
-  .logo__sub {
-    margin-top: 1px;
-    color: var(--text-secondary);
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 10px;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .conn-dot {
-    width: 8px;
-    height: 8px;
-    flex: 0 0 auto;
+  .brand__status {
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     background: var(--signal-bear);
     box-shadow: 0 0 8px var(--signal-bear);
   }
 
-  .conn-dot--online {
+  .brand__status--online {
     background: var(--signal-bull);
     box-shadow: 0 0 8px var(--signal-bull);
   }
 
-  .stats-bar {
+  .nav-list {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    border: 1px solid var(--surface-border);
-    border-radius: var(--radius-md);
-    overflow: hidden;
+    gap: var(--sp-1);
   }
 
-  .stat {
-    min-height: 58px;
-    padding: var(--sp-3);
-    border-right: 1px solid var(--surface-border);
-    border-bottom: 1px solid var(--surface-border);
-    background: var(--surface-base);
-  }
-
-  .stat:nth-child(2n) {
-    border-right: 0;
-  }
-
-  .stat:nth-last-child(-n + 2) {
-    border-bottom: 0;
-  }
-
-  .stat__label {
-    display: block;
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    font-size: 10px;
-  }
-
-  .stat__val {
-    display: block;
-    margin-top: var(--sp-2);
-    font-family: var(--font-mono);
-    font-size: 20px;
-    font-weight: 600;
-  }
-
-  .stat__val--bull {
-    color: var(--signal-bull);
-  }
-
-  .stat__val--bear {
-    color: var(--signal-bear);
-  }
-
-  .sidebar__section {
-    display: flex;
-    flex-direction: column;
+  .nav-item {
+    position: relative;
+    width: 100%;
+    min-height: 32px;
+    display: grid;
+    grid-template-columns: 18px 1fr;
+    align-items: center;
     gap: var(--sp-2);
-  }
-
-  .sidebar__label {
-    margin: 0 0 var(--sp-2);
+    border: 0;
+    border-radius: var(--radius-sm);
+    padding: 0 var(--sp-2);
+    background: transparent;
     color: var(--text-secondary);
     font-family: var(--font-mono);
-    font-size: 11px;
-    font-weight: 600;
+    font-size: 9px;
+    font-weight: 700;
+    text-align: left;
     text-transform: uppercase;
   }
 
+  .nav-item--active {
+    background: rgba(32, 208, 131, 0.13);
+    color: var(--signal-bull);
+  }
+
+  .nav-item--active::before {
+    content: '';
+    position: absolute;
+    left: -8px;
+    top: 3px;
+    bottom: 3px;
+    width: 2px;
+    border-radius: 999px;
+    background: var(--signal-bull);
+    box-shadow: 0 0 10px var(--signal-bull);
+  }
+
+  .nav-icon {
+    position: relative;
+    width: 13px;
+    height: 13px;
+    color: currentColor;
+  }
+
+  .nav-icon--grid {
+    border: 1px solid currentColor;
+    box-shadow: 6px 0 0 -1px currentColor, 0 6px 0 -1px currentColor, 6px 6px 0 -1px currentColor;
+  }
+
+  .nav-icon--trend::before {
+    content: '';
+    position: absolute;
+    inset: 5px 0 3px;
+    border-top: 2px solid currentColor;
+    transform: skew(-35deg);
+  }
+
+  .nav-icon--star::before {
+    content: '';
+    position: absolute;
+    inset: 1px;
+    border: 1px solid currentColor;
+    clip-path: polygon(50% 0, 62% 35%, 100% 38%, 70% 60%, 82% 100%, 50% 76%, 18% 100%, 30% 60%, 0 38%, 38% 35%);
+  }
+
+  .nav-icon--chat {
+    border: 1px solid currentColor;
+    border-radius: 3px;
+  }
+
+  .nav-icon--chat::after {
+    content: '';
+    position: absolute;
+    left: 2px;
+    bottom: -3px;
+    width: 5px;
+    height: 5px;
+    border-left: 1px solid currentColor;
+    border-bottom: 1px solid currentColor;
+    background: transparent;
+    transform: rotate(-12deg);
+  }
+
+  .nav-icon--bars::before {
+    content: '';
+    position: absolute;
+    inset: 2px 8px 1px 1px;
+    border-left: 2px solid currentColor;
+    box-shadow: 5px 3px 0 0 currentColor, 10px -2px 0 0 currentColor;
+  }
+
+  .side-metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--sp-1);
+  }
+
+  .side-metrics div {
+    min-width: 0;
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-sm);
+    padding: var(--sp-2);
+    background: rgba(4, 9, 14, 0.42);
+  }
+
+  .side-metrics span {
+    display: block;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 8px;
+    font-weight: 700;
+  }
+
+  .side-metrics strong {
+    display: block;
+    margin-top: 2px;
+    color: var(--signal-bull);
+    font-family: var(--font-mono);
+    font-size: 14px;
+  }
+
+  .side-metrics .bear {
+    color: var(--signal-bear);
+  }
+
+  .key-panel {
+    margin-top: auto;
+    display: grid;
+    gap: var(--sp-2);
+    border-top: 1px solid var(--surface-border);
+    padding-top: var(--sp-3);
+  }
+
+  .key-panel__title,
   .field-label {
     color: var(--text-secondary);
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
   }
 
   .field-label--spaced {
-    margin-top: var(--sp-4);
+    margin-top: var(--sp-1);
   }
 
   .key-row {
     display: grid;
-    grid-template-columns: 1fr 44px;
-    gap: var(--sp-2);
+    grid-template-columns: 1fr 30px;
+    gap: var(--sp-1);
   }
 
-  .sidebar__footer {
-    margin-top: auto;
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    font-size: 11px;
+  @media (max-width: 900px) {
+    .sidebar {
+      width: 100%;
+      min-height: auto;
+      position: static;
+    }
+
+    .nav-list {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .key-panel {
+      grid-template-columns: 1fr 1fr;
+      align-items: end;
+    }
   }
 </style>

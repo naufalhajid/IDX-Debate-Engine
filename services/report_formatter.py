@@ -14,6 +14,7 @@ from rich.table import Table
 from rich.text import Text
 
 from services.explainability_auditor import AuditPacket
+from utils.logger_config import logger
 
 
 _AGENT_ORDER = (
@@ -93,7 +94,8 @@ def _is_soft_hold_winner(method: Any, winner: Any = None) -> bool:
             "soft_rule",
             "soft_hold_rule",
         }
-    except Exception:
+    except Exception as exc:
+        logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
         return False
 
 
@@ -172,7 +174,8 @@ def _yes_no(value: Any) -> str:
 def _now_wib() -> datetime:
     try:
         return datetime.now(ZoneInfo("Asia/Jakarta"))
-    except Exception:
+    except Exception as exc:
+        logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
         return datetime.now().astimezone()
 
 

@@ -27,14 +27,20 @@ def test_health_reports_results_presence(monkeypatch, tmp_path):
     assert response.json() == {"status": "ok", "results_exist": False}
 
 
-def test_validate_key_errors_are_consistent():
+def test_validate_key_behavior():
     missing = client.get("/api/validate-key")
-    invalid = client.get("/api/validate-key", headers={"X-Gemini-API-Key": "bad"})
+    empty = client.get("/api/validate-key", headers={"X-Gemini-API-Key": "   "})
+    valid_random = client.get("/api/validate-key", headers={"X-Gemini-API-Key": "some-random-key-123"})
 
     assert missing.status_code == 401
     assert missing.json()["detail"]["code"] == "MISSING_API_KEY"
-    assert invalid.status_code == 422
-    assert invalid.json()["detail"]["code"] == "INVALID_API_KEY_FORMAT"
+    
+    assert empty.status_code == 401
+    assert empty.json()["detail"]["code"] == "MISSING_API_KEY"
+
+    assert valid_random.status_code == 200
+    assert valid_random.json() == {"valid": True}
+
 
 
 def test_results_missing_file_returns_no_results(monkeypatch, tmp_path):

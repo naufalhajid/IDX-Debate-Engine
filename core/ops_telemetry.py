@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from collections import Counter
 from datetime import datetime, timezone
@@ -13,10 +12,11 @@ from typing import Iterable, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from core.settings import settings
+from utils.logger_config import logger
 
-DEFAULT_PATH = Path(
-    os.getenv("OPS_TELEMETRY_STORAGE_PATH", "output/telemetry/telemetry_log.jsonl")
-)
+
+DEFAULT_PATH = settings.ops_telemetry_path
 _VERDICT_ORDER = ("BUY", "HOLD", "AVOID")
 
 
@@ -90,8 +90,8 @@ class OpsTelemetry:
         """Record one ticker metric without risking caller failure."""
         try:
             self._metrics.append(metric)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
 
     def build_batch_report(self, run_id: str, batch_timestamp: str) -> BatchReport:
         """Aggregate all in-memory ticker metrics for one batch run."""
@@ -171,8 +171,8 @@ class OpsTelemetry:
             with self.storage_path.open("a", encoding="utf-8") as file:
                 file.write(report.model_dump_json())
                 file.write("\n")
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
 
     def format_report(self, report: BatchReport) -> str:
         """Render a human-readable telemetry dashboard."""
@@ -311,7 +311,8 @@ def _load_reports(storage_path: Path) -> list[BatchReport]:
             continue
         try:
             reports.append(BatchReport.model_validate_json(line))
-        except Exception:
+        except Exception as exc:
+            logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
             continue
     return reports
 

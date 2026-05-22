@@ -2,6 +2,8 @@ import json
 import re
 from typing import Any
 
+from core.settings import settings
+
 
 def _as_float(value: Any, default: float = 0.0) -> float:
     if isinstance(value, bool):
@@ -118,6 +120,33 @@ def _build_rounds(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return rounds
 
 
+_SECTOR_CACHE_PATH = settings.sector_cache_path
+_sector_cache: dict[str, dict[str, str]] | None = None
+
+
+def _get_sector_cache() -> dict[str, dict[str, str]]:
+    global _sector_cache
+    if _sector_cache is not None:
+        return _sector_cache
+    if _SECTOR_CACHE_PATH.exists():
+        try:
+            _sector_cache = json.loads(_SECTOR_CACHE_PATH.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            _sector_cache = {}
+    else:
+        _sector_cache = {}
+    return _sector_cache
+
+
+def _resolve_sector(ticker: str, raw_sector: str | None) -> str:
+    """Return a human-readable sector, falling back to sector_cache.json."""
+    if raw_sector and raw_sector.lower() not in ("", "unknown"):
+        return raw_sector
+    cache = _get_sector_cache()
+    cached = cache.get(ticker.upper(), {})
+    return cached.get("sector") or cached.get("yf_sector") or "unknown"
+
+
 def normalize_result(entry: dict[str, Any]) -> dict[str, Any]:
     verdict = entry.get("verdict") if isinstance(entry.get("verdict"), dict) else {}
     risk = entry.get("risk_governor") if isinstance(entry.get("risk_governor"), dict) else {}
@@ -128,9 +157,10 @@ def normalize_result(entry: dict[str, Any]) -> dict[str, Any]:
     rating = str(verdict.get("rating") or "HOLD").upper()
     if rating == "SELL":
         rating = "AVOID"
+    ticker = str(entry.get("ticker") or verdict.get("ticker") or "").upper()
     return {
-        "ticker": str(entry.get("ticker") or verdict.get("ticker") or "").upper(),
-        "sector": str(entry.get("sector_key") or "Unknown"),
+        "ticker": ticker,
+        "sector": _resolve_sector(ticker, entry.get("sector_key")),
         "conviction_score": _as_percent_score(
             entry.get("conviction_score") or verdict.get("confidence")
         ),
