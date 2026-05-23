@@ -7,7 +7,6 @@
   import ServerStatusBar from '$lib/components/ServerStatusBar.svelte';
   import Sidebar from '$lib/components/Sidebar.svelte';
   import SkeletonLoader from '$lib/components/SkeletonLoader.svelte';
-  import TradeBox from '$lib/components/TradeBox.svelte';
   import {
     activeTicker,
     allResults,
@@ -112,10 +111,10 @@
 </script>
 
 <div class="page-viewport">
-  <div class="terminal-shell">
+  <div class="app-container">
     <Sidebar />
 
-    <main class="terminal-main">
+    <main class="main-content">
       <ServerStatusBar online={serverOnline} {loading} {lastUpdated} />
 
       <div class="workspace-grid">
@@ -127,14 +126,9 @@
           {/if}
         </section>
 
-        <aside class="right-rail">
-          <section class="debate-area">
-            <DebateTimeline />
-          </section>
-          <section class="trade-area">
-            <TradeBox />
-          </section>
-        </aside>
+        <section class="debate-area">
+          <DebateTimeline />
+        </section>
       </div>
     </main>
   </div>
@@ -147,59 +141,47 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: clamp(16px, 5vw, 56px);
-    background:
-      linear-gradient(145deg, rgba(255, 255, 255, 0.045), transparent 36%),
-      linear-gradient(180deg, #26323f 0%, #17212b 100%);
+    padding: clamp(16px, 3vw, 40px);
+    background: var(--surface-base);
   }
 
-  .terminal-shell {
-    width: min(1180px, 100%);
-    height: min(760px, 100%);
-    min-height: 620px;
+  .app-container {
+    width: 100%;
+    max-width: 1600px;
+    height: 100%;
+    min-height: 700px;
     display: flex;
     overflow: hidden;
-    border: 1px solid rgba(118, 139, 164, 0.16);
+    border: 1px solid var(--surface-border);
     border-radius: var(--radius-shell);
     background: var(--surface-frame);
-    box-shadow: var(--shadow-shell);
+    box-shadow: var(--shadow-panel);
   }
 
-  .terminal-main {
+  .main-content {
     flex: 1;
     min-width: 0;
     display: flex;
     flex-direction: column;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 22%),
-      #071019;
+    background: transparent;
   }
 
   .workspace-grid {
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-columns: minmax(520px, 1fr) 318px;
-    gap: var(--sp-3);
-    padding: var(--sp-3);
+    grid-template-columns: minmax(500px, 1fr) 450px;
+    gap: var(--sp-4);
+    padding: var(--sp-4);
   }
 
   .candidates-area,
-  .debate-area,
-  .trade-area {
+  .debate-area {
     min-width: 0;
     min-height: 0;
   }
 
-  .right-rail {
-    min-width: 0;
-    min-height: 0;
-    display: grid;
-    grid-template-rows: minmax(0, 1fr) 174px;
-    gap: var(--sp-3);
-  }
-
-  @media (max-width: 1040px) {
+  @media (max-width: 1080px) {
     :global(body) {
       overflow: auto;
     }
@@ -208,10 +190,10 @@
       height: auto;
       min-height: 100vh;
       align-items: flex-start;
-      padding: var(--sp-3);
+      padding: var(--sp-2);
     }
 
-    .terminal-shell {
+    .app-container {
       height: auto;
       min-height: 0;
       flex-direction: column;
@@ -221,8 +203,8 @@
       grid-template-columns: 1fr;
     }
 
-    .right-rail {
-      grid-template-rows: 520px auto;
+    .debate-area {
+      min-height: 600px;
     }
   }
 </style>

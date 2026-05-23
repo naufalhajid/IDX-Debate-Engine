@@ -16,7 +16,7 @@
     { label: 'Markets', icon: 'trend', active: false },
     { label: 'Watchlists', icon: 'star', active: false },
     { label: 'Debate Hub', icon: 'chat', active: false },
-    { label: 'Analytics', icon: 'bars', active: false }
+    { label: 'Analytics', icon: 'chart', active: false }
   ];
 
   onMount(async () => {
@@ -30,9 +30,8 @@
   });
 
   async function saveKey() {
-    // Clean key input from potential copy-paste spaces/quotes
     const cleanedKey = keyInput.trim().replace(/^['"]|['"]$/g, '');
-    keyInput = cleanedKey; // Update input field value
+    keyInput = cleanedKey;
     
     if (!cleanedKey) {
       toast('error', 'API Key tidak boleh kosong');
@@ -53,306 +52,265 @@
 
 <aside class="sidebar">
   <header class="brand">
-    <span class="brand__mark"></span>
-    <div class="brand__copy">
-      <strong>IDX DEBATE</strong>
-      <strong>ENGINE</strong>
+    <div class="brand-logo">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 3v18h18" />
+        <path d="m19 9-5 5-4-4-3 3" />
+      </svg>
     </div>
-    <span
-      class="brand__status"
-      class:brand__status--online={serverOnline}
-      title={serverOnline ? 'Server Online' : 'Server Offline'}
-    ></span>
+    <div class="brand-text">
+      <h2>IDX DEBATE</h2>
+      <span>Intelligence Engine</span>
+    </div>
+    <div class="status-indicator {serverOnline ? 'online' : 'offline'}" title={serverOnline ? 'Server Online' : 'Server Offline'}></div>
   </header>
 
-  <nav class="nav-list" aria-label="Primary navigation">
+  <nav class="navigation">
     {#each navItems as item}
-      <button class="nav-item" class:nav-item--active={item.active} type="button">
-        <span class="nav-icon nav-icon--{item.icon}"></span>
+      <button class="nav-item {item.active ? 'active' : ''}">
+        <div class="nav-icon">
+          {#if item.icon === 'grid'}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          {:else if item.icon === 'trend'}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+          {:else if item.icon === 'star'}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          {:else if item.icon === 'chat'}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          {:else if item.icon === 'chart'}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          {/if}
+        </div>
         <span>{item.label}</span>
       </button>
     {/each}
   </nav>
 
-  <div class="side-metrics">
-    <div>
-      <span>BUY</span>
-      <strong>{$summaryStats.buy + $summaryStats.strongBuy}</strong>
+  <div class="metrics-cards">
+    <div class="metric-card">
+      <span class="metric-label">BUY SIGNALS</span>
+      <strong class="metric-val signal-bull">{$summaryStats.buy + $summaryStats.strongBuy}</strong>
     </div>
-    <div>
-      <span>AVOID</span>
-      <strong class="bear">{$summaryStats.avoid}</strong>
+    <div class="metric-card">
+      <span class="metric-label">AVOID SIGNALS</span>
+      <strong class="metric-val signal-bear">{$summaryStats.avoid}</strong>
     </div>
   </div>
 
-  <section class="key-panel" aria-label="Settings">
-    <div class="key-panel__title">Settings</div>
-    <label class="field-label" for="api-key">Gemini Key</label>
-    <div class="key-row">
-      <input
-        id="api-key"
-        class="input"
-        type={showKey ? 'text' : 'password'}
-        placeholder="API Key..."
-        bind:value={keyInput}
-        onkeydown={(event) => event.key === 'Enter' && saveKey()}
-      />
-      <button
-        class="btn-icon"
-        onclick={() => (showKey = !showKey)}
-        title="Toggle visibility"
-        type="button"
-      >
-        {showKey ? 'H' : 'S'}
+  <section class="settings-panel">
+    <h3>Pengaturan</h3>
+    
+    <div class="form-group">
+      <label for="api-key">Gemini API Key</label>
+      <div class="input-with-action">
+        <input id="api-key" class="input" type={showKey ? 'text' : 'password'} placeholder="Masukkan API Key" bind:value={keyInput} onkeydown={(e) => e.key === 'Enter' && saveKey()} />
+        <button class="icon-button" onclick={() => (showKey = !showKey)}>
+          {#if showKey}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          {:else}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          {/if}
+        </button>
+      </div>
+      <button class="btn btn--primary full-width" onclick={saveKey} disabled={validating}>
+        {validating ? 'Memeriksa...' : 'Simpan Key'}
       </button>
     </div>
-    <button class="btn btn--primary" onclick={saveKey} disabled={validating} type="button">
-      {validating ? 'Check' : 'Save'}
-    </button>
 
-    <label class="field-label field-label--spaced" for="equity">Equity</label>
-    <input
-      id="equity"
-      class="input mono"
-      type="number"
-      step="1000000"
-      bind:value={$portfolioEquity}
-    />
+    <div class="form-group">
+      <label for="equity">Modal Simulasi (Equity)</label>
+      <input id="equity" class="input mono" type="number" step="1000000" bind:value={$portfolioEquity} />
+    </div>
   </section>
 </aside>
 
 <style>
   .sidebar {
-    width: 142px;
-    min-height: 100%;
+    width: 260px;
+    background: var(--surface-1);
+    border-right: 1px solid var(--surface-border);
     display: flex;
     flex-direction: column;
-    gap: var(--sp-4);
-    border-right: 1px solid rgba(118, 139, 164, 0.13);
-    padding: var(--sp-3) var(--sp-2);
-    background: linear-gradient(180deg, rgba(15, 24, 35, 0.94), rgba(8, 14, 21, 0.96));
+    padding: var(--sp-4);
+    gap: var(--sp-5);
   }
 
   .brand {
-    min-height: 54px;
-    display: grid;
-    grid-template-columns: 32px 1fr 10px;
+    display: flex;
     align-items: center;
-    gap: var(--sp-2);
-    padding: 0 var(--sp-1);
+    gap: var(--sp-3);
+    padding-bottom: var(--sp-4);
+    border-bottom: 1px solid var(--surface-border);
   }
 
-  .brand__mark {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    border: 1px solid rgba(255, 95, 102, 0.6);
-    background:
-      repeating-linear-gradient(135deg, rgba(255, 95, 102, 0.85) 0 2px, transparent 2px 5px),
-      rgba(255, 95, 102, 0.13);
-    box-shadow: 0 0 18px rgba(255, 95, 102, 0.18);
+  .brand-logo {
+    width: 36px;
+    height: 36px;
+    background: var(--accent-cyan-dim);
+    color: var(--accent-cyan);
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
-  .brand__copy {
-    min-width: 0;
-    display: grid;
-    line-height: 1.05;
-  }
-
-  .brand__copy strong {
-    overflow: hidden;
-    color: var(--text-primary);
-    font-family: var(--font-mono);
-    font-size: 10px;
+  .brand-text h2 {
+    margin: 0;
+    font-size: 16px;
     font-weight: 800;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    color: var(--text-primary);
   }
 
-  .brand__status {
-    width: 7px;
-    height: 7px;
+  .brand-text span {
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .status-indicator {
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
-    background: var(--signal-bear);
-    box-shadow: 0 0 8px var(--signal-bear);
+    margin-left: auto;
   }
+  .status-indicator.online { background: var(--signal-bull); box-shadow: 0 0 8px var(--signal-bull); }
+  .status-indicator.offline { background: var(--signal-bear); }
 
-  .brand__status--online {
-    background: var(--signal-bull);
-    box-shadow: 0 0 8px var(--signal-bull);
-  }
-
-  .nav-list {
-    display: grid;
+  .navigation {
+    display: flex;
+    flex-direction: column;
     gap: var(--sp-1);
   }
 
   .nav-item {
-    position: relative;
-    width: 100%;
-    min-height: 32px;
-    display: grid;
-    grid-template-columns: 18px 1fr;
+    display: flex;
     align-items: center;
-    gap: var(--sp-2);
-    border: 0;
-    border-radius: var(--radius-sm);
-    padding: 0 var(--sp-2);
+    gap: var(--sp-3);
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
     background: transparent;
     color: var(--text-secondary);
-    font-family: var(--font-mono);
-    font-size: 9px;
-    font-weight: 700;
-    text-align: left;
-    text-transform: uppercase;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
   }
 
-  .nav-item--active {
-    background: rgba(32, 208, 131, 0.13);
-    color: var(--signal-bull);
+  .nav-item:hover {
+    background: var(--surface-2);
+    color: var(--text-primary);
   }
 
-  .nav-item--active::before {
-    content: '';
-    position: absolute;
-    left: -8px;
-    top: 3px;
-    bottom: 3px;
-    width: 2px;
-    border-radius: 999px;
-    background: var(--signal-bull);
-    box-shadow: 0 0 10px var(--signal-bull);
+  .nav-item.active {
+    background: var(--accent-cyan-dim);
+    color: var(--accent-cyan);
+    border-color: rgba(56, 189, 248, 0.3);
   }
 
   .nav-icon {
-    position: relative;
-    width: 13px;
-    height: 13px;
-    color: currentColor;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
-  .nav-icon--grid {
-    border: 1px solid currentColor;
-    box-shadow: 6px 0 0 -1px currentColor, 0 6px 0 -1px currentColor, 6px 6px 0 -1px currentColor;
-  }
-
-  .nav-icon--trend::before {
-    content: '';
-    position: absolute;
-    inset: 5px 0 3px;
-    border-top: 2px solid currentColor;
-    transform: skew(-35deg);
-  }
-
-  .nav-icon--star::before {
-    content: '';
-    position: absolute;
-    inset: 1px;
-    border: 1px solid currentColor;
-    clip-path: polygon(50% 0, 62% 35%, 100% 38%, 70% 60%, 82% 100%, 50% 76%, 18% 100%, 30% 60%, 0 38%, 38% 35%);
-  }
-
-  .nav-icon--chat {
-    border: 1px solid currentColor;
-    border-radius: 3px;
-  }
-
-  .nav-icon--chat::after {
-    content: '';
-    position: absolute;
-    left: 2px;
-    bottom: -3px;
-    width: 5px;
-    height: 5px;
-    border-left: 1px solid currentColor;
-    border-bottom: 1px solid currentColor;
-    background: transparent;
-    transform: rotate(-12deg);
-  }
-
-  .nav-icon--bars::before {
-    content: '';
-    position: absolute;
-    inset: 2px 8px 1px 1px;
-    border-left: 2px solid currentColor;
-    box-shadow: 5px 3px 0 0 currentColor, 10px -2px 0 0 currentColor;
-  }
-
-  .side-metrics {
+  .metrics-cards {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: var(--sp-1);
-  }
-
-  .side-metrics div {
-    min-width: 0;
-    border: 1px solid var(--surface-border);
-    border-radius: var(--radius-sm);
-    padding: var(--sp-2);
-    background: rgba(4, 9, 14, 0.42);
-  }
-
-  .side-metrics span {
-    display: block;
-    color: var(--text-muted);
-    font-family: var(--font-mono);
-    font-size: 8px;
-    font-weight: 700;
-  }
-
-  .side-metrics strong {
-    display: block;
-    margin-top: 2px;
-    color: var(--signal-bull);
-    font-family: var(--font-mono);
-    font-size: 14px;
-  }
-
-  .side-metrics .bear {
-    color: var(--signal-bear);
-  }
-
-  .key-panel {
-    margin-top: auto;
-    display: grid;
     gap: var(--sp-2);
-    border-top: 1px solid var(--surface-border);
-    padding-top: var(--sp-3);
   }
 
-  .key-panel__title,
-  .field-label {
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    font-size: 9px;
+  .metric-card {
+    background: var(--surface-2);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-md);
+    padding: var(--sp-3);
+    text-align: center;
+  }
+
+  .metric-label {
+    display: block;
+    font-size: 10px;
+    color: var(--text-muted);
     font-weight: 700;
-    text-transform: uppercase;
+    margin-bottom: var(--sp-1);
   }
 
-  .field-label--spaced {
-    margin-top: var(--sp-1);
+  .metric-val {
+    font-size: 18px;
+    font-family: var(--font-mono);
   }
 
-  .key-row {
-    display: grid;
-    grid-template-columns: 1fr 30px;
+  .settings-panel {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    background: var(--surface-2);
+    border-radius: var(--radius-md);
+    padding: var(--sp-4);
+  }
+
+  .settings-panel h3 {
+    margin: 0 0 var(--sp-2) 0;
+    font-size: 14px;
+    color: var(--text-primary);
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
     gap: var(--sp-1);
   }
 
-  @media (max-width: 900px) {
+  .form-group label {
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .input-with-action {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .input-with-action input {
+    padding-right: 40px;
+  }
+
+  .icon-button {
+    position: absolute;
+    right: 8px;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+  }
+
+  .icon-button:hover {
+    color: var(--text-primary);
+    background: var(--surface-3);
+  }
+
+  .full-width {
+    width: 100%;
+    margin-top: var(--sp-2);
+  }
+
+  @media (max-width: 1080px) {
     .sidebar {
       width: 100%;
-      min-height: auto;
-      position: static;
+      border-right: none;
+      border-bottom: 1px solid var(--surface-border);
     }
-
-    .nav-list {
-      grid-template-columns: repeat(5, minmax(0, 1fr));
-    }
-
-    .key-panel {
-      grid-template-columns: 1fr 1fr;
-      align-items: end;
+    
+    .navigation {
+      flex-direction: row;
+      flex-wrap: wrap;
     }
   }
 </style>

@@ -105,7 +105,21 @@ async def health_check() -> dict[str, Any]:
 
 @router.get("/validate-key")
 async def validate_key(api_key: str = Depends(get_gemini_api_key)) -> dict[str, bool]:
-    return {"valid": bool(api_key)}
+    if not api_key:
+        return {"valid": False}
+    
+    from providers.gemini import get_flash_llm, gemini_api_key_override
+    import asyncio
+    
+    try:
+        with gemini_api_key_override(api_key):
+            llm = get_flash_llm()
+            # Set a very short timeout to not hang the dashboard
+            await asyncio.wait_for(llm.ainvoke("ping"), timeout=5.0)
+        return {"valid": True}
+    except Exception as e:
+        logger.warning(f"API Key validation failed: {e}")
+        return {"valid": False}
 
 
 @router.get("/stocks", response_model=list[StockSchema])  # QW-FIX-5
@@ -207,6 +221,80 @@ async def stream_debate(
                         if event is None:
                             yield ": heartbeat\n\n"
                         else:
+                            # Catch the verdict event to update the results file
+                            if event.get("type") == "verdict" and "raw_state" in event:
+                                try:
+                                    # Create a serializable format mimicking _run_single_debate
+                                    raw_state = event["raw_state"]
+                                    verdict_dict = {}
+                                    if raw_state.get("final_verdict"):
+                                        try:
+                                            verdict_dict = json.loads(raw_state["final_verdict"])
+                                        except Exception:
+                                            pass
+                                    
+                                    debate_history = raw_state.get("debate_history", [])
+                                    serializable_state = {
+                                        "ticker": ticker,
+                                        "verdict": verdict_dict,
+                                        "debate_rounds": raw_state.get("round_count", 0),
+                                        "consensus_reached": raw_state.get("consensus_reached", False),
+                                        "consensus_method": raw_state.get("consensus_method"),
+                                        "dissenting_agents": raw_state.get("dissenting_agents", []),
+                                        "agent_votes": raw_state.get("agent_votes", []),
+                                        "disagreement_type": raw_state.get("disagreement_type"),
+                                        "debate_history": [
+                                            {
+                                                "role": getattr(m, "role", "unknown"),
+                                                "content": getattr(m, "content", ""),
+                                                "round": getattr(m, "round_num", 0),
+                                                "position": getattr(m, "position", "UNKNOWN"),
+                                                "confidence": getattr(m, "confidence", None),
+                                            }
+                                            if hasattr(m, "role") else m
+                                            for m in debate_history
+                                        ],
+                                        "raw_data_summary": raw_state.get("raw_data", ""),
+                                        "metadata": raw_state.get("metadata", {}),
+                                        "error": raw_state.get("error"),
+                                        "status": "failed" if raw_state.get("error") else "success",
+                                        "conviction_score": 0.0,
+                                    }
+
+                                    # Write back to full_batch_results.json
+                                    async with _cache_lock:
+                                        content = "[]"
+                                        try:
+                                            async with aiofiles.open(RESULTS_PATH, mode="r", encoding="utf-8") as f:
+                                                content = await f.read()
+                                        except FileNotFoundError:
+                                            pass
+                                        
+                                        raw_data = json.loads(content) if content.strip() else []
+                                        if not isinstance(raw_data, list):
+                                            raw_data = []
+                                            
+                                        # Update or append the result
+                                        updated = False
+                                        for i, item in enumerate(raw_data):
+                                            if item.get("ticker") == ticker:
+                                                raw_data[i] = serializable_state
+                                                updated = True
+                                                break
+                                        if not updated:
+                                            raw_data.append(serializable_state)
+                                            
+                                        async with aiofiles.open(RESULTS_PATH, mode="w", encoding="utf-8") as f:
+                                            await f.write(json.dumps(raw_data, indent=2))
+                                        
+                                    # Force UI to fetch fresh results next time
+                                    invalidate_results_cache()
+                                except Exception as write_err:
+                                    logger.error(f"Failed to save stream result for {ticker}: {write_err}")
+                                
+                                # Do not send raw_state to frontend to save bandwidth
+                                event.pop("raw_state", None)
+
                             yield sse(event)
                         await asyncio.sleep(0)
                 except Exception as exc:

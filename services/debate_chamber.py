@@ -2758,7 +2758,11 @@ Start your response with '{' and end with '}'. Nothing else."""
                 state,
                 await self._devils_advocate_node(state),
             )
-            yield {"type": "devil_advocate", "ticker": ticker}
+            yield {
+                "type": "devil_advocate", 
+                "ticker": ticker,
+                "question": state.get("devils_advocate_question", "")
+            }
             await asyncio.sleep(0)
 
             yield {
@@ -2776,6 +2780,7 @@ Start your response with '{' and end with '}'. Nothing else."""
                 "type": "verdict",
                 "ticker": ticker,
                 "result": adapt_result(ticker, raw_result),
+                "raw_state": raw_result,
             }
             await asyncio.sleep(0)
 

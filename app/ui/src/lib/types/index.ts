@@ -15,6 +15,7 @@ export interface StockResult {
   scout_metrics: ScoutMetrics;
   devil_advocate_triggered: boolean;
   verdict_summary: string;
+  verdict_reasoning?: string;
 }
 
 export interface DebateRound {

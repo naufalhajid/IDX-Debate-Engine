@@ -6,235 +6,195 @@
   export let lastUpdated: Date | null = null;
 
   $: marketCards = [
-    { label: 'COMPOSITE', value: '7,155.20', change: '+0.31%' },
-    { label: 'STRONG BUY', value: String($summaryStats.strongBuy), change: 'live' },
-    { label: 'AVG CONV.', value: String($summaryStats.avgConviction), change: 'score' },
-    { label: 'USD/IDR', value: '18,050', change: lastUpdated ? lastUpdated.toLocaleTimeString('id-ID') : 'sync' }
+    { label: 'STRONG BUY RECS', value: String($summaryStats.strongBuy), change: 'Live', positive: true },
+    { label: 'AVG CONVICTION', value: String($summaryStats.avgConviction), change: 'Score', positive: null }
   ];
 </script>
 
-<div class="top-strip">
-  <div class="quick-tools" aria-label="Quick tools">
-    <button class="tool-btn" type="button" title="Menu">
-      <span></span><span></span><span></span>
-    </button>
-    <button class="tool-btn tool-btn--line" type="button" title="Market pulse"></button>
-    <button class="tool-btn tool-btn--refresh" type="button" title={loading ? 'Loading' : 'Refresh'}></button>
+<header class="top-header">
+  <div class="header-title">
+    <h1>Dashboard</h1>
+    <span class="subtitle">Overview and Active Recommendations</span>
   </div>
 
-  <div class="market-row">
+  <div class="market-overview">
     {#each marketCards as item}
       <div class="market-card">
-        <span class="market-card__label">{item.label}</span>
-        <strong>{item.value}</strong>
-        <span class="market-card__change">{item.change}</span>
+        <div class="card-info">
+          <span class="card-label">{item.label}</span>
+          <strong class="card-value">{item.value}</strong>
+        </div>
+        <div class="card-badge" class:pos={item.positive === true} class:neg={item.positive === false} class:neutral={item.positive === null}>
+          {item.change}
+        </div>
       </div>
     {/each}
   </div>
 
-  <div class="status-cluster">
-    <span class="status-pill" class:status-pill--online={online}>
-      <span></span>
-      {online ? 'API' : 'OFF'}
-    </span>
-    <span class="mini-icon mini-icon--chat" title="Messages"></span>
-    <span class="mini-icon mini-icon--bell" title="Alerts"></span>
-    <span class="user-dot" title="User"></span>
+  <div class="user-actions">
+    <div class="api-status {online ? 'online' : 'offline'}">
+      <span class="pulse"></span>
+      {online ? 'API Connected' : 'API Disconnected'}
+    </div>
+    
+    <button class="action-btn" title="Notifications">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span class="badge-dot"></span>
+    </button>
+
+    <div class="user-avatar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    </div>
   </div>
-</div>
+</header>
 
 <style>
-  .top-strip {
-    min-height: 50px;
-    display: grid;
-    grid-template-columns: 94px minmax(0, 1fr) auto;
+  .top-header {
+    min-height: 80px;
+    display: flex;
     align-items: center;
-    gap: var(--sp-2);
-    padding: var(--sp-2) var(--sp-3);
+    justify-content: space-between;
+    padding: var(--sp-3) var(--sp-4);
     border-bottom: 1px solid var(--surface-border);
-    background: rgba(5, 10, 15, 0.78);
+    background: transparent;
+    gap: var(--sp-4);
   }
 
-  .quick-tools {
-    display: grid;
-    grid-template-columns: repeat(3, 28px);
-    gap: var(--sp-1);
+  .header-title h1 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--text-primary);
   }
 
-  .tool-btn,
-  .mini-icon,
-  .user-dot {
-    position: relative;
-    border: 1px solid var(--surface-border);
-    border-radius: var(--radius-sm);
-    background: rgba(23, 34, 49, 0.72);
+  .header-title .subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
   }
 
-  .tool-btn {
-    width: 28px;
-    height: 28px;
-    padding: 0;
-  }
-
-  .tool-btn span {
-    width: 12px;
-    height: 1px;
-    display: block;
-    margin: 4px auto;
-    background: var(--text-secondary);
-  }
-
-  .tool-btn--line::before {
-    content: '';
-    position: absolute;
-    inset: 9px 7px 8px;
-    border-left: 2px solid transparent;
-    border-bottom: 2px solid var(--text-secondary);
-    transform: skew(-30deg);
-  }
-
-  .tool-btn--refresh::before {
-    content: '';
-    position: absolute;
-    inset: 7px;
-    border: 2px solid var(--text-secondary);
-    border-left-color: transparent;
-    border-radius: 50%;
-  }
-
-  .market-row {
-    min-width: 0;
-    display: grid;
-    grid-template-columns: repeat(4, minmax(110px, 1fr));
-    gap: var(--sp-2);
+  .market-overview {
+    display: flex;
+    gap: var(--sp-3);
+    flex: 1;
+    justify-content: center;
   }
 
   .market-card {
-    min-width: 0;
-    height: 34px;
-    display: grid;
-    grid-template-columns: 1fr auto;
-    grid-template-rows: 13px 17px;
-    align-items: center;
-    column-gap: var(--sp-2);
+    background: var(--surface-1);
     border: 1px solid var(--surface-border);
-    border-radius: var(--radius-sm);
-    padding: 4px var(--sp-2);
-    background: rgba(23, 34, 49, 0.78);
-    font-family: var(--font-mono);
-  }
-
-  .market-card__label {
-    grid-column: 1 / -1;
-    color: var(--text-muted);
-    font-size: 9px;
-    font-weight: 700;
-  }
-
-  .market-card strong {
-    overflow: hidden;
-    color: var(--text-primary);
-    font-size: 12px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .market-card__change {
-    color: var(--signal-bull);
-    font-size: 10px;
-    font-weight: 700;
-  }
-
-  .status-cluster {
+    border-radius: var(--radius-md);
+    padding: var(--sp-2) var(--sp-3);
     display: flex;
     align-items: center;
-    gap: var(--sp-2);
+    gap: var(--sp-4);
+    min-width: 160px;
   }
 
-  .status-pill {
-    height: 24px;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    border: 1px solid var(--surface-border);
-    border-radius: 999px;
-    padding: 0 var(--sp-2);
-    background: rgba(23, 34, 49, 0.76);
-    color: var(--signal-bear);
+  .card-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .card-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .card-value {
+    font-size: 16px;
     font-family: var(--font-mono);
-    font-size: 9px;
-    font-weight: 700;
+    color: var(--text-primary);
   }
 
-  .status-pill span {
-    width: 6px;
-    height: 6px;
+  .card-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: auto;
+  }
+
+  .card-badge.pos { background: var(--signal-bull-dim); color: var(--signal-bull); }
+  .card-badge.neg { background: var(--signal-bear-dim); color: var(--signal-bear); }
+  .card-badge.neutral { background: var(--surface-3); color: var(--text-primary); }
+
+  .user-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+  }
+
+  .api-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--surface-1);
+    border: 1px solid var(--surface-border);
+  }
+
+  .api-status.online { color: var(--signal-bull); }
+  .api-status.offline { color: var(--signal-bear); }
+
+  .pulse {
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     background: currentColor;
     box-shadow: 0 0 8px currentColor;
   }
 
-  .status-pill--online {
-    color: var(--signal-bull);
+  .action-btn {
+    position: relative;
+    background: var(--surface-1);
+    border: 1px solid var(--surface-border);
+    color: var(--text-secondary);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
   }
 
-  .mini-icon,
-  .user-dot {
-    width: 26px;
-    height: 26px;
-    display: inline-block;
+  .action-btn:hover {
+    color: var(--text-primary);
+    background: var(--surface-2);
   }
 
-  .mini-icon--chat::before {
-    content: '';
+  .badge-dot {
     position: absolute;
-    inset: 7px 6px 8px;
-    border: 2px solid var(--text-secondary);
-    border-radius: 3px;
-  }
-
-  .mini-icon--bell::before {
-    content: '';
-    position: absolute;
-    left: 8px;
-    top: 6px;
-    width: 9px;
-    height: 11px;
-    border: 2px solid var(--text-secondary);
-    border-radius: 8px 8px 4px 4px;
-  }
-
-  .mini-icon--bell::after {
-    content: '';
-    position: absolute;
-    right: 3px;
-    top: 2px;
+    top: 10px;
+    right: 10px;
     width: 8px;
     height: 8px;
+    background: var(--accent-red);
     border-radius: 50%;
-    background: var(--signal-bear);
-    box-shadow: 0 0 8px var(--signal-bear);
+    border: 2px solid var(--surface-1);
   }
 
-  .user-dot::before {
-    content: '';
-    position: absolute;
-    inset: 5px;
+  .user-avatar {
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
-    background: linear-gradient(180deg, #8fa0b4, #4d5b69);
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-violet));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    box-shadow: var(--shadow-sm);
   }
 
-  @media (max-width: 900px) {
-    .top-strip {
-      grid-template-columns: 1fr;
-    }
-
-    .market-row {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .status-cluster {
-      justify-content: flex-end;
+  @media (max-width: 1280px) {
+    .market-overview {
+      display: none;
     }
   }
 </style>

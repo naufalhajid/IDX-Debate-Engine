@@ -37,10 +37,27 @@
     return Math.max(0, Math.min(100, value));
   }
 
+  function formatIdr(value: number) {
+    return value.toLocaleString('id-ID');
+  }
+
   function ratingColor(rating: Rating) {
     if (rating.includes('BUY')) return 'var(--signal-bull)';
     if (rating === 'AVOID') return 'var(--signal-bear)';
     return 'var(--signal-hold)';
+  }
+
+  function splitArgumentByHeadings(text: string) {
+    if (!text) return [];
+    // Split text by "### "
+    const parts = text.split(/(?=### )/g);
+    return parts.map(part => {
+      const match = part.match(/^###\s*([^\n]+)\n([\s\S]*)$/);
+      if (match) {
+        return { title: match[1].trim(), content: match[2].trim() };
+      }
+      return { title: null, content: part.trim() };
+    }).filter(p => p.content || p.title);
   }
 
   $: activeResult = $allResults.find((item) => item.ticker === $activeTicker);
@@ -52,59 +69,78 @@
 <div class="debate-panel terminal-panel">
   {#if !$activeTicker}
     <div class="placeholder">
-      <div class="placeholder__text">Pilih saham dari tabel untuk melihat ruang debat</div>
+      <div class="placeholder__icon">📈</div>
+      <div class="placeholder__text">Pilih saham dari daftar Rekomendasi<br/>untuk melihat Analisis & Ruang Debat AI</div>
     </div>
   {:else}
     <header class="debate-header">
-      <div class="header-row">
-        <span class="panel-heading">Ruang Debat</span>
-        <span class="header-menu">...</span>
+      <div class="header-top">
+        <div class="ticker-info">
+          <h2>{$activeTicker}</h2>
+          <p>{resolveCompanyName($stockMap, $activeTicker ?? '', activeResult?.sector)}</p>
+        </div>
+        {#if activeResult}
+          <div class="rating-badge" style="--rating-color: {ratingColor(activeResult.rating)}">
+            {activeResult.rating.replace('_', ' ')}
+          </div>
+        {/if}
       </div>
-      <h2>{$activeTicker}</h2>
-      <p>{resolveCompanyName($stockMap, $activeTicker ?? '', activeResult?.sector)} · {formatSector(activeResult?.sector)}</p>
-      <div class="engine-row">
-        <span>MESIN DEBAT IDX v4.1</span>
-        <span class="engine-pill">{Math.max(1, fallbackRounds.length || 3)}/3</span>
-      </div>
+      
+      {#if activeResult}
+        <div class="price-highlights">
+          <div class="price-box">
+            <span class="price-label">Current / Entry Low</span>
+            <strong class="price-value">Rp {formatIdr(activeResult.entry_low)}</strong>
+          </div>
+          <div class="price-box">
+            <span class="price-label">Target Price</span>
+            <strong class="price-value signal-bull">Rp {formatIdr(activeResult.target_price)}</strong>
+          </div>
+          <div class="price-box">
+            <span class="price-label">Stop Loss</span>
+            <strong class="price-value signal-bear">Rp {formatIdr(activeResult.stop_loss)}</strong>
+          </div>
+        </div>
+      {/if}
     </header>
 
     {#if activeResult?.devil_advocate_triggered && !hasDevilEvent}
-      <div class="devil-banner">
-        <span class="devil-banner__mark">!</span>
-        <div>
+      <div class="alert-banner">
+        <div class="alert-icon">!</div>
+        <div class="alert-content">
           <strong>Devil's Advocate Aktif</strong>
-          <span>Konsensus diuji ulang sebelum verdict final.</span>
+          <span>Konsensus diuji ulang untuk memastikan ketahanan argumen AI.</span>
         </div>
       </div>
     {/if}
 
-    <div class="timeline-title">Linimasa Debat</div>
-
-    <div class="timeline" bind:this={timelineEl} onscroll={onScroll}>
+    <div class="timeline-container" bind:this={timelineEl} onscroll={onScroll}>
       {#each events as event, index (`${event.type}-${event.ticker}-${index}`)}
         {#if event.type === 'progress'}
-          <div class="progress-line">
-            <span>{formatKey(event.phase)}</span>
-            <strong>{pct(event.pct)}%</strong>
-            <span class="progress-track">
+          <div class="progress-indicator">
+            <div class="progress-text">
+              <span>{formatKey(event.phase)}...</span>
+              <span>{pct(event.pct)}%</span>
+            </div>
+            <div class="progress-bar">
               <span style="width: {pct(event.pct)}%"></span>
-            </span>
+            </div>
           </div>
 
         {:else if event.type === 'scout'}
-          <div class="scout-card">
-            <div class="scout-card__title">Laporan Scout</div>
-            <div class="scout-grid">
+          <div class="scout-summary">
+            <div class="scout-title">Ringkasan Scout</div>
+            <div class="scout-cards">
               {#each scoutCategories as category (category.key)}
-                <section class="scout-col">
-                  <div class="scout-col__header">{category.label}</div>
-                  {#each Object.entries(event.metrics[category.key]) as [key, value] (key)}
-                    <div class="scout-row">
-                      <span class="scout-key">{formatKey(key)}</span>
-                      <span class="scout-val">{value}</span>
+                <div class="scout-metric-card">
+                  <h4>{category.label}</h4>
+                  {#each Object.entries(event.metrics[category.key]).slice(0, 3) as [key, value] (key)}
+                    <div class="metric-row">
+                      <span class="metric-key">{formatKey(key)}</span>
+                      <span class="metric-val">{value}</span>
                     </div>
                   {/each}
-                </section>
+                </div>
               {/each}
             </div>
           </div>
@@ -113,45 +149,27 @@
           {@render roundBubble(event.data)}
 
         {:else if event.type === 'devil_advocate'}
-          <div class="devil-banner devil-banner--event">
-            <span class="devil-banner__mark">!</span>
-            <div>
-              <strong>⚠ Devil's Advocate Triggered</strong>
-              <span>Konsensus tercapai terlalu cepat — babak tambahan dipaksa untuk menguji ketahanan argumen.</span>
+          <div class="alert-banner alert-warning">
+            <div class="alert-icon">⚠</div>
+            <div class="alert-content">
+              <strong>Devil's Advocate Memicu!</strong>
+              <span>Konsensus tercapai terlalu cepat — AI dipaksa berdebat lebih keras.</span>
+              {#if event.question}
+                <div class="devil-question">
+                  <strong>Pertanyaan:</strong> {@html formatMarkdown(event.question)}
+                </div>
+              {/if}
             </div>
           </div>
 
         {:else if event.type === 'verdict'}
-          <div class="verdict-card verdict-card--final">
-            <div class="verdict-card__top">
-              <div>
-                <span>Verdict Final</span>
-                <strong>{event.result.ticker}</strong>
-              </div>
-              <span class="rating-chip" style="--rating-color: {ratingColor(event.result.rating)}">
-                {event.result.rating.replace('_', ' ')}
-              </span>
-            </div>
-            <div class="verdict-score-row">
-              <strong>{event.result.conviction_score}</strong>
-              <span>/100 keyakinan</span>
-            </div>
-            <div class="verdict-bar">
-              <span
-                style="width: {pct(event.result.conviction_score)}%; background: {ratingColor(event.result.rating)}"
-              ></span>
-            </div>
-            <div class="speech-content">{@html formatMarkdown(event.result.verdict_summary)}</div>
-          </div>
+          {@render finalVerdict(event.result)}
 
         {:else if event.type === 'done'}
-          <div class="done-line">✓ Analisis selesai</div>
+          <div class="status-message success">✓ Analisis selesai</div>
 
         {:else if event.type === 'error'}
-          <div class="error-banner">
-            <strong>✕ Terjadi Kesalahan</strong>
-            <span>{event.message}</span>
-          </div>
+          <div class="status-message error">✕ {event.message}</div>
         {/if}
       {/each}
 
@@ -159,484 +177,535 @@
         {#each fallbackRounds as round (round.round)}
           {@render roundBubble(round)}
         {/each}
-        <div class="verdict-card verdict-card--final">
-          <div class="verdict-card__top">
-            <div>
-              <span>Verdict Terakhir</span>
-              <strong>{activeResult.ticker}</strong>
-            </div>
-            <span class="rating-chip" style="--rating-color: {ratingColor(activeResult.rating)}">
-              {activeResult.rating.replace('_', ' ')}
-            </span>
-          </div>
-          <div class="verdict-score-row">
-            <strong>{activeResult.conviction_score}</strong>
-            <span>/100 keyakinan</span>
-          </div>
-          <div class="verdict-bar">
-            <span
-              style="width: {pct(activeResult.conviction_score)}%; background: {ratingColor(activeResult.rating)}"
-            ></span>
-          </div>
-          <div class="speech-content">{@html formatMarkdown(activeResult.verdict_summary)}</div>
-        </div>
+        {@render finalVerdict(activeResult)}
       {/if}
 
       {#if $isStreaming}
-        <div class="typing-indicator"><span></span><span></span><span></span></div>
+        <div class="typing-indicator">
+          <span></span><span></span><span></span>
+        </div>
       {/if}
     </div>
   {/if}
 </div>
 
 {#snippet roundBubble(round: DebateRound)}
-  <div class="round-block">
-    <div class="time-label">Ronde {round.round}</div>
-
-    <div class="speech-row speech-row--bull">
-      <div class="role-badge">
-        <strong>🐂 Bull</strong>
-        {#if round.score_delta > 0}
-          <span class="delta delta--pos">+{round.score_delta}</span>
-        {/if}
-      </div>
-      <div class="speech-bubble">
-        <div class="speech-content">{@html formatMarkdown(round.bull_argument)}</div>
-      </div>
-    </div>
-
-    <div class="speech-row speech-row--bear">
-      <div class="role-badge">
-        <strong>🐻 Bear</strong>
-        {#if round.score_delta < 0}
-          <span class="delta delta--neg">{round.score_delta}</span>
-        {/if}
-      </div>
-      <div class="speech-bubble">
-        <div class="speech-content">{@html formatMarkdown(round.bear_argument)}</div>
+  <div class="chat-thread">
+    <div class="chat-time">Babak {round.round}</div>
+    
+    <div class="chat-message bull-msg">
+      <div class="chat-avatar">🐂</div>
+      <div class="chat-bubbles-group">
+        <div class="chat-name">Bull AI {#if round.score_delta > 0}<span class="delta pos">+{round.score_delta}</span>{/if}</div>
+        {#each splitArgumentByHeadings(round.bull_argument) as part}
+          <div class="chat-bubble">
+            {#if part.title}
+              <div class="bubble-title">{part.title}</div>
+            {/if}
+            <div class="chat-text">{@html formatMarkdown(part.content)}</div>
+          </div>
+        {/each}
       </div>
     </div>
+
+    <div class="chat-message bear-msg">
+      <div class="chat-avatar">🐻</div>
+      <div class="chat-bubbles-group">
+        <div class="chat-name">Bear AI {#if round.score_delta < 0}<span class="delta neg">{round.score_delta}</span>{/if}</div>
+        {#each splitArgumentByHeadings(round.bear_argument) as part}
+          <div class="chat-bubble">
+            {#if part.title}
+              <div class="bubble-title">{part.title}</div>
+            {/if}
+            <div class="chat-text">{@html formatMarkdown(part.content)}</div>
+          </div>
+        {/each}
+      </div>
+    </div>
+  </div>
+{/snippet}
+
+{#snippet finalVerdict(result: StockResult)}
+  <div class="verdict-summary">
+    <div class="verdict-header">
+      <h3>Kesimpulan Akhir</h3>
+      <div class="rating-badge" style="--rating-color: {ratingColor(result.rating)}">
+        {result.rating.replace('_', ' ')}
+      </div>
+    </div>
+    
+    <div class="conviction-display">
+      <div class="conviction-score">
+        <strong>{result.conviction_score}</strong><small>/100</small>
+      </div>
+      <div class="conviction-label">Skor Keyakinan AI</div>
+    </div>
+    
+    <div class="chat-bubbles-group verdict-bubbles">
+      {#each splitArgumentByHeadings(result.verdict_summary) as part}
+        <div class="verdict-text-box">
+          {#if part.title}
+            <div class="bubble-title">{part.title}</div>
+          {/if}
+          <div class="verdict-text">{@html formatMarkdown(part.content)}</div>
+        </div>
+      {/each}
+    </div>
+
+    {#if result.verdict_reasoning}
+      <div class="verdict-reasoning">
+        <h4>Pemikiran & Alasan</h4>
+        <div class="chat-bubbles-group">
+          {#each splitArgumentByHeadings(result.verdict_reasoning) as part}
+            <div class="verdict-reasoning-box">
+              {#if part.title}
+                <div class="bubble-title">{part.title}</div>
+              {/if}
+              <div class="verdict-text">{@html formatMarkdown(part.content)}</div>
+            </div>
+          {/each}
+        </div>
+      </div>
+    {/if}
   </div>
 {/snippet}
 
 <style>
   .debate-panel {
     height: 100%;
-    min-height: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
   }
 
   .placeholder {
-    min-height: 100%;
+    height: 100%;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: var(--sp-4);
+    gap: var(--sp-4);
     color: var(--text-secondary);
-    font-family: var(--font-mono);
-    font-size: 11px;
     text-align: center;
+  }
+
+  .placeholder__icon {
+    font-size: 48px;
+    opacity: 0.5;
+  }
+
+  .placeholder__text {
+    font-size: 16px;
+    line-height: 1.5;
   }
 
   .debate-header {
     border-bottom: 1px solid var(--surface-border);
-    padding: var(--sp-3);
+    padding: var(--sp-4);
+    background: rgba(0, 0, 0, 0.2);
   }
 
-  .header-row,
-  .engine-row,
-  .verdict-card__top,
-  .verdict-score-row {
+  .header-top {
     display: flex;
-    align-items: center;
     justify-content: space-between;
-    gap: var(--sp-2);
+    align-items: flex-start;
+    margin-bottom: var(--sp-4);
   }
 
-  .header-menu {
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    font-size: 13px;
-  }
-
-  .debate-header h2 {
-    margin: var(--sp-2) 0 0;
+  .ticker-info h2 {
+    margin: 0 0 var(--sp-1) 0;
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
     color: var(--text-primary);
-    font-family: var(--font-mono);
-    font-size: 22px;
-    line-height: 1;
   }
 
-  .debate-header p {
-    margin: 3px 0 var(--sp-3);
-    color: var(--text-secondary);
-    font-size: 12px;
-  }
-
-  .engine-row {
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    font-size: 9px;
-    font-weight: 800;
-  }
-
-  .engine-pill,
-  .rating-chip {
-    border: 1px solid var(--signal-bull);
-    border-radius: 999px;
-    padding: 2px 6px;
-    color: var(--signal-bull);
-    background: var(--signal-bull-dim);
-  }
-
-  .timeline-title {
-    padding: var(--sp-3) var(--sp-3) var(--sp-1);
-    color: var(--text-primary);
-    font-family: var(--font-mono);
-    font-size: 11px;
-    font-weight: 800;
-    text-transform: uppercase;
-  }
-
-  .timeline {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    padding: 0 var(--sp-3) var(--sp-3);
-  }
-
-  .scout-card,
-  .progress-line,
-  .verdict-card,
-  .devil-banner,
-  .error-banner {
-    margin-bottom: var(--sp-3);
-    border: 1px solid var(--surface-border);
-    border-radius: var(--radius-md);
-    padding: var(--sp-2);
-    background: var(--surface-1);
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    font-size: 10px;
-  }
-
-  .progress-line {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: var(--sp-2);
-    align-items: center;
-  }
-
-  .progress-line strong {
-    color: var(--accent-cyan);
-  }
-
-  .progress-track,
-  .verdict-bar {
-    grid-column: 1 / -1;
-    height: 3px;
-    border-radius: 999px;
-    background: var(--surface-3);
-    overflow: hidden;
-  }
-
-  .progress-track span,
-  .verdict-bar span {
-    display: block;
-    height: 100%;
-    border-radius: inherit;
-    background: var(--accent-cyan);
-  }
-
-  .scout-card__title {
-    color: var(--accent-cyan);
-    font-weight: 800;
-    text-transform: uppercase;
-  }
-
-  .scout-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--sp-2);
-    margin-top: var(--sp-2);
-  }
-
-  .scout-col {
-    min-width: 0;
-    border: 1px solid var(--surface-border);
-    border-radius: var(--radius-sm);
-    padding: var(--sp-2);
-    background: var(--surface-base);
-  }
-
-  .scout-col__header {
-    margin-bottom: var(--sp-2);
-    color: var(--text-secondary);
-    font-size: 9px;
-    font-weight: 800;
-    text-transform: uppercase;
-  }
-
-  .scout-row {
-    display: grid;
-    gap: 2px;
-    margin-bottom: var(--sp-2);
-  }
-
-  .scout-row:last-child {
-    margin-bottom: 0;
-  }
-
-  .scout-key {
-    color: var(--text-muted);
-    font-size: 9px;
-  }
-
-  .scout-val {
-    overflow-wrap: anywhere;
-    color: var(--text-primary);
-    font-size: 10px;
-  }
-
-  .round-block {
-    display: grid;
-    gap: var(--sp-2);
-    margin-bottom: var(--sp-3);
-  }
-
-  .time-label {
-    color: var(--text-muted);
-    font-family: var(--font-mono);
-    font-size: 9px;
-    text-align: center;
-    text-transform: uppercase;
-  }
-
-  .speech-row {
-    display: grid;
-    gap: var(--sp-1);
-  }
-
-  .role-badge {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-2);
-    color: var(--signal-bull);
-    font-family: var(--font-mono);
-    font-size: 10px;
-    font-weight: 800;
-  }
-
-  .speech-row--bear .role-badge {
-    color: var(--signal-bear);
-  }
-
-  .speech-bubble {
-    position: relative;
-    border: 1px solid var(--signal-bull);
-    border-radius: var(--radius-md);
-    padding: var(--sp-2);
-    background: var(--signal-bull-dim);
-  }
-
-  .speech-row--bear .speech-bubble {
-    border-color: var(--signal-bear);
-    background: var(--signal-bear-dim);
-  }
-
-  .speech-content,
-  .error-banner span {
+  .ticker-info p {
     margin: 0;
-    color: var(--text-primary);
-    font-size: 10px;
-    line-height: 1.45;
-    overflow-wrap: anywhere;
-  }
-
-  .speech-content :global(strong) {
-    color: var(--text-primary);
-    font-weight: 800;
-  }
-
-  .speech-content :global(em) {
-    color: var(--text-code);
-    font-style: italic;
-  }
-
-  .speech-content :global(ul) {
-    margin: 4px 0;
-    padding-left: 14px;
-    list-style: disc;
-  }
-
-  .speech-content :global(li) {
-    margin-bottom: 2px;
-  }
-
-  .delta {
-    font-size: 10px;
-    font-weight: 800;
-  }
-
-  .delta--pos {
-    color: var(--signal-bull);
-  }
-
-  .delta--neg {
-    color: var(--signal-bear);
-  }
-
-  .devil-banner {
-    display: grid;
-    grid-template-columns: 24px 1fr;
-    gap: var(--sp-2);
-    border-color: var(--signal-hold);
-    background: var(--signal-hold-dim);
-  }
-
-  .devil-banner__mark {
-    width: 20px;
-    height: 20px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    background: var(--signal-hold-dim);
-    color: var(--signal-hold);
-    font-family: var(--font-mono);
-    font-weight: 800;
-  }
-
-  .devil-banner strong,
-  .devil-banner span,
-  .error-banner strong {
-    display: block;
-  }
-
-  .devil-banner strong {
-    color: var(--signal-hold);
-  }
-
-  .devil-banner span {
-    margin-top: 2px;
-    color: var(--text-primary);
-    line-height: 1.4;
-  }
-
-  .verdict-card--final {
-    border-color: var(--accent-cyan);
-    background: color-mix(in srgb, var(--accent-cyan) 10%, var(--surface-1));
-  }
-
-  .verdict-card__top span,
-  .verdict-card__top strong,
-  .verdict-score-row strong,
-  .verdict-score-row span {
-    display: block;
-    font-family: var(--font-mono);
-  }
-
-  .verdict-card__top span {
+    font-size: 14px;
     color: var(--text-secondary);
-    font-size: 9px;
-    text-transform: uppercase;
   }
 
-  .verdict-card__top strong {
-    color: var(--text-primary);
+  .rating-badge {
+    padding: 6px 12px;
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--rating-color) 15%, transparent);
+    color: var(--rating-color);
+    border: 1px solid color-mix(in srgb, var(--rating-color) 40%, transparent);
+    font-weight: 700;
     font-size: 14px;
   }
 
-  .rating-chip {
-    --rating-color: var(--signal-hold);
-    border-color: var(--rating-color);
-    color: var(--rating-color);
-    background: color-mix(in srgb, var(--rating-color) 16%, transparent);
-    font-size: 9px;
-    font-weight: 800;
+  .price-highlights {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--sp-3);
   }
 
-  .verdict-score-row {
-    justify-content: flex-start;
+  .price-box {
+    background: var(--surface-1);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-sm);
+    padding: var(--sp-3);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .price-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+
+  .price-value {
+    font-size: 16px;
+    font-family: var(--font-mono);
+  }
+
+  .alert-banner {
+    margin: var(--sp-4);
+    padding: var(--sp-3);
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+    border-left: 4px solid var(--accent-violet);
+    display: flex;
+    gap: var(--sp-3);
+    align-items: center;
+  }
+
+  .alert-warning {
+    border-left-color: var(--accent-gold);
+    background: rgba(240, 180, 41, 0.1);
+  }
+
+  .alert-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+  }
+
+  .alert-content strong {
+    display: block;
+    font-size: 14px;
+    margin-bottom: 2px;
+  }
+
+  .alert-content span { opacity: 0.9; }
+
+  .devil-question {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.2);
+    font-size: 14px;
+    font-style: italic;
+  }
+
+  .scout-metrics {
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  .timeline-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--sp-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-5);
+  }
+
+  .progress-indicator {
+    background: var(--surface-1);
+    padding: var(--sp-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+  }
+
+  .progress-text {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: var(--sp-2);
+  }
+
+  .progress-bar {
+    height: 4px;
+    background: var(--surface-3);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  .progress-bar span {
+    display: block;
+    height: 100%;
+    background: var(--accent-cyan);
+    transition: width 0.3s ease;
+  }
+
+  .scout-summary {
+    background: var(--surface-1);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    padding: var(--sp-4);
+  }
+
+  .scout-title {
+    font-weight: 700;
+    color: var(--accent-cyan);
+    margin-bottom: var(--sp-3);
+  }
+
+  .scout-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--sp-3);
+  }
+
+  .scout-metric-card h4 {
+    margin: 0 0 var(--sp-2) 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+  }
+
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+
+  .metric-key { color: var(--text-muted); }
+  .metric-val { color: var(--text-primary); }
+
+  .chat-thread {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+  }
+
+  .chat-time {
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted);
     margin: var(--sp-2) 0;
   }
 
-  .verdict-score-row strong {
-    color: var(--text-primary);
+  .chat-message {
+    display: flex;
+    gap: var(--sp-3);
+    max-width: 90%;
+  }
+
+  .bear-msg {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+  }
+
+  .chat-avatar {
     font-size: 24px;
+    line-height: 1;
+    margin-top: 4px;
+  }
+
+  .chat-bubble {
+    background: var(--surface-2);
+    padding: var(--sp-3) var(--sp-4);
+    border-radius: 16px;
+    border-top-left-radius: 4px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .bear-msg .chat-bubble {
+    background: var(--surface-1);
+    border-top-left-radius: 16px;
+    border-top-right-radius: 4px;
+    border: 1px solid var(--surface-border);
+  }
+
+  .chat-bubbles-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-width: 100%;
+  }
+
+  .bubble-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent-cyan);
+    margin-bottom: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .bear-msg .bubble-title {
+    color: var(--accent-orange);
+  }
+
+  .chat-name {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    margin-bottom: var(--sp-2);
+  }
+
+  .delta {
+    margin-left: 6px;
+    font-weight: bold;
+  }
+
+  .delta.pos { color: var(--signal-bull); }
+  .delta.neg { color: var(--signal-bear); }
+
+  .chat-text {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-primary);
+  }
+
+  .verdict-text {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--text-color);
+  }
+
+  .verdict-bubbles {
+    margin-top: 1rem;
+  }
+
+  .verdict-text-box {
+    background: rgba(255, 255, 255, 0.03);
+    padding: var(--sp-3) var(--sp-4);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .verdict-reasoning {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+    border-left: 3px solid var(--accent-blue);
+  }
+
+  .verdict-reasoning h4 {
+    margin: 0 0 1rem 0;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-color);
+    opacity: 0.8;
+  }
+
+  .verdict-reasoning-box {
+    background: rgba(0, 0, 0, 0.2);
+    padding: var(--sp-3) var(--sp-4);
+    border-radius: 8px;
+  }
+
+
+  .chat-text :global(p) { margin: 0 0 10px 0; }
+  .chat-text :global(p:last-child) { margin: 0; }
+  .chat-text :global(ul) { margin: 4px 0; padding-left: 20px; }
+  .chat-text :global(strong) { color: var(--accent-cyan); }
+
+  .verdict-summary {
+    background: linear-gradient(145deg, var(--surface-2), var(--surface-1));
+    border: 1px solid var(--accent-cyan);
+    border-radius: var(--radius-lg);
+    padding: var(--sp-5);
+    margin-top: var(--sp-4);
+  }
+
+  .verdict-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--sp-4);
+  }
+
+  .verdict-header h3 {
+    margin: 0;
+    color: var(--accent-cyan);
+  }
+
+  .conviction-display {
+    text-align: center;
+    margin-bottom: var(--sp-4);
+    padding: var(--sp-3);
+    background: rgba(0,0,0,0.2);
+    border-radius: var(--radius-md);
+  }
+
+  .conviction-score strong {
+    font-size: 42px;
+    font-family: var(--font-mono);
     line-height: 1;
   }
 
-  .verdict-score-row span {
+  .conviction-label {
+    font-size: 12px;
     color: var(--text-secondary);
-    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 4px;
   }
 
-  .verdict-card .speech-content {
-    margin-top: var(--sp-2);
+  .verdict-text {
+    font-size: 15px;
+    line-height: 1.6;
   }
 
-  .done-line {
-    margin-bottom: var(--sp-3);
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    font-size: 10px;
+  .status-message {
     text-align: center;
+    font-size: 14px;
+    padding: var(--sp-3);
+    border-radius: var(--radius-md);
+    background: var(--surface-1);
   }
 
-  .error-banner {
-    display: grid;
-    gap: var(--sp-1);
-    border-color: var(--signal-bear);
-    background: var(--signal-bear-dim);
-  }
-
-  .error-banner strong {
-    color: var(--signal-bear);
-    font-family: var(--font-mono);
-    font-size: 10px;
-  }
+  .status-message.success { color: var(--signal-bull); }
+  .status-message.error { color: var(--signal-bear); border: 1px solid var(--signal-bear); }
 
   .typing-indicator {
     display: flex;
-    gap: var(--sp-1);
-    padding: var(--sp-2);
+    gap: 6px;
+    padding: var(--sp-3);
+    align-self: flex-start;
   }
 
   .typing-indicator span {
-    width: 5px;
-    height: 5px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
-    background: var(--accent-cyan);
-    animation: blink 1s infinite ease-in-out;
+    background: var(--text-secondary);
+    animation: bounce 1.4s infinite ease-in-out both;
   }
 
-  .typing-indicator span:nth-child(2) {
-    animation-delay: 0.15s;
+  .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+  .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+
+  @keyframes bounce {
+    0%, 80%, 100% { transform: scale(0); }
+    40% { transform: scale(1); }
   }
 
-  .typing-indicator span:nth-child(3) {
-    animation-delay: 0.3s;
-  }
-
-  @media (max-width: 760px) {
-    .scout-grid {
+  @media (max-width: 768px) {
+    .scout-cards, .price-highlights {
       grid-template-columns: 1fr;
     }
-  }
-
-  @keyframes blink {
-    0%,
-    80%,
-    100% {
-      opacity: 0.25;
-    }
-
-    40% {
-      opacity: 1;
-    }
+    .chat-message { max-width: 100%; }
   }
 </style>

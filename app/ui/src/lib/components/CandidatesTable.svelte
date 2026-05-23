@@ -6,11 +6,11 @@
 
   export let onDebate: (tickers: string[]) => void = () => {};
 
-  const rowHeight = 43;
-  const buffer = 7;
+  const rowHeight = 64;
+  const buffer = 5;
   const RATING_CONFIG: Record<Rating, { label: string; color: string }> = {
     STRONG_BUY: { label: 'STRONG BUY', color: 'var(--signal-bull)' },
-    BUY: { label: 'BUY', color: '#42df94' },
+    BUY: { label: 'BUY', color: '#34d399' },
     HOLD: { label: 'HOLD', color: 'var(--signal-hold)' },
     AVOID: { label: 'AVOID', color: 'var(--signal-bear)' }
   };
@@ -19,7 +19,7 @@
   let sortKey: keyof StockResult = 'conviction_score';
   let sortDir: 'asc' | 'desc' = 'desc';
   let scrollTop = 0;
-  let viewportHeight = 520;
+  let viewportHeight = 600;
   let bodyEl: HTMLDivElement | undefined;
 
   function isChecked(event: Event) {
@@ -62,12 +62,6 @@
 
   function formatEntry(stock: StockResult) {
     return `${formatPrice(stock.entry_low)} - ${formatPrice(stock.entry_high)}`;
-  }
-
-  function debateSlot(index: number) {
-    const hour = 14 + Math.floor(index / 2);
-    const minute = index % 2 === 0 ? '00' : '30';
-    return `${String(hour).padStart(2, '0')}:${minute} GMT`;
   }
 
   function exportCSV() {
@@ -137,33 +131,36 @@
 
 <div class="table-panel terminal-panel">
   <header class="panel-header">
-    <div>
-      <div class="panel-heading">Stock Candidates</div>
-      <div class="panel-subtitle">Active stock tickers and active stock to tickers</div>
+    <div class="header-titles">
+      <h2 class="panel-heading">Rekomendasi Saham</h2>
+      <span class="panel-subtitle">Daftar kandidat potensial berdasarkan analisis mesin fundamental.</span>
     </div>
     <div class="panel-actions">
       <div class="search-wrap">
-        <span class="search-key">K</span>
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input
           class="search-input"
-          placeholder="Ticker / sector"
+          placeholder="Cari Ticker / Sektor..."
           bind:value={$searchQuery}
         />
         {#if $searchQuery}
-          <button class="clear-btn" onclick={() => searchQuery.set('')} type="button">x</button>
+          <button class="clear-btn" onclick={() => searchQuery.set('')} type="button">✕</button>
         {/if}
       </div>
       {#if selectedCount > 0}
         <button
-          class="debate-btn"
+          class="btn btn--primary debate-btn"
           disabled={$isStreaming}
           onclick={() => onDebate([...selectedTickers])}
           type="button"
         >
-          Debate {selectedCount}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Mulai Debat ({selectedCount})
         </button>
       {/if}
-      <button class="menu-dot" onclick={exportCSV} title="Export CSV (E)" type="button">CSV</button>
+      <button class="btn export-btn" onclick={exportCSV} title="Export CSV" type="button">
+        Export CSV
+      </button>
     </div>
   </header>
 
@@ -172,21 +169,20 @@
       <input type="checkbox" checked={allChecked} onchange={(event) => toggleAll(isChecked(event))} />
     </label>
     <button class="cell cell--ticker sortable" onclick={() => sort('ticker')} type="button">
-      Ticker {sortKey === 'ticker' ? (sortDir === 'desc' ? 'v' : '^') : ''}
+      TICKER {sortKey === 'ticker' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
     </button>
-    <div class="cell cell--company">Company</div>
+    <div class="cell cell--company">PERUSAHAAN</div>
     <button class="cell cell--conv sortable" onclick={() => sort('conviction_score')} type="button">
-      Conviction<br />Score {sortKey === 'conviction_score' ? (sortDir === 'desc' ? 'v' : '^') : ''}
+      SKOR KEYAKINAN {sortKey === 'conviction_score' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
     </button>
-    <div class="cell cell--rating">Rating</div>
+    <div class="cell cell--rating">RATING</div>
     <button class="cell cell--price sortable" onclick={() => sort('entry_low')} type="button">
-      Price<br />(IDR)
+      HARGA (IDR)
     </button>
     <button class="cell cell--edge sortable" onclick={() => sort('risk_reward')} type="button">
-      R/R<br />Edge
+      RISK/REWARD
     </button>
-    <div class="cell cell--entry">Entry<br />Range</div>
-    <div class="cell cell--next">Next<br />Debate</div>
+    <div class="cell cell--entry">AREA ENTRY</div>
   </div>
 
   <div
@@ -200,7 +196,7 @@
   >
     <div class="virtual-space" style="height: {totalHeight}px">
       <div class="virtual-window" style="transform: translateY({offsetY}px)">
-        {#each visibleRows as stock, index (stock.ticker)}
+        {#each visibleRows as stock (stock.ticker)}
           {@const cfg = RATING_CONFIG[stock.rating] ?? RATING_CONFIG.HOLD}
           <button
             class="table-row"
@@ -218,7 +214,7 @@
               />
             </span>
             <span class="cell cell--ticker ticker-code">
-              {stock.ticker}
+              <strong>{stock.ticker}</strong>
               <span
                 class="quick-debate"
                 class:quick-debate--disabled={$isStreaming}
@@ -229,12 +225,14 @@
                 onkeydown={(event) => { if (event.key === 'Enter') { event.stopPropagation(); if (!$isStreaming) onDebate([stock.ticker]); } }}
               >▶</span>
             </span>
-            <span class="cell cell--company company-cell">{resolveCompanyName($stockMap, stock.ticker, stock.sector)}</span>
+            <span class="cell cell--company company-cell">
+              {resolveCompanyName($stockMap, stock.ticker, stock.sector)}
+            </span>
             <span class="cell cell--conv conviction-cell">
-              <span>{stock.conviction_score}%</span>
-              <span class="mini-bar">
+              <div class="conv-score">{stock.conviction_score}%</div>
+              <div class="progress-bar">
                 <span style="width: {stock.conviction_score}%; background: {cfg.color}"></span>
-              </span>
+              </div>
             </span>
             <span class="cell cell--rating">
               <span class="badge" style="--badge-color: {cfg.color}">{cfg.label}</span>
@@ -247,7 +245,6 @@
               {stock.risk_reward >= 1 ? '+' : ''}{stock.risk_reward.toFixed(2)}x
             </span>
             <span class="cell cell--entry mono">{formatEntry(stock)}</span>
-            <span class="cell cell--next mono">{debateSlot(index)}</span>
           </button>
         {/each}
       </div>
@@ -256,15 +253,15 @@
 
   {#if sorted.length === 0}
     <div class="empty-state">
-      <div>Tidak ada hasil ditemukan</div>
-      {#if $searchQuery}<div class="text-muted">untuk "{$searchQuery}"</div>{/if}
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <p>Tidak ada hasil ditemukan</p>
+      {#if $searchQuery}<span class="text-muted">untuk "{$searchQuery}"</span>{/if}
     </div>
   {/if}
 </div>
 
 <style>
   .table-panel {
-    min-height: 0;
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -272,108 +269,108 @@
   }
 
   .panel-header {
-    min-height: 52px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--sp-3);
-    border-bottom: 1px solid rgba(118, 139, 164, 0.14);
-    padding: var(--sp-2) var(--sp-3);
+    gap: var(--sp-4);
+    padding: var(--sp-4);
+    border-bottom: 1px solid var(--surface-border);
+    background: transparent;
+  }
+
+  .header-titles h2 {
+    margin: 0;
   }
 
   .panel-actions {
     display: flex;
     align-items: center;
-    gap: var(--sp-2);
+    gap: var(--sp-3);
   }
 
   .search-wrap {
-    width: 174px;
     position: relative;
     display: flex;
     align-items: center;
+    width: 240px;
   }
 
-  .search-key {
+  .search-icon {
     position: absolute;
-    left: var(--sp-2);
+    left: 12px;
     color: var(--text-muted);
-    font-family: var(--font-mono);
-    font-size: 9px;
-    font-weight: 800;
   }
 
   .search-input {
     width: 100%;
-    height: 28px;
+    height: 38px;
     border: 1px solid var(--surface-border);
-    border-radius: var(--radius-sm);
-    padding: 0 24px 0 24px;
-    background: rgba(3, 8, 13, 0.44);
+    border-radius: var(--radius-md);
+    padding: 0 36px;
+    background: var(--surface-1);
     color: var(--text-primary);
     outline: none;
-    font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 14px;
+    transition: all 0.2s;
+  }
+
+  .search-input:focus {
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 0 2px var(--accent-cyan-dim);
   }
 
   .clear-btn {
     position: absolute;
-    right: 5px;
-    border: 0;
+    right: 8px;
     background: transparent;
+    border: none;
     color: var(--text-secondary);
-    font-family: var(--font-mono);
+    padding: 4px;
+    border-radius: 4px;
   }
 
-  .debate-btn,
-  .menu-dot {
-    height: 28px;
-    border: 1px solid var(--surface-border);
-    border-radius: var(--radius-sm);
-    padding: 0 var(--sp-2);
-    background: rgba(23, 34, 49, 0.72);
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    font-size: 9px;
-    font-weight: 800;
-    text-transform: uppercase;
+  .clear-btn:hover {
+    background: var(--surface-2);
+    color: var(--text-primary);
   }
 
   .debate-btn {
-    border-color: rgba(32, 208, 131, 0.46);
-    color: var(--signal-bull);
-    background: var(--signal-bull-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .export-btn {
+    font-weight: 500;
   }
 
   .table-head,
   .table-row {
     display: grid;
-    grid-template-columns: 28px 58px minmax(120px, 1fr) 78px 88px 78px 72px 112px 82px;
+    grid-template-columns: 40px 90px minmax(180px, 1fr) 140px 110px 110px 100px 160px;
     align-items: center;
+    width: 100%;
   }
 
   .table-head {
-    min-height: 38px;
-    border-bottom: 1px solid rgba(118, 139, 164, 0.13);
-    background: rgba(5, 10, 15, 0.34);
+    min-height: 48px;
+    border-bottom: 1px solid var(--surface-border);
+    background: var(--surface-1);
     color: var(--text-secondary);
-    font-family: var(--font-mono);
-    font-size: 9px;
-    font-weight: 800;
-    line-height: 1.05;
-    text-transform: uppercase;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
   }
 
   .table-body {
     flex: 1;
-    min-height: 0;
     overflow: auto;
     outline: none;
   }
 
   .virtual-space {
     position: relative;
-    min-width: 716px;
+    min-width: 800px;
   }
 
   .virtual-window {
@@ -382,34 +379,39 @@
   }
 
   .table-row {
-    width: 100%;
     border: 0;
-    border-bottom: 1px solid rgba(118, 139, 164, 0.11);
+    border-bottom: 1px solid var(--surface-border);
     padding: 0;
     background: transparent;
     color: var(--text-primary);
     text-align: left;
+    transition: background 0.15s;
   }
 
-  .table-row:hover,
-  .table-row--active {
-    background: linear-gradient(90deg, rgba(32, 208, 131, 0.16), rgba(32, 208, 131, 0.04));
+  .table-row:hover {
+    background: var(--surface-2);
   }
 
   .table-row--active {
-    box-shadow: inset 3px 0 0 var(--signal-bull);
+    background: var(--accent-cyan-dim);
+    box-shadow: inset 4px 0 0 var(--accent-cyan);
+  }
+
+  .table-row--active:hover {
+    background: var(--accent-cyan-dim);
   }
 
   .cell {
     min-width: 0;
-    padding: 0 var(--sp-2);
+    padding: 0 var(--sp-3);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    display: flex;
+    align-items: center;
   }
 
   .cell--check {
-    display: inline-flex;
     justify-content: center;
   }
 
@@ -423,36 +425,40 @@
     background: transparent;
     color: inherit;
     text-align: left;
+    cursor: pointer;
+  }
+
+  .sortable:hover {
+    color: var(--text-primary);
   }
 
   .ticker-code {
     position: relative;
-    color: var(--text-primary);
-    font-family: var(--font-mono);
-    font-size: 11px;
-    font-weight: 800;
+    font-size: 15px;
+  }
+
+  .ticker-code strong {
+    font-family: var(--font-sans);
+    font-weight: 700;
   }
 
   .quick-debate {
     position: absolute;
-    right: 2px;
+    right: 8px;
     top: 50%;
     transform: translateY(-50%);
-    width: 18px;
-    height: 18px;
+    width: 24px;
+    height: 24px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid rgba(32, 208, 131, 0.5);
     border-radius: var(--radius-sm);
-    padding: 0;
-    background: var(--signal-bull-dim);
-    color: var(--signal-bull);
-    font-size: 8px;
-    line-height: 1;
+    background: var(--signal-bull);
+    color: #fff;
+    font-size: 10px;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.15s ease;
+    transition: opacity 0.2s, transform 0.2s;
   }
 
   .table-row:hover .quick-debate {
@@ -461,8 +467,7 @@
   }
 
   .quick-debate:hover {
-    background: rgba(32, 208, 131, 0.3);
-    box-shadow: 0 0 8px rgba(32, 208, 131, 0.2);
+    transform: translateY(-50%) scale(1.1);
   }
 
   .quick-debate--disabled {
@@ -472,26 +477,33 @@
 
   .company-cell {
     color: var(--text-secondary);
-    font-size: 11px;
+    font-size: 14px;
   }
 
   .conviction-cell {
-    display: grid;
-    gap: 3px;
-    color: var(--text-primary);
-    font-family: var(--font-mono);
-    font-size: 10px;
-    font-weight: 800;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    width: 100%;
+    padding-right: var(--sp-4);
   }
 
-  .mini-bar {
-    height: 3px;
+  .conv-score {
+    font-size: 13px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+  }
+
+  .progress-bar {
+    height: 6px;
+    width: 100%;
+    background: var(--surface-3);
     border-radius: 999px;
-    background: rgba(118, 139, 164, 0.18);
     overflow: hidden;
   }
 
-  .mini-bar span {
+  .progress-bar span {
     display: block;
     height: 100%;
     border-radius: inherit;
@@ -500,46 +512,61 @@
   .badge {
     display: inline-flex;
     align-items: center;
-    height: 18px;
-    border: 1px solid color-mix(in srgb, var(--badge-color) 56%, transparent);
+    padding: 4px 10px;
     border-radius: var(--radius-sm);
-    padding: 0 6px;
+    background: color-mix(in srgb, var(--badge-color) 15%, transparent);
     color: var(--badge-color);
-    background: color-mix(in srgb, var(--badge-color) 18%, transparent);
-    font-family: var(--font-mono);
-    font-size: 9px;
-    font-weight: 800;
+    font-size: 12px;
+    font-weight: 700;
+    border: 1px solid color-mix(in srgb, var(--badge-color) 30%, transparent);
   }
 
   .cell--price,
   .cell--edge,
-  .cell--entry,
-  .cell--next {
-    color: var(--text-code);
-    font-size: 10px;
+  .cell--entry {
+    font-size: 14px;
   }
 
   .cell--edge {
     color: var(--signal-bull);
-    font-weight: 800;
+    font-weight: 700;
   }
 
   .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     padding: var(--sp-10);
     color: var(--text-secondary);
-    font-family: var(--font-mono);
-    text-align: center;
+    height: 100%;
+    gap: var(--sp-2);
   }
 
-  @media (max-width: 720px) {
-    .panel-header {
-      align-items: stretch;
-      flex-direction: column;
-    }
+  .empty-state svg {
+    opacity: 0.5;
+    margin-bottom: var(--sp-2);
+  }
 
-    .panel-actions,
-    .search-wrap {
+  .empty-state p {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  @media (max-width: 1024px) {
+    .panel-header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .panel-actions {
       width: 100%;
+      flex-wrap: wrap;
+    }
+    .search-wrap {
+      flex: 1;
+      min-width: 200px;
     }
   }
 </style>

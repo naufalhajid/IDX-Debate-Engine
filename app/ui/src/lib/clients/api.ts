@@ -60,7 +60,10 @@ export const api = {
           const frames = buffer.split('\n\n');
           buffer = frames.pop() ?? '';
           for (const frame of frames) {
-            const data = frame.replace(/^data:\s*/m, '').trim();
+            const cleanFrame = frame.trim();
+            if (!cleanFrame || cleanFrame.startsWith(':')) continue;
+            
+            const data = cleanFrame.replace(/^data:\s*/m, '').trim();
             if (!data) continue;
             if (data === '[DONE]') {
               onDone();
