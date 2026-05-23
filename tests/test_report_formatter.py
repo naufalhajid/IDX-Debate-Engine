@@ -246,10 +246,75 @@ def test_render_ticker_panel_handles_minimal_result() -> None:
     assert "BBCA" in console.export_text()
 
 
+def test_render_ticker_panel_contains_debate_argument_highlights() -> None:
+    console = Console(record=True, width=140)
+    formatter = RichFormatter(console=console)
+
+    formatter.render_ticker_panel(_mock_result())
+
+    output = console.export_text()
+    assert "ARGUMEN KUNCI" in output
+    assert "Bull case kuat" in output
+    assert "Bear case menyorot valuasi" in output
+    assert "Devil's Advocate" in output
+
+
+def test_argument_highlight_uses_latest_round_and_strips_footer() -> None:
+    console = Console(record=True, width=160)
+    formatter = RichFormatter(console=console)
+    result = _mock_result()
+    result["debate_history"] = [
+        {
+            "role": "bull",
+            "content": "Old thesis only.",
+            "round": 1,
+        },
+        {
+            "role": "bull",
+            "content": (
+                "Latest thesis starts with a clear setup. "
+                "Bid support at Rp 3,000 and fair value gap 68% improve odds.\n\n"
+                "Position: BUY\nAgent Confidence: 0.80"
+            ),
+            "round": 3,
+        },
+    ]
+
+    formatter.render_ticker_panel(result)
+
+    output = console.export_text()
+    assert "Latest thesis starts" in output
+    assert "Rp 3,000" in output
+    assert "Old thesis only" not in output
+    assert "Position: BUY" not in output
+
+
 def test_render_batch_summary_handles_empty_results() -> None:
     console = Console(record=True, width=100)
     formatter = RichFormatter(console=console)
 
     formatter.render_batch_summary([])
 
-    assert "HASIL ANALISIS BATCH" in console.export_text()
+    assert "HASIL DEBATE" in console.export_text()
+
+
+def test_render_batch_summary_uses_compact_debate_table() -> None:
+    console = Console(record=True, width=160)
+    formatter = RichFormatter(console=console)
+
+    formatter.render_batch_summary(
+        [_mock_result(), {"ticker": "TLKM", "error": "failed"}],
+        succeeded=1,
+        failed=1,
+        duration_seconds=74,
+    )
+
+    output = console.export_text()
+    assert "HASIL DEBATE" in output
+    assert "Ticker" in output
+    assert "Risk Gov" in output
+    assert "BBCA" in output
+    assert "TLKM" in output
+    assert "Berhasil: 1" in output
+    assert "Gagal: 1" in output
+    assert "Durasi: 1m 14s" in output

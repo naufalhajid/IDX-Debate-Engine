@@ -1,8 +1,7 @@
+import asyncio
 import json
 from pathlib import Path
 from types import SimpleNamespace
-
-import pytest
 
 from run_debate import _debate_one
 
@@ -22,17 +21,18 @@ class FakeDebateChamber:
         }
 
 
-@pytest.mark.asyncio
-async def test_run_debate_writes_timestamped_and_legacy_outputs(tmp_path: Path) -> None:
+def test_run_debate_writes_timestamped_and_legacy_outputs(tmp_path: Path) -> None:
     timestamp = "20260512_101530"
     generated_at = "2026-05-12T10:15:30+07:00"
 
-    ok = await _debate_one(
-        ticker="BBCA",
-        chamber=FakeDebateChamber(),
-        output_dir=tmp_path,
-        run_timestamp=timestamp,
-        generated_at=generated_at,
+    ok = asyncio.run(
+        _debate_one(
+            ticker="BBCA",
+            chamber=FakeDebateChamber(),
+            output_dir=tmp_path,
+            run_timestamp=timestamp,
+            generated_at=generated_at,
+        )
     )
 
     assert ok is True

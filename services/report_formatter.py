@@ -343,6 +343,81 @@ def _raw_history_argument(result: dict[str, Any], role: str, limit: int = 500) -
     return text if len(text) <= limit else text[: limit - 3] + "..."
 
 
+_ARGUMENT_NUMBER_RE = re.compile(r"(?:Rp\s*)?\d[\d.,]*(?:\s*(?:%|x))?", re.IGNORECASE)
+
+
+def _history_round(raw: dict[str, Any]) -> int:
+    value = raw.get("round")
+    if value is None:
+        value = raw.get("round_num")
+    number = _safe_float(value)
+    return -1 if number is None else int(number)
+
+
+def _clean_argument_text(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    text = re.split(
+        r"\n\s*(?:Position|Agent Confidence)\s*:",
+        text,
+        maxsplit=1,
+        flags=re.IGNORECASE,
+    )[0]
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _argument_sentences(value: Any) -> list[str]:
+    text = _clean_argument_text(value)
+    if not text:
+        return []
+    return [
+        item.strip()
+        for item in re.split(r"(?<=[.!?])\s+", text)
+        if item.strip()
+    ]
+
+
+def _summarize_argument_text(value: Any, limit: int = 220) -> str:
+    sentences = _argument_sentences(value)
+    if not sentences:
+        return "Data tidak tersedia"
+
+    selected: list[str] = [sentences[0]]
+    for sentence in sentences[1:]:
+        if len(selected) >= 3:
+            break
+        if _ARGUMENT_NUMBER_RE.search(sentence):
+            selected.append(sentence)
+    for sentence in sentences[1:]:
+        if len(selected) >= 2:
+            break
+        if sentence not in selected:
+            selected.append(sentence)
+
+    summary = " ".join(selected)
+    return summary if len(summary) <= limit else summary[: limit - 3].rstrip() + "..."
+
+
+def _latest_history_argument(result: dict[str, Any], role: str) -> str:
+    target = _canonical(role)
+    matches: list[tuple[int, str]] = []
+    for raw in _list_or_empty(result.get("debate_history")):
+        if not isinstance(raw, dict):
+            continue
+        role_key = _canonical(raw.get("role"))
+        if target == "devils_advocate":
+            is_match = _is_devils_advocate_agent(role_key)
+        else:
+            is_match = role_key == target
+        if is_match:
+            matches.append((_history_round(raw), str(raw.get("content") or "")))
+    if not matches:
+        return ""
+    matches.sort(key=lambda item: item[0])
+    return matches[-1][1]
+
+
 def _key_argument(
     result: dict[str, Any],
     packet: AuditPacket | None,
@@ -356,6 +431,24 @@ def _key_argument(
         if role == "devils_advocate" and packet.devils_advocate_question:
             return packet.devils_advocate_question
     return _raw_history_argument(result, role)
+
+
+def _key_argument_summary(
+    result: dict[str, Any],
+    packet: AuditPacket | None,
+    role: str,
+    limit: int = 220,
+) -> str:
+    packet_text = ""
+    if packet:
+        if role == "bull":
+            packet_text = packet.key_bull_argument
+        elif role == "bear":
+            packet_text = packet.key_bear_argument
+        elif role == "devils_advocate":
+            packet_text = packet.devils_advocate_question
+    source_text = packet_text or _latest_history_argument(result, role)
+    return _summarize_argument_text(source_text, limit)
 
 
 def _summary(result: dict[str, Any], packet: AuditPacket | None = None) -> str:
@@ -647,6 +740,32 @@ class RichFormatter:
             return "N/A"
         return value
 
+    def _argument_style(self, role: str) -> str:
+        if role == "bull":
+            return "green"
+        if role == "bear":
+            return "red"
+        return "yellow"
+
+    def _build_argument_group(
+        self,
+        result: dict[str, Any],
+        packet: AuditPacket | None,
+    ) -> Table:
+        table = Table.grid(padding=(0, 1))
+        table.add_column(style="bold", no_wrap=True)
+        table.add_column()
+        for label, role in (
+            ("Bull", "bull"),
+            ("Bear", "bear"),
+            ("Devil's Advocate", "devils_advocate"),
+        ):
+            table.add_row(
+                Text(label, style=self._argument_style(role)),
+                Text(_key_argument_summary(result, packet, role)),
+            )
+        return table
+
     def render_ticker_panel(
         self,
         result: dict,
@@ -730,6 +849,8 @@ class RichFormatter:
             table.add_row("Pemenang", _winner_agent(data, packet))
             vote_table = self._build_vote_table(data, packet)
             table.add_row("Voting Agent", vote_table)
+            table.add_row("", Rule("ARGUMEN KUNCI", style="dim"))
+            table.add_row("Highlight", self._build_argument_group(data, packet))
 
             risks = _key_risks(data)[:3]
             if risks:
@@ -779,60 +900,59 @@ class RichFormatter:
                 )
             )
 
-    def render_batch_summary(self, results: list[dict]) -> None:
+    def render_batch_summary(
+        self,
+        results: list[dict],
+        *,
+        succeeded: int | None = None,
+        failed: int | None = None,
+        duration_seconds: float | None = None,
+    ) -> None:
         """Print a readable batch summary panel."""
         try:
             rows = results if isinstance(results, list) else []
             ok_results = [row for row in rows if not row.get("error")]
             fail_results = [row for row in rows if row.get("error")]
-            grouped = {"BUY": [], "HOLD": [], "AVOID": []}
-            for row in ok_results:
-                grouped.setdefault(_rating(row), []).append(row)
+            succeeded = len(ok_results) if succeeded is None else succeeded
+            failed = len(fail_results) if failed is None else failed
 
-            body = Table.grid(padding=(0, 1))
-            body.add_column()
-            body.add_row(
-                f"Tickers dianalisis: {len(rows)}  |  "
-                f"Berhasil: {len(ok_results)}  |  Gagal: {len(fail_results)}"
+            table = Table(show_header=True, header_style="bold", expand=True)
+            table.add_column("Ticker", style="bold", no_wrap=True)
+            table.add_column("Rating", no_wrap=True)
+            table.add_column("Conf", justify="right", no_wrap=True)
+            table.add_column("R/R", justify="right", no_wrap=True)
+            table.add_column("Entry Zone")
+            table.add_column("Target")
+            table.add_column("Risk Gov")
+
+            for row in rows:
+                verdict = _verdict(row)
+                rating = "ERROR" if row.get("error") else _rating(row)
+                low, high = _entry_bounds(verdict)
+                risk = _risk(row)
+                table.add_row(
+                    _ticker(row),
+                    Text(rating, style=self._rating_style(rating)),
+                    _pct(verdict.get("confidence")),
+                    _ratio(verdict.get("risk_reward_ratio")),
+                    f"{_money(low, include_prefix=False)}-{_money(high, include_prefix=False)}",
+                    _money(verdict.get("target_price")),
+                    self._terminal_risk_governor_line(risk),
+                )
+
+            duration_text = ""
+            if duration_seconds is not None:
+                minutes, seconds = divmod(max(0, int(duration_seconds)), 60)
+                duration_text = f"  |  Durasi: {minutes}m {seconds:02d}s"
+            footer = Text(
+                f"Berhasil: {succeeded}  |  Gagal: {failed}{duration_text}",
+                style="dim",
             )
-            body.add_row("")
-            body.add_row(Text("REKOMENDASI HARI INI:", style="bold"))
-            body.add_row(Rule(style="dim"))
-            for rating in ("BUY", "HOLD", "AVOID"):
-                for row in grouped.get(rating, []):
-                    body.add_row(self._batch_recommendation_line(row, rating))
-
-            deployable = [
-                row
-                for row in grouped.get("BUY", [])
-                if _risk(row).get("status") == "deployable"
-            ]
-            waiting = [
-                row
-                for row in grouped.get("BUY", [])
-                if _risk(row).get("status") == "wait_for_pullback"
-            ]
-            body.add_row("")
-            body.add_row(Text("DAPAT DIEKSEKUSI SEKARANG:", style="bold"))
-            body.add_row(Rule(style="dim"))
-            if deployable:
-                for row in deployable:
-                    body.add_row(self._deployable_line(row))
-            else:
-                body.add_row("Tidak ada")
-            body.add_row("")
-            body.add_row(Text("PERLU TUNGGU:", style="bold"))
-            body.add_row(Rule(style="dim"))
-            if waiting:
-                for row in waiting:
-                    body.add_row(f"{_ticker(row)} - tunggu pullback ke zona entry")
-            else:
-                body.add_row("Tidak ada")
 
             self.console.print(
                 Panel(
-                    body,
-                    title="HASIL ANALISIS BATCH",
+                    Group(table, footer),
+                    title="HASIL DEBATE",
                     border_style="cyan",
                     padding=(1, 2),
                 )
@@ -841,7 +961,7 @@ class RichFormatter:
             self.console.print(
                 Panel(
                     f"Ringkasan batch tidak tersedia ({exc})",
-                    title="HASIL ANALISIS BATCH",
+                    title="HASIL DEBATE",
                     border_style="white",
                 )
             )
@@ -858,11 +978,13 @@ class RichFormatter:
         table.add_column("Agent")
         table.add_column("Posisi")
         table.add_column("Keyakinan", justify="right")
-        for agent, position, confidence, _result_text, style in rows:
+        table.add_column("Hasil")
+        for agent, position, confidence, result_text, style in rows:
             table.add_row(
                 agent,
                 position,
                 confidence,
+                result_text,
                 style=style,
             )
         override_note = _soft_hold_override_note(result, packet)

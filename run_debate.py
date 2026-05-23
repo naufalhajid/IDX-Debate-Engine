@@ -3,6 +3,7 @@
 import argparse
 import asyncio
 import json
+import sys
 from datetime import datetime
 from pathlib import Path
 from time import perf_counter
@@ -14,8 +15,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from rich.console import Console
-
+from app.cli.ui.console import console as cli_console
 from core.adaptive_planner import (
     DEFAULT_PLANNER,
     AdaptivePlanner,
@@ -36,6 +36,61 @@ from utils.logger_config import logger
 
 PROMPT_MANIFEST_PATH = Path(__file__).resolve().parent / "services" / "debate_prompts" / "manifest.json"
 _batch_failed_count: int = 0
+_DEBATE_LOGGING_CONFIGURED = False
+
+
+def _ensure_utf8_console() -> None:
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+    try:
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _normalize_log_level(value: str | None, default: str = "INFO") -> str:
+    candidate = str(value or "").strip().upper()
+    if not candidate:
+        return default
+    try:
+        logger.level(candidate)
+    except ValueError:
+        return default
+    return candidate
+
+
+def configure_debate_logging(*, verbose: bool = False) -> None:
+    """Keep run_debate console output structured unless verbose is requested."""
+    global _DEBATE_LOGGING_CONFIGURED
+    _ensure_utf8_console()
+    logger.remove()
+    log_format = "{time:YYYY-MM-DD HH:mm:ss.SSS} {level: <8} {file}:{line} | {message}"
+    log_level = _normalize_log_level(settings.LOG_LEVEL)
+    logger.add(
+        settings.LOG_APP_FILENAME,
+        format=log_format,
+        level=log_level,
+        rotation="1 MB",
+        retention="10 days",
+        compression="zip",
+        encoding="utf-8",
+    )
+    logger.add(
+        "pipeline.log",
+        format=log_format,
+        level=log_level,
+        encoding="utf-8",
+    )
+    if verbose:
+        logger.add(
+            sys.stderr,
+            format=settings.LOG_FORMAT,
+            level=log_level,
+            colorize=True,
+        )
+    _DEBATE_LOGGING_CONFIGURED = True
 
 
 def _now_iso() -> str:
@@ -184,6 +239,11 @@ def parse_args() -> argparse.Namespace:
             "Directory to save debate reports. Each run writes timestamped "
             "snapshots plus latest and legacy flat files (default: output/debates)"
         ),
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Show raw Loguru logs in addition to Rich debate summaries.",
     )
     args = parser.parse_args()
     if args.ticker_alias:
@@ -400,7 +460,7 @@ def _write_formatter_report(
         metadata = {**metadata, "run_id": run_timestamp}
         payload["metadata"] = metadata
     try:
-        formatter = RichFormatter(console=Console())
+        formatter = RichFormatter(console=cli_console)
         formatter.render_ticker_panel(payload)
     except Exception as e:
         logger.warning(f"[Formatter] {ticker}: {e}")
@@ -515,6 +575,45 @@ def _write_batch_telemetry_report(
         logger.info(f"[Telemetry] Batch report saved for {run_id}")
     except Exception as exc:
         logger.warning(f"[Telemetry] Failed to build batch report for {run_id}: {exc}")
+
+
+def _load_batch_debate_rows(output_dir: Path, tickers: list[str]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for ticker in tickers:
+        latest_path = output_dir / ticker / "latest_debate.json"
+        try:
+            if latest_path.exists():
+                rows.append(json.loads(latest_path.read_text(encoding="utf-8")))
+            else:
+                rows.append(
+                    {
+                        "ticker": ticker,
+                        "error": "Debate gagal atau artifact tidak ditemukan.",
+                    }
+                )
+        except Exception as exc:
+            rows.append({"ticker": ticker, "error": f"Artifact tidak terbaca: {exc}"})
+    return rows
+
+
+def _render_batch_debate_summary(
+    *,
+    output_dir: Path,
+    tickers: list[str],
+    succeeded: int,
+    failed: int,
+    duration_seconds: float,
+) -> None:
+    try:
+        rows = _load_batch_debate_rows(output_dir, tickers)
+        RichFormatter(console=cli_console).render_batch_summary(
+            rows,
+            succeeded=succeeded,
+            failed=failed,
+            duration_seconds=duration_seconds,
+        )
+    except Exception as exc:
+        logger.warning(f"[Formatter] Batch summary failed: {exc}")
 
 
 def _save_timestamped_report(
@@ -864,9 +963,10 @@ async def _debate_one(
     """
     global _batch_failed_count
 
-    logger.info(f"{'=' * 60}")
-    logger.info(f"Starting debate for: {ticker}")
-    logger.info(f"{'=' * 60}")
+    cli_console.print(
+        f"[idx.section]Debate[/idx.section] [idx.ticker]{ticker}[/idx.ticker]"
+    )
+    logger.info(f"[run_debate] Starting debate for {ticker}")
 
     started_at = perf_counter()
     _ledger_call(
@@ -1023,7 +1123,7 @@ async def _debate_one(
         # debate_chamber wraps this in RuntimeError for tenacity, but in case
         # it ever escapes, catch it here so the loop continues.
         logger.error(
-            f"[run_debate] ⚠️  {ticker}: CancelledError — connection dropped or timed out. "
+            f"[run_debate] {ticker}: CancelledError - connection dropped or timed out. "
             "Skipping to next ticker."
         )
         _record_ticker_telemetry(
@@ -1042,7 +1142,7 @@ async def _debate_one(
         )
         return False
     except Exception as e:
-        logger.error(f"[run_debate] 🚨 {ticker} failed unexpectedly: {e}")
+        logger.error(f"[run_debate] {ticker} failed unexpectedly: {e}")
         _record_ticker_telemetry(
             ticker=ticker,
             run_id=run_timestamp,
@@ -1065,11 +1165,16 @@ async def main() -> None:
     _batch_failed_count = 0
 
     args = parse_args()
+    configure_debate_logging(verbose=bool(args.verbose))
     lint_report = lint_prompt_pack(str(PROMPT_MANIFEST_PATH))
     for warning in lint_report.warnings:
         logger.warning(f"[PromptPackLinter] {warning}")
     if lint_report.errors:
         logger.error(f"[PromptPackLinter] Prompt pack invalid: {lint_report.errors}")
+        cli_console.print(
+            "[idx.error]Prompt pack invalid.[/idx.error] "
+            "Detail lengkap ada di log file."
+        )
         raise SystemExit(1)
 
     output_dir = Path(args.output_dir)
@@ -1086,6 +1191,10 @@ async def main() -> None:
         ticker_count=len(args.tickers),
         tickers=args.tickers,
     )
+    cli_console.print(
+        "[idx.header]Debate batch[/idx.header] "
+        f"{len(args.tickers)} ticker | output=[idx.path]{output_dir}[/idx.path]"
+    )
 
     # LLM instances created once and reused for all tickers
     from services.debate_chamber import DebateChamber
@@ -1101,8 +1210,16 @@ async def main() -> None:
             failed += 1
 
     logger.info(
-        f"All debates complete. ✅ {succeeded} succeeded / ❌ {failed} failed "
+        f"All debates complete. OK {succeeded} succeeded / FAIL {failed} failed "
         f"out of {len(args.tickers)} tickers."
+    )
+    duration_seconds = perf_counter() - batch_started_at
+    _render_batch_debate_summary(
+        output_dir=output_dir,
+        tickers=args.tickers,
+        succeeded=succeeded,
+        failed=failed,
+        duration_seconds=duration_seconds,
     )
     _write_batch_telemetry_report(
         output_dir=output_dir,
@@ -1115,7 +1232,7 @@ async def main() -> None:
         run_id=run_timestamp,
         succeeded=succeeded,
         failed=failed,
-        duration_seconds=perf_counter() - batch_started_at,
+        duration_seconds=duration_seconds,
     )
 
 

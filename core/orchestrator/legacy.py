@@ -71,9 +71,9 @@ from rich.rule import Rule
 from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
-from rich.theme import Theme
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from app.cli.ui.console import IDX_THEME
 from core.backtest_memory import BacktestMemory, DEFAULT_MEMORY, TradeOutcome
 from core.backtest_outcome_evaluator import evaluate_memory
 from core.budget import BudgetExhaustedError, get_usage, reset_budget
@@ -133,19 +133,8 @@ def _as_debate_message(m):
     return m
 
 
-# Tema warna konsisten â€” ubah di sini, berlaku di seluruh CLI.
-_CLI_THEME = Theme(
-    {
-        "brand": "bold cyan",
-        "ok": "bold green",
-        "warn": "bold yellow",
-        "danger": "bold red",
-        "muted": "dim white",
-        "prompt": "bold white",
-        "step": "bold magenta",
-        "amber": "yellow",
-    }
-)
+# Shared CLI theme; keep this alias for tests/importers that use legacy._CLI_THEME.
+_CLI_THEME = IDX_THEME
 console = Console(theme=_CLI_THEME, highlight=False)
 
 # Peta rating CIO â†’ warna Rich. Digunakan oleh live table dan result summary.

@@ -96,15 +96,29 @@ def test_filter_applies_safe_overrides(monkeypatch):
 def test_debate_normalizes_tickers_and_output_dir(monkeypatch):
     calls = []
 
-    def fake_run_debate_cli(*, tickers, output_dir):
-        calls.append((tickers, output_dir))
+    def fake_run_debate_cli(*, tickers, output_dir, verbose=False):
+        calls.append((tickers, output_dir, verbose))
 
     monkeypatch.setattr("app.cli.commands.debate.run_debate_cli", fake_run_debate_cli)
 
     result = runner.invoke(app, ["debate", "bbri", "BBCA", "--output-dir", "tmp/debates"])
 
     assert result.exit_code == 0, result.output
-    assert calls == [(["BBRI", "BBCA"], Path("tmp/debates"))]
+    assert calls == [(["BBRI", "BBCA"], Path("tmp/debates"), False)]
+
+
+def test_debate_uses_global_verbose_flag(monkeypatch):
+    calls = []
+
+    def fake_run_debate_cli(*, tickers, output_dir, verbose=False):
+        calls.append((tickers, output_dir, verbose))
+
+    monkeypatch.setattr("app.cli.commands.debate.run_debate_cli", fake_run_debate_cli)
+
+    result = runner.invoke(app, ["--verbose", "debate", "bbri"])
+
+    assert result.exit_code == 0, result.output
+    assert calls == [(["BBRI"], Path("output/debates"), True)]
 
 
 def test_pipeline_preserves_legacy_flags(monkeypatch):

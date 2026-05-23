@@ -18,15 +18,23 @@ def _normalize_tickers(tickers: list[str]) -> list[str]:
     return normalized
 
 
-def run_debate_cli(*, tickers: list[str], output_dir: Path) -> None:
+def run_debate_cli(
+    *,
+    tickers: list[str],
+    output_dir: Path,
+    verbose: bool = False,
+) -> None:
     import run_debate
 
     argv = ["run_debate.py", "--tickers", *tickers, "--output-dir", str(output_dir)]
+    if verbose:
+        argv.append("--verbose")
     with patch.object(sys, "argv", argv):
         asyncio.run(run_debate.main())
 
 
 def debate_command(
+    ctx: typer.Context,
     tickers: Annotated[
         list[str],
         typer.Argument(help="Ticker symbols to debate, e.g. BBRI BBCA TLKM."),
@@ -35,14 +43,29 @@ def debate_command(
         Path,
         typer.Option("--output-dir", help="Directory for debate reports."),
     ] = Path("output/debates"),
+    verbose: Annotated[
+        bool,
+        typer.Option("--verbose", help="Show raw Loguru logs in addition to Rich output."),
+    ] = False,
 ) -> None:
     """Run the existing AI debate chamber for one or more tickers."""
     normalized = _normalize_tickers(tickers)
+    root_ctx = ctx.find_root()
+    global_verbose = bool(((root_ctx.obj or {}) if root_ctx else {}).get("verbose"))
+    selected_verbose = verbose or global_verbose
     console.print(
-        f"[idx.header]Starting debate[/idx.header] tickers={', '.join(normalized)}"
+        "[idx.header]Memulai debate[/idx.header] "
+        f"tickers={', '.join(normalized)}"
     )
-    run_debate_cli(tickers=normalized, output_dir=output_dir)
-    console.print(f"[idx.ok]Debate complete.[/idx.ok] Output: [idx.path]{output_dir}[/idx.path]")
+    run_debate_cli(
+        tickers=normalized,
+        output_dir=output_dir,
+        verbose=selected_verbose,
+    )
+    console.print(
+        "[idx.ok]Debate selesai.[/idx.ok] "
+        f"Output: [idx.path]{output_dir}[/idx.path]"
+    )
 
 
 app = typer.Typer(help="AI debate chamber commands.")
