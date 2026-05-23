@@ -37,6 +37,7 @@ export const api = {
         ratings_distribution: Record<string, number>;
         fresh_count: number;
         stale_count: number;
+        latest_debate_date: string | null;
       };
     }>('/api/health'),
   validateKey: () => apiFetch<{ valid: boolean }>('/api/validate-key'),

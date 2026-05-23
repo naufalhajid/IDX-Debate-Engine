@@ -35,7 +35,7 @@ export type DebateEvent =
   | { type: 'progress'; ticker: string; phase: string; pct: number }
   | { type: 'scout'; ticker: string; metrics: ScoutMetrics }
   | { type: 'round'; ticker: string; data: DebateRound }
-  | { type: 'devil_advocate'; ticker: string }
+  | { type: 'devil_advocate'; ticker: string; question?: string }
   | { type: 'verdict'; ticker: string; result: StockResult }
   | { type: 'done'; ticker: string }
   | { type: 'error'; ticker: string; message: string };

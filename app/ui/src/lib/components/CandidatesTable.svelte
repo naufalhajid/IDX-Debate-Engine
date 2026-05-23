@@ -204,6 +204,8 @@
       <div class="virtual-window" style="transform: translateY({offsetY}px)">
         {#each visibleRows as stock (stock.ticker)}
           {@const cfg = RATING_CONFIG[stock.rating] ?? RATING_CONFIG.HOLD}
+          {@const filledCount = Math.round((stock.conviction_score ?? 0) / 10)}
+          {@const emptyCount = Math.max(0, 10 - filledCount)}
           <button
             class="table-row"
             class:table-row--active={$activeTicker === stock.ticker}
@@ -236,8 +238,8 @@
             </span>
             <span class="cell cell--conv conviction-cell">
               <div class="conv-score">{stock.conviction_score}%</div>
-              <div class="progress-bar">
-                <span style="width: {stock.conviction_score}%; background: {cfg.color}"></span>
+              <div class="text-progress-bar" style="color: {cfg.color}">
+                [{'■'.repeat(filledCount)}<span class="muted-blocks">{'□'.repeat(emptyCount)}</span>]
               </div>
             </span>
             <span class="cell cell--rating">
@@ -502,18 +504,15 @@
     font-family: var(--font-mono);
   }
 
-  .progress-bar {
-    height: 6px;
-    width: 100%;
-    background: var(--surface-3);
-    border-radius: 999px;
-    overflow: hidden;
+  .text-progress-bar {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    user-select: none;
   }
 
-  .progress-bar span {
-    display: block;
-    height: 100%;
-    border-radius: inherit;
+  .muted-blocks {
+    color: var(--text-muted);
   }
 
   .badge {

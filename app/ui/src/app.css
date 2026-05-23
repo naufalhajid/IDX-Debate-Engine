@@ -1,34 +1,34 @@
 :root {
-  --surface-base: #0f172a;
-  --surface-frame: #020617;
-  --surface-1: #1e293b;
-  --surface-2: #334155;
-  --surface-3: #475569;
-  --surface-border: rgba(255, 255, 255, 0.08);
-  --surface-border-strong: rgba(255, 255, 255, 0.15);
+  --surface-base: #090d16;
+  --surface-frame: #030509;
+  --surface-1: #0f1424;
+  --surface-2: #161e33;
+  --surface-3: #222d4a;
+  --surface-border: #182239;
+  --surface-border-strong: #253356;
 
-  --accent-cyan: #38bdf8;
-  --accent-cyan-dim: rgba(56, 189, 248, 0.15);
-  --accent-green: #34d399;
-  --accent-green-dim: rgba(52, 211, 153, 0.15);
-  --accent-red: #fb7185;
-  --accent-red-dim: rgba(251, 113, 133, 0.15);
-  --accent-violet: #818cf8;
+  --accent-cyan: #ff5a00; /* International Orange accent */
+  --accent-cyan-dim: rgba(255, 90, 0, 0.08);
+  --accent-green: #059669; /* Juniper Green */
+  --accent-green-dim: rgba(5, 150, 105, 0.12);
+  --accent-red: #be123c; /* Crimson Red */
+  --accent-red-dim: rgba(190, 18, 60, 0.12);
+  --accent-violet: #4f46e5;
   
-  --signal-bull: #10b981;
-  --signal-bull-dim: rgba(16, 185, 129, 0.15);
-  --signal-bear: #ef4444;
-  --signal-bear-dim: rgba(239, 68, 68, 0.15);
-  --signal-hold: #64748b;
-  --signal-hold-dim: rgba(100, 116, 139, 0.15);
+  --signal-bull: #059669;
+  --signal-bull-dim: rgba(5, 150, 105, 0.10);
+  --signal-bear: #be123c;
+  --signal-bear-dim: rgba(190, 18, 60, 0.10);
+  --signal-hold: #708090;
+  --signal-hold-dim: rgba(112, 128, 144, 0.10);
 
-  --text-primary: #f8fafc;
+  --text-primary: #f1f5f9;
   --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --text-code: #bae6fd;
+  --text-muted: #57657a;
+  --text-code: #ffedd5;
 
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
-  --font-sans: 'DM Sans', 'Inter', sans-serif;
+  --font-sans: 'Inter', 'SF Pro Display', -apple-system, sans-serif;
 
   --sp-1: 4px;
   --sp-2: 8px;
@@ -39,14 +39,14 @@
   --sp-8: 32px;
   --sp-10: 40px;
 
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-shell: 20px;
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-shell: 8px;
 
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-panel: 0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -4px rgb(0 0 0 / 0.3);
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-panel: none;
 
   --z-sidebar: 100;
   --z-toast: 200;
