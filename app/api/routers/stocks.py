@@ -40,6 +40,8 @@ async def _load_results() -> dict[str, dict[str, Any]]:  # QW-FIX-PF1
     Load batch results from disk into an in-memory dict keyed by ticker.
     Uses a TTL cache to avoid blocking disk reads on every API call.
     Cache is refreshed at most once every _CACHE_TTL_SECONDS.
+    If the batch results file is missing or invalid, it scans output/debates/
+    as a fallback to populate the results list.
     """
     global _cache, _cache_timestamp
 
@@ -52,39 +54,53 @@ async def _load_results() -> dict[str, dict[str, Any]]:  # QW-FIX-PF1
         if _cache and (now - _cache_timestamp) < _CACHE_TTL_SECONDS:
             return _cache
 
+        raw_data = []
         try:
             async with aiofiles.open(RESULTS_PATH, mode="r", encoding="utf-8") as f:
                 content = await f.read()
-            raw_data: Any = json.loads(content)
-            _cache = {  # QW-FIX-2  # QW-FIX-PF1
-                item["ticker"]: item
-                for item in normalize_batch(raw_data)
-                if "ticker" in item
-            }
-            _cache_timestamp = time.monotonic()
-            return _cache
-        except FileNotFoundError as exc:
-            raise _error(
-                "NO_RESULTS",
-                "Belum ada hasil analisis. Jalankan batch terlebih dahulu.",
-                status.HTTP_404_NOT_FOUND,
-            ) from exc
-        except json.JSONDecodeError as exc:
-            raise _error(
-                "INVALID_RESULTS",
-                f"Artifact hasil tidak valid: {exc}",
-                status.HTTP_500_INTERNAL_SERVER_ERROR,
-            ) from exc
+            if content.strip():
+                loaded = json.loads(content)
+                if isinstance(loaded, list):
+                    raw_data = loaded
         except Exception as exc:
-            logger.error(
-                f"[_load_results] Unexpected error reading results file: {exc}",
-                exc_info=True,
+            logger.warning(
+                f"[_load_results] Failed to read {RESULTS_PATH}: {exc}."
             )
-            raise _error(
-                "READ_ERROR",
-                "Gagal membaca hasil analisis.",
-                status.HTTP_500_INTERNAL_SERVER_ERROR,
-            ) from exc
+
+        # Merge results: key by ticker. Start with full_batch_results.json items
+        compiled_results = {
+            item["ticker"]: item
+            for item in raw_data
+            if isinstance(item, dict) and "ticker" in item
+        }
+
+        # Scan output/debates/*.json for any additional or missing individual debates
+        from pathlib import Path
+        debates_dir = Path("output/debates")
+        if debates_dir.exists():
+            for f in debates_dir.glob("*.json"):
+                try:
+                    async with aiofiles.open(f, mode="r", encoding="utf-8") as file:
+                        file_content = await file.read()
+                    if file_content.strip():
+                        data = json.loads(file_content)
+                        if isinstance(data, dict) and "ticker" in data:
+                            ticker_key = data["ticker"]
+                            # Only add if not already present in compiled_results
+                            if ticker_key not in compiled_results:
+                                compiled_results[ticker_key] = data
+                except Exception as e:
+                    logger.warning(f"[_load_results] Failed to read fallback {f}: {e}")
+        
+        raw_data = list(compiled_results.values())
+
+        _cache = {  # QW-FIX-2  # QW-FIX-PF1
+            item["ticker"]: item
+            for item in normalize_batch(raw_data)
+            if "ticker" in item
+        }
+        _cache_timestamp = time.monotonic()
+        return _cache
 
 
 def invalidate_results_cache() -> None:
@@ -100,7 +116,106 @@ def invalidate_results_cache() -> None:
 
 @router.get("/health")
 async def health_check() -> dict[str, Any]:
-    return {"status": "ok", "results_exist": RESULTS_PATH.exists()}
+    from pathlib import Path
+    from datetime import datetime, timedelta
+    
+    debates_dir = Path("output/debates")
+    latest_time = None
+    results = []
+    
+    if debates_dir.exists():
+        for f in debates_dir.glob("*.json"):
+            try:
+                mtime = f.stat().st_mtime
+                if latest_time is None or mtime > latest_time:
+                    latest_time = mtime
+                    
+                content = f.read_text(encoding="utf-8")
+                if not content.strip():
+                    continue
+                data = json.loads(content)
+                
+                verdict = data.get("verdict") or {}
+                rating = verdict.get("rating", "UNKNOWN")
+                confidence = verdict.get("confidence", 0.0)
+                conviction_score = data.get("conviction_score", 0.0)
+                rounds = data.get("debate_rounds", 0)
+                consensus = data.get("consensus_reached", False)
+                
+                metadata = data.get("metadata") or {}
+                batch_ts = metadata.get("batch_timestamp") or metadata.get("run_timestamp")
+                debate_date = datetime.fromtimestamp(mtime)
+                if batch_ts:
+                    try:
+                        debate_date = datetime.strptime(batch_ts, "%Y%m%d_%H%M%S")
+                    except ValueError:
+                        try:
+                            debate_date = datetime.strptime(batch_ts.split("_")[0], "%Y%m%d")
+                        except Exception:
+                            pass
+                
+                results.append({
+                    "rating": rating,
+                    "confidence": confidence,
+                    "conviction_score": conviction_score,
+                    "rounds": rounds,
+                    "consensus": consensus,
+                    "date": debate_date
+                })
+            except Exception:
+                pass
+                
+    total_debates = len(results)
+    
+    # Calculate stats
+    ratings_dist = {"STRONG_BUY": 0, "BUY": 0, "HOLD": 0, "AVOID": 0}
+    total_conviction = 0.0
+    total_confidence = 0.0
+    consensus_count = 0
+    fresh_count = 0
+    stale_count = 0
+    
+    # 1 month threshold (30 days) from now
+    now = datetime.now()
+    one_month_ago = now - timedelta(days=30)
+    
+    for r in results:
+        rating = r["rating"]
+        if rating in ratings_dist:
+            ratings_dist[rating] += 1
+        else:
+            ratings_dist[rating] = 1
+            
+        total_conviction += r["conviction_score"]
+        total_confidence += r["confidence"]
+        if r["consensus"]:
+            consensus_count += 1
+        if r["date"] >= one_month_ago:
+            fresh_count += 1
+        else:
+            stale_count += 1
+            
+    latest_date_str = None
+    if latest_time is not None:
+        latest_date_str = datetime.fromtimestamp(latest_time).isoformat()
+        
+    debate_stats = {
+        "total_debates": total_debates,
+        "avg_conviction": round(total_conviction / total_debates, 3) if total_debates > 0 else 0.0,
+        "avg_confidence": round(total_confidence / total_debates, 3) if total_debates > 0 else 0.0,
+        "consensus_rate": round((consensus_count / total_debates) * 100, 2) if total_debates > 0 else 0.0,
+        "ratings_distribution": ratings_dist,
+        "fresh_count": fresh_count,
+        "stale_count": stale_count,
+        "latest_debate_date": latest_date_str
+    }
+
+    return {
+        "status": "ok", 
+        "results_exist": RESULTS_PATH.exists(),
+        "latest_debate_date": latest_date_str,
+        "debate_stats": debate_stats
+    }
 
 
 @router.get("/validate-key")

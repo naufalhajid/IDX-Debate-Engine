@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { activeTicker, filteredResults, isStreaming, searchQuery } from '$lib/stores/dashboard';
+  import { activeTicker, filteredResults, isStreaming, searchQuery, activeTab } from '$lib/stores/dashboard';
   import { stockMap, resolveCompanyName } from '$lib/stores/metadata';
   import type { Rating, StockResult } from '$lib/types';
 
@@ -19,6 +19,7 @@
   let sortKey: keyof StockResult = 'conviction_score';
   let sortDir: 'asc' | 'desc' = 'desc';
   let scrollTop = 0;
+  let scrollLeft = 0;
   let viewportHeight = 600;
   let bodyEl: HTMLDivElement | undefined;
 
@@ -95,6 +96,7 @@
   function handleScroll(event: Event) {
     const target = event.currentTarget as HTMLDivElement;
     scrollTop = target.scrollTop;
+    scrollLeft = target.scrollLeft;
     viewportHeight = target.clientHeight;
   }
 
@@ -132,8 +134,12 @@
 <div class="table-panel terminal-panel">
   <header class="panel-header">
     <div class="header-titles">
-      <h2 class="panel-heading">Rekomendasi Saham</h2>
-      <span class="panel-subtitle">Daftar kandidat potensial berdasarkan analisis mesin fundamental.</span>
+      <h2 class="panel-heading">{$activeTab === 'watchlist' ? 'Watchlist Saham' : 'Rekomendasi Saham'}</h2>
+      <span class="panel-subtitle">
+        {$activeTab === 'watchlist'
+          ? 'Daftar saham potensial dengan rating STRONG BUY, BUY, dan HOLD.'
+          : 'Daftar kandidat potensial berdasarkan analisis mesin fundamental.'}
+      </span>
     </div>
     <div class="panel-actions">
       <div class="search-wrap">
@@ -164,7 +170,7 @@
     </div>
   </header>
 
-  <div class="table-head">
+  <div class="table-head" style="transform: translateX(-{scrollLeft}px)">
     <label class="cell cell--check" title="Select all">
       <input type="checkbox" checked={allChecked} onchange={(event) => toggleAll(isChecked(event))} />
     </label>
@@ -350,6 +356,7 @@
     grid-template-columns: 40px 90px minmax(180px, 1fr) 140px 110px 110px 100px 160px;
     align-items: center;
     width: 100%;
+    min-width: 800px;
   }
 
   .table-head {

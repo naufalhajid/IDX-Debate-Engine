@@ -1,13 +1,52 @@
 <script lang="ts">
-  import { summaryStats } from '$lib/stores/dashboard';
+  import { summaryStats, debateStats } from '$lib/stores/dashboard';
 
   export let online = false;
   export let loading = false;
   export let lastUpdated: Date | null = null;
+  export let latestDebateDate: string | null = null;
 
+  function getDebateDateInfo(dateStr: string | null) {
+    if (!dateStr) return { label: 'LATEST DEBATE', value: 'None', isRecent: null };
+    const date = new Date(dateStr);
+    const now = new Date();
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(now.getMonth() - 1);
+    
+    const isRecent = date > oneMonthAgo;
+    
+    return {
+      label: 'LATEST DEBATE',
+      value: date.toLocaleDateString(),
+      isRecent
+    };
+  }
+
+  $: debateInfo = getDebateDateInfo(latestDebateDate);
   $: marketCards = [
-    { label: 'STRONG BUY RECS', value: String($summaryStats.strongBuy), change: 'Live', positive: true },
-    { label: 'AVG CONVICTION', value: String($summaryStats.avgConviction), change: 'Score', positive: null }
+    { label: 'STRONG BUY RECS', value: String($summaryStats.strongBuy), change: 'Live', positive: true, valueClass: '' },
+    { label: 'AVG CONVICTION', value: String($summaryStats.avgConviction), change: 'Score', positive: null, valueClass: '' },
+    { 
+      label: 'TOTAL DEBATES', 
+      value: $debateStats ? String($debateStats.total_debates) : '0', 
+      change: 'Debated', 
+      positive: null, 
+      valueClass: '' 
+    },
+    { 
+      label: 'CONSENSUS RATE', 
+      value: $debateStats ? `${$debateStats.consensus_rate}%` : '0%', 
+      change: 'Rate', 
+      positive: $debateStats && $debateStats.consensus_rate > 50 ? true : null, 
+      valueClass: '' 
+    },
+    { 
+      label: debateInfo.label, 
+      value: debateInfo.value, 
+      change: debateInfo.isRecent === true ? 'Fresh' : debateInfo.isRecent === false ? 'Stale' : 'N/A', 
+      positive: debateInfo.isRecent,
+      valueClass: debateInfo.isRecent === true ? 'text-green' : debateInfo.isRecent === false ? 'text-red' : ''
+    }
   ];
 </script>
 
@@ -22,7 +61,7 @@
       <div class="market-card">
         <div class="card-info">
           <span class="card-label">{item.label}</span>
-          <strong class="card-value">{item.value}</strong>
+          <strong class="card-value {item.valueClass}">{item.value}</strong>
         </div>
         <div class="card-badge" class:pos={item.positive === true} class:neg={item.positive === false} class:neutral={item.positive === null}>
           {item.change}
@@ -33,8 +72,17 @@
 
   <div class="user-actions">
     <div class="api-status {online ? 'online' : 'offline'}">
-      <span class="pulse"></span>
-      {online ? 'API Connected' : 'API Disconnected'}
+      {#if loading}
+        <span class="spinner"></span>
+      {:else}
+        <span class="pulse"></span>
+      {/if}
+      <div class="status-details">
+        <span class="status-text">{online ? 'API Connected' : 'API Disconnected'}</span>
+        {#if lastUpdated}
+          <span class="last-updated">Updated: {lastUpdated.toLocaleTimeString()}</span>
+        {/if}
+      </div>
     </div>
     
     <button class="action-btn" title="Notifications">
@@ -49,6 +97,40 @@
 </header>
 
 <style>
+  .text-green { color: var(--signal-bull) !important; }
+  .text-red { color: var(--signal-bear) !important; }
+
+  .status-details {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    align-items: flex-start;
+  }
+
+  .status-text {
+    line-height: 1.2;
+  }
+
+  .last-updated {
+    font-size: 9px;
+    color: var(--text-muted);
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  .spinner {
+    width: 8px;
+    height: 8px;
+    border: 1.5px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
   .top-header {
     min-height: 80px;
     display: flex;

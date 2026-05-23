@@ -11,7 +11,8 @@
     activeTicker,
     allResults,
     debateStream,
-    isStreaming
+    isStreaming,
+    debateStats
   } from '$lib/stores/dashboard';
   import { stockList } from '$lib/stores/metadata';
   import { toast } from '$lib/stores/toast';
@@ -20,6 +21,7 @@
   let loading = true;
   let serverOnline = false;
   let lastUpdated: Date | null = null;
+  let latestDebateDate: string | null = null;
   let pollInterval: ReturnType<typeof setInterval>;
   let stopStream: (() => void) | null = null;
 
@@ -41,6 +43,10 @@
         api.stocks()
       ]);
       serverOnline = health.status === 'fulfilled';
+      if (health.status === 'fulfilled') {
+        latestDebateDate = health.value.latest_debate_date;
+        debateStats.set(health.value.debate_stats);
+      }
       if (stocks.status === 'fulfilled') {
         stockList.set(
           stocks.value.map((s: Record<string, unknown>) => ({
@@ -90,11 +96,13 @@
         isStreaming.set(false);
         stopStream = null;
         toast('success', 'Debate stream selesai');
+        loadData();
       },
       (message) => {
         isStreaming.set(false);
         stopStream = null;
         toast('error', message);
+        loadData();
       }
     );
   }
@@ -115,7 +123,7 @@
     <Sidebar />
 
     <main class="main-content">
-      <ServerStatusBar online={serverOnline} {loading} {lastUpdated} />
+      <ServerStatusBar online={serverOnline} {loading} {lastUpdated} {latestDebateDate} />
 
       <div class="workspace-grid">
         <section class="candidates-area">

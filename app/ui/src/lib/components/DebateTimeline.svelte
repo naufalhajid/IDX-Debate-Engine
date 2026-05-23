@@ -408,10 +408,7 @@
     font-style: italic;
   }
 
-  .scout-metrics {
-    font-size: 13px;
-    color: var(--text-secondary);
-  }
+
 
   .timeline-container {
     flex: 1;

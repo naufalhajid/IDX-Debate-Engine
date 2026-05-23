@@ -24,7 +24,21 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  health: () => apiFetch<{ status: string; results_exist: boolean }>('/api/health'),
+  health: () =>
+    apiFetch<{
+      status: string;
+      results_exist: boolean;
+      latest_debate_date: string | null;
+      debate_stats: {
+        total_debates: number;
+        avg_conviction: number;
+        avg_confidence: number;
+        consensus_rate: number;
+        ratings_distribution: Record<string, number>;
+        fresh_count: number;
+        stale_count: number;
+      };
+    }>('/api/health'),
   validateKey: () => apiFetch<{ valid: boolean }>('/api/validate-key'),
   stocks: () => apiFetch<Array<Record<string, unknown>>>('/api/stocks'),
   stockDetail: (ticker: string) =>

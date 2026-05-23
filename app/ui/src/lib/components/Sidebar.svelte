@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
   import { api } from '$lib/clients/api';
-  import { summaryStats } from '$lib/stores/dashboard';
+  import { summaryStats, debateStats, activeTab } from '$lib/stores/dashboard';
   import { apiKey, portfolioEquity } from '$lib/stores/session';
   import { toast } from '$lib/stores/toast';
 
@@ -12,11 +12,8 @@
   let validating = false;
 
   const navItems = [
-    { label: 'Dashboard', icon: 'grid', active: true },
-    { label: 'Markets', icon: 'trend', active: false },
-    { label: 'Watchlists', icon: 'star', active: false },
-    { label: 'Debate Hub', icon: 'chat', active: false },
-    { label: 'Analytics', icon: 'chart', active: false }
+    { id: 'dashboard', label: 'Dashboard', icon: 'grid' },
+    { id: 'watchlist', label: 'Watchlist', icon: 'star' }
   ];
 
   onMount(async () => {
@@ -67,18 +64,12 @@
 
   <nav class="navigation">
     {#each navItems as item}
-      <button class="nav-item {item.active ? 'active' : ''}">
+      <button class="nav-item {$activeTab === item.id ? 'active' : ''}" onclick={() => activeTab.set(item.id as 'dashboard' | 'watchlist')}>
         <div class="nav-icon">
           {#if item.icon === 'grid'}
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-          {:else if item.icon === 'trend'}
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
           {:else if item.icon === 'star'}
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          {:else if item.icon === 'chat'}
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          {:else if item.icon === 'chart'}
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
           {/if}
         </div>
         <span>{item.label}</span>
@@ -88,12 +79,28 @@
 
   <div class="metrics-cards">
     <div class="metric-card">
-      <span class="metric-label">BUY SIGNALS</span>
-      <strong class="metric-val signal-bull">{$summaryStats.buy + $summaryStats.strongBuy}</strong>
+      <span class="metric-label">BUY / STR. BUY</span>
+      <strong class="metric-val signal-bull">
+        {$debateStats ? (($debateStats.ratings_distribution.BUY || 0) + ($debateStats.ratings_distribution.STRONG_BUY || 0)) : 0}
+      </strong>
     </div>
     <div class="metric-card">
       <span class="metric-label">AVOID SIGNALS</span>
-      <strong class="metric-val signal-bear">{$summaryStats.avoid}</strong>
+      <strong class="metric-val signal-bear">
+        {$debateStats ? ($debateStats.ratings_distribution.AVOID || 0) : 0}
+      </strong>
+    </div>
+    <div class="metric-card">
+      <span class="metric-label">HOLD SIGNALS</span>
+      <strong class="metric-val" style="color: var(--text-secondary);">
+        {$debateStats ? ($debateStats.ratings_distribution.HOLD || 0) : 0}
+      </strong>
+    </div>
+    <div class="metric-card">
+      <span class="metric-label">FRESH DEBATES</span>
+      <strong class="metric-val signal-bull">
+        {$debateStats ? $debateStats.fresh_count : 0}
+      </strong>
     </div>
   </div>
 
