@@ -14,10 +14,16 @@
     HOLD: { label: 'HOLD', color: 'var(--signal-hold)' },
     AVOID: { label: 'AVOID', color: 'var(--signal-bear)' }
   };
+  const RATING_RANK: Record<Rating, number> = {
+    STRONG_BUY: 4,
+    BUY: 3,
+    HOLD: 2,
+    AVOID: 1
+  };
 
   let selectedTickers = new Set<string>();
   let sortKey: keyof StockResult = 'conviction_score';
-  let sortDir: 'asc' | 'desc' = 'desc';
+  let sortDir: 'desc' | 'asc' = 'desc';
   let scrollTop = 0;
   let scrollLeft = 0;
   let viewportHeight = 600;
@@ -27,13 +33,20 @@
     return (event.currentTarget as HTMLInputElement).checked;
   }
 
-  function compare(a: StockResult, b: StockResult) {
-    const va = a[sortKey];
-    const vb = b[sortKey];
-    if (typeof va === 'number' && typeof vb === 'number') {
-      return sortDir === 'desc' ? vb - va : va - vb;
+  function compare(a: StockResult, b: StockResult, key: keyof StockResult, dir: 'desc' | 'asc') {
+    if (key === 'rating') {
+      const ratingA = (a.rating || '').toUpperCase() as Rating;
+      const ratingB = (b.rating || '').toUpperCase() as Rating;
+      const ra = RATING_RANK[ratingA] ?? 0;
+      const rb = RATING_RANK[ratingB] ?? 0;
+      return dir === 'desc' ? rb - ra : ra - rb;
     }
-    return sortDir === 'desc'
+    const va = a[key] ?? '';
+    const vb = b[key] ?? '';
+    if (typeof va === 'number' && typeof vb === 'number') {
+      return dir === 'desc' ? vb - va : va - vb;
+    }
+    return dir === 'desc'
       ? String(vb).localeCompare(String(va))
       : String(va).localeCompare(String(vb));
   }
@@ -63,6 +76,11 @@
 
   function formatEntry(stock: StockResult) {
     return `${formatPrice(stock.entry_low)} - ${formatPrice(stock.entry_high)}`;
+  }
+
+  function formatDate(val: string) {
+    if (!val) return '-';
+    return val.split(' ')[0];
   }
 
   function exportCSV() {
@@ -120,7 +138,7 @@
     return () => window.removeEventListener('idx-export-csv', listener);
   });
 
-  $: sorted = [...$filteredResults].sort(compare);
+  $: sorted = [...$filteredResults].sort((a, b) => compare(a, b, sortKey, sortDir));
   $: selectedCount = selectedTickers.size;
   $: allChecked = sorted.length > 0 && selectedCount === sorted.length;
   $: startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - buffer);
@@ -181,14 +199,19 @@
     <button class="cell cell--conv sortable" onclick={() => sort('conviction_score')} type="button">
       SKOR KEYAKINAN {sortKey === 'conviction_score' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
     </button>
-    <div class="cell cell--rating">RATING</div>
+    <button class="cell cell--rating sortable" onclick={() => sort('rating')} type="button">
+      RATING {sortKey === 'rating' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
+    </button>
     <button class="cell cell--price sortable" onclick={() => sort('entry_low')} type="button">
-      HARGA (IDR)
+      HARGA (IDR) {sortKey === 'entry_low' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
     </button>
     <button class="cell cell--edge sortable" onclick={() => sort('risk_reward')} type="button">
-      RISK/REWARD
+      RISK/REWARD {sortKey === 'risk_reward' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
     </button>
     <div class="cell cell--entry">AREA ENTRY</div>
+    <button class="cell cell--date sortable" onclick={() => sort('last_debated_at')} type="button">
+      Latest{sortKey === 'last_debated_at' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
+    </button>
   </div>
 
   <div
@@ -253,6 +276,9 @@
               {stock.risk_reward >= 1 ? '+' : ''}{stock.risk_reward.toFixed(2)}x
             </span>
             <span class="cell cell--entry mono">{formatEntry(stock)}</span>
+            <span class="cell cell--date mono" title={stock.last_debated_at}>
+              {formatDate(stock.last_debated_at)}
+            </span>
           </button>
         {/each}
       </div>
@@ -355,10 +381,10 @@
   .table-head,
   .table-row {
     display: grid;
-    grid-template-columns: 40px 90px minmax(180px, 1fr) 140px 110px 110px 100px 160px;
+    grid-template-columns: 40px 90px minmax(180px, 1fr) 140px 110px 110px 100px 160px 120px;
     align-items: center;
     width: 100%;
-    min-width: 800px;
+    min-width: 950px;
   }
 
   .table-head {
@@ -529,7 +555,8 @@
 
   .cell--price,
   .cell--edge,
-  .cell--entry {
+  .cell--entry,
+  .cell--date {
     font-size: 14px;
   }
 

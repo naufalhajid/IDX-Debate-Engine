@@ -45,20 +45,28 @@
       serverOnline = health.status === 'fulfilled';
       if (health.status === 'fulfilled') {
         latestDebateDate = health.value.latest_debate_date;
-        debateStats.set(health.value.debate_stats);
+        const currentStats = get(debateStats);
+        if (JSON.stringify(currentStats) !== JSON.stringify(health.value.debate_stats)) {
+          debateStats.set(health.value.debate_stats);
+        }
       }
       if (stocks.status === 'fulfilled') {
-        stockList.set(
-          stocks.value.map((s: Record<string, unknown>) => ({
-            ticker: String(s.ticker ?? ''),
-            name: String(s.name ?? ''),
-            market_cap: typeof s.market_cap === 'number' ? s.market_cap : null,
-            home_page: typeof s.home_page === 'string' ? s.home_page : null
-          }))
-        );
+        const nextStocks = stocks.value.map((s: Record<string, unknown>) => ({
+          ticker: String(s.ticker ?? ''),
+          name: String(s.name ?? ''),
+          market_cap: typeof s.market_cap === 'number' ? s.market_cap : null,
+          home_page: typeof s.home_page === 'string' ? s.home_page : null
+        }));
+        const currentStocks = get(stockList);
+        if (JSON.stringify(currentStocks) !== JSON.stringify(nextStocks)) {
+          stockList.set(nextStocks);
+        }
       }
       if (results.status === 'fulfilled') {
-        allResults.set(results.value);
+        const currentResults = get(allResults);
+        if (JSON.stringify(currentResults) !== JSON.stringify(results.value)) {
+          allResults.set(results.value);
+        }
         if (!get(activeTicker) && results.value[0]) activeTicker.set(results.value[0].ticker);
         lastUpdated = new Date();
       } else {
@@ -109,7 +117,7 @@
 
   onMount(async () => {
     await loadData();
-    pollInterval = setInterval(loadData, 60_000);
+    pollInterval = setInterval(loadData, 5_000);
   });
 
   onDestroy(() => {

@@ -39,6 +39,21 @@ def _parse_entry_range(value: Any) -> tuple[float, float]:
     return parsed[0], parsed[1]
 
 
+def _normalize_date(timestamp_str: Any) -> str:
+    if not timestamp_str:
+        return ""
+    text = str(timestamp_str).strip()
+    match = re.match(r"^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})$", text)
+    if match:
+        return f"{match.group(1)}-{match.group(2)}-{match.group(3)} {match.group(4)}:{match.group(5)}:{match.group(6)}"
+    if "T" in text:
+        return text.replace("T", " ").split(".")[0]
+    match_short = re.match(r"^(\d{4})(\d{2})(\d{2})$", text)
+    if match_short:
+        return f"{match_short.group(1)}-{match_short.group(2)}-{match_short.group(3)}"
+    return text
+
+
 def _metric_value(text: str, pattern: str) -> str:
     match = re.search(pattern, text, flags=re.IGNORECASE)
     return match.group(1).strip() if match else "-"
@@ -158,6 +173,10 @@ def normalize_result(entry: dict[str, Any]) -> dict[str, Any]:
     if rating == "SELL":
         rating = "AVOID"
     ticker = str(entry.get("ticker") or verdict.get("ticker") or "").upper()
+
+    metadata = entry.get("metadata") if isinstance(entry.get("metadata"), dict) else {}
+    raw_date = metadata.get("batch_timestamp") or metadata.get("run_timestamp") or ""
+
     return {
         "ticker": ticker,
         "sector": _resolve_sector(ticker, entry.get("sector_key")),
@@ -186,6 +205,7 @@ def normalize_result(entry: dict[str, Any]) -> dict[str, Any]:
             verdict.get("weighted_reasoning")
             or ""
         ),
+        "last_debated_at": _normalize_date(raw_date),
     }
 
 

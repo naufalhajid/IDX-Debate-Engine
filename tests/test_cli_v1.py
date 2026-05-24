@@ -210,6 +210,51 @@ def test_pipeline_runner_passes_argparse_argv_without_program_name(monkeypatch):
     ]
 
 
+def test_run_debate_cli_invokes_orchestrator(monkeypatch):
+    calls = []
+
+    def fake_run_cli(argv):
+        calls.append(argv)
+
+    monkeypatch.setitem(sys.modules, "orchestrator", SimpleNamespace(_run_cli=fake_run_cli))
+
+    from app.cli.commands.debate import run_debate_cli
+
+    # Test with default output_dir ending with "debates"
+    run_debate_cli(
+        tickers=["BBRI", "BBCA"],
+        output_dir=Path("output/debates"),
+        verbose=True,
+    )
+
+    assert calls == [
+        [
+            "--tickers",
+            "BBRI",
+            "BBCA",
+            "--output-dir",
+            str(Path("output")),
+            "--verbose",
+        ]
+    ]
+
+    # Test with custom output_dir NOT ending with "debates"
+    calls.clear()
+    run_debate_cli(
+        tickers=["BBRI"],
+        output_dir=Path("tmp/custom"),
+        verbose=False,
+    )
+    assert calls == [
+        [
+            "--tickers",
+            "BBRI",
+            "--output-dir",
+            str(Path("tmp/custom")),
+        ]
+    ]
+
+
 def test_serve_maps_uvicorn_options(monkeypatch):
     calls = []
 

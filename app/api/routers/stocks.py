@@ -24,6 +24,7 @@ RESULTS_PATH = settings.results_path
 
 _cache: dict[str, dict[str, Any]] = {}  # QW-FIX-PF1
 _cache_timestamp: float = 0.0  # QW-FIX-PF1
+_cache_file_mtime: float = 0.0  # New: track results file modification time
 _CACHE_TTL_SECONDS: float = 60.0  # QW-FIX-PF1
 _cache_lock = asyncio.Lock()  # QW-FIX-PF1
 
@@ -43,15 +44,27 @@ async def _load_results() -> dict[str, dict[str, Any]]:  # QW-FIX-PF1
     If the batch results file is missing or invalid, it scans output/debates/
     as a fallback to populate the results list.
     """
-    global _cache, _cache_timestamp
+    global _cache, _cache_timestamp, _cache_file_mtime
+
+    current_mtime = 0.0
+    try:
+        if RESULTS_PATH.exists():
+            current_mtime = RESULTS_PATH.stat().st_mtime
+    except Exception:
+        pass
 
     now = time.monotonic()
-    if _cache and (now - _cache_timestamp) < _CACHE_TTL_SECONDS:
+    if _cache and (now - _cache_timestamp) < _CACHE_TTL_SECONDS and current_mtime == _cache_file_mtime:
         return _cache
 
     async with _cache_lock:
         now = time.monotonic()
-        if _cache and (now - _cache_timestamp) < _CACHE_TTL_SECONDS:
+        try:
+            if RESULTS_PATH.exists():
+                current_mtime = RESULTS_PATH.stat().st_mtime
+        except Exception:
+            pass
+        if _cache and (now - _cache_timestamp) < _CACHE_TTL_SECONDS and current_mtime == _cache_file_mtime:
             return _cache
 
         raw_data = []
@@ -100,6 +113,7 @@ async def _load_results() -> dict[str, dict[str, Any]]:  # QW-FIX-PF1
             if "ticker" in item
         }
         _cache_timestamp = time.monotonic()
+        _cache_file_mtime = current_mtime
         return _cache
 
 
@@ -108,9 +122,10 @@ def invalidate_results_cache() -> None:
     Call this after a new batch run completes to force cache refresh
     on the next API request. Mark: # QW-FIX-PF1
     """
-    global _cache, _cache_timestamp
+    global _cache, _cache_timestamp, _cache_file_mtime
     _cache = {}
     _cache_timestamp = 0.0
+    _cache_file_mtime = 0.0
     logger.info("[results_cache] Cache invalidated manually.")
 
 

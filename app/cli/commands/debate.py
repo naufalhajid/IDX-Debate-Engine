@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import asyncio
-import sys
 from pathlib import Path
 from typing import Annotated
-from unittest.mock import patch
 
 import typer
 
@@ -24,13 +21,17 @@ def run_debate_cli(
     output_dir: Path,
     verbose: bool = False,
 ) -> None:
-    import run_debate
+    import orchestrator
 
-    argv = ["run_debate.py", "--tickers", *tickers, "--output-dir", str(output_dir)]
+    if output_dir.name.lower() == "debates":
+        base_dir = output_dir.parent
+    else:
+        base_dir = output_dir
+
+    argv = ["--tickers", *tickers, "--output-dir", str(base_dir)]
     if verbose:
         argv.append("--verbose")
-    with patch.object(sys, "argv", argv):
-        asyncio.run(run_debate.main())
+    orchestrator._run_cli(argv)
 
 
 def debate_command(

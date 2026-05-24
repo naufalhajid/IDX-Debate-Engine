@@ -16,6 +16,7 @@ export interface StockResult {
   devil_advocate_triggered: boolean;
   verdict_summary: string;
   verdict_reasoning?: string;
+  last_debated_at: string;
 }
 
 export interface DebateRound {
