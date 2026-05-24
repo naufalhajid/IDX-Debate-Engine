@@ -208,7 +208,7 @@ def normalize_result(entry: dict[str, Any]) -> dict[str, Any]:
         "verdict_summary": str(
             verdict.get("summary")
             or entry.get("error")
-            or "Belum ada ringkasan verdict."
+            or "No verdict summary available."
         ),
         "verdict_reasoning": str(
             verdict.get("weighted_reasoning")

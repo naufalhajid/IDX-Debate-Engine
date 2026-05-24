@@ -70,11 +70,11 @@
         if (!get(activeTicker) && results.value[0]) activeTicker.set(results.value[0].ticker);
         lastUpdated = new Date();
       } else {
-        toast('warning', results.reason?.message ?? 'Belum ada hasil analisis');
+        toast('warning', results.reason?.message ?? 'No analysis results found');
       }
     } catch (error: unknown) {
       serverOnline = false;
-      toast('error', (error as Error).message ?? 'Gagal memuat data');
+      toast('error', (error as Error).message ?? 'Failed to load data');
     } finally {
       loading = false;
     }
@@ -115,7 +115,7 @@
       () => {
         isStreaming.set(false);
         stopStream = null;
-        toast('success', 'Debate stream selesai');
+        toast('success', 'Debate stream completed');
         loadData();
       },
       (message) => {

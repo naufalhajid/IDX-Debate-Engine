@@ -9,9 +9,9 @@
   let userScrolledUp = false;
 
   const scoutCategories: { key: keyof ScoutMetrics; label: string }[] = [
-    { key: 'technical', label: 'Teknikal' },
+    { key: 'technical', label: 'Technical' },
     { key: 'fundamental', label: 'Fundamental' },
-    { key: 'sentiment', label: 'Sentimen' }
+    { key: 'sentiment', label: 'Sentiment' }
   ];
 
   function onScroll() {
@@ -76,7 +76,7 @@
   {#if !$activeTicker}
     <div class="placeholder">
       <div class="placeholder__icon">📈</div>
-      <div class="placeholder__text">Pilih saham dari daftar Rekomendasi<br/>untuk melihat Analisis & Ruang Debat AI</div>
+      <div class="placeholder__text">Select a stock from the Recommendations list<br/>to view analysis & AI Debate Chamber</div>
     </div>
   {:else}
     <header class="debate-header">
@@ -163,7 +163,7 @@
               <span class="devil-advocate-tag">[SYSTEM_OVERRIDE.DEVILS_ADVOCATE]</span>
             </div>
             <div class="devil-advocate-body">
-              <p>Konsensus tercapai terlalu cepat. Memaksa agen AI untuk menguji kembali argumen bull/bear dengan sudut pandang skeptis.</p>
+              <p>Consensus reached too quickly. Forcing AI agents to re-examine bull/bear arguments with a skeptical lens.</p>
               {#if event.question}
                 <div class="devil-question-box">
                   <div class="devil-question-label">DIAGNOSTIC QUESTION:</div>
@@ -177,7 +177,7 @@
           {@render finalVerdict(event.result)}
 
         {:else if event.type === 'done'}
-          <div class="status-message success">✓ Analisis selesai</div>
+          <div class="status-message success">✓ Analysis completed</div>
 
         {:else if event.type === 'error'}
           <div class="status-message error">✕ {event.message}</div>
@@ -263,7 +263,7 @@
       <div class="conviction-score">
         <strong>{result.conviction_score ?? 0}</strong><small>/100</small>
       </div>
-      <div class="conviction-label">SKOR KEYAKINAN AI</div>
+      <div class="conviction-label">AI CONVICTION SCORE</div>
     </div>
     
     <div class="chat-bubbles-group verdict-bubbles">
@@ -279,7 +279,7 @@
 
     {#if result.verdict_reasoning}
       <div class="verdict-reasoning">
-        <h4>Pemikiran & Alasan</h4>
+        <h4>Thoughts & Reasoning</h4>
         <div class="chat-bubbles-group">
           {#each splitArgumentByHeadings(result.verdict_reasoning) as part}
             <div class="verdict-reasoning-box">

@@ -18,7 +18,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: `HTTP ${res.status}` }));
-    throw new Error(err?.detail?.message ?? err?.message ?? 'Request gagal');
+    throw new Error(err?.detail?.message ?? err?.message ?? 'Request failed');
   }
   return res.json() as Promise<T>;
 }
@@ -62,9 +62,9 @@ export const api = {
       .then(async (res) => {
         if (!res.ok) {
           const err = await res.json().catch(() => ({ message: `HTTP ${res.status}` }));
-          throw new Error(err?.detail?.message ?? err?.message ?? 'Stream gagal');
+          throw new Error(err?.detail?.message ?? err?.message ?? 'Stream failed');
         }
-        if (!res.body) throw new Error('Stream tidak tersedia');
+        if (!res.body) throw new Error('Stream not available');
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
@@ -87,7 +87,7 @@ export const api = {
             try {
               onEvent(JSON.parse(data) as DebateEvent);
             } catch {
-              onError?.('Event stream tidak bisa dibaca');
+              onError?.('Unable to parse stream event');
             }
           }
         }

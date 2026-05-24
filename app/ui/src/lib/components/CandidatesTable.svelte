@@ -152,11 +152,11 @@
 <div class="table-panel terminal-panel">
   <header class="panel-header">
     <div class="header-titles">
-      <h2 class="panel-heading">{$activeTab === 'watchlist' ? 'Watchlist Saham' : 'Rekomendasi Saham'}</h2>
+      <h2 class="panel-heading">{$activeTab === 'watchlist' ? 'Watchlist' : 'Stock Recommendations'}</h2>
       <span class="panel-subtitle">
         {$activeTab === 'watchlist'
-          ? 'Daftar saham potensial dengan rating STRONG BUY, BUY, dan HOLD.'
-          : 'Daftar kandidat potensial berdasarkan analisis mesin fundamental.'}
+          ? 'List of potential stocks rated STRONG BUY, BUY, and HOLD.'
+          : 'List of potential candidates based on fundamental engine analysis.'}
       </span>
     </div>
     <div class="panel-actions">
@@ -164,7 +164,7 @@
         <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input
           class="search-input"
-          placeholder="Cari Ticker / Sektor..."
+          placeholder="Search Ticker / Sector..."
           bind:value={$searchQuery}
         />
         {#if $searchQuery}
@@ -179,7 +179,7 @@
           type="button"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          Mulai Debat ({selectedCount})
+          Start Debate ({selectedCount})
         </button>
       {/if}
       <button class="btn export-btn" onclick={exportCSV} title="Export CSV" type="button">
@@ -195,9 +195,9 @@
     <button class="cell cell--ticker sortable" onclick={() => sort('ticker')} type="button">
       TICKER {sortKey === 'ticker' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
     </button>
-    <div class="cell cell--company">PERUSAHAAN</div>
+    <div class="cell cell--company">COMPANY</div>
     <button class="cell cell--conv sortable" onclick={() => sort('conviction_score')} type="button">
-      SKOR KEYAKINAN {sortKey === 'conviction_score' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
+      CONVICTION SCORE {sortKey === 'conviction_score' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
     </button>
     <button class="cell cell--rating sortable" onclick={() => sort('rating')} type="button">
       RATING {sortKey === 'rating' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
@@ -208,7 +208,7 @@
     <button class="cell cell--edge sortable" onclick={() => sort('risk_reward')} type="button">
       RISK/REWARD {sortKey === 'risk_reward' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
     </button>
-    <div class="cell cell--entry">AREA ENTRY</div>
+    <div class="cell cell--entry">ENTRY ZONE</div>
     <button class="cell cell--date sortable" onclick={() => sort('last_debated_at')} type="button">
       Latest{sortKey === 'last_debated_at' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
     </button>
@@ -288,8 +288,8 @@
   {#if sorted.length === 0}
     <div class="empty-state">
       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <p>Tidak ada hasil ditemukan</p>
-      {#if $searchQuery}<span class="text-muted">untuk "{$searchQuery}"</span>{/if}
+      <p>No results found</p>
+      {#if $searchQuery}<span class="text-muted">for "{$searchQuery}"</span>{/if}
     </div>
   {/if}
 </div>

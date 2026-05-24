@@ -10,7 +10,7 @@ async def get_gemini_api_key(
             detail={
                 "code": "MISSING_API_KEY",
                 "message": (
-                    "Gemini API Key tidak ditemukan. Masukkan key di panel Settings."
+                    "Gemini API Key not found. Please enter your key in the Settings panel."
                 ),
             },
         )
@@ -24,7 +24,7 @@ async def get_gemini_api_key(
             detail={
                 "code": "MISSING_API_KEY",
                 "message": (
-                    "Gemini API Key tidak ditemukan. Masukkan key di panel Settings."
+                    "Gemini API Key not found. Please enter your key in the Settings panel."
                 ),
             },
         )

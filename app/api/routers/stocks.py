@@ -107,7 +107,7 @@ async def _load_results() -> dict[str, dict[str, Any]]:  # QW-FIX-PF1
         if not compiled_results:
             raise _error(
                 "NO_RESULTS",
-                "Belum ada hasil analisis. Jalankan batch terlebih dahulu.",
+                "No analysis results found. Run batch first.",
                 status.HTTP_404_NOT_FOUND,
             )
 
@@ -292,7 +292,7 @@ async def get_stock_detail(
     if stock is None and latest is None:
         raise _error(
             "STOCK_NOT_FOUND",
-            f"Saham {normalized_ticker} tidak ditemukan.",
+            f"Stock {normalized_ticker} not found.",
             status.HTTP_404_NOT_FOUND,
         )
     return {

@@ -31,14 +31,14 @@
     keyInput = cleanedKey;
     
     if (!cleanedKey) {
-      toast('error', 'API Key tidak boleh kosong');
+      toast('error', 'API Key cannot be empty');
       return;
     }
     validating = true;
     try {
       apiKey.set(cleanedKey);
       await api.validateKey();
-      toast('success', 'API Key tersimpan dan valid');
+      toast('success', 'API Key saved and validated');
     } catch (error: unknown) {
       toast('error', (error as Error).message);
     } finally {
@@ -105,12 +105,12 @@
   </div>
 
   <section class="settings-panel">
-    <h3>Pengaturan</h3>
+    <h3>Settings</h3>
     
     <div class="form-group">
       <label for="api-key">Gemini API Key</label>
       <div class="input-with-action">
-        <input id="api-key" class="input" type={showKey ? 'text' : 'password'} placeholder="Masukkan API Key" bind:value={keyInput} onkeydown={(e) => e.key === 'Enter' && saveKey()} />
+        <input id="api-key" class="input" type={showKey ? 'text' : 'password'} placeholder="Enter API Key" bind:value={keyInput} onkeydown={(e) => e.key === 'Enter' && saveKey()} />
         <button class="icon-button" onclick={() => (showKey = !showKey)}>
           {#if showKey}
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -120,12 +120,12 @@
         </button>
       </div>
       <button class="btn btn--primary full-width" onclick={saveKey} disabled={validating}>
-        {validating ? 'Memeriksa...' : 'Simpan Key'}
+        {validating ? 'Checking...' : 'Save Key'}
       </button>
     </div>
 
     <div class="form-group">
-      <label for="equity">Modal Simulasi (Equity)</label>
+      <label for="equity">Simulated Equity</label>
       <input id="equity" class="input mono" type="number" step="1000000" bind:value={$portfolioEquity} />
     </div>
   </section>
