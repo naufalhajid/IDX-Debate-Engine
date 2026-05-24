@@ -59,13 +59,13 @@ class Excel(BuilderInterface):
             f"Excel file saved successfully in the root project (./{self.filename})"
         )
 
-    def insert_stock(self):
+    async def insert_stock(self):
         """
         Inserts stock data into the spreadsheet.
         """
         self._write_to_sheet("idx-stocks", self.fundamental_analyser.stocks_sheet())
 
-    def insert_key_statistic(self):
+    async def insert_key_statistic(self):
         """
         Inserts keystatistic data into the spreadsheet.
         """
@@ -73,20 +73,20 @@ class Excel(BuilderInterface):
             "key-statistics", self.fundamental_analyser.key_statistics_sheet()
         )
 
-    def insert_key_analysis(self):
+    async def insert_key_analysis(self):
         """
         Inserts fundamental analysis data into the spreadsheet.
         """
 
         self._write_to_sheet("analysis", self.key_analysis_analyser.analysis_sheet())
 
-    def insert_sentiment(self):
+    async def insert_sentiment(self):
         """
         Inserts sentiment analysis data into the spreadsheet.
         """
         self._write_to_sheet("sentiments", self.sentiment_analyser.sentiment_sheet())
 
-    def insert_stock_price(self):
+    async def insert_stock_price(self):
         """
         Inserts stock price data into the spreadsheet.
         """

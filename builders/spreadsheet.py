@@ -61,7 +61,7 @@ class Spreadsheet(BuilderInterface):
                 self.spreadsheet_id, google_drive_email
             )
 
-    def insert_stock(self):
+    async def insert_stock(self):
         """
         Inserts stock data into the spreadsheet.
         """
@@ -72,7 +72,7 @@ class Spreadsheet(BuilderInterface):
             f"Stocks has been inserted on https://docs.google.com/spreadsheets/d/{self.spreadsheet_id}"
         )
 
-    def insert_key_statistic(self):
+    async def insert_key_statistic(self):
         """
         Inserts keystatistic data into the spreadsheet.
         """
@@ -85,7 +85,7 @@ class Spreadsheet(BuilderInterface):
             f"Key statistics has been inserted on https://docs.google.com/spreadsheets/d/{self.spreadsheet_id}"
         )
 
-    def insert_key_analysis(self):
+    async def insert_key_analysis(self):
         """
         Inserts fundamental analysis data into the spreadsheet.
         """
@@ -98,7 +98,7 @@ class Spreadsheet(BuilderInterface):
             f"Analysis has been inserted on https://docs.google.com/spreadsheets/d/{self.spreadsheet_id}"
         )
 
-    def insert_sentiment(self):
+    async def insert_sentiment(self):
         """
         Inserts sentiment analysis data into the spreadsheet.
         """
@@ -113,7 +113,7 @@ class Spreadsheet(BuilderInterface):
             f"Sentiment has been inserted on https://docs.google.com/spreadsheets/d/{self.spreadsheet_id}"
         )
 
-    def insert_stock_price(self):
+    async def insert_stock_price(self):
         """
         Inserts stock price data into the spreadsheet.
         """

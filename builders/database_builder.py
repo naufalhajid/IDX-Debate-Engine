@@ -1,4 +1,5 @@
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from builders.builder_interface import BuilderInterface
 from db import (
@@ -22,7 +23,7 @@ from db import (
 )
 from db.models.stock import Stock
 
-from db.session import get_session
+from db.session import get_async_session
 from schemas.stock import Stock as StockSchema
 from utils.logger_config import logger
 
@@ -32,10 +33,10 @@ class DatabaseBuilder(BuilderInterface):
         logger.info("Database Builder started")
         self.stocks = stocks
 
-    def insert_stock(self):
+    async def insert_stock(self):
         logger.info("Storing stocks")
-        for stock in self.stocks:
-            with get_session() as session:
+        async with get_async_session() as session:
+            for stock in self.stocks:
                 stock_model = Stock(
                     ticker=stock.ticker,
                     name=stock.name,
@@ -44,16 +45,14 @@ class DatabaseBuilder(BuilderInterface):
                     market_cap=stock.market_cap,
                     home_page=stock.home_page,
                 )
-
                 session.add(stock_model)
 
-    def update_or_insert_stock(self):
+    async def update_or_insert_stock(self):
         logger.info("Updating or inserting stocks")
-        for stock in self.stocks:
-            with get_session() as session:
+        async with get_async_session() as session:
+            for stock in self.stocks:
                 query = select(Stock).where(Stock.ticker == stock.ticker)
-
-                existing_stock = session.scalars(query).one_or_none()
+                existing_stock = (await session.scalars(query)).one_or_none()
 
                 if existing_stock:
                     existing_stock.market_cap = stock.market_cap
@@ -68,13 +67,12 @@ class DatabaseBuilder(BuilderInterface):
                         market_cap=stock.market_cap,
                         home_page=stock.home_page,
                     )
-
                     session.add(stock_model)
 
-    def insert_key_statistic(self):
+    async def insert_key_statistic(self):
         logger.info("Storing key statistics")
-        for stock in self.stocks:
-            with get_session() as session:
+        async with get_async_session() as session:
+            for stock in self.stocks:
                 # Create instances of related models
                 current_valuation = CurrentValuation(
                     **stock.fundamental.current_valuation.to_dict()
@@ -123,7 +121,8 @@ class DatabaseBuilder(BuilderInterface):
                     ]
                 )
 
-                session.commit()
+                # Flush to populate IDs before inserting fundamental record
+                await session.flush()
 
                 # Create the Fundamental instance
                 fundamental = Fundamental(
@@ -146,10 +145,10 @@ class DatabaseBuilder(BuilderInterface):
                 # Add the Fundamental instance to the session
                 session.add(fundamental)
 
-    def insert_key_analysis(self):
+    async def insert_key_analysis(self):
         logger.info("Storing Key Analysis")
-        for stock in self.stocks:
-            with get_session() as session:
+        async with get_async_session() as session:
+            for stock in self.stocks:
                 key_analysis = KeyAnalysis(
                     normal_price=stock.key_analysis.normal_price,
                     price_to_equity_discount=stock.key_analysis.price_to_equity_discount,
@@ -164,26 +163,25 @@ class DatabaseBuilder(BuilderInterface):
                     composite_rank=stock.key_analysis.composite_rank,
                     stock_ticker=stock.ticker,
                 )
-
                 session.add(key_analysis)
 
-    def insert_sentiment(self):
+    async def insert_sentiment(self):
         logger.info("Storing Sentiment")
-        for stock in self.stocks:
-            for sentiment in stock.sentiment:
-                with get_session() as session:
-                    sentiment = Sentiment(
+        async with get_async_session() as session:
+            for stock in self.stocks:
+                for sentiment in stock.sentiment:
+                    sentiment_model = Sentiment(
                         content=sentiment.content,
                         rate=sentiment.rate,
                         stock_ticker=stock.ticker,
                         posted_at=sentiment.posted_at,
                     )
-                    session.add(sentiment)
+                    session.add(sentiment_model)
 
-    def insert_stock_price(self):
+    async def insert_stock_price(self):
         logger.info("Storing Stock Price")
-        for stock in self.stocks:
-            with get_session() as session:
+        async with get_async_session() as session:
+            for stock in self.stocks:
                 stock_price = StockPrice(
                     stock_ticker=stock.ticker,
                     price=stock.stock_price.price,
@@ -200,5 +198,4 @@ class DatabaseBuilder(BuilderInterface):
                     fsell=stock.stock_price.fsell,
                     fbuy=stock.stock_price.fbuy,
                 )
-
                 session.add(stock_price)

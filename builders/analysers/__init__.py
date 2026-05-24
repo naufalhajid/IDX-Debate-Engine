@@ -15,20 +15,20 @@ class Analyser:
         self.stock_price_analyser = StockPriceAnalyser(stocks=stocks)
         self.output: BuilderOutputType = None
 
-    def build(self, output: BuilderOutputType, title: str):
+    async def build(self, output: BuilderOutputType, title: str):
         self.output = output
         if output == BuilderOutputType.EXCEL:
             from builders.excel import Excel
 
-            self._build_output(Excel, title)
+            await self._build_output(Excel, title)
         elif output == BuilderOutputType.SPREADSHEET:
             from builders.spreadsheet import Spreadsheet
 
-            self._build_output(Spreadsheet, title)
+            await self._build_output(Spreadsheet, title)
         else:
             raise ValueError("Unsupported output method")
 
-    def _build_output(self, builder_class, title):
+    async def _build_output(self, builder_class, title):
         builder = builder_class(
             title=title,
             fundamental_analyser=self.fundamental_analyser,
@@ -36,11 +36,11 @@ class Analyser:
             key_analysis_analyser=self.key_analysis_analyser,
             stock_price_analyser=self.stock_price_analyser,
         )
-        builder.insert_key_analysis()
-        builder.insert_stock()
-        builder.insert_stock_price()
-        builder.insert_key_statistic()
-        builder.insert_sentiment()
+        await builder.insert_key_analysis()
+        await builder.insert_stock()
+        await builder.insert_stock_price()
+        await builder.insert_key_statistic()
+        await builder.insert_sentiment()
 
         if self.output == BuilderOutputType.EXCEL:
             builder.save()

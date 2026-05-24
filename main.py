@@ -77,19 +77,18 @@ async def main_async() -> None:  # QW-FIX-AR2
 
     # Analyser to build the output
     title = f"IDX Fundamental Analysis {date.today().strftime('%Y-%m-%d')}"
-    await asyncio.to_thread(  # QW-FIX-AR2
-        Analyser(stocks=stocks).build,  # QW-FIX-AR2
-        output=args.output_format,  # QW-FIX-AR2
-        title=title,  # QW-FIX-AR2
-    )  # QW-FIX-AR2
+    await Analyser(stocks=stocks).build(
+        output=args.output_format,
+        title=title,
+    )
 
     # Populate to database
     database_builder = DatabaseBuilder(stocks=stocks)
-    await asyncio.to_thread(database_builder.update_or_insert_stock)  # QW-FIX-AR2
-    await asyncio.to_thread(database_builder.insert_key_statistic)  # QW-FIX-AR2
-    await asyncio.to_thread(database_builder.insert_key_analysis)  # QW-FIX-AR2
-    await asyncio.to_thread(database_builder.insert_stock_price)  # QW-FIX-AR2
-    await asyncio.to_thread(database_builder.insert_sentiment)  # QW-FIX-AR2
+    await database_builder.update_or_insert_stock()
+    await database_builder.insert_key_statistic()
+    await database_builder.insert_key_analysis()
+    await database_builder.insert_stock_price()
+    await database_builder.insert_sentiment()
 
     elapsed = time.time() - start_time
     elapsed_minutes = elapsed / 60
