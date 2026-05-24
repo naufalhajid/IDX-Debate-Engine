@@ -175,7 +175,16 @@ def normalize_result(entry: dict[str, Any]) -> dict[str, Any]:
     ticker = str(entry.get("ticker") or verdict.get("ticker") or "").upper()
 
     metadata = entry.get("metadata") if isinstance(entry.get("metadata"), dict) else {}
-    raw_date = metadata.get("batch_timestamp") or metadata.get("run_timestamp") or ""
+    raw_date = (
+        metadata.get("batch_timestamp")
+        or metadata.get("run_timestamp")
+        or metadata.get("run_id")
+    )
+    if not raw_date or str(raw_date).lower() == "unknown":
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        from core.settings import settings
+        raw_date = datetime.now(ZoneInfo(settings.DATETIME_TIMEZONE)).strftime("%Y%m%d_%H%M%S")
 
     return {
         "ticker": ticker,

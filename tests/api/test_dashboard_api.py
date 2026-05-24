@@ -15,6 +15,7 @@ client = TestClient(app)
 def _reset_results_path(monkeypatch, path):
     get_batch_cache().clear()
     monkeypatch.setattr(stocks_router, "RESULTS_PATH", path)
+    stocks_router.invalidate_results_cache()
 
 
 def test_health_reports_results_presence(monkeypatch, tmp_path):
@@ -24,10 +25,19 @@ def test_health_reports_results_presence(monkeypatch, tmp_path):
     response = client.get("/api/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "results_exist": False}
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["results_exist"] is False
 
 
-def test_validate_key_behavior():
+def test_validate_key_behavior(monkeypatch):
+    class FakeLLM:
+        async def ainvoke(self, prompt, **kwargs):
+            return "pong"
+
+    from providers import gemini
+    monkeypatch.setattr(gemini, "get_flash_llm", lambda: FakeLLM())
+
     missing = client.get("/api/validate-key")
     empty = client.get("/api/validate-key", headers={"X-Gemini-API-Key": "   "})
     valid_random = client.get("/api/validate-key", headers={"X-Gemini-API-Key": "some-random-key-123"})

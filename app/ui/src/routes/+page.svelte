@@ -81,7 +81,19 @@
   }
 
   function handleStreamEvent(event: DebateEvent) {
-    debateStream.update((items) => [...items, event]);
+    debateStream.update((items) => {
+      if (event.type === 'verdict') {
+        const idx = items.findIndex(
+          (item) => item.type === 'verdict' && item.ticker === event.ticker
+        );
+        if (idx !== -1) {
+          const updated = [...items];
+          updated[idx] = event;
+          return updated;
+        }
+      }
+      return [...items, event];
+    });
     activeTicker.set(event.ticker);
     if (event.type === 'verdict') upsertResult(event.result);
     if (event.type === 'done' || event.type === 'error') {

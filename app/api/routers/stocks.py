@@ -88,8 +88,7 @@ async def _load_results() -> dict[str, dict[str, Any]]:  # QW-FIX-PF1
         }
 
         # Scan output/debates/*.json for any additional or missing individual debates
-        from pathlib import Path
-        debates_dir = Path("output/debates")
+        debates_dir = RESULTS_PATH.parent / "debates"
         if debates_dir.exists():
             for f in debates_dir.glob("*.json"):
                 try:
@@ -105,6 +104,13 @@ async def _load_results() -> dict[str, dict[str, Any]]:  # QW-FIX-PF1
                 except Exception as e:
                     logger.warning(f"[_load_results] Failed to read fallback {f}: {e}")
         
+        if not compiled_results:
+            raise _error(
+                "NO_RESULTS",
+                "Belum ada hasil analisis. Jalankan batch terlebih dahulu.",
+                status.HTTP_404_NOT_FOUND,
+            )
+
         raw_data = list(compiled_results.values())
 
         _cache = {  # QW-FIX-2  # QW-FIX-PF1
@@ -134,7 +140,7 @@ async def health_check() -> dict[str, Any]:
     from pathlib import Path
     from datetime import datetime, timedelta
     
-    debates_dir = Path("output/debates")
+    debates_dir = RESULTS_PATH.parent / "debates"
     latest_time = None
     results = []
     
@@ -316,120 +322,108 @@ async def stream_debate(
     async def event_generator():
         from providers.gemini import gemini_api_key_override
         from services.debate_chamber import DebateChamber
+        from core.orchestrator.pipeline import main as orchestrator_main
+
+        event_queue = asyncio.Queue()
 
         def sse(data: dict[str, Any] | str) -> str:
             if isinstance(data, str):
                 return f"data: {data}\n\n"
             return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
-        async def stream_with_heartbeat(chamber: DebateChamber, ticker: str):
-            stream = chamber.stream_run(ticker)
-            try:
-                while True:
-                    next_event = asyncio.create_task(anext(stream))
-                    while True:
-                        try:
-                            yield await asyncio.wait_for(
-                                asyncio.shield(next_event),
-                                timeout=15,
-                            )
-                            break
-                        except asyncio.TimeoutError:
-                            yield None
-                    if next_event.done() and next_event.exception() is not None:
-                        raise next_event.exception()
-            except StopAsyncIteration:
-                return
-            finally:
-                await stream.aclose()
+        class StreamingDebateChamber(DebateChamber):
+            async def run(self, ticker: str, current_price: float = 0.0) -> dict:
+                final_result = {}
+                async for event in self.stream_run(ticker):
+                    await event_queue.put(event)
+                    if event.get("type") == "verdict":
+                        final_result = event.get("raw_state", {})
+                    elif event.get("type") == "error":
+                        if not final_result:
+                            from core.orchestrator.legacy import _empty_result
+                            final_result = _empty_result(ticker, event.get("message", "Unknown error"))
+                return final_result
 
-        with gemini_api_key_override(api_key):
-            for ticker in payload.tickers:
-                chamber = DebateChamber()
+        def chamber_factory():
+            return StreamingDebateChamber()
+
+        # Phase 1: Pre-flight checks progress
+        for ticker in payload.tickers:
+            yield sse({"type": "progress", "ticker": ticker, "phase": "Pre-flight Checks", "pct": 5})
+
+        # Phase 2: Market Regime Detection progress
+        for ticker in payload.tickers:
+            yield sse({"type": "progress", "ticker": ticker, "phase": "Market Regime", "pct": 10})
+
+        user_config = {
+            "total_capital": 1_000_000.0,
+            "max_loss_pct": 0.02,
+            "max_positions": 5,
+        }
+
+        # Run orchestrator main in a background task
+        orchestrator_task = None
+        try:
+            with gemini_api_key_override(api_key):
+                orchestrator_task = asyncio.create_task(
+                    orchestrator_main(
+                        tickers=payload.tickers,
+                        user_config=user_config,
+                        chamber_factory=chamber_factory,
+                        mode="multi",
+                        raise_on_error=True,
+                    )
+                )
+
+            # Consume events from the queue while the task runs
+            while not orchestrator_task.done() or not event_queue.empty():
                 try:
-                    async for event in stream_with_heartbeat(chamber, ticker):
-                        if event is None:
-                            yield ": heartbeat\n\n"
-                        else:
-                            # Catch the verdict event to update the results file
-                            if event.get("type") == "verdict" and "raw_state" in event:
-                                try:
-                                    # Create a serializable format mimicking _run_single_debate
-                                    raw_state = event["raw_state"]
-                                    verdict_dict = {}
-                                    if raw_state.get("final_verdict"):
-                                        try:
-                                            verdict_dict = json.loads(raw_state["final_verdict"])
-                                        except Exception:
-                                            pass
-                                    
-                                    debate_history = raw_state.get("debate_history", [])
-                                    serializable_state = {
-                                        "ticker": ticker,
-                                        "verdict": verdict_dict,
-                                        "debate_rounds": raw_state.get("round_count", 0),
-                                        "consensus_reached": raw_state.get("consensus_reached", False),
-                                        "consensus_method": raw_state.get("consensus_method"),
-                                        "dissenting_agents": raw_state.get("dissenting_agents", []),
-                                        "agent_votes": raw_state.get("agent_votes", []),
-                                        "disagreement_type": raw_state.get("disagreement_type"),
-                                        "debate_history": [
-                                            {
-                                                "role": getattr(m, "role", "unknown"),
-                                                "content": getattr(m, "content", ""),
-                                                "round": getattr(m, "round_num", 0),
-                                                "position": getattr(m, "position", "UNKNOWN"),
-                                                "confidence": getattr(m, "confidence", None),
-                                            }
-                                            if hasattr(m, "role") else m
-                                            for m in debate_history
-                                        ],
-                                        "raw_data_summary": raw_state.get("raw_data", ""),
-                                        "metadata": raw_state.get("metadata", {}),
-                                        "error": raw_state.get("error"),
-                                        "status": "failed" if raw_state.get("error") else "success",
-                                        "conviction_score": 0.0,
-                                    }
+                    event = await asyncio.wait_for(event_queue.get(), timeout=1.0)
+                    if event.get("type") == "verdict":
+                        # Strip raw_state to save bandwidth
+                        event.pop("raw_state", None)
+                    yield sse(event)
+                    event_queue.task_done()
+                except asyncio.TimeoutError:
+                    yield ": heartbeat\n\n"
 
-                                    # Write back to full_batch_results.json
-                                    async with _cache_lock:
-                                        content = "[]"
-                                        try:
-                                            async with aiofiles.open(RESULTS_PATH, mode="r", encoding="utf-8") as f:
-                                                content = await f.read()
-                                        except FileNotFoundError:
-                                            pass
-                                        
-                                        raw_data = json.loads(content) if content.strip() else []
-                                        if not isinstance(raw_data, list):
-                                            raw_data = []
-                                            
-                                        # Update or append the result
-                                        updated = False
-                                        for i, item in enumerate(raw_data):
-                                            if item.get("ticker") == ticker:
-                                                raw_data[i] = serializable_state
-                                                updated = True
-                                                break
-                                        if not updated:
-                                            raw_data.append(serializable_state)
-                                            
-                                        async with aiofiles.open(RESULTS_PATH, mode="w", encoding="utf-8") as f:
-                                            await f.write(json.dumps(raw_data, indent=2))
-                                        
-                                    # Force UI to fetch fresh results next time
-                                    invalidate_results_cache()
-                                except Exception as write_err:
-                                    logger.error(f"Failed to save stream result for {ticker}: {write_err}")
-                                
-                                # Do not send raw_state to frontend to save bandwidth
-                                event.pop("raw_state", None)
+            # Check if orchestrator raised an exception
+            if orchestrator_task.exception() is not None:
+                exc = orchestrator_task.exception()
+                logger.error(f"Orchestrator pipeline failed: {exc}", exc_info=exc)
+                for ticker in payload.tickers:
+                    yield sse({"type": "error", "ticker": ticker, "message": f"Orchestrator pipeline failed: {exc}"})
+            else:
+                # Yield 95% progress for scoring and sizing
+                for ticker in payload.tickers:
+                    yield sse({"type": "progress", "ticker": ticker, "phase": "Scoring & Sizing", "pct": 95})
 
-                            yield sse(event)
-                        await asyncio.sleep(0)
-                except Exception as exc:
-                    yield sse({"type": "error", "ticker": ticker, "message": str(exc)})
-        yield sse("[DONE]")
+                # Invalidate cache and yield the final scored verdicts
+                invalidate_results_cache()
+                final_results = await _load_results()
+                for ticker in payload.tickers:
+                    if ticker in final_results:
+                        yield sse({
+                            "type": "verdict",
+                            "ticker": ticker,
+                            "result": final_results[ticker]
+                        })
+                    yield sse({"type": "done", "ticker": ticker})
+
+        except asyncio.CancelledError:
+            if orchestrator_task and not orchestrator_task.done():
+                orchestrator_task.cancel()
+                try:
+                    await orchestrator_task
+                except asyncio.CancelledError:
+                    pass
+            raise
+        except Exception as e:
+            logger.error(f"Error during streaming debate orchestrator: {e}", exc_info=e)
+            for ticker in payload.tickers:
+                yield sse({"type": "error", "ticker": ticker, "message": str(e)})
+        finally:
+            yield sse("[DONE]")
 
     return StreamingResponse(
         event_generator(),

@@ -48,7 +48,7 @@ import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
-from typing import Any
+from typing import Any, Callable
 from uuid import uuid4
 
 
@@ -3151,6 +3151,7 @@ async def run_batch_debates(
     sector_map: dict[str, str] | None = None,
     abort_event: asyncio.Event | None = None,
     run_id: str | None = None,
+    chamber_factory: Callable[[], Any] | None = None,
 ) -> list[dict]:
     # abort_event di-inject dari main() agar signal handler bisa mengaksesnya.
     """
@@ -3410,9 +3411,11 @@ async def run_batch_debates(
             f"(concurrency={max_concurrent}, "
             f"RPM={ORCHESTRATOR_CONFIG['rpm_limit']})"
         )
-        from services.debate_chamber import DebateChamber
-
-        chamber = DebateChamber()
+        if chamber_factory is not None:
+            chamber = chamber_factory()
+        else:
+            from services.debate_chamber import DebateChamber
+            chamber = DebateChamber()
         results = await asyncio.gather(
             *[_guarded(t) for t in tickers],
             return_exceptions=True,
@@ -3574,10 +3577,31 @@ select_top3 = select_top_n
 
 
 def save_full_results(results: list[dict], path: Path = FULL_RESULTS_PATH) -> None:
-    """Simpan semua hasil debate sebagai JSON tunggal."""
+    """Simpan semua hasil debate sebagai JSON tunggal, menggabungkan dengan hasil yang sudah ada."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8")
-    logger.info(f"[Persist] Full results -> {path}")
+    existing_data = []
+    if path.exists():
+        try:
+            content = path.read_text(encoding="utf-8")
+            if content.strip():
+                existing_data = json.loads(content)
+                if not isinstance(existing_data, list):
+                    existing_data = []
+        except Exception as e:
+            logger.warning(f"[Persist] Gagal membaca existing results untuk merge: {e}")
+            existing_data = []
+
+    # Map existing data by ticker for quick updates
+    data_dict = {item["ticker"]: item for item in existing_data if isinstance(item, dict) and "ticker" in item}
+    
+    # Update or add new results
+    for r in results:
+        if isinstance(r, dict) and "ticker" in r:
+            data_dict[r["ticker"]] = r
+            
+    merged_results = list(data_dict.values())
+    path.write_text(json.dumps(merged_results, indent=2, ensure_ascii=False), encoding="utf-8")
+    logger.info(f"[Persist] Full results (merged {len(results)} new/updated into {len(merged_results)} total) -> {path}")
 
 
 def save_single_agent_results(
@@ -4272,6 +4296,9 @@ async def main(
     output_dir: Path = OUTPUT_DIR,
     user_config: dict | None = None,
     mode: str | None = None,
+    chamber_factory: Callable[[], Any] | None = None,
+    tickers: list[str] | None = None,
+    raise_on_error: bool = False,
 ) -> None:
     """
     Pipeline penuh: Validate -> Regime -> Parse -> Debate -> Rank -> Report.
@@ -4324,7 +4351,7 @@ async def main(
     except Exception as e:
         logger.warning(f"[BacktestEval] Auto-eval failed: {e}")
 
-    ticker_override = list(CLI_TICKERS_OVERRIDE or [])
+    ticker_override = list(tickers or CLI_TICKERS_OVERRIDE or [])
 
     reset_budget()
     if user_config is None:
@@ -4346,6 +4373,8 @@ async def main(
     if not deps.is_valid:
         logger.error("[Dependencies] Blocking issue ditemukan. Pipeline dihentikan.")
         _cli_renderer.flush_buffered_alerts()
+        if raise_on_error:
+            raise RuntimeError("Dependencies validation failed: blocking issue found.")
         raise SystemExit(1)
 
     # Step 0a: Dependency Validation
@@ -4363,6 +4392,8 @@ async def main(
                 if not maybe_rerun_quant_filter():
                     logger.error("[Validator] Auto-rerun gagal. Pipeline dihentikan.")
                     _cli_renderer.flush_buffered_alerts()
+                    if raise_on_error:
+                        raise RuntimeError("Candidate validation auto-rerun failed.")
                     return
             else:
                 logger.error(
@@ -4370,6 +4401,8 @@ async def main(
                     "atau jalankan run_quant_filter.py secara manual."
                 )
                 _cli_renderer.flush_buffered_alerts()
+                if raise_on_error:
+                    raise RuntimeError("Candidate validation failed and CANDIDATES_AUTO_RERUN is false.")
                 return
         else:
             logger.info(f"[Validator] {validation.message}")
@@ -4416,6 +4449,8 @@ async def main(
     except (FileNotFoundError, ValueError) as e:
         logger.error(f"[Orchestrator] {e}")
         _cli_renderer.flush_buffered_alerts()
+        if raise_on_error:
+            raise RuntimeError(f"Candidate intake failed: {e}")
         return
     _cli_renderer.set_pipeline_status(
         "Candidates",
@@ -4469,6 +4504,8 @@ async def main(
                     "[ProviderHealth] No price provider available. Pipeline dihentikan."
                 )
                 _cli_renderer.flush_buffered_alerts()
+                if raise_on_error:
+                    raise RuntimeError("No price provider available (provider health check failed).")
                 return
             logger.warning(
                 "[ProviderHealth] Planner allowed degraded mode despite provider "
@@ -4508,6 +4545,7 @@ async def main(
                     sector_map=sector_map,
                     abort_event=abort_event,
                     run_id=ledger_run_id,
+                    chamber_factory=chamber_factory,
                 )
             _enhance_completed_results(results, ledger_run_id, fetch_news=not dry_run)
             for result in results:
@@ -4572,6 +4610,10 @@ async def main(
     batch_timestamp = datetime.now(ZoneInfo(settings.DATETIME_TIMEZONE)).strftime(
         "%Y%m%d_%H%M%S"
     )
+    for r in results:
+        if isinstance(r, dict):
+            r.setdefault("metadata", {})
+            r["metadata"]["batch_timestamp"] = batch_timestamp
     save_full_results(results, FULL_RESULTS_PATH)
     _ledger_artifact_write(
         run_id=ledger_run_id,
