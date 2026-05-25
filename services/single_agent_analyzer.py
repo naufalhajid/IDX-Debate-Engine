@@ -27,13 +27,22 @@ from services.context_pack_builder import (
     pack_to_prompt_string,
 )
 from services.fair_value_calculator import build_fair_value_report
-from services.stockbit_api_client import StockbitApiClient
 from utils.logger_config import logger
 from utils.market_data_cache import derive_current_price, prefetch_market_data
 from utils.technicals import compute_atr, compute_rsi
 
 
 BASE_URL = "https://exodus.stockbit.com"
+StockbitApiClient = None
+
+
+def _get_stockbit_api_client_class():
+    global StockbitApiClient
+    if StockbitApiClient is None:
+        from services.stockbit_api_client import StockbitApiClient as client_class
+
+        StockbitApiClient = client_class
+    return StockbitApiClient
 
 
 class SingleAgentVerdict(BaseModel):
@@ -92,7 +101,7 @@ class SingleAgentAnalyzer:
     def stockbit_client(self) -> StockbitApiClient:
         """Create the Stockbit client lazily to keep module import side-effect free."""
         if self._stockbit_client is None:
-            self._stockbit_client = StockbitApiClient()
+            self._stockbit_client = _get_stockbit_api_client_class()()
         return self._stockbit_client
 
     def _fetch_market_data(self, ticker: str) -> ContextPack:

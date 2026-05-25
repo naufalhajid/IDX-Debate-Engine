@@ -215,7 +215,7 @@ def _plan_runtime_decision(
         return None
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Stock Debate Chamber — Adversarial Multi-Agent Analysis",
     )
@@ -245,7 +245,20 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Show raw Loguru logs in addition to Rich debate summaries.",
     )
-    args = parser.parse_args()
+    parser.add_argument(
+        "--details",
+        dest="details",
+        action="store_true",
+        default=True,
+        help="Show detailed Rich ticker panels on console.",
+    )
+    parser.add_argument(
+        "--no-details",
+        dest="details",
+        action="store_false",
+        help="Skip detailed Rich ticker panels on console.",
+    )
+    args = parser.parse_args(argv)
     if args.ticker_alias:
         args.tickers = (args.tickers or []) + args.ticker_alias
     if not args.tickers:
@@ -453,17 +466,19 @@ def _write_formatter_report(
     ticker: str,
     result: dict[str, Any],
     run_timestamp: str,
+    render_details: bool = True,
 ) -> None:
     payload = dict(result)
     metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
     if str(metadata.get("run_id") or "").lower() in {"", "unknown"}:
         metadata = {**metadata, "run_id": run_timestamp}
         payload["metadata"] = metadata
-    try:
-        formatter = RichFormatter(console=cli_console)
-        formatter.render_ticker_panel(payload)
-    except Exception as e:
-        logger.warning(f"[Formatter] {ticker}: {e}")
+    if render_details:
+        try:
+            formatter = RichFormatter(console=cli_console)
+            formatter.render_ticker_panel(payload)
+        except Exception as e:
+            logger.warning(f"[Formatter] {ticker}: {e}")
 
     try:
         md = DEFAULT_MD.generate_ticker_report(payload)
@@ -950,6 +965,7 @@ async def _debate_one(
     output_dir: Path,
     run_timestamp: str,
     generated_at: str,
+    render_details: bool = True,
 ) -> bool:
     """
     Run the full debate pipeline for a single ticker and save the result.
@@ -1018,11 +1034,19 @@ async def _debate_one(
             "ticker": result["ticker"],
             "verdict": verdict_payload,
             "debate_rounds": result["round_count"],
+            "consensus_reached": result.get("consensus_reached", False),
+            "consensus_method": result.get("consensus_method"),
+            "dissenting_agents": result.get("dissenting_agents", []),
+            "agent_votes": result.get("agent_votes", []),
+            "consensus_winner": result.get("consensus_winner"),
+            "disagreement_type": result.get("disagreement_type"),
             "debate_history": [
                 {
                     "role": m.role,
                     "content": m.content,
                     "round": m.round_num,
+                    "position": getattr(m, "position", "UNKNOWN"),
+                    "confidence": getattr(m, "confidence", None),
                 }
                 for m in debate_history
             ],
@@ -1090,6 +1114,7 @@ async def _debate_one(
             ticker=ticker,
             result=report,
             run_timestamp=run_timestamp,
+            render_details=render_details,
         )
         _record_ticker_telemetry(
             ticker=ticker,
@@ -1160,11 +1185,11 @@ async def _debate_one(
         return False
 
 
-async def main() -> None:
+async def main(argv: list[str] | None = None) -> None:
     global _batch_failed_count
     _batch_failed_count = 0
 
-    args = parse_args()
+    args = parse_args(argv)
     configure_debate_logging(verbose=bool(args.verbose))
     lint_report = lint_prompt_pack(str(PROMPT_MANIFEST_PATH))
     for warning in lint_report.warnings:
@@ -1203,7 +1228,14 @@ async def main() -> None:
 
     succeeded, failed = 0, 0
     for ticker in args.tickers:
-        ok = await _debate_one(ticker, chamber, output_dir, run_timestamp, generated_at)
+        ok = await _debate_one(
+            ticker,
+            chamber,
+            output_dir,
+            run_timestamp,
+            generated_at,
+            render_details=bool(args.details),
+        )
         if ok:
             succeeded += 1
         else:

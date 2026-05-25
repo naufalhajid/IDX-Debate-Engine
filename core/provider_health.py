@@ -5,16 +5,15 @@ from __future__ import annotations
 import asyncio
 import sys
 
-import yfinance as yf
 from pydantic import BaseModel, ConfigDict
 
 from core.failure_taxonomy import FailureRecord, classify_exception
-from services.stockbit_api_client import StockbitApiClient
 
 
 DEFAULT_TICKER = "BBCA"
 STOCKBIT_BASE_URL = "https://exodus.stockbit.com"
 YFINANCE_HEALTH_TICKER = "BBCA.JK"
+StockbitApiClient = None
 
 
 class ProviderHealthReport(BaseModel):
@@ -26,6 +25,21 @@ class ProviderHealthReport(BaseModel):
     yfinance_ok: bool
     failures: list[str]
     can_proceed: bool
+
+
+def _get_yfinance():
+    import yfinance as yf
+
+    return yf
+
+
+def _get_stockbit_api_client_class():
+    global StockbitApiClient
+    if StockbitApiClient is None:
+        from services.stockbit_api_client import StockbitApiClient as client_class
+
+        StockbitApiClient = client_class
+    return StockbitApiClient
 
 
 async def check_all_providers(tickers: list[str]) -> ProviderHealthReport:
@@ -69,7 +83,7 @@ async def _check_yfinance() -> tuple[bool, str | None]:
 
 
 def _ping_stockbit(ticker: str) -> None:
-    client = StockbitApiClient()
+    client = _get_stockbit_api_client_class()()
     url = f"{STOCKBIT_BASE_URL}/company-price-feed/v2/orderbook/companies/{ticker}"
     response = client.get(url)
     if not isinstance(response, dict) or not response.get("data"):
@@ -77,7 +91,7 @@ def _ping_stockbit(ticker: str) -> None:
 
 
 def _ping_yfinance() -> None:
-    fast_info = yf.Ticker(YFINANCE_HEALTH_TICKER).fast_info
+    fast_info = _get_yfinance().Ticker(YFINANCE_HEALTH_TICKER).fast_info
     if fast_info is None:
         raise ValueError(f"No price data from yfinance for {YFINANCE_HEALTH_TICKER}")
 

@@ -120,15 +120,13 @@
     <div class="timeline-container" bind:this={timelineEl} onscroll={onScroll}>
       {#each events as event, index (`${event.type}-${event.ticker}-${index}`)}
         {#if event.type === 'progress'}
-          {@const filledCount = Math.round(pct(event.pct) / 5)}
-          {@const emptyCount = Math.max(0, 20 - filledCount)}
           <div class="terminal-progress">
             <div class="terminal-progress-text">
               <span class="mono-label">> RUNNING_PHASE: {formatKey(event.phase).toUpperCase()}...</span>
               <span class="mono-pct">{pct(event.pct)}%</span>
             </div>
-            <div class="terminal-progress-bar-text">
-              [{'■'.repeat(filledCount)}{'□'.repeat(emptyCount)}]
+            <div class="sleek-progress-bar">
+              <div class="progress-fill" style="width: {pct(event.pct)}%"></div>
             </div>
           </div>
 
@@ -878,6 +876,24 @@
 
   .indicator-text {
     letter-spacing: 0.5px;
+  }
+
+  .sleek-progress-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--surface-base);
+    border-radius: 3px;
+    overflow: hidden;
+    border: 1px solid var(--surface-border);
+    margin-top: 4px;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-cyan), #ff7a00);
+    box-shadow: 0 0 10px var(--accent-cyan);
+    border-radius: 3px;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   @media (max-width: 1024px) {

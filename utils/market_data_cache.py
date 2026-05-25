@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from typing import Any
 
 import pandas as pd
-import yfinance as yf
 
 from utils.exdate_scanner import (
     CRITICAL_WINDOW_DAYS,
@@ -16,6 +15,12 @@ from utils.logger_config import logger
 
 
 MarketData = dict[str, Any]
+
+
+def _get_yfinance():
+    import yfinance as yf
+
+    return yf
 
 
 def _normalise_history(history: Any) -> Any:
@@ -73,7 +78,7 @@ def _safe_get(mapping: Any, key: str) -> Any:
 
 
 def _fetch_yfinance_bundle(ticker: str) -> MarketData:
-    yf_ticker = yf.Ticker(f"{ticker}.JK")
+    yf_ticker = _get_yfinance().Ticker(f"{ticker}.JK")
     market_data: MarketData = {
         "history": None,
         "info": {},

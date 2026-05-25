@@ -136,6 +136,10 @@ def test_rating_label_maps_core_ratings() -> None:
     assert formatter._rating_emoji("BUY") == "BUY"
     assert formatter._rating_emoji("HOLD") == "HOLD"
     assert formatter._rating_emoji("AVOID") == "AVOID"
+    assert formatter._rating_emoji("STRONG_BUY") == "BUY"
+    assert formatter._rating_emoji("SELL") == "AVOID"
+    assert formatter._rating_style("STRONG_BUY") == "bold green"
+    assert formatter._rating_style("SELL") == "bold red"
 
 
 def test_confidence_bar_mixed_fill() -> None:
@@ -192,6 +196,13 @@ def test_generate_ticker_report_avoid_skips_catalyst_section() -> None:
     assert "Katalis Potensial" not in report
 
 
+def test_generate_ticker_report_normalizes_strong_buy_rating() -> None:
+    report = MarkdownFormatter().generate_ticker_report(_mock_result("STRONG_BUY"))
+
+    assert "| **Rekomendasi** | **BUY** |" in report
+    assert "Katalis Potensial" in report
+
+
 def test_generate_ticker_report_contains_all_agent_names() -> None:
     report = MarkdownFormatter().generate_ticker_report(_mock_result())
 
@@ -200,9 +211,48 @@ def test_generate_ticker_report_contains_all_agent_names() -> None:
         "Bear",
         "Chartist",
         "Fundamental Scout",
+        "Sentiment Specialist",
         "Devil's Advocate",
     ):
         assert name in report
+
+
+def test_vote_table_includes_sentiment_specialist_in_order() -> None:
+    result = _mock_result()
+    result["agent_votes"].insert(
+        4,
+        {
+            "agent": "sentiment_specialist",
+            "position": "HOLD",
+            "confidence": 0.55,
+            "supporting_winner": False,
+        },
+    )
+
+    report = MarkdownFormatter().generate_ticker_report(result)
+
+    assert "| Sentiment Specialist | HOLD | 55% |" in report
+    assert report.index("Fundamental Scout") < report.index("Sentiment Specialist")
+    assert report.index("Sentiment Specialist") < report.index("Devil's Advocate")
+
+
+def test_markdown_risk_governor_does_not_instantiate_rich_formatter(monkeypatch) -> None:
+    def fail_if_called(self, risk):
+        raise AssertionError("MarkdownFormatter should not call RichFormatter")
+
+    monkeypatch.setattr(RichFormatter, "_risk_governor_line", fail_if_called)
+
+    report = MarkdownFormatter().generate_ticker_report(_mock_result())
+
+    assert "| **Risk Governor** | Siap dieksekusi |" in report
+
+
+def test_generate_ticker_report_replaces_advocatus_with_decision_summary() -> None:
+    report = MarkdownFormatter().generate_ticker_report(_mock_result())
+
+    assert "Ringkasan & Alasan Pilihan Agent" in report
+    assert "Distribusi pilihan agent" in report
+    assert "Advocatus Diaboli" not in report
 
 
 def test_generate_ticker_report_contains_confidence_percent() -> None:
@@ -256,7 +306,9 @@ def test_render_ticker_panel_contains_debate_argument_highlights() -> None:
     assert "ARGUMEN KUNCI" in output
     assert "Bull case kuat" in output
     assert "Bear case menyorot valuasi" in output
-    assert "Devil's Advocate" in output
+    assert "Ringkasan Pilihan" in output
+    assert "Alasan agent" in output
+    assert "Advocatus" not in output
 
 
 def test_argument_highlight_uses_latest_round_and_strips_footer() -> None:
@@ -287,6 +339,27 @@ def test_argument_highlight_uses_latest_round_and_strips_footer() -> None:
     assert "Rp 3,000" in output
     assert "Old thesis only" not in output
     assert "Position: BUY" not in output
+
+
+def test_markdown_key_argument_uses_latest_round() -> None:
+    result = _mock_result()
+    result["debate_history"] = [
+        {
+            "role": "bull",
+            "content": "Latest thesis should win.\n\nPosition: BUY",
+            "round": 3,
+        },
+        {
+            "role": "bull",
+            "content": "Old thesis should lose.",
+            "round": 1,
+        },
+    ]
+
+    report = MarkdownFormatter().generate_ticker_report(result)
+
+    assert "Latest thesis should win" in report
+    assert "Old thesis should lose" not in report
 
 
 def test_render_batch_summary_handles_empty_results() -> None:

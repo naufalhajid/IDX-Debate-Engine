@@ -98,9 +98,9 @@ async def _load_results() -> dict[str, dict[str, Any]]:  # QW-FIX-PF1
                         data = json.loads(file_content)
                         if isinstance(data, dict) and "ticker" in data:
                             ticker_key = data["ticker"]
-                            # Only add if not already present in compiled_results
-                            if ticker_key not in compiled_results:
-                                compiled_results[ticker_key] = data
+                            # Always update compiled_results with the individual debate file,
+                            # as it contains the most recent debate result for this ticker.
+                            compiled_results[ticker_key] = data
                 except Exception as e:
                     logger.warning(f"[_load_results] Failed to read fallback {f}: {e}")
         

@@ -12,8 +12,6 @@ import logging
 from pathlib import Path
 from typing import Callable, Iterable, Literal
 
-import yfinance as yf
-
 from core.backtest_memory import BacktestMemory, DEFAULT_PATH, TradeOutcome
 from core.settings import settings
 from utils.logger_config import logger
@@ -74,6 +72,12 @@ class EvaluationSummary:
 
 
 PriceFetcher = Callable[[str, date, date], list[PriceBar]]
+
+
+def _get_yfinance():
+    import yfinance as yf
+
+    return yf
 
 
 def evaluate_trade_outcome(
@@ -241,7 +245,7 @@ def fetch_yfinance_price_bars(ticker: str, start: date, end: date) -> list[Price
             contextlib.redirect_stderr(io.StringIO()),
             contextlib.redirect_stdout(io.StringIO()),
         ):
-            frame = yf.download(
+            frame = _get_yfinance().download(
                 symbol,
                 start=start.isoformat(),
                 end=(end + timedelta(days=1)).isoformat(),

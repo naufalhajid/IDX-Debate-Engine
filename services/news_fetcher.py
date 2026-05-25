@@ -9,7 +9,6 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any
 
-import yfinance as yf
 from pydantic import BaseModel, ConfigDict, Field
 
 from core.failure_taxonomy import classify_exception
@@ -23,6 +22,13 @@ CACHE_TTL_MINUTES = 30
 UNKNOWN_DATE_RECENCY_SCORE = 0.15
 
 IDX_TICKER_RE = re.compile(r"^[A-Z]{4}$")
+
+
+def _get_yfinance():
+    import yfinance as yf
+
+    return yf
+
 
 NEGATIVE_KEYWORDS = [
     "rugi",
@@ -179,7 +185,7 @@ class NewsFetcher:
         if symbol is None:
             return []
         try:
-            raw_news = yf.Ticker(symbol).news
+            raw_news = _get_yfinance().Ticker(symbol).news
             return [item for item in raw_news or [] if isinstance(item, dict)]
         except Exception as exc:
             failure = classify_exception(exc, source="yfinance_news")

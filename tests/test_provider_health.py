@@ -1,4 +1,5 @@
 import pytest
+from types import SimpleNamespace
 
 from core import provider_health
 
@@ -35,7 +36,11 @@ class DownTicker:
 @pytest.mark.asyncio
 async def test_check_all_providers_both_healthy(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(provider_health, "StockbitApiClient", HealthyStockbitClient)
-    monkeypatch.setattr(provider_health.yf, "Ticker", HealthyTicker)
+    monkeypatch.setattr(
+        provider_health,
+        "_get_yfinance",
+        lambda: SimpleNamespace(Ticker=HealthyTicker),
+    )
 
     report = await provider_health.check_all_providers(["BBCA"])
 
@@ -50,7 +55,11 @@ async def test_check_all_providers_stockbit_down_yfinance_up(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(provider_health, "StockbitApiClient", DownStockbitClient)
-    monkeypatch.setattr(provider_health.yf, "Ticker", HealthyTicker)
+    monkeypatch.setattr(
+        provider_health,
+        "_get_yfinance",
+        lambda: SimpleNamespace(Ticker=HealthyTicker),
+    )
 
     report = await provider_health.check_all_providers(["BBCA"])
 
@@ -64,7 +73,11 @@ async def test_check_all_providers_stockbit_down_yfinance_up(
 @pytest.mark.asyncio
 async def test_check_all_providers_both_down(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(provider_health, "StockbitApiClient", DownStockbitClient)
-    monkeypatch.setattr(provider_health.yf, "Ticker", DownTicker)
+    monkeypatch.setattr(
+        provider_health,
+        "_get_yfinance",
+        lambda: SimpleNamespace(Ticker=DownTicker),
+    )
 
     report = await provider_health.check_all_providers(["BBCA"])
 

@@ -126,8 +126,165 @@
       }
     );
   }
+  let rightWidth = 450;
+  let isResizing = false;
+  let workspaceEl: HTMLDivElement | undefined = undefined;
+
+  function startResizing(event: MouseEvent) {
+    event.preventDefault();
+    isResizing = true;
+    const startX = event.clientX;
+    const startWidth = rightWidth;
+
+    function onMouseMove(moveEvent: MouseEvent) {
+      if (!isResizing) return;
+      const deltaX = moveEvent.clientX - startX;
+      const newWidth = startWidth - deltaX;
+
+      if (workspaceEl) {
+        const totalWidth = workspaceEl.clientWidth;
+        const minLeftWidth = 500;
+        const minRightWidth = 350;
+        const maxRightWidth = totalWidth - minLeftWidth - 12; // 12px for splitter
+        rightWidth = Math.max(minRightWidth, Math.min(maxRightWidth, newWidth));
+      } else {
+        rightWidth = Math.max(350, Math.min(800, newWidth));
+      }
+    }
+
+    function onMouseUp() {
+      isResizing = false;
+      localStorage.setItem('idx-dashboard-right-width', String(rightWidth));
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    }
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }
+
+  function startResizingTouch(event: TouchEvent) {
+    if (event.touches.length !== 1) return;
+    isResizing = true;
+    const startX = event.touches[0].clientX;
+    const startWidth = rightWidth;
+
+    function onTouchMove(moveEvent: TouchEvent) {
+      if (!isResizing || moveEvent.touches.length !== 1) return;
+      const deltaX = moveEvent.touches[0].clientX - startX;
+      const newWidth = startWidth - deltaX;
+
+      if (workspaceEl) {
+        const totalWidth = workspaceEl.clientWidth;
+        const minLeftWidth = 500;
+        const minRightWidth = 350;
+        const maxRightWidth = totalWidth - minLeftWidth - 12;
+        rightWidth = Math.max(minRightWidth, Math.min(maxRightWidth, newWidth));
+      } else {
+        rightWidth = Math.max(350, Math.min(800, newWidth));
+      }
+    }
+
+    function onTouchEnd() {
+      isResizing = false;
+      localStorage.setItem('idx-dashboard-right-width', String(rightWidth));
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onTouchEnd);
+    }
+
+    window.addEventListener('touchmove', onTouchMove, { passive: true });
+    window.addEventListener('touchend', onTouchEnd);
+  }
+
+  let sidebarWidth = 260;
+  let isSidebarResizing = false;
+  let isSidebarCollapsed = false;
+
+  function startSidebarResizing(event: MouseEvent) {
+    event.preventDefault();
+    isSidebarResizing = true;
+    const startX = event.clientX;
+    const startWidth = sidebarWidth;
+
+    function onMouseMove(moveEvent: MouseEvent) {
+      if (!isSidebarResizing) return;
+      const deltaX = moveEvent.clientX - startX;
+      const newWidth = startWidth + deltaX;
+      sidebarWidth = Math.max(220, Math.min(380, newWidth));
+    }
+
+    function onMouseUp() {
+      isSidebarResizing = false;
+      localStorage.setItem('idx-dashboard-sidebar-width', String(sidebarWidth));
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    }
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }
+
+  function startSidebarResizingTouch(event: TouchEvent) {
+    if (event.touches.length !== 1) return;
+    isSidebarResizing = true;
+    const startX = event.touches[0].clientX;
+    const startWidth = sidebarWidth;
+
+    function onTouchMove(moveEvent: TouchEvent) {
+      if (!isSidebarResizing || moveEvent.touches.length !== 1) return;
+      const deltaX = moveEvent.touches[0].clientX - startX;
+      const newWidth = startWidth + deltaX;
+      sidebarWidth = Math.max(220, Math.min(380, newWidth));
+    }
+
+    function onTouchEnd() {
+      isSidebarResizing = false;
+      localStorage.setItem('idx-dashboard-sidebar-width', String(sidebarWidth));
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onTouchEnd);
+    }
+
+    window.addEventListener('touchmove', onTouchMove, { passive: true });
+    window.addEventListener('touchend', onTouchEnd);
+  }
+
+  $: if (isSidebarCollapsed) {
+    sidebarWidth = 72;
+  } else if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('idx-dashboard-sidebar-width');
+    if (saved) {
+      const parsed = parseInt(saved, 10);
+      if (!isNaN(parsed) && parsed >= 220 && parsed <= 380) {
+        sidebarWidth = parsed;
+      }
+    } else {
+      sidebarWidth = 260;
+    }
+  }
+
+  $: if (typeof window !== 'undefined') {
+    localStorage.setItem('idx-dashboard-sidebar-collapsed', String(isSidebarCollapsed));
+  }
 
   onMount(async () => {
+    const savedRight = localStorage.getItem('idx-dashboard-right-width');
+    if (savedRight) {
+      const parsed = parseInt(savedRight, 10);
+      if (!isNaN(parsed) && parsed >= 300 && parsed <= 1000) {
+        rightWidth = parsed;
+      }
+    }
+    const savedSidebar = localStorage.getItem('idx-dashboard-sidebar-width');
+    if (savedSidebar) {
+      const parsed = parseInt(savedSidebar, 10);
+      if (!isNaN(parsed) && parsed >= 220 && parsed <= 380) {
+        sidebarWidth = parsed;
+      }
+    }
+    const savedCollapsed = localStorage.getItem('idx-dashboard-sidebar-collapsed');
+    if (savedCollapsed) {
+      isSidebarCollapsed = savedCollapsed === 'true';
+    }
     await loadData();
     pollInterval = setInterval(loadData, 5_000);
   });
@@ -140,12 +297,32 @@
 
 <div class="page-viewport">
   <div class="app-container">
-    <Sidebar />
+    <Sidebar bind:collapsed={isSidebarCollapsed} width={sidebarWidth} />
+
+    {#if !isSidebarCollapsed}
+      <!-- svelte-ignore a11y-no-static-element-interactions -->
+      <div 
+        class="sidebar-splitter"
+        class:sidebar-splitter--resizing={isSidebarResizing}
+        onmousedown={startSidebarResizing}
+        ontouchstart={startSidebarResizingTouch}
+        role="separator"
+        aria-label="Resize sidebar"
+      >
+        <div class="splitter-handle"></div>
+      </div>
+    {:else}
+      <div class="sidebar-collapsed-border"></div>
+    {/if}
 
     <main class="main-content">
       <ServerStatusBar online={serverOnline} {loading} {lastUpdated} {latestDebateDate} />
 
-      <div class="workspace-grid">
+      <div 
+        class="workspace-grid" 
+        bind:this={workspaceEl} 
+        style="grid-template-columns: 1fr auto {rightWidth}px; gap: 0;"
+      >
         <section class="candidates-area">
           {#if loading}
             <SkeletonLoader rows={10} />
@@ -153,6 +330,18 @@
             <CandidatesTable onDebate={startDebate} />
           {/if}
         </section>
+
+        <!-- svelte-ignore a11y-no-static-element-interactions -->
+        <div 
+          class="workspace-splitter"
+          class:workspace-splitter--resizing={isResizing}
+          onmousedown={startResizing}
+          ontouchstart={startResizingTouch}
+          role="separator"
+          aria-label="Resize panels"
+        >
+          <div class="splitter-handle"></div>
+        </div>
 
         <section class="debate-area">
           <DebateTimeline />
@@ -198,8 +387,8 @@
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-columns: minmax(500px, 1fr) 450px;
-    gap: var(--sp-4);
+    grid-template-columns: minmax(500px, 1fr) auto 450px;
+    gap: 0;
     padding: var(--sp-4);
   }
 
@@ -207,6 +396,123 @@
   .debate-area {
     min-width: 0;
     min-height: 0;
+  }
+
+  .workspace-splitter {
+    width: 16px;
+    cursor: col-resize;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    user-select: none;
+    transition: background-color 0.2s;
+  }
+
+  .splitter-handle {
+    width: 2px;
+    height: 40px;
+    background-color: var(--surface-border-strong);
+    border-radius: 1px;
+    transition: background-color 0.2s, height 0.2s, box-shadow 0.2s;
+    position: relative;
+  }
+
+  .splitter-handle::before,
+  .splitter-handle::after {
+    content: '';
+    position: absolute;
+    left: -4px;
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    background-color: var(--surface-border-strong);
+    top: calc(50% - 4px);
+    transition: background-color 0.2s;
+  }
+  .splitter-handle::after {
+    top: calc(50% + 2px);
+  }
+
+  .workspace-splitter:hover {
+    background-color: rgba(255, 90, 0, 0.04);
+  }
+
+  .workspace-splitter:hover .splitter-handle,
+  .workspace-splitter--resizing .splitter-handle {
+    background-color: var(--accent-cyan);
+    height: 80px;
+    box-shadow: 0 0 8px var(--accent-cyan);
+  }
+
+  .workspace-splitter:hover .splitter-handle::before,
+  .workspace-splitter:hover .splitter-handle::after,
+  .workspace-splitter--resizing .splitter-handle::before,
+  .workspace-splitter--resizing .splitter-handle::after {
+    background-color: var(--accent-cyan);
+  }
+
+  .sidebar-splitter {
+    width: 12px;
+    cursor: col-resize;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    user-select: none;
+    background: transparent;
+    border-right: 1px solid var(--surface-border);
+    transition: background-color 0.2s, border-color 0.2s;
+  }
+
+  .sidebar-splitter:hover {
+    background-color: rgba(255, 90, 0, 0.04);
+    border-color: transparent;
+  }
+
+  .sidebar-splitter .splitter-handle {
+    width: 2px;
+    height: 40px;
+    background-color: var(--surface-border-strong);
+    border-radius: 1px;
+    transition: background-color 0.2s, height 0.2s, box-shadow 0.2s;
+    position: relative;
+  }
+
+  .sidebar-splitter .splitter-handle::before,
+  .sidebar-splitter .splitter-handle::after {
+    content: '';
+    position: absolute;
+    left: -4px;
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    background-color: var(--surface-border-strong);
+    top: calc(50% - 4px);
+    transition: background-color 0.2s;
+  }
+  .sidebar-splitter .splitter-handle::after {
+    top: calc(50% + 2px);
+  }
+
+  .sidebar-splitter:hover .splitter-handle,
+  .sidebar-splitter--resizing .splitter-handle {
+    background-color: var(--accent-cyan);
+    height: 80px;
+    box-shadow: 0 0 8px var(--accent-cyan);
+  }
+
+  .sidebar-splitter:hover .splitter-handle::before,
+  .sidebar-splitter:hover .splitter-handle::after,
+  .sidebar-splitter--resizing .splitter-handle::before,
+  .sidebar-splitter--resizing .splitter-handle::after {
+    background-color: var(--accent-cyan);
+  }
+
+  .sidebar-collapsed-border {
+    width: 1px;
+    background-color: var(--surface-border);
+    height: 100%;
   }
 
   @media (max-width: 1080px) {
@@ -228,7 +534,14 @@
     }
 
     .workspace-grid {
-      grid-template-columns: 1fr;
+      grid-template-columns: 1fr !important;
+      gap: var(--sp-4) !important;
+    }
+
+    .workspace-splitter,
+    .sidebar-splitter,
+    .sidebar-collapsed-border {
+      display: none !important;
     }
 
     .debate-area {

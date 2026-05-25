@@ -37,13 +37,16 @@ def _run_cli(argv: list[str] | None = None) -> None:
     _pipeline._ensure_utf8_stdout()
     args = _pipeline._parse_cli_args(argv)
     _pipeline.configure_cli_logging(verbose=args.verbose)
+    _pipeline._cli_renderer.show_details = getattr(args, "details", False)
     configure_output_dir(Path(args.output_dir))
     scrape_cmd = _pipeline.shlex.split(args.scrape_cmd) if args.scrape_cmd else None
-    _pipeline._cli.run(
+    pipeline_ok = _pipeline._cli.run(
         interactive=not args.no_interactive,
         skip_scraping=args.skip_scraping,
         scrape_cmd=scrape_cmd,
     )
+    if not pipeline_ok:
+        raise SystemExit(1)
     user_config = (
         {"total_capital": 1_000_000.0, "max_loss_pct": 0.02, "max_positions": 5}
         if args.no_interactive
@@ -54,6 +57,7 @@ def _run_cli(argv: list[str] | None = None) -> None:
             dry_run=args.dry_run,
             output_dir=_pipeline.OUTPUT_DIR,
             user_config=user_config,
+            raise_on_error=True,
         )
     )
 

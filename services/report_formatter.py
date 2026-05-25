@@ -22,6 +22,7 @@ _AGENT_ORDER = (
     "bear",
     "chartist",
     "fundamental_scout",
+    "sentiment_specialist",
     "devils_advocate",
 )
 
@@ -198,12 +199,12 @@ def _ticker(result: dict[str, Any], packet: AuditPacket | None = None) -> str:
 
 def _rating(result: dict[str, Any], packet: AuditPacket | None = None) -> str:
     verdict = _verdict(result)
-    return str(
+    return _canonical_position(
         verdict.get("rating")
         or result.get("rating")
         or (packet.verdict_rating if packet else None)
         or "UNKNOWN"
-    ).upper()
+    )
 
 
 def _entry_bounds(verdict: dict[str, Any]) -> tuple[float | None, float | None]:
@@ -313,6 +314,18 @@ def _risk(result: dict[str, Any]) -> dict[str, Any]:
     return _dict_or_empty(result.get("risk_governor"))
 
 
+def _risk_governor_label(risk: dict) -> str:
+    status = _dict_or_empty(risk).get("status", "unknown")
+    labels = {
+        "deployable": "Siap dieksekusi",
+        "conditional_deployable": "Conditional watchlist",
+        "wait_for_pullback": "Tunggu pullback",
+        "watchlist_only": "Pantau saja",
+        "reject": "Ditolak sistem",
+    }
+    return labels.get(str(status), str(status))
+
+
 def _key_risks(result: dict[str, Any]) -> list[str]:
     verdict = _verdict(result)
     risks = _list_or_empty(verdict.get("key_risks"))
@@ -328,19 +341,6 @@ def _catalysts(result: dict[str, Any]) -> list[str]:
         for item in _list_or_empty(verdict.get("key_catalysts"))
         if str(item).strip()
     ]
-
-
-def _raw_history_argument(result: dict[str, Any], role: str, limit: int = 500) -> str:
-    messages = []
-    for raw in _list_or_empty(result.get("debate_history")):
-        if not isinstance(raw, dict):
-            continue
-        if _canonical(raw.get("role")) == role:
-            messages.append(str(raw.get("content") or "").strip())
-    text = messages[-1] if messages else ""
-    if not text:
-        return "Data tidak tersedia"
-    return text if len(text) <= limit else text[: limit - 3] + "..."
 
 
 _ARGUMENT_NUMBER_RE = re.compile(r"(?:Rp\s*)?\d[\d.,]*(?:\s*(?:%|x))?", re.IGNORECASE)
@@ -430,7 +430,10 @@ def _key_argument(
             return packet.key_bear_argument
         if role == "devils_advocate" and packet.devils_advocate_question:
             return packet.devils_advocate_question
-    return _raw_history_argument(result, role)
+    text = _latest_history_argument(result, role)
+    if not text:
+        return "Data tidak tersedia"
+    return text if len(text) <= 500 else text[:497] + "..."
 
 
 def _key_argument_summary(
@@ -449,6 +452,99 @@ def _key_argument_summary(
             packet_text = packet.devils_advocate_question
     source_text = packet_text or _latest_history_argument(result, role)
     return _summarize_argument_text(source_text, limit)
+
+
+def _vote_distribution_summary(
+    result: dict[str, Any],
+    packet: AuditPacket | None = None,
+) -> str:
+    votes = [
+        vote
+        for vote in _agent_votes(result, packet)
+        if not _is_devils_advocate_agent(_vote_value(vote, "agent"))
+    ]
+    if not votes:
+        return "data voting tidak tersedia"
+
+    counts: dict[str, int] = {}
+    for vote in votes:
+        position = _canonical_position(_vote_value(vote, "position"))
+        if position == "UNKNOWN":
+            continue
+        counts[position] = counts.get(position, 0) + 1
+    if not counts:
+        return "data voting tidak tersedia"
+    ordered = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    total = sum(counts.values())
+    return ", ".join(f"{position} {count}/{total}" for position, count in ordered)
+
+
+def _fallback_agent_reason(agent: Any, position: str) -> str:
+    agent_key = _canonical(agent)
+    if agent_key == "fundamental_scout":
+        return f"memilih {position} berdasarkan valuasi, profitabilitas, dan kualitas fundamental"
+    if agent_key == "chartist":
+        return f"memilih {position} berdasarkan tren harga, momentum, dan area teknikal"
+    if agent_key == "sentiment_specialist":
+        return f"memilih {position} berdasarkan sentimen berita dan risiko headline"
+    return f"memilih {position} berdasarkan sinyal debat yang tersedia"
+
+
+def _agent_choice_reason_lines(
+    result: dict[str, Any],
+    packet: AuditPacket | None = None,
+    *,
+    per_reason_limit: int = 130,
+) -> list[str]:
+    lines: list[str] = []
+    for vote in _agent_votes(result, packet):
+        agent = _vote_value(vote, "agent")
+        if _is_devils_advocate_agent(agent):
+            continue
+        position = _canonical_position(_vote_value(vote, "position"))
+        label = _agent_label(agent)
+        reason = str(_vote_value(vote, "summary") or "").strip()
+        if not reason and _canonical(agent) in {"bull", "bear"}:
+            reason = _key_argument_summary(
+                result,
+                packet,
+                _canonical(agent),
+                limit=per_reason_limit,
+            )
+            if reason == "Data tidak tersedia":
+                reason = ""
+        if not reason:
+            reason = _fallback_agent_reason(agent, position)
+        else:
+            reason = f"memilih {position} karena {reason}"
+        reason = _short_text(reason, per_reason_limit).rstrip(".; ")
+        lines.append(f"{label}: {reason}")
+    return lines
+
+
+def _debate_decision_summary(
+    result: dict[str, Any],
+    packet: AuditPacket | None = None,
+    *,
+    limit: int = 700,
+) -> str:
+    verdict = _verdict(result)
+    rating = _rating(result, packet)
+    reasoning = str(
+        verdict.get("weighted_reasoning")
+        or verdict.get("summary")
+        or _summary(result, packet)
+    ).strip()
+    distribution = _vote_distribution_summary(result, packet)
+    reason_lines = _agent_choice_reason_lines(result, packet, per_reason_limit=120)
+
+    parts = [
+        f"Keputusan akhir {rating}: {_short_text(reasoning, 260)}",
+        f"Distribusi pilihan agent: {distribution}.",
+    ]
+    if reason_lines:
+        parts.append("Alasan agent: " + "; ".join(reason_lines) + ".")
+    return _short_text(" ".join(parts), limit)
 
 
 def _summary(result: dict[str, Any], packet: AuditPacket | None = None) -> str:
@@ -662,7 +758,7 @@ class RichFormatter:
         self.console = console or Console()
 
     def _rating_style(self, rating: str) -> str:
-        normalized = str(rating or "").upper()
+        normalized = _canonical_position(rating)
         if normalized == "BUY":
             return "bold green"
         if normalized == "HOLD":
@@ -672,8 +768,8 @@ class RichFormatter:
         return "bold white"
 
     def _rating_emoji(self, rating: str) -> str:
-        normalized = str(rating or "").upper()
-        if normalized in {"BUY", "HOLD", "AVOID", "STRONG_BUY", "SELL"}:
+        normalized = _canonical_position(rating)
+        if normalized in {"BUY", "HOLD", "AVOID"}:
             return normalized
         return "UNKNOWN"
 
@@ -698,32 +794,16 @@ class RichFormatter:
         return f"{bar} {value:.0%}"
 
     def _risk_governor_line(self, risk: dict) -> str:
-        status = _dict_or_empty(risk).get("status", "unknown")
-        labels = {
-            "deployable": "Siap dieksekusi",
-            "conditional_deployable": "Conditional watchlist",
-            "wait_for_pullback": "Tunggu pullback",
-            "watchlist_only": "Pantau saja",
-            "reject": "Ditolak sistem",
-        }
-        return labels.get(str(status), str(status))
+        return _risk_governor_label(risk)
 
     def _terminal_emoji(self, rating: str) -> str:
-        normalized = str(rating or "").upper()
-        return normalized if normalized else "UNKNOWN"
+        normalized = _canonical_position(rating)
+        return normalized if normalized in {"BUY", "HOLD", "AVOID"} else "UNKNOWN"
 
     def _terminal_risk_governor_line(self, risk: dict) -> str:
         if self._console_supports_unicode():
             return self._risk_governor_line(risk)
-        status = _dict_or_empty(risk).get("status", "unknown")
-        labels = {
-            "deployable": "Siap dieksekusi",
-            "conditional_deployable": "Conditional watchlist",
-            "wait_for_pullback": "Tunggu pullback",
-            "watchlist_only": "Pantau saja",
-            "reject": "Ditolak sistem",
-        }
-        return labels.get(str(status), str(status))
+        return _risk_governor_label(risk)
 
     def _console_supports_unicode(self) -> bool:
         encoding = str(getattr(self.console.file, "encoding", "") or "")
@@ -758,12 +838,15 @@ class RichFormatter:
         for label, role in (
             ("Bull", "bull"),
             ("Bear", "bear"),
-            ("Devil's Advocate", "devils_advocate"),
         ):
             table.add_row(
                 Text(label, style=self._argument_style(role)),
                 Text(_key_argument_summary(result, packet, role)),
-            )
+        )
+        table.add_row(
+            Text("Ringkasan Pilihan", style="yellow"),
+            Text(_debate_decision_summary(result, packet, limit=420)),
+        )
         return table
 
     def render_ticker_panel(
@@ -799,94 +882,141 @@ class RichFormatter:
             risk = _risk(data)
             news_sentiment, news_adj = _get_news(data)
 
-            table = Table.grid(padding=(0, 2))
-            table.add_column(style="bold", no_wrap=True)
-            table.add_column()
-            table.add_row(
-                "Rekomendasi",
-                Text(
-                    rating,
-                    style=rating_style,
-                ),
-            )
-            table.add_row("Keyakinan", confidence_text)
-            table.add_row("Harga Kini", _money(current_price))
-            table.add_row("", Rule("VALUASI", style="dim"))
-            table.add_row("Nilai Wajar", _money(fair_value))
-            table.add_row(
-                "Selisih",
-                Text(
-                    f"{_signed_pct(value_gap)} dari harga kini",
-                    style=value_style,
-                ),
-            )
-            table.add_row("Status", _valuation_status(fair_value, current_price))
-            table.add_row("", Rule("RENCANA TRADE", style="dim"))
-            table.add_row(
-                "Entry Zone",
-                f"{_money(entry_low)} – {_money(entry_high)}",
-            )
-            table.add_row(
-                "Target",
-                f"{_money(target)}  ({_signed_pct(upside)})",
-            )
-            table.add_row(
-                "Stop Loss",
-                f"{_money(stop)}  ({_signed_pct(-downside if downside is not None else None)})",
-            )
-            table.add_row("Risk/Reward", _ratio(verdict.get("risk_reward_ratio")))
-            table.add_row("Timeframe", str(verdict.get("timeframe") or "N/A"))
-            table.add_row("", Rule("DEBAT", style="dim"))
-            table.add_row("Ronde", str(data.get("debate_rounds") or "N/A"))
             consensus = data.get("consensus_reached")
             if consensus is None:
                 consensus = verdict.get("consensus_reached")
             method = data.get("consensus_method") or verdict.get("consensus_method")
-            table.add_row(
-                "Konsensus",
-                f"{_yes_no(consensus)} — {_method_indonesian(method)}",
-            )
-            table.add_row("Pemenang", _winner_agent(data, packet))
-            vote_table = self._build_vote_table(data, packet)
-            table.add_row("Voting Agent", vote_table)
-            table.add_row("", Rule("ARGUMEN KUNCI", style="dim"))
-            table.add_row("Highlight", self._build_argument_group(data, packet))
 
-            risks = _key_risks(data)[:3]
-            if risks:
-                table.add_row("", Rule("RISIKO & KATALIS", style="dim"))
-                for index, risk_text in enumerate(risks, start=1):
-                    table.add_row(
-                        "Risiko" if index == 1 else "",
-                        f"{self._warning_marker()}{risk_text}",
-                    )
-            catalysts = _catalysts(data)[:2] if rating == "BUY" else []
-            for index, catalyst in enumerate(catalysts, start=1):
-                table.add_row(
-                    "Katalis" if index == 1 else "",
-                    f"{self._sparkle_marker()}{catalyst}",
+            # 1. Header Table
+            header_table = Table.grid(padding=(0, 2), expand=True)
+            header_table.add_column(justify="left")
+            header_table.add_column(justify="right")
+            header_table.add_row(
+                Text.assemble(
+                    ("RATING: ", "bold cyan"),
+                    (f"{rating}  ", rating_style),
+                    ("KEYAKINAN: ", "bold cyan"),
+                    (confidence_text)
+                ),
+                Text.assemble(
+                    ("KONSENSUS: ", "bold cyan"),
+                    (_yes_no(consensus) + f" ({_method_indonesian(method)})", "green" if consensus else "yellow"),
+                    ("   RONDE: ", "bold cyan"),
+                    (str(data.get("debate_rounds") or "N/A"), "magenta")
                 )
-
-            table.add_row("", Rule("SISTEM", style="dim"))
-            table.add_row("Risk Governor", self._terminal_risk_governor_line(risk))
-            table.add_row("News", f"{news_sentiment} ({news_adj:+.2f})")
-            table.add_row(
-                "Data Sentimen",
-                "tersedia"
-                if news_sentiment.lower() not in {"tidak tersedia", "unknown"}
-                else "tidak tersedia",
             )
-            table.add_row("Dibuat", _generated_at(data, packet))
+
+            # 2. Left Column: Rencana Trade & Valuasi
+            left_table = Table.grid(padding=(0, 2))
+            left_table.add_column(style="bold cyan", no_wrap=True)
+            left_table.add_column(style="white")
+            left_table.add_row("Harga Kini", _money(current_price))
+            left_table.add_row("Nilai Wajar", _money(fair_value))
+            left_table.add_row(
+                "Selisih Valuasi",
+                Text(
+                    f"{_signed_pct(value_gap)} ({_valuation_status(fair_value, current_price)})",
+                    style=value_style,
+                ),
+            )
+            left_table.add_row("Zona Entry", f"{_money(entry_low)} – {_money(entry_high)}")
+            left_table.add_row("Target Harga", f"{_money(target)}  ({_signed_pct(upside)})")
+            left_table.add_row(
+                "Stop Loss",
+                f"{_money(stop)}  ({_signed_pct(-downside if downside is not None else None)})",
+            )
+            left_table.add_row("Risk/Reward", _ratio(verdict.get("risk_reward_ratio")))
+            left_table.add_row("Timeframe", str(verdict.get("timeframe") or "N/A"))
+
+            # 3. Right Column: Voting & Integrasi Agen
+            vote_table = self._build_vote_table(data, packet)
+
+            # Wrap columns in a parent grid table to show side-by-side
+            columns_table = Table.grid(padding=(0, 4), expand=True)
+            columns_table.add_column(ratio=1)
+            columns_table.add_column(ratio=1)
+
+            trade_panel = Panel(
+                left_table,
+                title="[bold cyan]RENCANA TRADE & VALUASI[/bold cyan]",
+                border_style="cyan",
+                expand=True,
+            )
+            vote_panel = Panel(
+                vote_table,
+                title="[bold magenta]VOTING & INTEGRASI AGEN[/bold magenta]",
+                border_style="magenta",
+                expand=True,
+            )
+
+            columns_table.add_row(trade_panel, vote_panel)
+
+            # 4. Argumen Utama & Ancaman
+            arg_table = Table.grid(padding=(0, 2), expand=True)
+            arg_table.add_column(style="bold", no_wrap=True, width=18)
+            arg_table.add_column()
+
+            bull_arg = _key_argument_summary(data, packet, "bull", limit=300)
+            bear_arg = _key_argument_summary(data, packet, "bear", limit=300)
+            decision_summary = _debate_decision_summary(data, packet, limit=520)
+
+            arg_table.add_row(Text("🟢 Bull (Optimis)", style="green"), Text(bull_arg))
+            arg_table.add_row("", "")
+            arg_table.add_row(Text("🔴 Bear (Pesimis)", style="red"), Text(bear_arg))
+            arg_table.add_row("", "")
+            arg_table.add_row(Text("Ringkasan Pilihan", style="yellow"), Text(decision_summary))
+
+            arg_panel = Panel(
+                arg_table,
+                title="[bold yellow]ARGUMEN KUNCI DEBAT[/bold yellow]",
+                border_style="yellow",
+                padding=(1, 2),
+                expand=True,
+            )
+
+            # 5. Risks & Catalysts / Sistem
+            risks = _key_risks(data)[:3]
+            catalysts = _catalysts(data)[:2] if rating == "BUY" else []
+
+            sys_table = Table.grid(padding=(0, 2))
+            sys_table.add_column(style="bold cyan", no_wrap=True, width=18)
+            sys_table.add_column(style="white")
+            sys_table.add_row("Risk Governor", self._terminal_risk_governor_line(risk))
+            sys_table.add_row("News Sentiment", f"{news_sentiment} ({news_adj:+.2f})")
+
+            if risks:
+                sys_table.add_row("Key Risks", "\n".join(f"• {r}" for r in risks))
+            if catalysts:
+                sys_table.add_row("Key Catalysts", "\n".join(f"• {c}" for c in catalysts))
+
+            sys_panel = Panel(
+                sys_table,
+                title="[bold blue]SISTEM & MANAJEMEN RISIKO[/bold blue]",
+                border_style="blue",
+                padding=(1, 2),
+                expand=True,
+            )
+
+            # Assemble everything into a Group and display inside the grand border Panel
+            grand_group = Group(
+                header_table,
+                Rule(style="dim"),
+                columns_table,
+                arg_panel,
+                sys_panel,
+                Text(f"Dibuat: {_generated_at(data, packet)}", style="dim", justify="right")
+            )
 
             border = {
                 "BUY": "green",
                 "HOLD": "yellow",
                 "AVOID": "red",
             }.get(rating, "white")
+
             self.console.print(
                 Panel(
-                    table,
-                    title=f"ANALISIS: {ticker}",
+                    grand_group,
+                    title=f"ANALISIS DEBAT: [bold]{ticker}[/bold]",
                     border_style=border,
                     padding=(1, 2),
                 )
@@ -1112,8 +1242,8 @@ class MarkdownFormatter:
                 "**Bear (Pesimis):**",
                 f"> {_key_argument(data, packet, 'bear')}",
                 "",
-                "**Advocatus Diaboli:**",
-                f"> {_key_argument(data, packet, 'devils_advocate')}",
+                "**Ringkasan & Alasan Pilihan Agent:**",
+                f"> {_debate_decision_summary(data, packet, limit=900)}",
                 "",
                 "---",
                 "",
@@ -1144,7 +1274,7 @@ class MarkdownFormatter:
                     "",
                     "| Komponen | Hasil |",
                     "|----------|-------|",
-                    f"| **Risk Governor** | {RichFormatter()._risk_governor_line(risk)} |",
+                    f"| **Risk Governor** | {_risk_governor_label(risk)} |",
                     f"| **Sentimen Berita** | {news_sentiment} ({news_adj:+.2f}) |",
                     f"| **Data Tersedia** | {', '.join(sources) if sources else 'Tidak ada'} |",
                     f"| **Field Hilang** | {', '.join(missing) if missing else 'Tidak ada'} |",

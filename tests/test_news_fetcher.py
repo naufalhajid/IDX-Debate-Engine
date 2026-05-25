@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from services.news_fetcher import (
     BREAKING_NEWS_HOURS,
@@ -48,12 +49,16 @@ def _raw(
 
 
 def _mock_ticker(news: list[dict] | Exception):
-    patcher = patch("services.news_fetcher.yf.Ticker")
-    mocked_ticker = patcher.start()
+    mocked_ticker = Mock()
     if isinstance(news, Exception):
         mocked_ticker.side_effect = news
     else:
         mocked_ticker.return_value.news = news
+    patcher = patch(
+        "services.news_fetcher._get_yfinance",
+        return_value=SimpleNamespace(Ticker=mocked_ticker),
+    )
+    patcher.start()
     return patcher, mocked_ticker
 
 

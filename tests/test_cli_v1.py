@@ -96,29 +96,43 @@ def test_filter_applies_safe_overrides(monkeypatch):
 def test_debate_normalizes_tickers_and_output_dir(monkeypatch):
     calls = []
 
-    def fake_run_debate_cli(*, tickers, output_dir, verbose=False):
-        calls.append((tickers, output_dir, verbose))
+    def fake_run_debate_cli(*, tickers, output_dir, verbose=False, details=True):
+        calls.append((tickers, output_dir, verbose, details))
 
     monkeypatch.setattr("app.cli.commands.debate.run_debate_cli", fake_run_debate_cli)
 
     result = runner.invoke(app, ["debate", "bbri", "BBCA", "--output-dir", "tmp/debates"])
 
     assert result.exit_code == 0, result.output
-    assert calls == [(["BBRI", "BBCA"], Path("tmp/debates"), False)]
+    assert calls == [(["BBRI", "BBCA"], Path("tmp/debates"), False, True)]
+
+
+def test_debate_accepts_tickers_option_for_readme_compatibility(monkeypatch):
+    calls = []
+
+    def fake_run_debate_cli(*, tickers, output_dir, verbose=False, details=True):
+        calls.append((tickers, output_dir, verbose, details))
+
+    monkeypatch.setattr("app.cli.commands.debate.run_debate_cli", fake_run_debate_cli)
+
+    result = runner.invoke(app, ["debate", "--tickers", "bbri", "BBCA"])
+
+    assert result.exit_code == 0, result.output
+    assert calls == [(["BBRI", "BBCA"], Path("output/debates"), False, True)]
 
 
 def test_debate_uses_global_verbose_flag(monkeypatch):
     calls = []
 
-    def fake_run_debate_cli(*, tickers, output_dir, verbose=False):
-        calls.append((tickers, output_dir, verbose))
+    def fake_run_debate_cli(*, tickers, output_dir, verbose=False, details=True):
+        calls.append((tickers, output_dir, verbose, details))
 
     monkeypatch.setattr("app.cli.commands.debate.run_debate_cli", fake_run_debate_cli)
 
     result = runner.invoke(app, ["--verbose", "debate", "bbri"])
 
     assert result.exit_code == 0, result.output
-    assert calls == [(["BBRI"], Path("output/debates"), True)]
+    assert calls == [(["BBRI"], Path("output/debates"), True, True)]
 
 
 def test_pipeline_preserves_legacy_flags(monkeypatch):
@@ -210,21 +224,21 @@ def test_pipeline_runner_passes_argparse_argv_without_program_name(monkeypatch):
     ]
 
 
-def test_run_debate_cli_invokes_orchestrator(monkeypatch):
+def test_run_debate_cli_invokes_isolated_debate_runner(monkeypatch):
     calls = []
 
-    def fake_run_cli(argv):
+    async def fake_main(argv):
         calls.append(argv)
 
-    monkeypatch.setitem(sys.modules, "orchestrator", SimpleNamespace(_run_cli=fake_run_cli))
+    monkeypatch.setitem(sys.modules, "run_debate", SimpleNamespace(main=fake_main))
 
     from app.cli.commands.debate import run_debate_cli
 
-    # Test with default output_dir ending with "debates"
     run_debate_cli(
         tickers=["BBRI", "BBCA"],
         output_dir=Path("output/debates"),
         verbose=True,
+        details=True,
     )
 
     assert calls == [
@@ -233,17 +247,17 @@ def test_run_debate_cli_invokes_orchestrator(monkeypatch):
             "BBRI",
             "BBCA",
             "--output-dir",
-            str(Path("output")),
+            str(Path("output/debates")),
             "--verbose",
         ]
     ]
 
-    # Test with custom output_dir NOT ending with "debates"
     calls.clear()
     run_debate_cli(
         tickers=["BBRI"],
         output_dir=Path("tmp/custom"),
         verbose=False,
+        details=False,
     )
     assert calls == [
         [
@@ -251,6 +265,7 @@ def test_run_debate_cli_invokes_orchestrator(monkeypatch):
             "BBRI",
             "--output-dir",
             str(Path("tmp/custom")),
+            "--no-details",
         ]
     ]
 

@@ -25,11 +25,15 @@ from __future__ import annotations
 import asyncio
 from typing import Literal
 
-import yfinance as yf
-
 from utils.logger_config import logger
 
 RegimeType = Literal["HIGH", "NORMAL", "LOW"]
+
+
+def _get_yfinance():
+    import yfinance as yf
+
+    return yf
 
 
 async def fetch_ihsg_volatility(lookback_days: int = 20) -> float | None:
@@ -48,7 +52,7 @@ async def fetch_ihsg_volatility(lookback_days: int = 20) -> float | None:
         loop = asyncio.get_event_loop()
         df = await loop.run_in_executor(
             None,
-            lambda: yf.download(
+            lambda: _get_yfinance().download(
                 "^JKSE",
                 period=f"{lookback_days + 5}d",
                 progress=False,

@@ -13,10 +13,38 @@ class FakeDebateChamber:
             "final_verdict": json.dumps({"ticker": ticker, "rating": "BUY", "confidence": 0.72}),
             "round_count": 1,
             "debate_history": [
-                SimpleNamespace(role="bull", content="Momentum remains constructive.", round_num=1),
+                SimpleNamespace(
+                    role="bull",
+                    content="Momentum remains constructive.",
+                    round_num=1,
+                    position="BUY",
+                    confidence=0.72,
+                ),
             ],
             "raw_data": "synthetic test data",
             "metadata": {"source": "fake-chamber"},
+            "consensus_reached": True,
+            "consensus_method": "voting",
+            "dissenting_agents": ["bear"],
+            "agent_votes": [
+                {
+                    "agent": "bull",
+                    "position": "BUY",
+                    "confidence": 0.72,
+                    "supporting_winner": True,
+                },
+                {
+                    "agent": "bear",
+                    "position": "AVOID",
+                    "confidence": 0.41,
+                    "supporting_winner": False,
+                },
+            ],
+            "consensus_winner": {
+                "agent": "bull",
+                "position": "BUY",
+                "confidence": 0.72,
+            },
             "error": None,
         }
 
@@ -52,5 +80,12 @@ def test_run_debate_writes_timestamped_and_legacy_outputs(tmp_path: Path) -> Non
     assert payload["metadata"]["run_timestamp"] == timestamp
     assert payload["metadata"]["generated_at"] == generated_at
     assert payload["metadata"]["versioned_output"] is True
+    assert payload["consensus_reached"] is True
+    assert payload["consensus_method"] == "voting"
+    assert payload["dissenting_agents"] == ["bear"]
+    assert payload["agent_votes"][0]["agent"] == "bull"
+    assert payload["consensus_winner"]["agent"] == "bull"
+    assert payload["debate_history"][0]["position"] == "BUY"
+    assert payload["debate_history"][0]["confidence"] == 0.72
     assert json.loads(latest_file.read_text(encoding="utf-8")) == payload
     assert json.loads(legacy_file.read_text(encoding="utf-8")) == payload

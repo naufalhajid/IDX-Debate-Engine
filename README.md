@@ -17,6 +17,18 @@ Built for decision-support, not decision-making. This system automates the trans
 
 ---
 
+## 🎥 Quick Demo & Preview
+
+<p align="center">
+  <img src="docs/assets/dashboard_preview.png" alt="IDX Debate Engine Dashboard Banner" width="100%">
+</p>
+
+> [!TIP]
+> **Demo Video Walkthrough:** You can watch the video demonstration of the system in action here:
+> [🎥 View Demo Video (docs/assets/demo_walkthrough.mp4)](docs/assets/demo_walkthrough.mp4)
+
+---
+
 ## System Architecture
 
 The pipeline is sequential at the batch level and parallel at the agent level. Each ticker traverses the entire graph before the next one begins, ensuring clean state isolation and predictable token budgeting.
@@ -254,6 +266,10 @@ Heartbeat frames (`: heartbeat`) are emitted every 1 second on idle to prevent p
 - `ToastStack.svelte` — non-blocking error surface
 - Stores: `dashboard.ts`, `metadata.ts`, `session.ts`, `toast.ts` — reactive state management via Svelte runes
 
+<p align="center">
+  <img src="docs/assets/dashboard_interface.png" alt="Svelte 5 Dashboard Interface" width="100%">
+</p>
+
 ---
 
 ### 7. RAG Evidence Store
@@ -461,6 +477,10 @@ uv run idx serve
 # Sector analysis
 uv run idx sector list
 ```
+
+<p align="center">
+  <img src="docs/assets/cli_preview.png" alt="CLI Interface and Rich Console Output" width="100%">
+</p>
 
 ---
 

@@ -508,6 +508,7 @@ class CliRenderer:
     def __init__(self, con: Console = console) -> None:
         self.con = con
         self.verbose = False
+        self.show_details = False
         self.reset_run()
 
     def reset_run(self) -> None:
@@ -1214,7 +1215,7 @@ class CliRenderer:
     def render_debate_summaries(self, results: list[dict[str, Any]]) -> None:
         if not results:
             return
-        if not self.verbose:
+        if not self.verbose and not self.show_details and len(results) > 3:
             return
         self.phase("Per-Ticker Detail Panels")
         audit_by_ticker: dict[str, list[str]] = {}
@@ -5206,6 +5207,11 @@ def _parse_cli_args(argv: list[str] | None = None) -> argparse.Namespace:
             "mendiagnosis error API, rate-limit, atau kegagalan parsing. "
             "Tanpa flag ini, hanya summary terstruktur yang ditampilkan."
         ),
+    )
+    parser.add_argument(
+        "--details",
+        action="store_true",
+        help="Tampilkan panel detail hasil debat untuk setiap ticker secara visual di terminal.",
     )
     parser.add_argument(
         "--tickers",

@@ -16,10 +16,15 @@ from datetime import datetime, timezone
 from typing import TypedDict
 
 import pandas as pd
-import yfinance as yf
 
 
 # ── Constants ────────────────────────────────────────────────────────────────
+
+
+def _get_yfinance():
+    import yfinance as yf
+
+    return yf
 
 CRITICAL_WINDOW_DAYS = 7    # Hard exclude — terlalu dekat untuk swing entry
 WARNING_WINDOW_DAYS  = 30   # Soft flag — masuk debate dengan metadata
@@ -65,7 +70,7 @@ def scan_exdate(ticker: str, current_price: float = 0.0) -> ExDateInfo:
     }
 
     try:
-        t = yf.Ticker(f"{ticker}.JK")
+        t = _get_yfinance().Ticker(f"{ticker}.JK")
 
         # ── 1. Get upcoming dividends from yfinance calendar ─────────────────
         # yfinance returns a dict with "Ex-Dividend Date" as a Timestamp or None

@@ -409,7 +409,7 @@ async def test_market_data_cache_prefetches_one_yfinance_bundle(monkeypatch):
         def dividends(self):
             return pd.Series(dtype=float)
 
-    monkeypatch.setattr(mdc.yf, "Ticker", FakeTicker)
+    monkeypatch.setattr(mdc, "_get_yfinance", lambda: SimpleNamespace(Ticker=FakeTicker))
     cache = mdc.TickerDataCache()
 
     data = await cache.prefetch("BBRI")

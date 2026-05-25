@@ -9,7 +9,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import yfinance as yf
 
 from core.quant_filter.config import (
     NAME_SECTOR_KEYWORDS,
@@ -33,6 +32,13 @@ try:
     _HAS_ADAPTER = True
 except ImportError:
     _HAS_ADAPTER = False
+
+
+def _get_yfinance():
+    import yfinance as yf
+
+    return yf
+
 
 def _build_sector_map(
     tickers: list[str],
@@ -222,7 +228,7 @@ def download_yf_with_retry(
     for attempt in range(1, retries + 1):
         try:
             logger.info(f"yfinance download attempt {attempt}/{retries} ({len(tickers)} ticker)...")
-            data = yf.download(
+            data = _get_yfinance().download(
                 tickers,
                 period=period,
                 group_by="ticker",
@@ -755,7 +761,7 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
 
     ihsg_return_1m: float = 0.0
     try:
-        ihsg_data = yf.download(
+        ihsg_data = _get_yfinance().download(
             "^JKSE",
             period=cfg["yf_period"],
             progress=False,
