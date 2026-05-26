@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import re
@@ -55,6 +56,7 @@ class EvidenceChunk(BaseModel):
     source: str
     fetched_at: str
     freshness_seconds: int | None
+    content_hash: str = ""
     relevance_score: float = Field(default=0.0, ge=0.0, le=1.0)
     is_stale: bool
 
@@ -73,6 +75,8 @@ class EvidenceBundle(BaseModel):
     has_stale_data: bool
     staleness_warning: str | None
     token_estimate: int
+    selected_content_chars: int = 0
+    rendered_char_count: int = 0
     created_at: str
     citation_ids: list[str] = Field(default_factory=list)
 
@@ -110,12 +114,6 @@ class RAGEvidenceStore:
 
     def chunk_context_pack(self, pack: ContextPack, run_id: str) -> list[EvidenceChunk]:
         """Convert a normalized context pack into category-aware evidence chunks."""
-        fetched_at_dt = _resolve_pack_timestamp(pack)
-        fetched_at = fetched_at_dt.isoformat()
-        freshness_seconds = _freshness_seconds(fetched_at_dt)
-        is_stale = (
-            freshness_seconds is not None and freshness_seconds > STALE_THRESHOLD_SECONDS
-        )
         chunks: list[EvidenceChunk] = []
         category_counts: dict[CategoryName, int] = {}
 
@@ -125,15 +123,27 @@ class RAGEvidenceStore:
                 return
             category_index = category_counts.get(category, 0)
             category_counts[category] = category_index + 1
+            source = _source_for_category(pack.data_sources, category)
+            fetched_at_dt = _resolve_chunk_timestamp(pack, category, source)
+            fetched_at = fetched_at_dt.isoformat()
+            freshness_seconds = _freshness_seconds(fetched_at_dt)
+            is_stale = (
+                freshness_seconds is not None
+                and freshness_seconds > STALE_THRESHOLD_SECONDS
+            )
             chunks.append(
                 EvidenceChunk(
-                    chunk_id=f"{pack.ticker}_{category}_{category_index}",
+                    chunk_id=(
+                        f"{pack.ticker}_{_safe_id_part(run_id)}_"
+                        f"{category}_{category_index}"
+                    ),
                     ticker=pack.ticker,
                     category=category,
                     content=clean_content,
-                    source=_source_for_category(pack.data_sources, category),
+                    source=source,
                     fetched_at=fetched_at,
                     freshness_seconds=freshness_seconds,
+                    content_hash=_content_hash(clean_content),
                     relevance_score=0.0,
                     is_stale=is_stale,
                 )
@@ -158,8 +168,20 @@ class RAGEvidenceStore:
             append_chunk("exdate", f"Dividend Ex-Date: {exdate}")
 
         sources = ", ".join(pack.data_sources) if pack.data_sources else "unknown"
+        timestamps = (
+            _compact_json(pack.source_timestamps)
+            if getattr(pack, "source_timestamps", None)
+            else "unknown"
+        )
         missing = ", ".join(pack.missing_fields) if pack.missing_fields else "none"
-        append_chunk("metadata", f"Data Sources: {sources} | Missing Fields: {missing}")
+        append_chunk(
+            "metadata",
+            (
+                f"Data Sources: {sources} | "
+                f"Source Timestamps: {timestamps} | "
+                f"Missing Fields: {missing}"
+            ),
+        )
 
         return chunks
 
@@ -194,28 +216,33 @@ class RAGEvidenceStore:
         scored = self.score_chunks(chunks, query_context)
         selected: list[EvidenceChunk] = []
         selected_ids: set[str] = set()
-        total_chars = 0
 
         fair_value_chunk = next(
             (chunk for chunk in scored if chunk.category == "fair_value"),
             None,
         )
-        if fair_value_chunk is not None and len(fair_value_chunk.content) <= MAX_BUNDLE_CHARS:
+        if fair_value_chunk is not None and _selection_fits(
+            [fair_value_chunk],
+            total_considered=len(chunks),
+            query_context=query_context,
+        ):
             selected.append(fair_value_chunk)
             selected_ids.add(fair_value_chunk.chunk_id)
-            total_chars += len(fair_value_chunk.content)
 
         for chunk in scored:
             if len(selected) >= max_chunks:
                 break
             if chunk.chunk_id in selected_ids:
                 continue
-            next_total = total_chars + len(chunk.content)
-            if next_total > MAX_BUNDLE_CHARS:
+            candidate = [*selected, chunk]
+            if not _selection_fits(
+                candidate,
+                total_considered=len(chunks),
+                query_context=query_context,
+            ):
                 continue
             selected.append(chunk)
             selected_ids.add(chunk.chunk_id)
-            total_chars = next_total
 
         return selected
 
@@ -228,63 +255,28 @@ class RAGEvidenceStore:
         """Build, log, and return a selected evidence bundle."""
         chunks = self.chunk_context_pack(pack, run_id)
         selected = self.select_evidence(chunks, query_context)
-        has_stale_data = any(chunk.is_stale for chunk in selected)
-        token_estimate = sum(len(chunk.content) for chunk in selected) // CHARS_PER_TOKEN
-        bundle = EvidenceBundle(
+        bundle = _make_bundle(
             ticker=pack.ticker,
             run_id=run_id,
             query_context=query_context,
-            chunks=selected,
-            total_chunks_considered=len(chunks),
-            total_chunks_selected=len(selected),
-            has_stale_data=has_stale_data,
-            staleness_warning=(
-                "Some selected evidence is older than 24 hours."
-                if has_stale_data
-                else None
-            ),
-            token_estimate=token_estimate,
-            created_at=datetime.now(timezone.utc).isoformat(),
-            citation_ids=[chunk.chunk_id for chunk in selected],
+            selected=selected,
+            total_considered=len(chunks),
         )
+        while bundle.rendered_char_count > MAX_BUNDLE_CHARS and selected:
+            selected = selected[:-1]
+            bundle = _make_bundle(
+                ticker=pack.ticker,
+                run_id=run_id,
+                query_context=query_context,
+                selected=selected,
+                total_considered=len(chunks),
+            )
         self.log_bundle(bundle)
         return bundle
 
     def bundle_to_prompt_string(self, bundle: EvidenceBundle) -> str:
         """Render selected evidence as a compact prompt-ready text block."""
-        lines = [
-            f"=== EVIDENCE BRIEF: {bundle.ticker} ===",
-            f"Query: {bundle.query_context}",
-        ]
-        if bundle.has_stale_data:
-            lines.append("\u26a0\ufe0f WARNING: Some data may be stale")
-        lines.append("")
-
-        for chunk in bundle.chunks:
-            lines.extend(
-                [
-                    f"[{chunk.category.upper()}]",
-                    f"Evidence ID: {chunk.chunk_id}",
-                    chunk.content,
-                    f"Source: {chunk.source} | Score: {chunk.relevance_score:.2f}",
-                ]
-            )
-            if chunk.is_stale:
-                lines.append("\u26a0\ufe0f STALE")
-            lines.append("")
-
-        lines.extend(
-            [
-                "---",
-                (
-                    "Total evidence: "
-                    f"{bundle.total_chunks_selected}/{bundle.total_chunks_considered} "
-                    "chunks selected"
-                ),
-                f"Token estimate: ~{bundle.token_estimate}",
-            ]
-        )
-        return "\n".join(lines)
+        return "\n".join(_render_bundle_lines(bundle))
 
     def log_bundle(self, bundle: EvidenceBundle) -> None:
         """Append a compact bundle summary to JSONL without affecting runtime flow."""
@@ -295,6 +287,26 @@ class RAGEvidenceStore:
             "total_selected": bundle.total_chunks_selected,
             "selected_chunk_ids": bundle.citation_ids,
             "has_stale_data": bundle.has_stale_data,
+            "staleness_warning": bundle.staleness_warning,
+            "query_context": bundle.query_context,
+            "token_estimate": bundle.token_estimate,
+            "selected_content_chars": bundle.selected_content_chars,
+            "rendered_char_count": bundle.rendered_char_count,
+            "selected_chunks": [
+                {
+                    "chunk_id": chunk.chunk_id,
+                    "category": chunk.category,
+                    "source": chunk.source,
+                    "fetched_at": chunk.fetched_at,
+                    "freshness_seconds": chunk.freshness_seconds,
+                    "relevance_score": chunk.relevance_score,
+                    "is_stale": chunk.is_stale,
+                    "content_hash": chunk.content_hash,
+                    "content_chars": len(chunk.content),
+                    "content": chunk.content,
+                }
+                for chunk in bundle.chunks
+            ],
             "created_at": bundle.created_at,
         }
         try:
@@ -325,7 +337,21 @@ def guard_evidence_citations(
     min_citations: int = 1,
 ) -> CitationGuardReport:
     """Validate claimed evidence IDs against a selected evidence bundle."""
-    citation_map = {citation.chunk_id: citation for citation in citations_for_bundle(bundle)}
+    return guard_evidence_citation_ids(
+        citations_for_bundle(bundle),
+        cited_chunk_ids,
+        min_citations=min_citations,
+    )
+
+
+def guard_evidence_citation_ids(
+    citations: list[EvidenceCitation],
+    cited_chunk_ids: list[str],
+    *,
+    min_citations: int = 1,
+) -> CitationGuardReport:
+    """Validate claimed evidence IDs against selected citation metadata."""
+    citation_map = {citation.chunk_id: citation for citation in citations}
     cited_unique = [chunk_id for chunk_id in dict.fromkeys(cited_chunk_ids) if chunk_id]
     cited_chunks = [
         citation_map[chunk_id]
@@ -352,8 +378,140 @@ def guard_evidence_citations(
     )
 
 
+def _make_bundle(
+    *,
+    ticker: str,
+    run_id: str,
+    query_context: str,
+    selected: list[EvidenceChunk],
+    total_considered: int,
+) -> EvidenceBundle:
+    has_stale_data = any(chunk.is_stale for chunk in selected)
+    selected_content_chars = sum(len(chunk.content) for chunk in selected)
+    provisional = EvidenceBundle(
+        ticker=ticker,
+        run_id=run_id,
+        query_context=query_context,
+        chunks=selected,
+        total_chunks_considered=total_considered,
+        total_chunks_selected=len(selected),
+        has_stale_data=has_stale_data,
+        staleness_warning=(
+            "Some selected evidence is older than 24 hours."
+            if has_stale_data
+            else None
+        ),
+        token_estimate=selected_content_chars // CHARS_PER_TOKEN,
+        selected_content_chars=selected_content_chars,
+        rendered_char_count=0,
+        created_at=datetime.now(timezone.utc).isoformat(),
+        citation_ids=[chunk.chunk_id for chunk in selected],
+    )
+    rendered_char_count = len("\n".join(_render_bundle_lines(provisional)))
+    token_estimate = rendered_char_count // CHARS_PER_TOKEN
+    bundle = provisional.model_copy(
+        update={
+            "token_estimate": token_estimate,
+            "rendered_char_count": rendered_char_count,
+        }
+    )
+    # Recompute once because the token-estimate footer may change length.
+    return bundle.model_copy(
+        update={"rendered_char_count": len("\n".join(_render_bundle_lines(bundle)))}
+    )
+
+
+def _render_bundle_lines(bundle: EvidenceBundle) -> list[str]:
+    lines = [
+        f"=== EVIDENCE BRIEF: {bundle.ticker} ===",
+        f"Query: {bundle.query_context}",
+    ]
+    if bundle.has_stale_data:
+        lines.append("\u26a0\ufe0f WARNING: Some data may be stale")
+    lines.append("")
+
+    for chunk in bundle.chunks:
+        lines.extend(
+            [
+                f"[{chunk.category.upper()}]",
+                f"Evidence ID: {chunk.chunk_id}",
+                chunk.content,
+                f"Source: {chunk.source} | Score: {chunk.relevance_score:.2f}",
+            ]
+        )
+        if chunk.is_stale:
+            lines.append("\u26a0\ufe0f STALE")
+        lines.append("")
+
+    lines.extend(
+        [
+            "---",
+            (
+                "Total evidence: "
+                f"{bundle.total_chunks_selected}/{bundle.total_chunks_considered} "
+                "chunks selected"
+            ),
+            f"Token estimate: ~{bundle.token_estimate}",
+        ]
+    )
+    return lines
+
+
+def _selection_fits(
+    selected: list[EvidenceChunk],
+    *,
+    total_considered: int,
+    query_context: str,
+) -> bool:
+    if not selected:
+        return True
+    bundle = _make_bundle(
+        ticker=selected[0].ticker,
+        run_id="selection",
+        query_context=query_context,
+        selected=selected,
+        total_considered=total_considered,
+    )
+    return bundle.rendered_char_count <= MAX_BUNDLE_CHARS
+
+
+def _resolve_chunk_timestamp(
+    pack: ContextPack,
+    category: CategoryName,
+    source: str,
+) -> datetime:
+    timestamps = getattr(pack, "source_timestamps", {}) or {}
+    candidates = (
+        source,
+        source.lower(),
+        category,
+        "market_data" if category in {"technical", "fair_value"} else "",
+        "context",
+    )
+    for key in candidates:
+        value = _timestamp_for_key(timestamps, key)
+        if value is None:
+            continue
+        return _parse_timestamp(value)
+    return _resolve_pack_timestamp(pack)
+
+
+def _timestamp_for_key(timestamps: dict[str, str], key: str) -> str | None:
+    if not key:
+        return None
+    key_lower = key.lower()
+    for stored_key, value in timestamps.items():
+        if stored_key.lower() == key_lower and value:
+            return value
+    return None
+
+
 def _resolve_pack_timestamp(pack: ContextPack) -> datetime:
     value = getattr(pack, "generated_at", None) or pack.as_of
+    return _parse_timestamp(value)
+
+
+def _parse_timestamp(value: Any) -> datetime:
     if isinstance(value, datetime):
         timestamp = value
     elif isinstance(value, str) and value.strip():
@@ -430,6 +588,15 @@ def _split_text(text: str, max_chars: int) -> list[str]:
 
 def _compact_json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _content_hash(content: str) -> str:
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+def _safe_id_part(value: str) -> str:
+    clean = re.sub(r"[^A-Za-z0-9]+", "_", str(value or "unknown")).strip("_")
+    return clean or "unknown"
 
 
 def _extract_exdate(fundamentals: dict) -> Any | None:

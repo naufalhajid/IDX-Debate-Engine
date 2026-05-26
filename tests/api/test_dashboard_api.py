@@ -149,3 +149,63 @@ def test_debate_stream_uses_stream_run(monkeypatch):
     assert '"ticker": "BBCA"' in body
     assert '"type": "progress"' in body
     assert "data: [DONE]" in body
+
+
+def test_debate_stream_forwards_dashboard_config(monkeypatch):
+    from core.orchestrator import pipeline
+
+    captured = {}
+
+    async def fake_orchestrator_main(**kwargs):
+        captured.update(kwargs)
+        return []
+
+    async def fake_load_results():
+        return {
+            "BBCA": {
+                "ticker": "BBCA",
+                "sector": "bank",
+                "conviction_score": 75,
+                "rating": "BUY",
+                "actionable": True,
+                "target_price": 9800,
+                "stop_loss": 8800,
+                "entry_low": 9000,
+                "entry_high": 9200,
+                "risk_reward": 2.0,
+                "debate_rounds": [],
+                "scout_metrics": {
+                    "technical": {},
+                    "fundamental": {},
+                    "sentiment": {},
+                },
+                "devil_advocate_triggered": False,
+                "verdict_summary": "Final verdict.",
+                "last_debated_at": "2026-05-26",
+            }
+        }
+
+    monkeypatch.setattr(pipeline, "main", fake_orchestrator_main)
+    monkeypatch.setattr(stocks_router, "_load_results", fake_load_results)
+
+    with client.stream(
+        "POST",
+        "/api/debate/stream",
+        json={
+            "tickers": ["bbca"],
+            "total_capital": 100_000_000,
+            "max_loss_pct": 0.01,
+            "max_positions": 3,
+        },
+        headers={"X-Gemini-API-Key": "AIza-test"},
+    ) as response:
+        body = response.read().decode("utf-8")
+
+    assert response.status_code == 200
+    assert captured["tickers"] == ["BBCA"]
+    assert captured["user_config"] == {
+        "total_capital": 100_000_000.0,
+        "max_loss_pct": 0.01,
+        "max_positions": 3,
+    }
+    assert '"stage": "final"' in body

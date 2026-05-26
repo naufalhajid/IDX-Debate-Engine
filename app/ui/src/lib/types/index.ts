@@ -37,6 +37,6 @@ export type DebateEvent =
   | { type: 'scout'; ticker: string; metrics: ScoutMetrics }
   | { type: 'round'; ticker: string; data: DebateRound }
   | { type: 'devil_advocate'; ticker: string; question?: string }
-  | { type: 'verdict'; ticker: string; result: StockResult }
+  | { type: 'verdict'; ticker: string; result: StockResult; stage?: 'interim' | 'final' }
   | { type: 'done'; ticker: string }
   | { type: 'error'; ticker: string; message: string };

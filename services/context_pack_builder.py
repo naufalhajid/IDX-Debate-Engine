@@ -7,7 +7,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 MAX_PROMPT_CHARS = 3_200
@@ -28,6 +28,7 @@ class ContextPack(BaseModel):
     technicals: dict
     sentiment_summary: str | None
     data_sources: list[str]
+    source_timestamps: dict[str, str] = Field(default_factory=dict)
     missing_fields: list[str]
     token_estimate: int
 
@@ -70,6 +71,7 @@ def build_context_pack(ticker: str, raw_data: dict) -> ContextPack:
         nested_paths=(("sentiment", "summary"),),
     )
     data_sources = _collect_data_sources(raw_data)
+    source_timestamps = _collect_source_timestamps(raw_data)
 
     missing_fields = []
     if price is None:
@@ -94,6 +96,7 @@ def build_context_pack(ticker: str, raw_data: dict) -> ContextPack:
         technicals=technicals,
         sentiment_summary=sentiment_summary,
         data_sources=data_sources,
+        source_timestamps=source_timestamps,
         missing_fields=missing_fields,
         token_estimate=0,
     )
@@ -106,6 +109,11 @@ def pack_to_prompt_string(pack: ContextPack) -> str:
     fundamentals_json = _compact_json(pack.fundamentals)
     technicals_json = _compact_json(pack.technicals)
     sources = ", ".join(pack.data_sources) if pack.data_sources else "unknown"
+    source_timestamps = (
+        _compact_json(pack.source_timestamps)
+        if pack.source_timestamps
+        else "unknown"
+    )
     missing = ", ".join(pack.missing_fields) if pack.missing_fields else "none"
     fair_value = (
         f"Rp {pack.fair_value:,.0f}" if pack.fair_value is not None else "INSUFFICIENT_DATA"
@@ -119,6 +127,7 @@ def pack_to_prompt_string(pack: ContextPack) -> str:
             f"Current Price: Rp {pack.price:,.0f}\n"
             f"Fair Value Estimate: {fair_value}\n"
             f"Data Sources: {sources}\n"
+            f"Source Timestamps: {source_timestamps}\n"
             f"Missing Fields: {missing}\n"
             f"Technical Indicators: {technicals_json}\n\n"
             f"Fundamental Brief: {fundamentals}\n\n"
@@ -252,6 +261,34 @@ def _collect_data_sources(raw_data: dict) -> list[str]:
             seen.add(source)
             unique_sources.append(source)
     return unique_sources
+
+
+def _collect_source_timestamps(raw_data: dict) -> dict[str, str]:
+    timestamps: dict[str, str] = {}
+    raw_timestamps = raw_data.get("source_timestamps")
+    if isinstance(raw_timestamps, dict):
+        for source, timestamp in raw_timestamps.items():
+            clean_source = str(source).strip().lower()
+            clean_timestamp = _optional_text(timestamp)
+            if clean_source and clean_timestamp:
+                timestamps[clean_source] = clean_timestamp
+
+    market_data = raw_data.get("market_data")
+    if isinstance(market_data, dict):
+        source = str(market_data.get("source") or "market_data").strip().lower()
+        fetched_at = _optional_text(
+            market_data.get("history_as_of") or market_data.get("fetched_at")
+        )
+        if source and fetched_at:
+            timestamps[source] = fetched_at
+            timestamps.setdefault("market_data", fetched_at)
+
+    for key in ("as_of", "timestamp", "generated_at"):
+        timestamp = _optional_text(raw_data.get(key))
+        if timestamp:
+            timestamps.setdefault("context", timestamp)
+            break
+    return timestamps
 
 
 def _compact_json(value: Any) -> str:

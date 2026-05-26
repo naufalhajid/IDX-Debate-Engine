@@ -218,7 +218,10 @@ def check_all_dependencies(
     )
 
 
-def maybe_rerun_quant_filter(script_path: str = "run_quant_filter.py") -> bool:
+def maybe_rerun_quant_filter(
+    script_path: str = "run_quant_filter.py",
+    output_dir: Path | str | None = None,
+) -> bool:
     """
     Jalankan run_quant_filter.py via subprocess jika CANDIDATES_AUTO_RERUN=True.
 
@@ -234,9 +237,17 @@ def maybe_rerun_quant_filter(script_path: str = "run_quant_filter.py") -> bool:
         logger.error(f"[Validator] Script tidak ditemukan: {script_path}")
         return False
 
-    logger.info(f"[Validator] Auto-rerun: menjalankan {script_path} ...")
+    command = [sys.executable, str(script)]
+    if output_dir is not None:
+        command.extend(["--output-dir", str(output_dir)])
+
+    logger.info(
+        "[Validator] Auto-rerun: menjalankan "
+        + " ".join(command[1:])
+        + " ..."
+    )
     result = subprocess.run(
-        [sys.executable, str(script)],
+        command,
         # Tidak capture output — biarkan mengalir ke terminal
         # supaya user bisa melihat progress scraping secara real-time.
     )

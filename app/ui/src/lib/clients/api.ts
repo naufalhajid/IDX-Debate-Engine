@@ -2,7 +2,13 @@ import { get } from 'svelte/store';
 import { apiKey } from '$lib/stores/session';
 import type { DebateEvent, StockResult } from '$lib/types';
 
-const BASE = 'http://localhost:8000';
+const BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
+
+export interface DebateRunConfig {
+  total_capital?: number;
+  max_loss_pct?: number;
+  max_positions?: number;
+}
 
 function headers(): HeadersInit {
   return {
@@ -48,6 +54,7 @@ export const api = {
 
   streamDebate(
     tickers: string[],
+    config: DebateRunConfig,
     onEvent: (event: DebateEvent) => void,
     onDone: () => void,
     onError?: (message: string) => void
@@ -56,7 +63,7 @@ export const api = {
     fetch(`${BASE}/api/debate/stream`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify({ tickers }),
+      body: JSON.stringify({ tickers, ...config }),
       signal: controller.signal
     })
       .then(async (res) => {
@@ -78,7 +85,12 @@ export const api = {
             const cleanFrame = frame.trim();
             if (!cleanFrame || cleanFrame.startsWith(':')) continue;
             
-            const data = cleanFrame.replace(/^data:\s*/m, '').trim();
+            const data = cleanFrame
+              .split('\n')
+              .filter((line) => line.startsWith('data:'))
+              .map((line) => line.replace(/^data:\s*/, ''))
+              .join('\n')
+              .trim();
             if (!data) continue;
             if (data === '[DONE]') {
               onDone();

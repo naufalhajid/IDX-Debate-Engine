@@ -24,7 +24,7 @@ RESULTS_PATH = settings.results_path
 
 _cache: dict[str, dict[str, Any]] = {}  # QW-FIX-PF1
 _cache_timestamp: float = 0.0  # QW-FIX-PF1
-_cache_file_mtime: float = 0.0  # New: track results file modification time
+_cache_file_mtime: float = 0.0  # Tracks batch/debate artifact modification time
 _CACHE_TTL_SECONDS: float = 60.0  # QW-FIX-PF1
 _cache_lock = asyncio.Lock()  # QW-FIX-PF1
 
@@ -34,6 +34,24 @@ def _error(code: str, message: str, status_code: int) -> HTTPException:
         status_code=status_code,
         detail={"code": code, "message": message},
     )
+
+
+def _results_signature() -> float:
+    signature = 0.0
+    try:
+        if RESULTS_PATH.exists():
+            signature = max(signature, RESULTS_PATH.stat().st_mtime)
+    except OSError:
+        pass
+
+    debates_dir = RESULTS_PATH.parent / "debates"
+    if debates_dir.exists():
+        for path in debates_dir.glob("*.json"):
+            try:
+                signature = max(signature, path.stat().st_mtime)
+            except OSError:
+                continue
+    return signature
 
 
 async def _load_results() -> dict[str, dict[str, Any]]:  # QW-FIX-PF1
@@ -46,12 +64,7 @@ async def _load_results() -> dict[str, dict[str, Any]]:  # QW-FIX-PF1
     """
     global _cache, _cache_timestamp, _cache_file_mtime
 
-    current_mtime = 0.0
-    try:
-        if RESULTS_PATH.exists():
-            current_mtime = RESULTS_PATH.stat().st_mtime
-    except Exception:
-        pass
+    current_mtime = _results_signature()
 
     now = time.monotonic()
     if _cache and (now - _cache_timestamp) < _CACHE_TTL_SECONDS and current_mtime == _cache_file_mtime:
@@ -59,11 +72,7 @@ async def _load_results() -> dict[str, dict[str, Any]]:  # QW-FIX-PF1
 
     async with _cache_lock:
         now = time.monotonic()
-        try:
-            if RESULTS_PATH.exists():
-                current_mtime = RESULTS_PATH.stat().st_mtime
-        except Exception:
-            pass
+        current_mtime = _results_signature()
         if _cache and (now - _cache_timestamp) < _CACHE_TTL_SECONDS and current_mtime == _cache_file_mtime:
             return _cache
 
@@ -137,7 +146,6 @@ def invalidate_results_cache() -> None:
 
 @router.get("/health")
 async def health_check() -> dict[str, Any]:
-    from pathlib import Path
     from datetime import datetime, timedelta
     
     debates_dir = RESULTS_PATH.parent / "debates"
@@ -233,7 +241,7 @@ async def health_check() -> dict[str, Any]:
 
     return {
         "status": "ok", 
-        "results_exist": RESULTS_PATH.exists(),
+        "results_exist": RESULTS_PATH.exists() or bool(results),
         "latest_debate_date": latest_date_str,
         "debate_stats": debate_stats
     }
@@ -335,7 +343,8 @@ async def stream_debate(
             async def run(self, ticker: str, current_price: float = 0.0) -> dict:
                 final_result = {}
                 async for event in self.stream_run(ticker):
-                    await event_queue.put(event)
+                    if event.get("type") != "done":
+                        await event_queue.put(event)
                     if event.get("type") == "verdict":
                         final_result = event.get("raw_state", {})
                     elif event.get("type") == "error":
@@ -356,9 +365,9 @@ async def stream_debate(
             yield sse({"type": "progress", "ticker": ticker, "phase": "Market Regime", "pct": 10})
 
         user_config = {
-            "total_capital": 1_000_000.0,
-            "max_loss_pct": 0.02,
-            "max_positions": 5,
+            "total_capital": float(payload.total_capital),
+            "max_loss_pct": float(payload.max_loss_pct),
+            "max_positions": int(payload.max_positions),
         }
 
         # Run orchestrator main in a background task
@@ -382,6 +391,7 @@ async def stream_debate(
                     if event.get("type") == "verdict":
                         # Strip raw_state to save bandwidth
                         event.pop("raw_state", None)
+                        event.setdefault("stage", "interim")
                     yield sse(event)
                     event_queue.task_done()
                 except asyncio.TimeoutError:
@@ -406,6 +416,7 @@ async def stream_debate(
                         yield sse({
                             "type": "verdict",
                             "ticker": ticker,
+                            "stage": "final",
                             "result": final_results[ticker]
                         })
                     yield sse({"type": "done", "ticker": ticker})

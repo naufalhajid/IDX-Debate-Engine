@@ -95,7 +95,7 @@
       {#if activeResult}
         <div class="price-highlights">
           <div class="price-box">
-            <span class="price-label">Current / Entry Low</span>
+            <span class="price-label">Entry Low</span>
             <strong class="price-value mono">Rp {formatIdr(activeResult.entry_low)}</strong>
           </div>
           <div class="price-box">
@@ -451,13 +451,6 @@
   .mono-pct {
     color: var(--accent-cyan);
     font-weight: 700;
-  }
-
-  .terminal-progress-bar-text {
-    font-family: var(--font-mono);
-    font-size: 12px;
-    letter-spacing: 2px;
-    color: var(--text-muted);
   }
 
   .scout-summary-terminal {

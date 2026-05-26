@@ -17,15 +17,17 @@ Built for decision-support, not decision-making. This system automates the trans
 
 ---
 
-## 🎥 Quick Demo & Preview
+## Example Output Preview
 
 <p align="center">
-  <img src="docs/assets/dashboard_preview.png" alt="IDX Debate Engine Dashboard Banner" width="100%">
+  <img src="docs/assets/sample_output_report.svg" alt="Sanitized IDX Debate Engine output preview" width="100%">
 </p>
 
-> [!TIP]
-> **Demo Video Walkthrough:** You can watch the video demonstration of the system in action here:
-> [🎥 View Demo Video (docs/assets/demo_walkthrough.mp4)](docs/assets/demo_walkthrough.mp4)
+The preview above is generated from the sanitized sample artifacts in
+[`examples/sample_TOP_3_SWING_TRADES.md`](examples/sample_TOP_3_SWING_TRADES.md)
+and [`examples/sample_full_batch_results.json`](examples/sample_full_batch_results.json).
+It shows the shape of the final report without exposing live market analysis,
+private API responses, or local runtime data.
 
 ---
 
@@ -266,9 +268,8 @@ Heartbeat frames (`: heartbeat`) are emitted every 1 second on idle to prevent p
 - `ToastStack.svelte` — non-blocking error surface
 - Stores: `dashboard.ts`, `metadata.ts`, `session.ts`, `toast.ts` — reactive state management via Svelte runes
 
-<p align="center">
-  <img src="docs/assets/dashboard_interface.png" alt="Svelte 5 Dashboard Interface" width="100%">
-</p>
+The dashboard consumes the same normalized `StockResult` shape shown in the
+preview at the top of this README.
 
 ---
 
@@ -276,11 +277,12 @@ Heartbeat frames (`: heartbeat`) are emitted every 1 second on idle to prevent p
 
 **File:** `services/rag_evidence_store.py`
 
-A freshness-aware evidence selection layer that sits between the data scouts and the debate context. Prevents stale market data from being injected into agent prompts without a staleness warning.
+A freshness-aware deterministic evidence selection layer that sits between the data scouts and the debate context. It is not a vector database; it scores normalized `ContextPack` chunks by category, query keywords, and per-source freshness, then injects a compact evidence brief with audit-friendly citation IDs.
 
-- Maximum 12 evidence chunks per bundle, hard-capped at 2,400 characters
+- Maximum 12 evidence chunks per bundle, with the final rendered evidence brief hard-capped at 2,400 characters
 - Stale threshold: 86,400 seconds (24 hours)
 - Category weights: `fair_value=1.0`, `fundamental=0.9`, `technical=0.85`, `sentiment=0.6`, `exdate=0.7`, `metadata=0.3`
+- Evidence logs include selected chunk content, content hashes, source timestamps, freshness flags, rendered character count, and citation IDs for post-run audit
 - Chunks scored by relevance × freshness × category weight; top-K selected per bundle
 
 ---
@@ -443,13 +445,13 @@ cd ../..
 Runs the complete pipeline: quant filter → regime detection → parallel scouts → debate chamber → CIO verdict → risk governor → portfolio optimization → reports.
 
 ```bash
-uv run python orchestrator.py
+uv run idx pipeline
 ```
 
 **Dry-run mode** (mock LLM responses, no API calls):
 
 ```bash
-uv run python orchestrator.py --dry-run --no-interactive --output-dir tmp/dry_run
+uv run idx pipeline --dry-run --no-interactive --output-dir tmp/dry_run
 ```
 
 ---
@@ -478,16 +480,15 @@ uv run idx serve
 uv run idx sector list
 ```
 
-<p align="center">
-  <img src="docs/assets/cli_preview.png" alt="CLI Interface and Rich Console Output" width="100%">
-</p>
+Generated CLI and batch artifacts are represented by the sanitized examples in
+the `examples/` directory.
 
 ---
 
 ### Run Isolated Debate
 
 ```bash
-uv run python run_debate.py --tickers BBRI BBCA --output-dir output/debates
+uv run idx debate BBRI BBCA --output-dir output/debates
 ```
 
 ---
@@ -495,7 +496,7 @@ uv run python run_debate.py --tickers BBRI BBCA --output-dir output/debates
 ### Regenerate Quantitative Candidates
 
 ```bash
-uv run python run_quant_filter.py
+uv run idx scan
 ```
 
 ---
@@ -503,7 +504,7 @@ uv run python run_quant_filter.py
 ### Start the API Server
 
 ```bash
-uv run python run_api.py
+uv run idx serve
 # FastAPI available at http://127.0.0.1:8000
 # Interactive docs at http://127.0.0.1:8000/docs
 ```

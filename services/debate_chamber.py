@@ -20,6 +20,7 @@ Refactored (audit fixes):
 import asyncio
 from collections import Counter
 from collections.abc import AsyncGenerator
+from datetime import datetime, timezone
 import json
 import re
 from time import perf_counter
@@ -62,7 +63,12 @@ from schemas.debate import (
     validate_swing_targets,
 )
 from services.context_pack_builder import build_context_pack, pack_to_prompt_string
-from services.rag_evidence_store import DEFAULT_STORE as rag_store
+from services.rag_evidence_store import (
+    DEFAULT_STORE as rag_store,
+    EvidenceCitation,
+    citations_for_bundle,
+    guard_evidence_citation_ids,
+)
 from services.fair_value_calculator import build_fair_value_report
 from services.debate_prompt_registry import PROMPT_REGISTRY, PROMPT_VERSION
 from services.debate_run_guard import run_with_guard
@@ -157,6 +163,72 @@ def _state_attempt(state: DebateChamberState, attempt_key: str) -> int:
         return int(_state_metadata(state).get(attempt_key, 0) or 0)
     except (TypeError, ValueError):
         return 0
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _market_data_timestamp(market_data: dict[str, Any]) -> str:
+    for key in ("history_as_of", "fetched_at", "timestamp", "generated_at", "as_of"):
+        value = market_data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    history = market_data.get("history")
+    try:
+        if history is not None and len(history) > 0:
+            last_index = history.index[-1]
+            timestamp = pd.Timestamp(last_index)
+            if timestamp.tzinfo is None:
+                timestamp = timestamp.tz_localize(timezone.utc)
+            else:
+                timestamp = timestamp.tz_convert(timezone.utc)
+            return timestamp.isoformat()
+    except Exception:
+        pass
+    return _utc_now_iso()
+
+
+def _rag_citation_ids_from_text(value: Any) -> list[str]:
+    texts: list[str] = []
+
+    def collect(item: Any) -> None:
+        if item is None:
+            return
+        if isinstance(item, str):
+            texts.append(item)
+            return
+        if isinstance(item, dict):
+            for child in item.values():
+                collect(child)
+            return
+        if isinstance(item, (list, tuple, set)):
+            for child in item:
+                collect(child)
+
+    collect(value)
+    joined = "\n".join(texts)
+    patterns = (
+        r"Evidence ID:\s*([A-Za-z0-9_.:-]+)",
+        r"\bevidence_id[\"'`:\s]+([A-Za-z0-9_.:-]+)",
+        r"\b([A-Z0-9]{2,8}_[A-Za-z0-9_]+_(?:fair_value|fundamental|technical|sentiment|exdate|metadata)_\d+)\b",
+    )
+    found: list[str] = []
+    for pattern in patterns:
+        found.extend(re.findall(pattern, joined, flags=re.IGNORECASE))
+    return [chunk_id for chunk_id in dict.fromkeys(found) if chunk_id]
+
+
+def _rag_citations_from_metadata(metadata: dict[str, Any]) -> list[EvidenceCitation]:
+    citations: list[EvidenceCitation] = []
+    for item in metadata.get("rag_citations") or []:
+        if not isinstance(item, dict):
+            continue
+        try:
+            citations.append(EvidenceCitation(**item))
+        except Exception:
+            continue
+    return citations
 
 
 def _ledger_stage_start(
@@ -967,6 +1039,7 @@ class DebateChamber:
                 "prompt_version": getattr(self, "prompt_version", PROMPT_VERSION),
                 "run_id": run_id,
                 "market_data_source": market_data.get("source", "unknown"),
+                "market_data_fetched_at": _market_data_timestamp(market_data),
                 "market_data_cached": True,
                 "flash_calls": 0,
                 "pro_calls": 0,
@@ -1533,9 +1606,24 @@ Current Date (Asia/Jakarta): {current_date}
         if tech:
             sources.append("yfinance")
 
+        context_generated_at = _utc_now_iso()
+        market_data = state.get("market_data") or {}
+        market_data_as_of = _market_data_timestamp(market_data)
+        source_timestamps = {
+            "stockbit": context_generated_at,
+            "gemini": context_generated_at,
+            "context": context_generated_at,
+        }
+        if market_source:
+            source_timestamps[str(market_source).lower()] = market_data_as_of
+        if tech:
+            source_timestamps["yfinance"] = market_data_as_of
+            source_timestamps["market_data"] = market_data_as_of
+
         context_pack = build_context_pack(
             ticker,
             {
+                "as_of": market_data_as_of,
                 "current_price": current_price,
                 "fair_value_estimate": fair_value_estimate,
                 "fundamentals": {
@@ -1548,6 +1636,8 @@ Current Date (Asia/Jakarta): {current_date}
                 },
                 "sentiment_summary": self._compact_text(s, 800),
                 "data_sources": sources,
+                "source_timestamps": source_timestamps,
+                "market_data": market_data,
             },
         )
         if context_pack.missing_fields:
@@ -1570,6 +1660,17 @@ Current Date (Asia/Jakarta): {current_date}
                 metadata["rag_chunks_selected"] = bundle.total_chunks_selected
                 metadata["rag_chunks_considered"] = bundle.total_chunks_considered
                 metadata["rag_token_estimate"] = bundle.token_estimate
+                metadata["rag_rendered_char_count"] = bundle.rendered_char_count
+                metadata["rag_citation_ids"] = bundle.citation_ids
+                metadata["rag_citations"] = [
+                    citation.model_dump(mode="json")
+                    for citation in citations_for_bundle(bundle)
+                ]
+                metadata["rag_stale_citation_ids"] = [
+                    citation.chunk_id
+                    for citation in citations_for_bundle(bundle)
+                    if citation.is_stale
+                ]
                 state["metadata"] = metadata
             except Exception as exc:
                 logger.warning(f"[RAG] Failed to store telemetry metrics: {exc}")
@@ -2365,6 +2466,19 @@ Current Date (Asia/Jakarta): {current_date}
             state.get("raw_data", ""),
             3_000,
         )
+        rag_metadata = _state_metadata(state)
+        rag_citation_ids = [
+            str(chunk_id)
+            for chunk_id in rag_metadata.get("rag_citation_ids", [])
+            if str(chunk_id).strip()
+        ]
+        citation_instruction = ""
+        if rag_citation_ids:
+            citation_instruction = (
+                "\n\nEvidence Citation Requirement:\n"
+                "When explaining weighted_reasoning, cite at least one selected "
+                f"Evidence ID exactly as written. Valid IDs: {', '.join(rag_citation_ids)}"
+            )
         user_content = (
             f"Ticker: {ticker}\n"
             f"Current Market Price: Rp {current_price:,.0f}\n\n"
@@ -2374,7 +2488,8 @@ Current Date (Asia/Jakarta): {current_date}
             f"{conflict_signal}\n\n"
             f"=== CONSENSUS DIRECTIVE ===\n"
             f"{consensus_directive}\n\n"
-            f"Decision Brief (compressed, no raw source dump):\n{decision_context}\n\n"
+            f"Decision Brief (compressed, no raw source dump):\n"
+            f"{decision_context}{citation_instruction}\n\n"
             f"Debate Transcript (price mentions redacted; Trade Envelope is the only price source):\n{hist}\n\n"
             f"Devil's Advocate Challenge:\n{state.get('devils_advocate_question', 'N/A')}"
         )
@@ -2474,6 +2589,32 @@ Start your response with '{' and end with '}'. Nothing else."""
             )
             return p
 
+        def _apply_citation_guard(parsed: dict) -> dict:
+            citations = _rag_citations_from_metadata(_state_metadata(state))
+            if not citations:
+                return parsed
+            cited_ids = _rag_citation_ids_from_text(parsed)
+            report = guard_evidence_citation_ids(
+                citations,
+                cited_ids,
+                min_citations=1,
+            )
+            metadata = dict(_state_metadata(state))
+            metadata["rag_citation_guard"] = report.model_dump(mode="json")
+            state["metadata"] = metadata
+            if report.valid:
+                return parsed
+
+            logger.warning(
+                f"[RAG] {ticker} CIO citation guard failed: {report.errors}"
+            )
+            p = dict(parsed)
+            p["weighted_reasoning"] = self._append_reason(
+                p.get("weighted_reasoning"),
+                "Evidence citation guard warning: " + "; ".join(report.errors),
+            )
+            return p
+
         try:
             resp = await self._invoke_llm_for_state(
                 state,
@@ -2487,6 +2628,7 @@ Start your response with '{' and end with '}'. Nothing else."""
             parsed = _apply_envelope(parsed)
             parsed = self._apply_consensus_override(parsed, state)
             parsed = _apply_news_adjustment(parsed)
+            parsed = _apply_citation_guard(parsed)
             verdict_json = CIOVerdict(**parsed).model_dump_json()
             logger.info(f"[CIO] JSON parsed successfully for {ticker}")
         except Exception as e:
@@ -2518,9 +2660,10 @@ Start your response with '{' and end with '}'. Nothing else."""
             detail={
                 "rating": verdict_detail.get("rating"),
                 "confidence": verdict_detail.get("confidence"),
+                "rag_citation_guard": _state_metadata(state).get("rag_citation_guard"),
             },
         )
-        return {"final_verdict": verdict_json}
+        return {"final_verdict": verdict_json, "metadata": _state_metadata(state)}
 
     # ── Graph Assembly ───────────────────────────────────────────────────────
 
@@ -2838,6 +2981,7 @@ Start your response with '{' and end with '}'. Nothing else."""
                 "prompt_version": getattr(self, "prompt_version", PROMPT_VERSION),
                 "run_id": getattr(self, "run_id", "unknown"),
                 "market_data_source": market_data.get("source", "unknown"),
+                "market_data_fetched_at": _market_data_timestamp(market_data),
                 "market_data_cached": True,
                 "flash_calls": 0,
                 "pro_calls": 0,

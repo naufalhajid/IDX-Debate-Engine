@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from services.context_pack_builder import ContextPack
@@ -10,11 +11,16 @@ from services.rag_evidence_store import (
     EvidenceChunk,
     RAGEvidenceStore,
     citations_for_bundle,
+    guard_evidence_citation_ids,
     guard_evidence_citations,
 )
 
 
-def _pack(*, as_of: datetime | None = None) -> ContextPack:
+def _pack(
+    *,
+    as_of: datetime | None = None,
+    source_timestamps: dict[str, str] | None = None,
+) -> ContextPack:
     return ContextPack(
         ticker="BBCA",
         as_of=as_of or datetime.now(timezone.utc),
@@ -27,6 +33,7 @@ def _pack(*, as_of: datetime | None = None) -> ContextPack:
         technicals={"rsi14": 43.7, "ma50": 6478.0, "ma200": 7389.0},
         sentiment_summary="INSUFFICIENT_DATA but no red flags.",
         data_sources=["stockbit", "yfinance", "gemini"],
+        source_timestamps=source_timestamps or {},
         missing_fields=[],
         token_estimate=100,
     )
@@ -68,6 +75,24 @@ def test_chunk_context_pack_returns_chunks_for_non_empty_categories(
         "exdate",
         "metadata",
     }.issubset(categories)
+    assert all(chunk.content_hash for chunk in chunks)
+    assert all("_run_1_" in chunk.chunk_id for chunk in chunks)
+
+
+def test_chunk_context_pack_uses_source_timestamp_for_staleness(
+    tmp_path: Path,
+) -> None:
+    old_yfinance = (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
+    store = RAGEvidenceStore(tmp_path / "evidence.jsonl")
+
+    chunks = store.chunk_context_pack(
+        _pack(source_timestamps={"yfinance": old_yfinance}),
+        run_id="run-1",
+    )
+
+    technical_chunks = [chunk for chunk in chunks if chunk.category == "technical"]
+    assert technical_chunks
+    assert all(chunk.is_stale for chunk in technical_chunks)
 
 
 def test_score_chunks_fair_value_scores_higher_than_metadata(tmp_path: Path) -> None:
@@ -149,7 +174,23 @@ def test_build_bundle_returns_consistent_counts(tmp_path: Path) -> None:
     assert isinstance(bundle, EvidenceBundle)
     assert bundle.total_chunks_selected <= bundle.total_chunks_considered
     assert bundle.citation_ids == [chunk.chunk_id for chunk in bundle.chunks]
+    assert bundle.rendered_char_count <= MAX_BUNDLE_CHARS
     assert (tmp_path / "evidence.jsonl").exists()
+
+
+def test_log_bundle_records_auditable_chunk_content(tmp_path: Path) -> None:
+    log_path = tmp_path / "evidence.jsonl"
+    store = RAGEvidenceStore(log_path)
+
+    bundle = store.build_bundle(_pack(), run_id="run-1")
+    record = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+    assert record["rendered_char_count"] == bundle.rendered_char_count
+    assert record["selected_chunks"]
+    first_chunk = record["selected_chunks"][0]
+    assert first_chunk["chunk_id"] == bundle.citation_ids[0]
+    assert first_chunk["content_hash"]
+    assert first_chunk["content"]
 
 
 def test_bundle_to_prompt_string_contains_ticker_and_header(tmp_path: Path) -> None:
@@ -195,3 +236,16 @@ def test_guard_evidence_citations_reports_missing_or_insufficient_ids(
     assert report.valid is False
     assert report.missing_citation_ids == ["missing-id"]
     assert any("expected at least 2 citation" in error for error in report.errors)
+
+
+def test_guard_evidence_citation_ids_works_from_metadata_citations(
+    tmp_path: Path,
+) -> None:
+    store = RAGEvidenceStore(tmp_path / "evidence.jsonl")
+    bundle = store.build_bundle(_pack(), run_id="run-1")
+    citations = citations_for_bundle(bundle)
+
+    report = guard_evidence_citation_ids(citations, [bundle.citation_ids[0]])
+
+    assert report.valid is True
+    assert report.cited_chunks[0].chunk_id == bundle.citation_ids[0]

@@ -4388,15 +4388,19 @@ async def main(
     else:
         validation = check_candidates_file(JSON_PATH, settings.CANDIDATES_MAX_AGE_HOURS)
         if not validation.is_valid:
-            logger.warning(f"[Validator] {validation.message}")
             if settings.CANDIDATES_AUTO_RERUN:
-                if not maybe_rerun_quant_filter():
+                logger.info(
+                    f"[Validator] {validation.message} Auto-rerun quant filter."
+                )
+                if not maybe_rerun_quant_filter(output_dir=OUTPUT_DIR):
+                    logger.warning(f"[Validator] {validation.message}")
                     logger.error("[Validator] Auto-rerun gagal. Pipeline dihentikan.")
                     _cli_renderer.flush_buffered_alerts()
                     if raise_on_error:
                         raise RuntimeError("Candidate validation auto-rerun failed.")
                     return
             else:
+                logger.warning(f"[Validator] {validation.message}")
                 logger.error(
                     "[Validator] Set CANDIDATES_AUTO_RERUN=true untuk auto-rerun, "
                     "atau jalankan run_quant_filter.py secara manual."

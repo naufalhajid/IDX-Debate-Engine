@@ -79,6 +79,7 @@ def _safe_get(mapping: Any, key: str) -> Any:
 
 def _fetch_yfinance_bundle(ticker: str) -> MarketData:
     yf_ticker = _get_yfinance().Ticker(f"{ticker}.JK")
+    fetched_at = datetime.now(timezone.utc).isoformat()
     market_data: MarketData = {
         "history": None,
         "info": {},
@@ -86,10 +87,21 @@ def _fetch_yfinance_bundle(ticker: str) -> MarketData:
         "calendar": None,
         "dividends": None,
         "source": "yfinance",
+        "fetched_at": fetched_at,
+        "history_as_of": fetched_at,
     }
 
     try:
         market_data["history"] = _normalise_history(yf_ticker.history(period="1y"))
+        history = market_data["history"]
+        if history is not None and len(history) > 0:
+            last_index = history.index[-1]
+            history_as_of = pd.Timestamp(last_index)
+            if history_as_of.tzinfo is None:
+                history_as_of = history_as_of.tz_localize(timezone.utc)
+            else:
+                history_as_of = history_as_of.tz_convert(timezone.utc)
+            market_data["history_as_of"] = history_as_of.isoformat()
     except Exception as exc:
         logger.warning("[MarketData] {} history fetch failed: {}", ticker, exc)
 

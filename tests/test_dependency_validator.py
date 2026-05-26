@@ -1,10 +1,15 @@
 """Tests untuk core/dependency_validator.py."""
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
-from core.dependency_validator import ValidationResult, check_candidates_file
+from core.dependency_validator import (
+    ValidationResult,
+    check_candidates_file,
+    maybe_rerun_quant_filter,
+)
 
 
 def test_file_not_found(tmp_path: Path) -> None:
@@ -58,3 +63,21 @@ def test_validation_result_fields() -> None:
     assert r.is_valid is True
     assert r.age_hours == 1.5
     assert r.message == "ok"
+
+
+def test_maybe_rerun_quant_filter_passes_output_dir(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    script = tmp_path / "run_quant_filter.py"
+    script.write_text("print('ok')", encoding="utf-8")
+    captured: dict[str, list[str]] = {}
+
+    def fake_run(command: list[str]) -> SimpleNamespace:
+        captured["command"] = command
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr("core.dependency_validator.subprocess.run", fake_run)
+
+    assert maybe_rerun_quant_filter(script_path=str(script), output_dir=tmp_path / "dry")
+    assert captured["command"][-2:] == ["--output-dir", str(tmp_path / "dry")]

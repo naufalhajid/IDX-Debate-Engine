@@ -587,6 +587,81 @@ async def test_cio_uses_decision_brief_and_redacts_debate_prices(monkeypatch):
     assert "Rp [REDACTED: use Python Trade Envelope]" in human_prompt
 
 
+@pytest.mark.asyncio
+async def test_cio_records_rag_citation_guard_when_evidence_id_missing(monkeypatch):
+    chamber = _chamber()
+    chamber.pro_llm = FakeLLM(model="gemini-2.5-pro")
+    evidence_id = "BBRI_run_1_technical_0"
+
+    async def fake_invoke(llm, messages, inject_rules=True):
+        return SimpleNamespace(
+            content=json.dumps(
+                {
+                    "ticker": "BBRI",
+                    "rating": "BUY",
+                    "confidence": 0.72,
+                    "summary": "Valid setup.",
+                    "weighted_reasoning": "Envelope-driven decision.",
+                    "key_catalysts": ["volume"],
+                    "key_risks": ["breakdown"],
+                    "timeframe": "1-3 Months",
+                    "entry_price_range": "1 - 2",
+                    "target_price": 3,
+                    "stop_loss": 1,
+                    "current_price": 1000,
+                    "fair_value": 1200,
+                    "expected_return": "+5.0%",
+                    "risk_reward_ratio": 2.0,
+                    "consensus_reached": False,
+                    "consensus_method": None,
+                    "dissenting_agents": [],
+                }
+            )
+        )
+
+    monkeypatch.setattr(chamber, "_invoke_llm", fake_invoke)
+
+    result = await chamber._cio_judge_node(
+        {
+            "ticker": "BBRI",
+            "current_price": 1000.0,
+            "technical_indicators": {"ma50": 980, "atr14": 30},
+            "fair_value_estimate": 1200.0,
+            "debate_history": [
+                DebateMessage(role="bull", content="BUY with momentum", round_num=1)
+            ],
+            "raw_data": "compact raw",
+            "decision_brief": f"Evidence ID: {evidence_id}\nRSI support holds.",
+            "consensus_reached": False,
+            "consensus_method": None,
+            "dissenting_agents": [],
+            "agent_votes": [],
+            "disagreement_type": "direction",
+            "devils_advocate_question": "What if support breaks?",
+            "metadata": {
+                "rag_citation_ids": [evidence_id],
+                "rag_citations": [
+                    {
+                        "chunk_id": evidence_id,
+                        "category": "technical",
+                        "source": "yfinance",
+                        "relevance_score": 0.95,
+                        "is_stale": False,
+                    }
+                ],
+            },
+        }
+    )
+
+    verdict = json.loads(result["final_verdict"])
+    guard = result["metadata"]["rag_citation_guard"]
+
+    assert guard["valid"] is False
+    assert guard["missing_citation_ids"] == []
+    assert "expected at least 1 citation" in guard["errors"][0]
+    assert "Evidence citation guard warning" in verdict["weighted_reasoning"]
+
+
 def test_cio_verdict_rejects_invalid_price_ordering():
     with pytest.raises(ValueError, match="Invalid swing price ordering"):
         CIOVerdict(

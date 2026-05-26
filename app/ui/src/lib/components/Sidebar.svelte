@@ -39,7 +39,12 @@
     validating = true;
     try {
       apiKey.set(cleanedKey);
-      await api.validateKey();
+      const result = await api.validateKey();
+      if (!result.valid) {
+        apiKey.clear();
+        toast('error', 'API Key validation failed');
+        return;
+      }
       toast('success', 'API Key saved and validated');
     } catch (error: unknown) {
       toast('error', (error as Error).message);

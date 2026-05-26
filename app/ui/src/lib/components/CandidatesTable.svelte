@@ -139,6 +139,12 @@
   });
 
   $: sorted = [...$filteredResults].sort((a, b) => compare(a, b, sortKey, sortDir));
+  $: {
+    const visibleTickers = new Set(sorted.map((stock) => stock.ticker));
+    if ([...selectedTickers].some((ticker) => !visibleTickers.has(ticker))) {
+      selectedTickers = new Set([...selectedTickers].filter((ticker) => visibleTickers.has(ticker)));
+    }
+  }
   $: selectedCount = selectedTickers.size;
   $: allChecked = sorted.length > 0 && selectedCount === sorted.length;
   $: startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - buffer);

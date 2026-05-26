@@ -15,6 +15,7 @@
     debateStats
   } from '$lib/stores/dashboard';
   import { stockList } from '$lib/stores/metadata';
+  import { portfolioEquity } from '$lib/stores/session';
   import { toast } from '$lib/stores/toast';
   import type { DebateEvent, StockResult } from '$lib/types';
 
@@ -24,6 +25,8 @@
   let latestDebateDate: string | null = null;
   let pollInterval: ReturnType<typeof setInterval>;
   let stopStream: (() => void) | null = null;
+  let noResultsToastShown = false;
+  let pendingStreamTickers = new Set<string>();
 
   function upsertResult(result: StockResult) {
     allResults.update((items) => {
@@ -63,6 +66,7 @@
         }
       }
       if (results.status === 'fulfilled') {
+        noResultsToastShown = false;
         const currentResults = get(allResults);
         if (JSON.stringify(currentResults) !== JSON.stringify(results.value)) {
           allResults.set(results.value);
@@ -70,7 +74,10 @@
         if (!get(activeTicker) && results.value[0]) activeTicker.set(results.value[0].ticker);
         lastUpdated = new Date();
       } else {
-        toast('warning', results.reason?.message ?? 'No analysis results found');
+        if (!noResultsToastShown) {
+          toast('warning', results.reason?.message ?? 'No analysis results found');
+          noResultsToastShown = true;
+        }
       }
     } catch (error: unknown) {
       serverOnline = false;
@@ -83,8 +90,12 @@
   function handleStreamEvent(event: DebateEvent) {
     debateStream.update((items) => {
       if (event.type === 'verdict') {
+        const stage = event.stage ?? 'interim';
         const idx = items.findIndex(
-          (item) => item.type === 'verdict' && item.ticker === event.ticker
+          (item) =>
+            item.type === 'verdict' &&
+            item.ticker === event.ticker &&
+            (item.stage ?? 'interim') === stage
         );
         if (idx !== -1) {
           const updated = [...items];
@@ -97,7 +108,7 @@
     activeTicker.set(event.ticker);
     if (event.type === 'verdict') upsertResult(event.result);
     if (event.type === 'done' || event.type === 'error') {
-      isStreaming.set(false);
+      pendingStreamTickers.delete(event.ticker);
     }
     if (event.type === 'error') {
       toast('error', `${event.ticker}: ${event.message}`);
@@ -105,21 +116,30 @@
   }
 
   function startDebate(tickers: string[]) {
-    if (!tickers.length || get(isStreaming)) return;
+    const cleanedTickers = [...new Set(tickers.map((ticker) => ticker.trim().toUpperCase()).filter(Boolean))];
+    if (!cleanedTickers.length || get(isStreaming)) return;
     stopStream?.();
     debateStream.set([]);
+    pendingStreamTickers = new Set(cleanedTickers);
     isStreaming.set(true);
     stopStream = api.streamDebate(
-      tickers,
+      cleanedTickers,
+      {
+        total_capital: get(portfolioEquity),
+        max_loss_pct: 0.02,
+        max_positions: 5
+      },
       handleStreamEvent,
       () => {
         isStreaming.set(false);
+        pendingStreamTickers = new Set();
         stopStream = null;
         toast('success', 'Debate stream completed');
         loadData();
       },
       (message) => {
         isStreaming.set(false);
+        pendingStreamTickers = new Set();
         stopStream = null;
         toast('error', message);
         loadData();
@@ -300,17 +320,16 @@
     <Sidebar bind:collapsed={isSidebarCollapsed} width={sidebarWidth} />
 
     {#if !isSidebarCollapsed}
-      <!-- svelte-ignore a11y-no-static-element-interactions -->
-      <div 
+      <button
+        type="button"
         class="sidebar-splitter"
         class:sidebar-splitter--resizing={isSidebarResizing}
         onmousedown={startSidebarResizing}
         ontouchstart={startSidebarResizingTouch}
-        role="separator"
         aria-label="Resize sidebar"
       >
         <div class="splitter-handle"></div>
-      </div>
+      </button>
     {:else}
       <div class="sidebar-collapsed-border"></div>
     {/if}
@@ -331,17 +350,16 @@
           {/if}
         </section>
 
-        <!-- svelte-ignore a11y-no-static-element-interactions -->
-        <div 
+        <button
+          type="button"
           class="workspace-splitter"
           class:workspace-splitter--resizing={isResizing}
           onmousedown={startResizing}
           ontouchstart={startResizingTouch}
-          role="separator"
           aria-label="Resize panels"
         >
           <div class="splitter-handle"></div>
-        </div>
+        </button>
 
         <section class="debate-area">
           <DebateTimeline />
@@ -400,12 +418,16 @@
 
   .workspace-splitter {
     width: 16px;
+    padding: 0;
+    border: 0;
     cursor: col-resize;
     display: flex;
     align-items: center;
     justify-content: center;
     position: relative;
     user-select: none;
+    background: transparent;
+    color: inherit;
     transition: background-color 0.2s;
   }
 
@@ -454,6 +476,7 @@
 
   .sidebar-splitter {
     width: 12px;
+    padding: 0;
     cursor: col-resize;
     display: flex;
     align-items: center;
@@ -461,6 +484,7 @@
     position: relative;
     user-select: none;
     background: transparent;
+    color: inherit;
     border-right: 1px solid var(--surface-border);
     transition: background-color 0.2s, border-color 0.2s;
   }
