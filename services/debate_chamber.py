@@ -761,6 +761,31 @@ class DebateChamber:
         bull_vote = next((v for v in votes if v["agent"] == "bull"), None)
         bear_vote = next((v for v in votes if v["agent"] == "bear"), None)
 
+        known_positions = [
+            str(v.get("position"))
+            for v in votes
+            if v.get("position") in {"BUY", "HOLD", "AVOID"}
+        ]
+        counts = Counter(known_positions)
+        if counts:
+            position, count = counts.most_common(1)[0]
+            threshold = (
+                ROUND1_CONSENSUS_THRESHOLD
+                if round_count <= 1
+                else CONSENSUS_THRESHOLD
+            )
+            if count / CONSENSUS_AGENT_COUNT >= threshold:
+                majority_votes = [v for v in votes if v.get("position") == position]
+                winner = max(majority_votes, key=lambda v: float(v.get("confidence", 0.0) or 0.0))
+                return {
+                    "consensus_reached": True,
+                    "consensus_method": "voting",
+                    "disagreement_type": None,
+                    "dissenting_agents": self._dissenters(votes, position),
+                    "consensus_winner": winner,
+                    "agent_votes": votes,
+                }
+
         if bull_vote and bear_vote:
             bull_pos = str(bull_vote.get("position"))
             bear_pos = str(bear_vote.get("position"))
@@ -792,31 +817,6 @@ class DebateChamber:
                     "disagreement_type": "timing",
                     "dissenting_agents": [],
                     "consensus_winner": None,
-                    "agent_votes": votes,
-                }
-
-        known_positions = [
-            str(v.get("position"))
-            for v in votes
-            if v.get("position") in {"BUY", "HOLD", "AVOID"}
-        ]
-        counts = Counter(known_positions)
-        if counts:
-            position, count = counts.most_common(1)[0]
-            threshold = (
-                ROUND1_CONSENSUS_THRESHOLD
-                if round_count <= 1
-                else CONSENSUS_THRESHOLD
-            )
-            if count / CONSENSUS_AGENT_COUNT >= threshold:
-                majority_votes = [v for v in votes if v.get("position") == position]
-                winner = max(majority_votes, key=lambda v: float(v.get("confidence", 0.0) or 0.0))
-                return {
-                    "consensus_reached": True,
-                    "consensus_method": "voting",
-                    "disagreement_type": None,
-                    "dissenting_agents": self._dissenters(votes, position),
-                    "consensus_winner": winner,
                     "agent_votes": votes,
                 }
 
@@ -1361,7 +1361,7 @@ Current Date (Asia/Jakarta): {current_date}
                 f"=== ORDERBOOK ===\n{json.dumps(orderbook_data)[:5_000]}"
             )),
         ]
-        resp = await self._invoke_llm_for_state(state, self.flash_llm, messages)
+        resp = await self._invoke_llm_for_state(state, self.pro_llm, messages)
         content, signal = self._ensure_signal_footer(resp.content, "chartist")
         self._record_observation(state, "chartist", content, signal)
         if not technical_partial:

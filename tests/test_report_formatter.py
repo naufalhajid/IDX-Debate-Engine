@@ -22,9 +22,9 @@ def _mock_result(rating: str = "BUY") -> dict:
             "stop_loss": 8500,
             "risk_reward_ratio": 2.4,
             "timeframe": "1-3 Months",
-            "summary": "BBCA masih menarik dengan risiko terukur.",
-            "key_risks": ["Volatilitas IHSG", "Tekanan margin"],
-            "key_catalysts": ["Likuiditas kuat", "Rotasi sektor bank"],
+            "summary": "BBCA remains attractive with measured risk.",
+            "key_risks": ["IHSG volatility", "Margin pressure"],
+            "key_catalysts": ["Strong liquidity", "Banking sector rotation"],
         },
         "debate_rounds": 3,
         "consensus_reached": True,
@@ -65,15 +65,15 @@ def _mock_result(rating: str = "BUY") -> dict:
         "debate_history": [
             {
                 "role": "bull",
-                "content": "Bull case kuat.\n\nPosition: BUY\nAgent Confidence: 0.70",
+                "content": "Strong bull case.\n\nPosition: BUY\nAgent Confidence: 0.70",
             },
             {
                 "role": "bear",
-                "content": "Bear case menyorot valuasi.\n\nPosition: AVOID\nAgent Confidence: 0.60",
+                "content": "Bear case highlights valuation risk.\n\nPosition: AVOID\nAgent Confidence: 0.60",
             },
             {
                 "role": "devils_advocate",
-                "content": "Apa skenario invalidasinya?",
+                "content": "What is the invalidation scenario?",
             },
         ],
         "risk_governor": {"status": "deployable"},
@@ -108,7 +108,7 @@ def _mock_packet() -> AuditPacket:
                 confidence=0.7,
                 round_num=1,
                 supporting_winner=True,
-                summary="Bull case kuat.",
+                summary="Strong bull case.",
             )
         ],
         evidence_used=[
@@ -120,13 +120,13 @@ def _mock_packet() -> AuditPacket:
                 freshness_note=None,
             )
         ],
-        key_bull_argument="Bull case kuat.",
-        key_bear_argument="Bear case menyorot valuasi.",
-        devils_advocate_question="Apa skenario invalidasinya?",
+        key_bull_argument="Strong bull case.",
+        key_bear_argument="Bear case highlights valuation risk.",
+        devils_advocate_question="What is the invalidation scenario?",
         data_freshness_ok=True,
         stale_sources=[],
         missing_fields=[],
-        one_line_summary="BBCA BUY dengan keyakinan 70%.",
+        one_line_summary="BBCA BUY with 70% confidence.",
     )
 
 
@@ -160,13 +160,13 @@ def test_confidence_bar_full_fill() -> None:
 def test_risk_governor_deployable_line() -> None:
     line = RichFormatter()._risk_governor_line({"status": "deployable"})
 
-    assert "Siap" in line
+    assert "Execution" in line
 
 
 def test_risk_governor_reject_line() -> None:
     line = RichFormatter()._risk_governor_line({"status": "reject"})
 
-    assert "Ditolak" in line
+    assert "System rejected" in line
 
 
 def test_risk_governor_conditional_line() -> None:
@@ -180,27 +180,27 @@ def test_generate_ticker_report_contains_title_and_ticker(tmp_path) -> None:
     path = tmp_path / "latest_report.md"
     path.write_text(report, encoding="utf-8")
 
-    assert "Laporan Analisis" in path.read_text(encoding="utf-8")
+    assert "Analysis Report" in path.read_text(encoding="utf-8")
     assert "BBCA" in report
 
 
 def test_generate_ticker_report_buy_contains_catalyst_section() -> None:
     report = MarkdownFormatter().generate_ticker_report(_mock_result("BUY"))
 
-    assert "Katalis Potensial" in report
+    assert "Potential Catalysts" in report
 
 
 def test_generate_ticker_report_avoid_skips_catalyst_section() -> None:
     report = MarkdownFormatter().generate_ticker_report(_mock_result("AVOID"))
 
-    assert "Katalis Potensial" not in report
+    assert "Potential Catalysts" not in report
 
 
 def test_generate_ticker_report_normalizes_strong_buy_rating() -> None:
     report = MarkdownFormatter().generate_ticker_report(_mock_result("STRONG_BUY"))
 
-    assert "| **Rekomendasi** | **BUY** |" in report
-    assert "Katalis Potensial" in report
+    assert "| **Recommendation** | **BUY** |" in report
+    assert "Potential Catalysts" in report
 
 
 def test_generate_ticker_report_contains_all_agent_names() -> None:
@@ -244,14 +244,14 @@ def test_markdown_risk_governor_does_not_instantiate_rich_formatter(monkeypatch)
 
     report = MarkdownFormatter().generate_ticker_report(_mock_result())
 
-    assert "| **Risk Governor** | Siap dieksekusi |" in report
+    assert "| **Risk Governor** | Execution ready |" in report
 
 
 def test_generate_ticker_report_replaces_advocatus_with_decision_summary() -> None:
     report = MarkdownFormatter().generate_ticker_report(_mock_result())
 
-    assert "Ringkasan & Alasan Pilihan Agent" in report
-    assert "Distribusi pilihan agent" in report
+    assert "Decision Summary & Agent Rationale" in report
+    assert "Agent choice distribution" in report
     assert "Advocatus Diaboli" not in report
 
 
@@ -266,7 +266,7 @@ def test_generate_batch_summary_contains_run_id_and_title() -> None:
     report = MarkdownFormatter().generate_batch_summary([_mock_result()], "run-123")
 
     assert "run-123" in report
-    assert "Ringkasan Analisis Batch" in report
+    assert "Batch Analysis Summary" in report
 
 
 def test_generate_batch_summary_contains_buy_ticker_in_results_table() -> None:
@@ -282,9 +282,9 @@ def test_vote_table_soft_hold_uses_override_note() -> None:
 
     report = MarkdownFormatter().generate_ticker_report(result)
 
-    assert "| Agent | Posisi | Keyakinan |" in report
-    assert "| Agent | Posisi | Keyakinan | Hasil |" not in report
-    assert "di-override oleh soft_hold_rule" in report
+    assert "| Agent | Position | Confidence |" in report
+    assert "| Agent | Position | Confidence | Outcome |" not in report
+    assert "overridden by soft_hold_rule" in report
 
 
 def test_render_ticker_panel_handles_minimal_result() -> None:
@@ -303,11 +303,12 @@ def test_render_ticker_panel_contains_debate_argument_highlights() -> None:
     formatter.render_ticker_panel(_mock_result())
 
     output = console.export_text()
-    assert "ARGUMEN KUNCI" in output
-    assert "Bull case kuat" in output
-    assert "Bear case menyorot valuasi" in output
-    assert "Ringkasan Pilihan" in output
-    assert "Alasan agent" in output
+    assert "KEY DEBATE" in output
+    assert "Strong bull case" in output
+    assert "Bear case highlights valuation" in output
+    assert "Decision Summary" in output
+    assert "Agent rationale" in output
+    assert "News Sentiment" not in output
     assert "Advocatus" not in output
 
 
@@ -368,7 +369,7 @@ def test_render_batch_summary_handles_empty_results() -> None:
 
     formatter.render_batch_summary([])
 
-    assert "HASIL DEBATE" in console.export_text()
+    assert "DEBATE RESULTS" in console.export_text()
 
 
 def test_render_batch_summary_uses_compact_debate_table() -> None:
@@ -383,11 +384,11 @@ def test_render_batch_summary_uses_compact_debate_table() -> None:
     )
 
     output = console.export_text()
-    assert "HASIL DEBATE" in output
+    assert "DEBATE RESULTS" in output
     assert "Ticker" in output
     assert "Risk Gov" in output
     assert "BBCA" in output
     assert "TLKM" in output
-    assert "Berhasil: 1" in output
-    assert "Gagal: 1" in output
-    assert "Durasi: 1m 14s" in output
+    assert "Succeeded: 1" in output
+    assert "Failed: 1" in output
+    assert "Duration: 1m 14s" in output

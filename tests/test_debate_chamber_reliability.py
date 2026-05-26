@@ -264,6 +264,34 @@ async def test_consensus_round_two_allows_three_of_five_votes(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_consensus_round_two_majority_beats_soft_hold(monkeypatch):
+    chamber = _chamber()
+
+    async def fake_invoke(llm, messages, inject_rules=True):
+        raise AssertionError("consensus evaluator should be deterministic")
+
+    monkeypatch.setattr(chamber, "_invoke_llm", fake_invoke)
+
+    result = await chamber._consensus_evaluator_node(
+        {
+            "round_count": 2,
+            "fundamental_data": "Position: BUY\nAgent Confidence: 0.75",
+            "technical_data": "Position: BUY\nAgent Confidence: 0.85",
+            "sentiment_data": "Position: HOLD\nAgent Confidence: 0.00",
+            "debate_history": [
+                DebateMessage(role="bull", content="Position: BUY\nAgent Confidence: 0.85", round_num=2),
+                DebateMessage(role="bear", content="Position: AVOID\nAgent Confidence: 0.85", round_num=2),
+            ],
+        }
+    )
+
+    assert result["consensus_reached"] is True
+    assert result["consensus_method"] == "voting"
+    assert result["consensus_winner"]["position"] == "BUY"
+    assert result["dissenting_agents"] == ["sentiment_specialist", "bear"]
+
+
+@pytest.mark.asyncio
 async def test_consensus_round_three_uses_confidence_winner(monkeypatch):
     chamber = _chamber()
 
@@ -288,6 +316,44 @@ async def test_consensus_round_three_uses_confidence_winner(monkeypatch):
     assert result["consensus_reached"] is False
     assert result["consensus_method"] == "confidence_winner"
     assert result["consensus_winner"]["agent"] == "bear"
+
+
+@pytest.mark.asyncio
+async def test_chartist_node_uses_pro_llm(monkeypatch):
+    chamber = _chamber()
+    chamber.flash_llm = FakeLLM(model="gemini-2.5-flash")
+    chamber.pro_llm = FakeLLM(model="gemini-2.5-pro")
+    captured = {}
+
+    async def fast_sleep(_seconds):
+        return None
+
+    async def fake_fetch_url(_url):
+        return {}
+
+    async def fake_invoke_for_state(state, llm, messages, inject_rules=True):
+        captured["llm"] = llm
+        captured["messages"] = messages
+        return SimpleNamespace(
+            content="Technicals support patience.\n\nPosition: HOLD\nAgent Confidence: 0.55"
+        )
+
+    monkeypatch.setattr(dc.asyncio, "sleep", fast_sleep)
+    monkeypatch.setattr(chamber, "_fetch_url", fake_fetch_url)
+    monkeypatch.setattr(chamber, "_invoke_llm_for_state", fake_invoke_for_state)
+
+    result = await chamber._chartist_node(
+        {
+            "ticker": "BBCA",
+            "market_data": {},
+            "metadata": {},
+        }
+    )
+
+    assert captured["llm"] is chamber.pro_llm
+    assert captured["llm"] is not chamber.flash_llm
+    assert captured["messages"]
+    assert "Position: HOLD" in result["technical_data"]
 
 
 @pytest.mark.asyncio

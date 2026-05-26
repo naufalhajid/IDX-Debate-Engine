@@ -36,9 +36,9 @@ _AGENT_LABELS = {
 }
 
 _METHOD_LABELS = {
-    "voting": "Voting mayoritas",
-    "confidence_winner": "Pemenang confidence",
-    "soft_hold": "Aturan soft hold",
+    "voting": "Majority voting",
+    "confidence_winner": "Confidence winner",
+    "soft_hold": "Soft hold rule",
 }
 
 
@@ -80,11 +80,19 @@ def _agent_label(agent: Any) -> str:
 
 def _winner_missing(value: Any) -> bool:
     token = _canonical(value)
-    return token in {"", "none", "null", "unknown", "n/a", "data_tidak_tersedia"}
+    return token in {
+        "",
+        "none",
+        "null",
+        "unknown",
+        "n/a",
+        "data_tidak_tersedia",
+        "data_unavailable",
+    }
 
 
 def _soft_hold_label() -> str:
-    return "Soft Hold Rule\n(tidak ada konsensus)"
+    return "Soft Hold Rule\n(no consensus)"
 
 
 def _is_soft_hold_winner(method: Any, winner: Any = None) -> bool:
@@ -169,7 +177,7 @@ def _method_indonesian(value: Any) -> str:
 
 
 def _yes_no(value: Any) -> str:
-    return "Ya" if bool(value) else "Tidak"
+    return "Yes" if bool(value) else "No"
 
 
 def _now_wib() -> datetime:
@@ -262,7 +270,7 @@ def _valuation_status(fair_value: Any, current_price: Any) -> str:
 def _short_text(value: Any, limit: int = 60) -> str:
     text = str(value or "").strip()
     if not text:
-        return "Data tidak tersedia"
+        return "Data unavailable"
     return text if len(text) <= limit else text[: max(0, limit - 3)] + "..."
 
 
@@ -272,7 +280,7 @@ def _get_news(result: dict[str, Any]) -> tuple[str, float]:
         result.get("news_sentiment")
         or metadata.get("news_overall_sentiment")
         or metadata.get("news_sentiment")
-        or "tidak tersedia"
+        or "unavailable"
     )
     adjustment = _safe_float(
         result.get("news_confidence_adjustment")
@@ -317,11 +325,11 @@ def _risk(result: dict[str, Any]) -> dict[str, Any]:
 def _risk_governor_label(risk: dict) -> str:
     status = _dict_or_empty(risk).get("status", "unknown")
     labels = {
-        "deployable": "Siap dieksekusi",
+        "deployable": "Execution ready",
         "conditional_deployable": "Conditional watchlist",
-        "wait_for_pullback": "Tunggu pullback",
-        "watchlist_only": "Pantau saja",
-        "reject": "Ditolak sistem",
+        "wait_for_pullback": "Wait for pullback",
+        "watchlist_only": "Watchlist only",
+        "reject": "System rejected",
     }
     return labels.get(str(status), str(status))
 
@@ -381,7 +389,7 @@ def _argument_sentences(value: Any) -> list[str]:
 def _summarize_argument_text(value: Any, limit: int = 220) -> str:
     sentences = _argument_sentences(value)
     if not sentences:
-        return "Data tidak tersedia"
+        return "Data unavailable"
 
     selected: list[str] = [sentences[0]]
     for sentence in sentences[1:]:
@@ -432,7 +440,7 @@ def _key_argument(
             return packet.devils_advocate_question
     text = _latest_history_argument(result, role)
     if not text:
-        return "Data tidak tersedia"
+        return "Data unavailable"
     return text if len(text) <= 500 else text[:497] + "..."
 
 
@@ -464,7 +472,7 @@ def _vote_distribution_summary(
         if not _is_devils_advocate_agent(_vote_value(vote, "agent"))
     ]
     if not votes:
-        return "data voting tidak tersedia"
+        return "voting data unavailable"
 
     counts: dict[str, int] = {}
     for vote in votes:
@@ -473,7 +481,7 @@ def _vote_distribution_summary(
             continue
         counts[position] = counts.get(position, 0) + 1
     if not counts:
-        return "data voting tidak tersedia"
+        return "voting data unavailable"
     ordered = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
     total = sum(counts.values())
     return ", ".join(f"{position} {count}/{total}" for position, count in ordered)
@@ -482,12 +490,12 @@ def _vote_distribution_summary(
 def _fallback_agent_reason(agent: Any, position: str) -> str:
     agent_key = _canonical(agent)
     if agent_key == "fundamental_scout":
-        return f"memilih {position} berdasarkan valuasi, profitabilitas, dan kualitas fundamental"
+        return f"chose {position} based on valuation, profitability, and fundamental quality"
     if agent_key == "chartist":
-        return f"memilih {position} berdasarkan tren harga, momentum, dan area teknikal"
+        return f"chose {position} based on price trend, momentum, and technical setup"
     if agent_key == "sentiment_specialist":
-        return f"memilih {position} berdasarkan sentimen berita dan risiko headline"
-    return f"memilih {position} berdasarkan sinyal debat yang tersedia"
+        return f"chose {position} based on news sentiment and headline risk"
+    return f"chose {position} based on available debate signals"
 
 
 def _agent_choice_reason_lines(
@@ -511,12 +519,12 @@ def _agent_choice_reason_lines(
                 _canonical(agent),
                 limit=per_reason_limit,
             )
-            if reason == "Data tidak tersedia":
+            if reason == "Data unavailable":
                 reason = ""
         if not reason:
             reason = _fallback_agent_reason(agent, position)
         else:
-            reason = f"memilih {position} karena {reason}"
+            reason = f"chose {position} because {reason}"
         reason = _short_text(reason, per_reason_limit).rstrip(".; ")
         lines.append(f"{label}: {reason}")
     return lines
@@ -539,11 +547,11 @@ def _debate_decision_summary(
     reason_lines = _agent_choice_reason_lines(result, packet, per_reason_limit=120)
 
     parts = [
-        f"Keputusan akhir {rating}: {_short_text(reasoning, 260)}",
-        f"Distribusi pilihan agent: {distribution}.",
+        f"Final decision {rating}: {_short_text(reasoning, 260)}",
+        f"Agent choice distribution: {distribution}.",
     ]
     if reason_lines:
-        parts.append("Alasan agent: " + "; ".join(reason_lines) + ".")
+        parts.append("Agent rationale: " + "; ".join(reason_lines) + ".")
     return _short_text(" ".join(parts), limit)
 
 
@@ -555,7 +563,7 @@ def _summary(result: dict[str, Any], packet: AuditPacket | None = None) -> str:
         verdict.get("summary")
         or verdict.get("weighted_reasoning")
         or result.get("summary")
-        or "Data tidak tersedia"
+        or "Data unavailable"
     )
 
 
@@ -638,7 +646,7 @@ def _winner_agent(result: dict[str, Any], packet: AuditPacket | None = None) -> 
         if voting_winners:
             return f"{', '.join(voting_winners)} (voting)"
         return "Voting majority"
-    return _soft_hold_label() if _is_soft_hold_winner(method) else "Data tidak tersedia"
+    return _soft_hold_label() if _is_soft_hold_winner(method) else "Data unavailable"
 
 
 def _voting_winner_agents(
@@ -693,7 +701,7 @@ def _soft_hold_override_note(
         or (packet.winner_agent if packet else None)
     )
     if _is_soft_hold_winner(method, winner):
-        return "Semua agen di-override oleh soft_hold_rule karena tidak ada konsensus."
+        return "All agents were overridden by soft_hold_rule because no consensus was reached."
     return None
 
 
@@ -844,7 +852,7 @@ class RichFormatter:
                 Text(_key_argument_summary(result, packet, role)),
         )
         table.add_row(
-            Text("Ringkasan Pilihan", style="yellow"),
+            Text("Decision Summary", style="yellow"),
             Text(_debate_decision_summary(result, packet, limit=420)),
         )
         return table
@@ -866,7 +874,7 @@ class RichFormatter:
                 or (packet.verdict_confidence if packet else None)
             )
             confidence_text = (
-                "Data tidak tersedia"
+                "Data unavailable"
                 if confidence is None
                 else self._terminal_confidence_bar(confidence)
             )
@@ -880,7 +888,6 @@ class RichFormatter:
             upside = _move_pct(target, current_price)
             downside = _downside_pct(stop, current_price)
             risk = _risk(data)
-            news_sentiment, news_adj = _get_news(data)
 
             consensus = data.get("consensus_reached")
             if consensus is None:
@@ -895,32 +902,32 @@ class RichFormatter:
                 Text.assemble(
                     ("RATING: ", "bold cyan"),
                     (f"{rating}  ", rating_style),
-                    ("KEYAKINAN: ", "bold cyan"),
+                    ("CONFIDENCE: ", "bold cyan"),
                     (confidence_text)
                 ),
                 Text.assemble(
-                    ("KONSENSUS: ", "bold cyan"),
+                    ("CONSENSUS: ", "bold cyan"),
                     (_yes_no(consensus) + f" ({_method_indonesian(method)})", "green" if consensus else "yellow"),
-                    ("   RONDE: ", "bold cyan"),
+                    ("   ROUND: ", "bold cyan"),
                     (str(data.get("debate_rounds") or "N/A"), "magenta")
                 )
             )
 
-            # 2. Left Column: Rencana Trade & Valuasi
+            # 2. Left Column: Trade Plan & Valuation
             left_table = Table.grid(padding=(0, 2))
             left_table.add_column(style="bold cyan", no_wrap=True)
             left_table.add_column(style="white")
-            left_table.add_row("Harga Kini", _money(current_price))
-            left_table.add_row("Nilai Wajar", _money(fair_value))
+            left_table.add_row("Current Price", _money(current_price))
+            left_table.add_row("Fair Value", _money(fair_value))
             left_table.add_row(
-                "Selisih Valuasi",
+                "Valuation Gap",
                 Text(
                     f"{_signed_pct(value_gap)} ({_valuation_status(fair_value, current_price)})",
                     style=value_style,
                 ),
             )
-            left_table.add_row("Zona Entry", f"{_money(entry_low)} – {_money(entry_high)}")
-            left_table.add_row("Target Harga", f"{_money(target)}  ({_signed_pct(upside)})")
+            left_table.add_row("Entry Zone", f"{_money(entry_low)} – {_money(entry_high)}")
+            left_table.add_row("Target Price", f"{_money(target)}  ({_signed_pct(upside)})")
             left_table.add_row(
                 "Stop Loss",
                 f"{_money(stop)}  ({_signed_pct(-downside if downside is not None else None)})",
@@ -928,7 +935,7 @@ class RichFormatter:
             left_table.add_row("Risk/Reward", _ratio(verdict.get("risk_reward_ratio")))
             left_table.add_row("Timeframe", str(verdict.get("timeframe") or "N/A"))
 
-            # 3. Right Column: Voting & Integrasi Agen
+            # 3. Right Column: Agent Voting & Integration
             vote_table = self._build_vote_table(data, packet)
 
             # Wrap columns in a parent grid table to show side-by-side
@@ -938,20 +945,20 @@ class RichFormatter:
 
             trade_panel = Panel(
                 left_table,
-                title="[bold cyan]RENCANA TRADE & VALUASI[/bold cyan]",
+                title="[bold cyan]TRADE PLAN & VALUATION[/bold cyan]",
                 border_style="cyan",
                 expand=True,
             )
             vote_panel = Panel(
                 vote_table,
-                title="[bold magenta]VOTING & INTEGRASI AGEN[/bold magenta]",
+                title="[bold magenta]AGENT VOTING & INTEGRATION[/bold magenta]",
                 border_style="magenta",
                 expand=True,
             )
 
             columns_table.add_row(trade_panel, vote_panel)
 
-            # 4. Argumen Utama & Ancaman
+            # 4. Key Debate Arguments
             arg_table = Table.grid(padding=(0, 2), expand=True)
             arg_table.add_column(style="bold", no_wrap=True, width=18)
             arg_table.add_column()
@@ -960,21 +967,21 @@ class RichFormatter:
             bear_arg = _key_argument_summary(data, packet, "bear", limit=300)
             decision_summary = _debate_decision_summary(data, packet, limit=520)
 
-            arg_table.add_row(Text("🟢 Bull (Optimis)", style="green"), Text(bull_arg))
+            arg_table.add_row(Text("🟢 Bull (Optimistic)", style="green"), Text(bull_arg))
             arg_table.add_row("", "")
-            arg_table.add_row(Text("🔴 Bear (Pesimis)", style="red"), Text(bear_arg))
+            arg_table.add_row(Text("🔴 Bear (Pessimistic)", style="red"), Text(bear_arg))
             arg_table.add_row("", "")
-            arg_table.add_row(Text("Ringkasan Pilihan", style="yellow"), Text(decision_summary))
+            arg_table.add_row(Text("Decision Summary", style="yellow"), Text(decision_summary))
 
             arg_panel = Panel(
                 arg_table,
-                title="[bold yellow]ARGUMEN KUNCI DEBAT[/bold yellow]",
+                title="[bold yellow]KEY DEBATE ARGUMENTS[/bold yellow]",
                 border_style="yellow",
                 padding=(1, 2),
                 expand=True,
             )
 
-            # 5. Risks & Catalysts / Sistem
+            # 5. System & Risk Management
             risks = _key_risks(data)[:3]
             catalysts = _catalysts(data)[:2] if rating == "BUY" else []
 
@@ -982,7 +989,6 @@ class RichFormatter:
             sys_table.add_column(style="bold cyan", no_wrap=True, width=18)
             sys_table.add_column(style="white")
             sys_table.add_row("Risk Governor", self._terminal_risk_governor_line(risk))
-            sys_table.add_row("News Sentiment", f"{news_sentiment} ({news_adj:+.2f})")
 
             if risks:
                 sys_table.add_row("Key Risks", "\n".join(f"• {r}" for r in risks))
@@ -991,7 +997,7 @@ class RichFormatter:
 
             sys_panel = Panel(
                 sys_table,
-                title="[bold blue]SISTEM & MANAJEMEN RISIKO[/bold blue]",
+                title="[bold blue]SYSTEM & RISK MANAGEMENT[/bold blue]",
                 border_style="blue",
                 padding=(1, 2),
                 expand=True,
@@ -1004,7 +1010,7 @@ class RichFormatter:
                 columns_table,
                 arg_panel,
                 sys_panel,
-                Text(f"Dibuat: {_generated_at(data, packet)}", style="dim", justify="right")
+                Text(f"Generated: {_generated_at(data, packet)}", style="dim", justify="right")
             )
 
             border = {
@@ -1016,7 +1022,7 @@ class RichFormatter:
             self.console.print(
                 Panel(
                     grand_group,
-                    title=f"ANALISIS DEBAT: [bold]{ticker}[/bold]",
+                    title=f"DEBATE ANALYSIS: [bold]{ticker}[/bold]",
                     border_style=border,
                     padding=(1, 2),
                 )
@@ -1024,8 +1030,8 @@ class RichFormatter:
         except Exception as exc:
             self.console.print(
                 Panel(
-                    f"Data tidak tersedia ({exc})",
-                    title="ANALISIS: UNKNOWN",
+                    f"Data unavailable ({exc})",
+                    title="ANALYSIS: UNKNOWN",
                     border_style="white",
                 )
             )
@@ -1073,16 +1079,16 @@ class RichFormatter:
             duration_text = ""
             if duration_seconds is not None:
                 minutes, seconds = divmod(max(0, int(duration_seconds)), 60)
-                duration_text = f"  |  Durasi: {minutes}m {seconds:02d}s"
+                duration_text = f"  |  Duration: {minutes}m {seconds:02d}s"
             footer = Text(
-                f"Berhasil: {succeeded}  |  Gagal: {failed}{duration_text}",
+                f"Succeeded: {succeeded}  |  Failed: {failed}{duration_text}",
                 style="dim",
             )
 
             self.console.print(
                 Panel(
                     Group(table, footer),
-                    title="HASIL DEBATE",
+                    title="DEBATE RESULTS",
                     border_style="cyan",
                     padding=(1, 2),
                 )
@@ -1090,8 +1096,8 @@ class RichFormatter:
         except Exception as exc:
             self.console.print(
                 Panel(
-                    f"Ringkasan batch tidak tersedia ({exc})",
-                    title="HASIL DEBATE",
+                    f"Batch summary unavailable ({exc})",
+                    title="DEBATE RESULTS",
                     border_style="white",
                 )
             )
@@ -1103,12 +1109,12 @@ class RichFormatter:
     ) -> Table | Text | Group:
         rows = _agent_rows(result, packet)
         if not rows:
-            return Text("Tidak ada data voting", style="dim")
+            return Text("No voting data", style="dim")
         table = Table(show_header=True, header_style="bold", expand=False)
         table.add_column("Agent")
-        table.add_column("Posisi")
-        table.add_column("Keyakinan", justify="right")
-        table.add_column("Hasil")
+        table.add_column("Position")
+        table.add_column("Confidence", justify="right")
+        table.add_column("Outcome")
         for agent, position, confidence, result_text, style in rows:
             table.add_row(
                 agent,
@@ -1148,7 +1154,7 @@ class RichFormatter:
         verdict = _verdict(result)
         low, high = _entry_bounds(verdict)
         return (
-            f"{_ticker(result)} - harga di zona entry\n"
+            f"{_ticker(result)} - price is inside the entry zone\n"
             f"   Entry: {_money(low)}-{_money(high)}  "
             f"Target: {_money(verdict.get('target_price'))}  "
             f"Stop: {_money(verdict.get('stop_loss'))}"
@@ -1156,7 +1162,7 @@ class RichFormatter:
 
 
 class MarkdownFormatter:
-    """Generate Bahasa Indonesia Markdown reports for debate results."""
+    """Generate English Markdown reports for debate results."""
 
     def generate_ticker_report(
         self,
@@ -1191,115 +1197,115 @@ class MarkdownFormatter:
 
             lines = [
                 "---",
-                f"# Laporan Analisis: {ticker}",
-                f"**Tanggal**: {_date_wib()}",
+                f"# Analysis Report: {ticker}",
+                f"**Date**: {_date_wib()}",
                 f"**Run ID**: {_run_id(data, packet)}",
                 "**Mode**: Multi-Agent AI Debate",
                 "",
                 "---",
                 "",
-                "## Ringkasan Eksekutif",
+                "## Executive Summary",
                 "",
                 "| Item | Detail |",
                 "|------|--------|",
-                f"| **Rekomendasi** | **{rating}** |",
-                f"| **Keyakinan** | {confidence_text} |",
-                f"| **Harga Saat Ini** | {_money(current_price)} |",
-                f"| **Nilai Wajar** | {_money(fair_value)} |",
-                f"| **Selisih** | {_signed_pct(value_gap)} ({value_status}) |",
+                f"| **Recommendation** | **{rating}** |",
+                f"| **Confidence** | {confidence_text} |",
+                f"| **Current Price** | {_money(current_price)} |",
+                f"| **Fair Value** | {_money(fair_value)} |",
+                f"| **Gap** | {_signed_pct(value_gap)} ({value_status}) |",
                 "",
                 f"> {_summary(data, packet)}",
                 "",
                 "---",
                 "",
-                "## Rencana Trade",
+                "## Trade Plan",
                 "",
-                "| Parameter | Nilai |",
+                "| Parameter | Value |",
                 "|-----------|-------|",
-                f"| **Zona Entry** | {_money(low)} - {_money(high)} |",
-                f"| **Target Harga** | {_money(target)} ({_signed_pct(upside)}) |",
+                f"| **Entry Zone** | {_money(low)} - {_money(high)} |",
+                f"| **Target Price** | {_money(target)} ({_signed_pct(upside)}) |",
                 f"| **Stop Loss** | {_money(stop)} ({_signed_pct(-downside if downside is not None else None)}) |",
                 f"| **Risk/Reward** | {_ratio(verdict.get('risk_reward_ratio'))} |",
                 f"| **Timeframe** | {verdict.get('timeframe') or 'N/A'} |",
                 "",
                 "---",
                 "",
-                "## Proses Debat Multi-Agent",
+                "## Multi-Agent Debate Process",
                 "",
-                f"**Jumlah Ronde**: {data.get('debate_rounds') or 'N/A'}",
-                f"**Konsensus**: {_yes_no(data.get('consensus_reached') or verdict.get('consensus_reached'))}",
-                f"**Metode**: {_method_indonesian(method)}",
+                f"**Rounds**: {data.get('debate_rounds') or 'N/A'}",
+                f"**Consensus**: {_yes_no(data.get('consensus_reached') or verdict.get('consensus_reached'))}",
+                f"**Method**: {_method_indonesian(method)}",
                 "",
-                "### Voting Agent",
+                "### Agent Voting",
                 "",
                 *self._markdown_vote_table(data, packet),
                 "",
-                "### Argumen Kunci",
+                "### Key Arguments",
                 "",
-                "**Bull (Optimis):**",
+                "**Bull (Optimistic):**",
                 f"> {_key_argument(data, packet, 'bull')}",
                 "",
-                "**Bear (Pesimis):**",
+                "**Bear (Pessimistic):**",
                 f"> {_key_argument(data, packet, 'bear')}",
                 "",
-                "**Ringkasan & Alasan Pilihan Agent:**",
+                "**Decision Summary & Agent Rationale:**",
                 f"> {_debate_decision_summary(data, packet, limit=900)}",
                 "",
                 "---",
                 "",
-                "## Analisis Risiko",
+                "## Risk Analysis",
                 "",
             ]
             risks = _key_risks(data)
             if risks:
                 lines.extend(f"- {item}" for item in risks)
             else:
-                lines.append("Data risiko tidak tersedia.")
+                lines.append("Risk data unavailable.")
             lines.append("")
 
             if rating == "BUY":
-                lines.extend(["## Katalis Potensial", ""])
+                lines.extend(["## Potential Catalysts", ""])
                 catalysts = _catalysts(data)
                 if catalysts:
                     lines.extend(f"- {item}" for item in catalysts)
                 else:
-                    lines.append("Data katalis tidak tersedia.")
+                    lines.append("Catalyst data unavailable.")
                 lines.append("")
 
             lines.extend(
                 [
                     "---",
                     "",
-                    "## Evaluasi Sistem",
+                    "## System Evaluation",
                     "",
-                    "| Komponen | Hasil |",
+                    "| Component | Result |",
                     "|----------|-------|",
                     f"| **Risk Governor** | {_risk_governor_label(risk)} |",
-                    f"| **Sentimen Berita** | {news_sentiment} ({news_adj:+.2f}) |",
-                    f"| **Data Tersedia** | {', '.join(sources) if sources else 'Tidak ada'} |",
-                    f"| **Field Hilang** | {', '.join(missing) if missing else 'Tidak ada'} |",
+                    f"| **News Sentiment** | {news_sentiment} ({news_adj:+.2f}) |",
+                    f"| **Available Data** | {', '.join(sources) if sources else 'None'} |",
+                    f"| **Missing Fields** | {', '.join(missing) if missing else 'None'} |",
                     "",
                     "---",
                     "",
-                    "## Metodologi",
+                    "## Methodology",
                     "",
-                    "Analisis ini dihasilkan oleh sistem",
-                    "**Multi-Agent AI Debate** menggunakan",
-                    "Google Gemini sebagai engine LLM.",
-                    "Lima agent AI dengan perspektif berbeda",
+                    "This analysis was generated by the",
+                    "**Multi-Agent AI Debate** system using",
+                    "Google Gemini as the LLM engine.",
+                    "Five AI agents with different perspectives",
                     "(Bull, Bear, Chartist, Fundamental Scout,",
-                    "Sentiment Specialist) berdebat selama",
-                    f"{data.get('debate_rounds') or 'N/A'} ronde sebelum CIO Agent",
-                    "mengambil keputusan final.",
+                    "Sentiment Specialist) debated for",
+                    f"{data.get('debate_rounds') or 'N/A'} rounds before the CIO Agent",
+                    "made the final decision.",
                     "",
-                    "Setiap keputusan dapat diaudit",
-                    "berdasarkan bukti yang tersedia",
-                    "pada waktu analisis.",
+                    "Every decision can be audited",
+                    "against the evidence available",
+                    "at analysis time.",
                     "",
                     "---",
-                    "*Laporan ini dihasilkan otomatis oleh",
+                    "*This report was generated automatically by",
                     "IDX Fundamental Analysis System.",
-                    "Bukan merupakan saran investasi resmi.*",
+                    "It is not official investment advice.*",
                 ]
             )
             return "\n".join(lines)
@@ -1308,11 +1314,11 @@ class MarkdownFormatter:
             return "\n".join(
                 [
                     "---",
-                    f"# Laporan Analisis: {ticker}",
-                    f"**Tanggal**: {_date_wib()}",
+                    f"# Analysis Report: {ticker}",
+                    f"**Date**: {_date_wib()}",
                     "**Mode**: Multi-Agent AI Debate",
                     "",
-                    "Data tidak tersedia.",
+                    "Data unavailable.",
                     f"Error formatter: {exc}",
                 ]
             )
@@ -1336,30 +1342,30 @@ class MarkdownFormatter:
             ]
             lines = [
                 "---",
-                "# Ringkasan Analisis Batch",
-                f"**Tanggal**: {_date_wib()}",
+                "# Batch Analysis Summary",
+                f"**Date**: {_date_wib()}",
                 f"**Run ID**: {run_id}",
-                f"**Total Saham**: {len(rows)}",
+                f"**Total Stocks**: {len(rows)}",
                 "",
-                "## Hasil Keseluruhan",
+                "## Overall Results",
                 "",
-                "| Rating | Jumlah | Saham |",
+                "| Rating | Count | Stocks |",
                 "|--------|--------|-------|",
                 self._rating_summary_row("BUY", grouped.get("BUY", [])),
                 self._rating_summary_row("HOLD", grouped.get("HOLD", [])),
                 self._rating_summary_row("AVOID", grouped.get("AVOID", [])),
                 "",
-                "## Saham yang Dapat Dieksekusi",
+                "## Executable Stocks",
                 "",
             ]
             if deployable:
                 for row in deployable:
                     lines.extend(self._deployable_summary(row))
             else:
-                lines.append("Tidak ada.")
+                lines.append("None.")
                 lines.append("")
 
-            lines.extend(["## Saham dalam Watchlist", ""])
+            lines.extend(["## Watchlist Stocks", ""])
             if waiting:
                 for row in waiting:
                     verdict = _verdict(row)
@@ -1367,12 +1373,12 @@ class MarkdownFormatter:
                     lines.extend(
                         [
                             f"### {_ticker(row)}",
-                            f"- Tunggu pullback ke: {_money(low)} - {_money(high)}",
+                            f"- Wait for pullback to: {_money(low)} - {_money(high)}",
                             "",
                         ]
                     )
             else:
-                lines.append("Tidak ada.")
+                lines.append("None.")
                 lines.append("")
 
             lines.extend(["---", "*Generated by IDX Fundamental Analysis*"])
@@ -1381,11 +1387,11 @@ class MarkdownFormatter:
             return "\n".join(
                 [
                     "---",
-                    "# Ringkasan Analisis Batch",
-                    f"**Tanggal**: {_date_wib()}",
+                    "# Batch Analysis Summary",
+                    f"**Date**: {_date_wib()}",
                     f"**Run ID**: {run_id}",
                     "",
-                    "Data tidak tersedia.",
+                    "Data unavailable.",
                     f"Error formatter: {exc}",
                 ]
             )
@@ -1397,9 +1403,9 @@ class MarkdownFormatter:
     ) -> list[str]:
         rows = _agent_rows(result, packet)
         if not rows:
-            return ["Tidak ada data voting"]
+            return ["No voting data"]
         lines = [
-            "| Agent | Posisi | Keyakinan |",
+            "| Agent | Position | Confidence |",
             "|-------|--------|-----------|",
         ]
         for agent, position, confidence, _outcome, _style in rows:
@@ -1425,7 +1431,7 @@ class MarkdownFormatter:
             f"- Stop: {_money(verdict.get('stop_loss'))}",
             (
                 f"- R/R: {_ratio(verdict.get('risk_reward_ratio'))} | "
-                f"Keyakinan: {_pct(verdict.get('confidence'))}"
+                f"Confidence: {_pct(verdict.get('confidence'))}"
             ),
             "",
         ]
