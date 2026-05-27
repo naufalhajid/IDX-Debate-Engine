@@ -1,3 +1,4 @@
+import asyncio
 import concurrent.futures
 import threading
 
@@ -24,7 +25,6 @@ from schemas.fundamental import (
 from schemas.sentiment import Sentiment
 from schemas.stock import Stock
 from schemas.stock_price import StockPrice
-from services.stockbit_api_client import StockbitApiClient
 from utils.helpers import (
     parse_currency_to_float,
     parse_key_statistic_results_item_value,
@@ -47,6 +47,8 @@ class StockBit:
         self.stocks = stocks
         self.base_url = "https://exodus.stockbit.com"
         self.key_statistic = None
+        from services.stockbit_api_client import StockbitApiClient
+
         self.stockbit_api_client = StockbitApiClient()
 
     def key_statistic_by_stock(self, stock: Stock) -> dict:
@@ -555,7 +557,76 @@ class StockBit:
 
         return self.stockbit_api_client.get(url)
 
-    def stream_by_stock(self, stock: Stock) -> dict:
+    @staticmethod
+    def _ticker(stock: Stock | str) -> str:
+        return getattr(stock, "ticker", str(stock))
+
+    @staticmethod
+    def _extract_stream_posts(raw: dict | list | None) -> list[dict]:
+        if not raw:
+            return []
+        if isinstance(raw, list):
+            return [post for post in raw if isinstance(post, dict)]
+        if not isinstance(raw, dict):
+            return []
+
+        data = raw.get("data")
+        if isinstance(data, list):
+            return [post for post in data if isinstance(post, dict)]
+        if isinstance(data, dict):
+            stream = data.get("stream")
+            if isinstance(stream, list):
+                return [post for post in stream if isinstance(post, dict)]
+            if any(key in data for key in ("stream_id", "id", "post_id", "content")):
+                return [data]
+
+        stream = raw.get("stream")
+        if isinstance(stream, list):
+            return [post for post in stream if isinstance(post, dict)]
+        if any(key in raw for key in ("stream_id", "id", "post_id", "content")):
+            return [raw]
+        return []
+
+    @staticmethod
+    def _stream_post_key(post: dict) -> str | None:
+        for key in ("stream_id", "id", "post_id"):
+            value = post.get(key)
+            if value not in (None, ""):
+                return str(value)
+        return None
+
+    @staticmethod
+    def _apply_verified_weight(post: dict) -> dict:
+        weighted_post = dict(post)
+        user = weighted_post.get("user")
+        is_verified = isinstance(user, dict) and user.get("is_verified") is True
+        weighted_post["_verified_weight"] = 1.5 if is_verified else 1.0
+        return weighted_post
+
+    @classmethod
+    def _merge_stream_posts(cls, ticker: str, *post_groups: list[dict]) -> list[dict]:
+        seen_keys: set[str] = set()
+        combined: list[dict] = []
+        for post in [post for group in post_groups for post in group]:
+            post_key = cls._stream_post_key(post)
+            if post_key is None:
+                logger.warning(
+                    f"Stockbit stream merge for {ticker}: post missing "
+                    "stream_id/id/post_id; including without dedup"
+                )
+                combined.append(cls._apply_verified_weight(post))
+                continue
+            if post_key in seen_keys:
+                continue
+            seen_keys.add(post_key)
+            combined.append(cls._apply_verified_weight(post))
+        return combined
+
+    def stream_by_stock(
+        self,
+        stock: Stock | str,
+        category: str = "STREAM_CATEGORY_IDEAS",
+    ) -> dict:
         """
         Fetches the stream data for a given stock.
 
@@ -570,8 +641,9 @@ class StockBit:
         Returns:
         - dict: A dictionary containing the response data from the HTTP POST request.
         """
-        url = f"{self.base_url}/stream/v3/symbol/{stock.ticker}"
-        payload = {"category": "STREAM_CATEGORY_ALL", "last_stream_id": 0, "limit": 20}
+        ticker = self._ticker(stock)
+        url = f"{self.base_url}/stream/v3/symbol/{ticker}"
+        payload = {"category": category, "last_stream_id": 0, "limit": 20}
         return self.stockbit_api_client.post(url, payload)
 
     def with_stream_data(self):
@@ -587,31 +659,14 @@ class StockBit:
         def safe_fetch(stock):
             nonlocal processed_count
             try:
-                response_stream_pinned, response_stream = self._safe_fetch_stream_data(stock)
-
-                if response_stream_pinned != {}:
-                    pinned_data = response_stream_pinned.get("data")
-                    if pinned_data is not None:
-                        posted_at = datetime.fromisoformat(pinned_data["created_at"])
-                        sentiment = Sentiment(
-                            content=pinned_data["content"], posted_at=posted_at
-                        )
-                        stock.sentiment = [sentiment]
-
-                if response_stream != {}:
-                    stream_outer = response_stream.get("data")
-                    if stream_outer:
-                        stream_data = stream_outer.get("stream")
-                        if stream_data is not None:
-                            for stream in stream_data:
-                                posted_at = datetime.fromisoformat(stream["created_at"])
-                                sentiment = Sentiment(
-                                    content=stream["content"], posted_at=posted_at
-                                )
-                                if stock.sentiment is None:
-                                    stock.sentiment = [sentiment]
-                                else:
-                                    stock.sentiment.append(sentiment)
+                combined_posts = self._safe_fetch_stream_data(stock)
+                stock.sentiment = [
+                    Sentiment(
+                        content=post.get("content", ""),
+                        posted_at=datetime.fromisoformat(post["created_at"]),
+                    )
+                    for post in combined_posts
+                ]
 
                 with processed_lock:
                     processed_count += 1
@@ -626,17 +681,74 @@ class StockBit:
 
         return self
 
-    def _safe_fetch_stream_data(self, stock: Stock) -> tuple[dict, dict]:
+    def _safe_fetch_stream_data(self, stock: Stock) -> list[dict]:
         """
-        Fetches stream data and retries once after re-authentication when 401 is detected.
+        Fetches pinned, IDEAS, and NEWS stream data with per-source fallbacks.
         """
+        return asyncio.run(self._safe_fetch_stream_data_async(stock))
+
+    async def _fetch_stream_source(self, stock: Stock, operation: str, category: str | None = None) -> dict:
+        ticker = self._ticker(stock)
         try:
-            return self.stream_pinned_by_stock(stock), self.stream_by_stock(stock)
-        except Exception as e:
-            if "401" in str(e):
+            if operation == "pinned":
+                return await asyncio.to_thread(self.stream_pinned_by_stock, stock)
+            return await asyncio.to_thread(self.stream_by_stock, stock, category=category)
+        except Exception as exc:
+            if "401" in str(exc):
                 logger.warning(
-                    f"Token expired while fetching stream for {stock.ticker}, re-authenticating."
+                    f"Token expired while fetching Stockbit {operation} "
+                    f"for {ticker}, re-authenticating: {exc}"
                 )
-                self.stockbit_api_client.reauthenticate()
-                return self.stream_pinned_by_stock(stock), self.stream_by_stock(stock)
-            raise
+                try:
+                    await asyncio.to_thread(self.stockbit_api_client.reauthenticate)
+                    if operation == "pinned":
+                        return await asyncio.to_thread(self.stream_pinned_by_stock, stock)
+                    return await asyncio.to_thread(
+                        self.stream_by_stock,
+                        stock,
+                        category=category,
+                    )
+                except Exception as retry_exc:
+                    logger.warning(
+                        f"Stockbit {operation} retry failed for {ticker}: {retry_exc}"
+                    )
+                    return {}
+            logger.warning(f"Stockbit {operation} fetch failed for {ticker}: {exc}")
+            return {}
+
+    async def _safe_fetch_stream_data_async(self, stock: Stock) -> list[dict]:
+        ticker = self._ticker(stock)
+        pinned_raw, ideas_raw, news_raw = await asyncio.gather(
+            self._fetch_stream_source(stock, "pinned"),
+            self._fetch_stream_source(
+                stock,
+                "STREAM_CATEGORY_IDEAS",
+                category="STREAM_CATEGORY_IDEAS",
+            ),
+            self._fetch_stream_source(
+                stock,
+                "STREAM_CATEGORY_NEWS",
+                category="STREAM_CATEGORY_NEWS",
+            ),
+        )
+        pinned_posts = self._extract_stream_posts(pinned_raw)
+        ideas_posts = self._extract_stream_posts(ideas_raw)
+        news_posts = self._extract_stream_posts(news_raw)
+        total_before_dedup = len(pinned_posts) + len(ideas_posts) + len(news_posts)
+        combined_posts = self._merge_stream_posts(
+            ticker,
+            pinned_posts,
+            ideas_posts,
+            news_posts,
+        )
+        verified_count = sum(
+            1 for post in combined_posts if post.get("_verified_weight") == 1.5
+        )
+        logger.debug(
+            f"Stockbit stream data for {ticker}: "
+            f"pinned={len(pinned_posts)} ideas={len(ideas_posts)} "
+            f"news={len(news_posts)} total_before_dedup={total_before_dedup} "
+            f"total_after_dedup={len(combined_posts)} "
+            f"verified_posts={verified_count}"
+        )
+        return combined_posts

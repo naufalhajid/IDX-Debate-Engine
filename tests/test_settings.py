@@ -43,3 +43,21 @@ def test_cli_log_level_normalization_handles_blank_and_invalid_values() -> None:
     assert _normalize_log_level("") == "INFO"
     assert _normalize_log_level("not-a-level") == "INFO"
     assert _normalize_log_level("debug") == "DEBUG"
+
+
+def test_legacy_ledger_call_accepts_action_payload() -> None:
+    from core.orchestrator.legacy import _ledger_call
+
+    captured: dict[str, str] = {}
+
+    def fake_planner_decision(**kwargs):
+        captured.update(kwargs)
+
+    _ledger_call(
+        "planner decision",
+        fake_planner_decision,
+        action="RETRY",
+        stage="DEBATE",
+    )
+
+    assert captured == {"action": "RETRY", "stage": "DEBATE"}

@@ -2081,10 +2081,8 @@ def configure_cli_logging(*, verbose: bool = False) -> None:
         settings.LOG_APP_FILENAME,
         format=log_format,
         level=log_level,
-        rotation="1 MB",
-        retention="10 days",
-        compression="zip",
         encoding="utf-8",
+        enqueue=True,
     )
     logger.add(
         "pipeline.log",
@@ -2129,12 +2127,12 @@ ORCHESTRATOR_CONFIG: dict[str, Any] = {
         "rr_ratio": settings.CONVICTION_WEIGHT_RR_RATIO,
     },
     "rr_normalization_cap": settings.CONVICTION_RR_NORMALIZATION_CAP,
-    "max_concurrent_debates": int(os.getenv("MAX_CONCURRENT_DEBATES", "3")),
+    "max_concurrent_debates": int(os.getenv("MAX_CONCURRENT_DEBATES", "5")),
     "excluded_ratings": {"AVOID", "HOLD", "SELL"},
     "top_n_selection": int(os.getenv("TOP_N_SELECTION", "3")),
     "max_price_retry_attempts": int(os.getenv("MAX_PRICE_RETRY_ATTEMPTS", "3")),
     "rpm_limit": int(os.getenv("GEMINI_RPM_LIMIT", "10")),
-    "batch_delay": float(os.getenv("BATCH_DELAY_SECONDS", "0.5")),
+    "batch_delay": float(os.getenv("BATCH_DELAY_SECONDS", "0.2")),
     # Diisi oleh regime detection di main()
     "min_conviction_override": settings.PORTFOLIO_MIN_CONVICTION,
 }
@@ -2158,11 +2156,11 @@ CLI_TICKERS_OVERRIDE: list[str] | None = None
 CLI_MODE: str = "multi"
 
 
-def _ledger_call(action: str, func, *args, **kwargs) -> None:
+def _ledger_call(operation: str, func, *args, **kwargs) -> None:
     try:
         func(*args, **kwargs)
     except Exception as exc:
-        logger.warning(f"[ExecutionLedger] {action} failed: {exc}")
+        logger.warning(f"[ExecutionLedger] {operation} failed: {exc}")
 
 
 def _ledger_emit_event(event: LedgerEvent) -> None:

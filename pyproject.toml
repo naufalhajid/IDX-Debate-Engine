@@ -5,7 +5,7 @@ description = "IDX Composite Fundamental Analysis"
 readme = "README.md"
 requires-python = ">=3.12,<4.0"
 license = { text = "MIT" }
-authors = [{ name = "Satrya Budi Pratama" }]
+authors = [{ name = "Naufal Ibrahim Hajid" }]
 dependencies = [
     "undetected-chromedriver>=3.5.5",
     "beautifulsoup4>=4.12.3",
@@ -94,6 +94,7 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+asyncio_mode = "auto"
 
 [tool.ruff]
 extend-exclude = ["scratch"]

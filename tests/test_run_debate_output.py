@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from run_debate import _debate_one
+from run_debate import _debate_one, _ledger_call
 
 
 class FakeDebateChamber:
@@ -89,3 +89,19 @@ def test_run_debate_writes_timestamped_and_legacy_outputs(tmp_path: Path) -> Non
     assert payload["debate_history"][0]["confidence"] == 0.72
     assert json.loads(latest_file.read_text(encoding="utf-8")) == payload
     assert json.loads(legacy_file.read_text(encoding="utf-8")) == payload
+
+
+def test_run_debate_ledger_call_accepts_action_payload() -> None:
+    captured: dict[str, str] = {}
+
+    def fake_planner_decision(**kwargs):
+        captured.update(kwargs)
+
+    _ledger_call(
+        "planner decision",
+        fake_planner_decision,
+        action="RETRY",
+        stage="DEBATE",
+    )
+
+    assert captured == {"action": "RETRY", "stage": "DEBATE"}

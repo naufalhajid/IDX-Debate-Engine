@@ -38,9 +38,8 @@ logger.add(
     settings.LOG_APP_FILENAME,
     format=("{time:YYYY-MM-DD HH:mm:ss.SSS} {level: <8} {file}:{line} | {message}"),
     level=level,
-    rotation="1 MB",  # Rotate after the log file reaches 1 MB
-    retention="10 days",  # Keep rotated files for 10 days
-    compression="zip",  # Compress rotated files
+    encoding="utf-8",
+    enqueue=True,
 )
 
 # Export the logger for use in other modules

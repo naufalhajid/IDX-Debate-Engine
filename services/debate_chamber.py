@@ -138,11 +138,11 @@ def _as_debate_message(m):
     return m
 
 
-def _ledger_call(action: str, func, *args, **kwargs) -> None:
+def _ledger_call(operation: str, func, *args, **kwargs) -> None:
     try:
         func(*args, **kwargs)
     except Exception as exc:
-        logger.warning(f"[ExecutionLedger] {action} failed: {exc}")
+        logger.warning(f"[ExecutionLedger] {operation} failed: {exc}")
 
 
 def _state_metadata(state: DebateChamberState) -> dict:
@@ -522,6 +522,9 @@ ROUND1_CONSENSUS_THRESHOLD = 0.80
 CONSENSUS_AGENT_COUNT = 5
 MAX_DEBATE_ROUNDS = 3
 SOFT_HOLD_CONFIDENCE_DELTA = 0.15
+SENTIMENT_STREAM_PAGE_SIZE = 20
+SENTIMENT_STREAM_PAGE_LIMIT = 3
+SENTIMENT_POST_CONTENT_LIMIT = 280
 
 AGENT_SIGNAL_PROMPT = PROMPT_REGISTRY.prompts["AGENT_SIGNAL_PROMPT"]
 
@@ -536,6 +539,10 @@ RESPONSE FORMAT — You must respond with ONLY a valid JSON object, no other tex
 }
 If data is insufficient (fewer than 5 posts), return:
 {"position": "HOLD", "confidence": 0.0, "status": "INSUFFICIENT_DATA", "reasoning": "...", "key_signals": []}
+""".strip()
+
+SENTIMENT_SIGNAL_WEIGHTING_INSTRUCTION = """
+SIGNAL WEIGHTING: Posts with "_verified_weight": 1.5 are from verified Stockbit users (analysts, institutional accounts). Weight their sentiment signals more heavily in your analysis. Posts with "_verified_weight": 1.0 are from regular retail users and still count - do not ignore them.
 """.strip()
 
 
@@ -648,40 +655,182 @@ class DebateChamber:
             stream = data.get("stream")
             if isinstance(stream, list):
                 return [post for post in stream if isinstance(post, dict)]
-            if any(key in data for key in ("id", "post_id", "content")):
+            if any(key in data for key in ("stream_id", "id", "post_id", "content")):
                 return [data]
 
         stream = raw.get("stream")
         if isinstance(stream, list):
             return [post for post in stream if isinstance(post, dict)]
-        if any(key in raw for key in ("id", "post_id", "content")):
+        if any(key in raw for key in ("stream_id", "id", "post_id", "content")):
             return [raw]
         return []
 
     @staticmethod
     def _stockbit_post_id(post: dict[str, Any]) -> str | None:
-        for key in ("id", "post_id", "stream_id"):
+        for key in ("stream_id", "id", "post_id"):
             value = post.get(key)
             if value not in (None, ""):
                 return str(value)
         return None
 
+    @staticmethod
+    def _stockbit_verified_weight(post: dict[str, Any]) -> float:
+        user = post.get("user")
+        if isinstance(user, dict) and user.get("is_verified") is True:
+            return 1.5
+        return 1.0
+
+    @staticmethod
+    def _stockbit_page_cursor(posts: list[dict[str, Any]]) -> Any | None:
+        for post in reversed(posts):
+            stream_id = post.get("stream_id")
+            if stream_id not in (None, ""):
+                return stream_id
+        return None
+
+    @staticmethod
+    def _compact_stockbit_post_for_llm(
+        post: dict[str, Any],
+        *,
+        content_limit: int = SENTIMENT_POST_CONTENT_LIMIT,
+    ) -> dict[str, Any]:
+        compact: dict[str, Any] = {
+            key: post[key]
+            for key in ("stream_id", "id", "post_id", "created_at", "_verified_weight")
+            if key in post
+        }
+
+        for content_key in ("content", "message", "text", "body"):
+            value = post.get(content_key)
+            if isinstance(value, str) and value.strip():
+                content = value.strip()
+                if len(content) > content_limit:
+                    content = content[:content_limit].rstrip() + "..."
+                compact["content"] = content
+                break
+
+        user = post.get("user")
+        if isinstance(user, dict):
+            compact_user = {
+                key: user[key]
+                for key in ("username", "name", "is_verified")
+                if key in user
+            }
+            if compact_user:
+                compact["user"] = compact_user
+
+        for key in ("like_count", "likes_count", "comment_count", "comments_count"):
+            value = post.get(key)
+            if isinstance(value, int | float | str):
+                compact[key] = value
+
+        return compact
+
     @classmethod
     def _merge_stockbit_posts(
         cls,
         pinned_posts: list[dict[str, Any]],
-        stream_posts: list[dict[str, Any]],
+        *post_groups: list[dict[str, Any]],
+        ticker: str | None = None,
     ) -> list[dict[str, Any]]:
         seen_ids: set[str] = set()
         combined: list[dict[str, Any]] = []
-        for post in [*pinned_posts, *stream_posts]:
+        for post in [*pinned_posts, *[post for group in post_groups for post in group]]:
             post_id = cls._stockbit_post_id(post)
             if post_id is not None:
                 if post_id in seen_ids:
                     continue
                 seen_ids.add(post_id)
-            combined.append(post)
+            else:
+                logger.warning(
+                    f"[Sentiment] {ticker or 'unknown'}: post missing "
+                    "stream_id/id/post_id; including without dedup"
+                )
+            weighted_post = dict(post)
+            weighted_post["_verified_weight"] = cls._stockbit_verified_weight(post)
+            combined.append(weighted_post)
         return combined
+
+    @staticmethod
+    def _serialize_stockbit_posts_for_llm(
+        posts: list[dict[str, Any]],
+        *,
+        protected_count: int = 0,
+        max_chars: int = 10_000,
+    ) -> tuple[str, int]:
+        compacted_posts = [
+            DebateChamber._compact_stockbit_post_for_llm(post)
+            for post in posts
+        ]
+        protected_count = min(max(protected_count, 0), len(compacted_posts))
+        serialized = json.dumps(compacted_posts, ensure_ascii=False)
+        if len(serialized) <= max_chars:
+            return serialized, 0
+
+        original_count = len(compacted_posts)
+        kept_posts = list(compacted_posts)
+
+        def truncation_note(kept_count: int) -> dict[str, str]:
+            return {
+                "_note": (
+                    f"Truncated. {original_count} posts total, "
+                    f"showing first {kept_count}."
+                )
+            }
+
+        def dumps_with_note(selected_posts: list[dict[str, Any]]) -> str:
+            return json.dumps(
+                [*selected_posts, truncation_note(len(selected_posts))],
+                ensure_ascii=False,
+            )
+
+        while len(kept_posts) > protected_count:
+            kept_posts = kept_posts[:-1]
+            serialized = dumps_with_note(kept_posts)
+            if len(serialized) <= max_chars:
+                return serialized, original_count - len(kept_posts)
+
+        serialized = dumps_with_note(kept_posts)
+        if len(serialized) <= max_chars:
+            return serialized, original_count - len(kept_posts)
+
+        content_limit = SENTIMENT_POST_CONTENT_LIMIT
+        while content_limit >= 0:
+            compact_posts: list[dict[str, Any]] = []
+            for post in kept_posts:
+                compact_post = dict(post)
+                content = compact_post.get("content")
+                if isinstance(content, str) and len(content) > content_limit:
+                    compact_post["content"] = (
+                        content[:content_limit].rstrip() + "..."
+                        if content_limit
+                        else "..."
+                    )
+                compact_posts.append(compact_post)
+            serialized = dumps_with_note(compact_posts)
+            if len(serialized) <= max_chars:
+                return serialized, original_count - len(compact_posts)
+            content_limit = content_limit // 2 if content_limit > 20 else content_limit - 1
+
+        minimal_posts: list[dict[str, Any]] = []
+        for post in kept_posts:
+            minimal_post = {
+                key: post[key]
+                for key in ("stream_id", "id", "post_id", "created_at", "_verified_weight")
+                if key in post
+            }
+            minimal_post["content"] = "..."
+            minimal_posts.append(minimal_post)
+        serialized = dumps_with_note(minimal_posts)
+        if len(serialized) <= max_chars:
+            return serialized, original_count - len(minimal_posts)
+
+        logger.warning(
+            "[Sentiment] Protected Stockbit posts exceed LLM context cap after "
+            "compaction; sending truncation note only"
+        )
+        serialized = json.dumps([truncation_note(0)], ensure_ascii=False)
+        return serialized[:max_chars], original_count
 
     @staticmethod
     def _sentiment_insufficient_payload(reasoning: str) -> dict[str, Any]:
@@ -1339,6 +1488,18 @@ Current Date (Asia/Jakarta): {current_date}
             logger.warning(f"Failed to fetch {url}: {e}")
             raise
 
+    @retry(
+        wait=wait_exponential(min=2, max=10),
+        stop=stop_after_attempt(3),
+        retry=retry_if_exception(_is_transient_error),
+    )
+    async def _post_url(self, url: str, payload: dict[str, Any]) -> dict | None:
+        try:
+            return await asyncio.to_thread(self.stockbit_client.post, url, payload)
+        except Exception as e:
+            logger.warning(f"Failed to post {url} payload={payload}: {e}")
+            raise
+
     # ── Phase 1 — Parallel Data Nodes (all on Flash) ────────────────────────
 
     async def _fetch_sentiment_endpoint(
@@ -1352,6 +1513,61 @@ Current Date (Asia/Jakarta): {current_date}
         except Exception as exc:
             logger.warning(f"[Sentiment] {ticker}: {label} endpoint failed: {exc}")
             return None
+
+    async def _fetch_sentiment_stream_posts(
+        self,
+        ticker: str,
+        category: str,
+        *,
+        pages: int = SENTIMENT_STREAM_PAGE_LIMIT,
+        limit: int = SENTIMENT_STREAM_PAGE_SIZE,
+    ) -> list[dict[str, Any]]:
+        url = f"{BASE_URL}/stream/v3/symbol/{ticker}"
+        posts: list[dict[str, Any]] = []
+        last_stream_id: Any = 0
+        requested_cursors: set[str] = set()
+
+        for page in range(1, max(pages, 0) + 1):
+            payload = {
+                "category": category,
+                "last_stream_id": last_stream_id,
+                "limit": limit,
+            }
+            requested_cursors.add(str(last_stream_id))
+            try:
+                raw = await self._post_url(url, payload)
+            except Exception as exc:
+                logger.warning(
+                    f"[Sentiment] {ticker}: {category} page {page} "
+                    f"endpoint failed: {exc}"
+                )
+                break
+
+            page_posts = self._extract_stockbit_posts(raw)
+            logger.debug(
+                f"[Sentiment] {ticker}: {category} page={page} "
+                f"posts={len(page_posts)} last_stream_id={last_stream_id}"
+            )
+            if not page_posts:
+                break
+
+            posts.extend(page_posts)
+            next_cursor = self._stockbit_page_cursor(page_posts)
+            if next_cursor in (None, ""):
+                logger.debug(
+                    f"[Sentiment] {ticker}: {category} page={page} "
+                    "has no stream_id cursor; stopping pagination"
+                )
+                break
+            if str(next_cursor) in requested_cursors:
+                logger.debug(
+                    f"[Sentiment] {ticker}: {category} page={page} "
+                    f"repeated cursor={next_cursor}; stopping pagination"
+                )
+                break
+            last_stream_id = next_cursor
+
+        return posts
 
     async def _fetch_market_data(self, ticker: str) -> dict:
         return await prefetch_market_data(ticker)
@@ -1616,30 +1832,46 @@ Current Date (Asia/Jakarta): {current_date}
         )
         await asyncio.sleep(1.0)   # stagger to avoid burst rate-limit
         try:
-            pinned_raw, stream_raw = await asyncio.gather(
-                self._fetch_sentiment_endpoint(
+            pinned_raw, ideas_posts, news_posts = await asyncio.gather(
+                asyncio.shield(self._fetch_sentiment_endpoint(
                     ticker,
                     "pinned",
                     f"{BASE_URL}/stream/v3/symbol/{ticker}/pinned",
-                ),
-                self._fetch_sentiment_endpoint(
+                )),
+                asyncio.shield(self._fetch_sentiment_stream_posts(
                     ticker,
-                    "stream",
-                    f"{BASE_URL}/stream/v3/symbol/{ticker}?limit=20",
-                ),
+                    "STREAM_CATEGORY_IDEAS",
+                )),
+                asyncio.shield(self._fetch_sentiment_stream_posts(
+                    ticker,
+                    "STREAM_CATEGORY_NEWS",
+                )),
             )
             pinned_posts = self._extract_stockbit_posts(pinned_raw)
-            stream_posts = self._extract_stockbit_posts(stream_raw)
-            combined_posts = self._merge_stockbit_posts(pinned_posts, stream_posts)
-            logger.debug(
+            total_before_dedup = (
+                len(pinned_posts) + len(ideas_posts) + len(news_posts)
+            )
+            combined_posts = self._merge_stockbit_posts(
+                pinned_posts,
+                ideas_posts,
+                news_posts,
+                ticker=ticker,
+            )
+            verified_count = sum(
+                1 for post in combined_posts if post.get("_verified_weight") == 1.5
+            )
+            logger.info(
                 f"[Sentiment] {ticker}: pinned_posts={len(pinned_posts)} "
-                f"stream_posts={len(stream_posts)} "
-                f"unique_posts={len(combined_posts)}"
+                f"ideas_posts={len(ideas_posts)} "
+                f"news_posts={len(news_posts)} "
+                f"total_before_dedup={total_before_dedup} "
+                f"total_after_dedup={len(combined_posts)} "
+                f"verified_posts={verified_count}"
             )
 
             if not combined_posts:
                 payload = self._sentiment_insufficient_payload(
-                    "No Stockbit social posts available from pinned or stream endpoints."
+                    "No Stockbit social posts available from pinned, IDEAS, or NEWS endpoints."
                 )
                 signal = self._sentiment_signal_from_payload(payload)
                 content = self._format_sentiment_content(payload, signal)
@@ -1652,25 +1884,38 @@ Current Date (Asia/Jakarta): {current_date}
                         "source": "stockbit",
                         "available": False,
                         "pinned_posts": len(pinned_posts),
-                        "stream_posts": len(stream_posts),
+                        "stream_posts": len(ideas_posts) + len(news_posts),
+                        "ideas_posts": len(ideas_posts),
+                        "news_posts": len(news_posts),
                         "unique_posts": len(combined_posts),
+                        "verified_posts": verified_count,
                     },
                 )
                 news_update = await _news_context_for_state(state, ticker)
                 return {"sentiment_data": content, **news_update}
 
+            serialized_posts, truncated_count = self._serialize_stockbit_posts_for_llm(
+                combined_posts,
+                protected_count=len(pinned_posts),
+                max_chars=10_000,
+            )
+            if truncated_count:
+                logger.info(
+                    f"[Sentiment] {ticker}: truncated_posts={truncated_count} "
+                    f"serialized_chars={len(serialized_posts)}"
+                )
+
             messages = [
                 SystemMessage(
                     content=(
                         SENTIMENT_PROMPT
-                        + AGENT_SIGNAL_PROMPT
                         + "\n\n"
                         + SENTIMENT_JSON_RESPONSE_FORMAT
+                        + "\n\n"
+                        + SENTIMENT_SIGNAL_WEIGHTING_INSTRUCTION
                     )
                 ),
-                HumanMessage(
-                    content=json.dumps(combined_posts, ensure_ascii=False)[:10_000]
-                ),
+                HumanMessage(content=serialized_posts),
             ]
             resp = await self._invoke_llm_for_state(state, self.flash_llm, messages)
             payload = self._sentiment_payload_from_response(ticker, resp.content)
@@ -1684,14 +1929,19 @@ Current Date (Asia/Jakarta): {current_date}
                 detail={
                     "source": "stockbit",
                     "pinned_posts": len(pinned_posts),
-                    "stream_posts": len(stream_posts),
+                    "stream_posts": len(ideas_posts) + len(news_posts),
+                    "ideas_posts": len(ideas_posts),
+                    "news_posts": len(news_posts),
+                    "total_before_dedup": total_before_dedup,
                     "unique_posts": len(combined_posts),
+                    "verified_posts": verified_count,
+                    "truncated_posts": truncated_count,
                 },
             )
             news_update = await _news_context_for_state(state, ticker)
             return {"sentiment_data": content, **news_update}
         except Exception as e:
-            logger.error(f"[Sentiment] Error: {e}")
+            logger.error(f"[Sentiment] {ticker}: SENTIMENT_FETCH error: {e}")
             failure_record = classify_exception(e, "stockbit").model_dump(mode="json")
             decision = _planner_decision_for_state(
                 state,

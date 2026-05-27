@@ -72,10 +72,8 @@ def configure_debate_logging(*, verbose: bool = False) -> None:
         settings.LOG_APP_FILENAME,
         format=log_format,
         level=log_level,
-        rotation="1 MB",
-        retention="10 days",
-        compression="zip",
         encoding="utf-8",
+        enqueue=True,
     )
     logger.add(
         "pipeline.log",
@@ -99,11 +97,11 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _ledger_call(action: str, func, *args, **kwargs) -> None:
+def _ledger_call(operation: str, func, *args, **kwargs) -> None:
     try:
         func(*args, **kwargs)
     except Exception as exc:
-        logger.warning(f"[ExecutionLedger] {action} failed: {exc}")
+        logger.warning(f"[ExecutionLedger] {operation} failed: {exc}")
 
 
 def _ledger_artifact_write(
