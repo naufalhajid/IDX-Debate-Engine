@@ -144,6 +144,7 @@ async def fetch_news_rss(
             kontan_url,
             ticker=normalized_ticker,
             source="Kontan RSS",
+            default_item_source="Kontan",
             silent_http_statuses={403},
             silent_timeout=True,
         )
@@ -161,6 +162,7 @@ async def _fetch_rss_items(
     *,
     ticker: str,
     source: str,
+    default_item_source: str | None = None,
     silent_http_statuses: set[int] | None = None,
     silent_timeout: bool = False,
 ) -> list[dict]:
@@ -181,7 +183,7 @@ async def _fetch_rss_items(
         return []
 
     try:
-        return _parse_rss_items(xml_text)
+        return _parse_rss_items(xml_text, default_source=default_item_source)
     except Exception as exc:
         logger.warning("[News] %s %s parse failed: %s", ticker, source, exc)
         return []
@@ -232,7 +234,7 @@ async def _fetch_text(
     return response.text
 
 
-def _parse_rss_items(xml_text: str) -> list[dict]:
+def _parse_rss_items(xml_text: str, default_source: str | None = None) -> list[dict]:
     root = ET.fromstring(xml_text)
     parsed_items: list[dict] = []
     for item in root.findall(".//item"):
@@ -241,11 +243,13 @@ def _parse_rss_items(xml_text: str) -> list[dict]:
         published_dt = _parse_rss_pub_date(_child_text(item, "pubDate"))
         if not title or not link or published_dt is None:
             continue
+        source = _rss_item_source(item, title, default_source=default_source)
         parsed_items.append(
             {
                 "title": title,
                 "link": link,
                 "published": published_dt.isoformat(),
+                "source": source,
                 "summary": _strip_html(_child_text(item, "description")),
             }
         )
@@ -255,6 +259,21 @@ def _parse_rss_items(xml_text: str) -> list[dict]:
 def _child_text(item: ET.Element, tag: str) -> str:
     child = item.find(tag)
     return (child.text or "").strip() if child is not None else ""
+
+
+def _rss_item_source(
+    item: ET.Element,
+    title: str,
+    *,
+    default_source: str | None = None,
+) -> str:
+    if default_source:
+        return default_source
+    source = _child_text(item, "source")
+    if source:
+        return source
+    parts = title.rsplit(" - ", 1)
+    return parts[-1].strip() if len(parts) == 2 else "unknown"
 
 
 def _parse_rss_pub_date(value: str) -> datetime | None:

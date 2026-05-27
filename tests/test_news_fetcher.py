@@ -11,6 +11,7 @@ from services.news_fetcher import (
     NewsEventTag,
     NewsFetcher,
     NewsSentiment,
+    _parse_rss_items,
     fetch_news_rss,
 )
 
@@ -419,3 +420,62 @@ def test_fetch_news_rss_uses_kontan_fallback_when_google_empty() -> None:
 
     assert calls == ["Google News RSS", "Kontan RSS"]
     assert news == [kontan_item]
+
+
+def test_parse_rss_items_uses_google_source_tag() -> None:
+    xml_text = """
+    <rss>
+      <channel>
+        <item>
+          <title>Wismilak (WIIM) Bagikan Dividen - IDX Channel</title>
+          <source url="https://www.idxchannel.com">IDX Channel</source>
+          <link>https://example.test/wiim-dividen</link>
+          <pubDate>Mon, 25 May 2026 10:00:00 GMT</pubDate>
+          <description><![CDATA[<p>Dividen cair Juni.</p>]]></description>
+        </item>
+      </channel>
+    </rss>
+    """
+
+    parsed = _parse_rss_items(xml_text)
+
+    assert parsed[0]["source"] == "IDX Channel"
+    assert parsed[0]["summary"] == "Dividen cair Juni."
+
+
+def test_parse_rss_items_falls_back_to_title_suffix_source() -> None:
+    xml_text = """
+    <rss>
+      <channel>
+        <item>
+          <title>Target Volume SKT Dua Miliar Batang - KabarBursa.com</title>
+          <link>https://example.test/wiim-target-volume</link>
+          <pubDate>Fri, 22 May 2026 08:00:00 GMT</pubDate>
+          <description>WIIM masuk radar beli investor.</description>
+        </item>
+      </channel>
+    </rss>
+    """
+
+    parsed = _parse_rss_items(xml_text)
+
+    assert parsed[0]["source"] == "KabarBursa.com"
+
+
+def test_parse_rss_items_uses_kontan_default_source() -> None:
+    xml_text = """
+    <rss>
+      <channel>
+        <item>
+          <title>WIIM Update</title>
+          <link>https://www.kontan.co.id/news/wiim-update</link>
+          <pubDate>Fri, 22 May 2026 08:00:00 GMT</pubDate>
+          <description>Berita emiten.</description>
+        </item>
+      </channel>
+    </rss>
+    """
+
+    parsed = _parse_rss_items(xml_text, default_source="Kontan")
+
+    assert parsed[0]["source"] == "Kontan"
