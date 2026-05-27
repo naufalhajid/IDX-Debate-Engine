@@ -7,6 +7,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from utils.logger_config import logger
+
 
 RiskStatus = Literal[
     "deployable",
@@ -16,6 +18,9 @@ RiskStatus = Literal[
     "reject",
 ]
 
+# These thresholds are intentionally conservative for swing-trade sizing:
+# confidence below 60% or R/R below 1.5x should remain a watchlist/reject signal,
+# not an executable allocation.
 MIN_BUYABLE_CONFIDENCE = 0.60
 MIN_BUYABLE_RR = 1.50
 UNBUYABLE_RATINGS = {"AVOID", "SELL"}
@@ -66,6 +71,20 @@ def evaluate_risk(candidate: dict[str, Any]) -> RiskDecision:
         candidate.get("target_price"),
     )
     stop_loss = _first_float(verdict.get("stop_loss"), candidate.get("stop_loss"))
+    logger.debug(
+        "[Risk] raw inputs ticker={} rating={} confidence={} current={} entry={} "
+        "target={} stop={} rr={}",
+        ticker,
+        verdict.get("rating") or candidate.get("rating"),
+        verdict.get("confidence") or candidate.get("confidence"),
+        current_price,
+        verdict.get("entry_price_range") or candidate.get("entry_price_range"),
+        target_price,
+        stop_loss,
+        verdict.get("risk_reward_ratio")
+        or candidate.get("risk_reward_ratio")
+        or candidate.get("rr_ratio"),
+    )
 
     reason_codes: list[str] = []
     if current_price is None or current_price <= 0:
@@ -80,7 +99,8 @@ def evaluate_risk(candidate: dict[str, Any]) -> RiskDecision:
         reason_codes.append("missing_stop_loss")
 
     if reason_codes:
-        return RiskDecision(
+        return _log_decision(
+            RiskDecision(
             ticker=ticker,
             status="reject",
             sizing_allowed=False,
@@ -91,6 +111,7 @@ def evaluate_risk(candidate: dict[str, Any]) -> RiskDecision:
             entry_high=entry_high,
             target_price=target_price,
             stop_loss=stop_loss,
+            )
         )
 
     assert current_price is not None
@@ -102,7 +123,8 @@ def evaluate_risk(candidate: dict[str, Any]) -> RiskDecision:
     verdict_reason_codes = _verdict_reason_codes(candidate, verdict)
     hard_rejects = [code for code in verdict_reason_codes if code in HARD_REJECT_CODES]
     if hard_rejects:
-        return RiskDecision(
+        return _log_decision(
+            RiskDecision(
             ticker=ticker,
             status="reject",
             sizing_allowed=False,
@@ -113,10 +135,12 @@ def evaluate_risk(candidate: dict[str, Any]) -> RiskDecision:
             entry_high=entry_high,
             target_price=target_price,
             stop_loss=stop_loss,
+            )
         )
 
     if target_price <= current_price:
-        return RiskDecision(
+        return _log_decision(
+            RiskDecision(
             ticker=ticker,
             status="reject",
             sizing_allowed=False,
@@ -127,10 +151,12 @@ def evaluate_risk(candidate: dict[str, Any]) -> RiskDecision:
             entry_high=entry_high,
             target_price=target_price,
             stop_loss=stop_loss,
+            )
         )
 
     if stop_loss >= current_price:
-        return RiskDecision(
+        return _log_decision(
+            RiskDecision(
             ticker=ticker,
             status="reject",
             sizing_allowed=False,
@@ -141,12 +167,14 @@ def evaluate_risk(candidate: dict[str, Any]) -> RiskDecision:
             entry_high=entry_high,
             target_price=target_price,
             stop_loss=stop_loss,
+            )
         )
 
     conditional = _is_conditional_setup(verdict_reason_codes, verdict)
     if entry_low <= current_price <= entry_high:
         if conditional:
-            return RiskDecision(
+            return _log_decision(
+                RiskDecision(
                 ticker=ticker,
                 status="conditional_deployable",
                 sizing_allowed=False,
@@ -161,8 +189,10 @@ def evaluate_risk(candidate: dict[str, Any]) -> RiskDecision:
                 entry_high=entry_high,
                 target_price=target_price,
                 stop_loss=stop_loss,
+                )
             )
-        return RiskDecision(
+        return _log_decision(
+            RiskDecision(
             ticker=ticker,
             status="deployable",
             sizing_allowed=True,
@@ -173,10 +203,12 @@ def evaluate_risk(candidate: dict[str, Any]) -> RiskDecision:
             entry_high=entry_high,
             target_price=target_price,
             stop_loss=stop_loss,
+            )
         )
 
     if current_price > entry_high:
-        return RiskDecision(
+        return _log_decision(
+            RiskDecision(
             ticker=ticker,
             status="wait_for_pullback",
             sizing_allowed=False,
@@ -187,9 +219,11 @@ def evaluate_risk(candidate: dict[str, Any]) -> RiskDecision:
             entry_high=entry_high,
             target_price=target_price,
             stop_loss=stop_loss,
+            )
         )
 
-    return RiskDecision(
+    return _log_decision(
+        RiskDecision(
         ticker=ticker,
         status="watchlist_only",
         sizing_allowed=False,
@@ -200,6 +234,7 @@ def evaluate_risk(candidate: dict[str, Any]) -> RiskDecision:
         entry_high=entry_high,
         target_price=target_price,
         stop_loss=stop_loss,
+        )
     )
 
 
@@ -207,6 +242,19 @@ def annotate_risk(entry: dict[str, Any]) -> RiskDecision:
     """Attach a top-level risk_governor artifact to an orchestrator entry."""
     decision = evaluate_risk(entry)
     entry["risk_governor"] = decision.model_dump()
+    return decision
+
+
+def _log_decision(decision: RiskDecision) -> RiskDecision:
+    """Log the computed risk decision and return it unchanged."""
+    logger.debug(
+        "[Risk] decision ticker={} score={} status={} sizing_allowed={} reasons={}",
+        decision.ticker,
+        1.0 if decision.sizing_allowed else 0.0,
+        decision.status,
+        decision.sizing_allowed,
+        decision.reason_codes,
+    )
     return decision
 
 

@@ -26,7 +26,7 @@ class KeyStats:
     # Income statement
     eps_ttm: float = 0.0          # Earnings Per Share (Trailing Twelve Months)
     eps_forward: float = 0.0      # EPS proyeksi tahun depan (jika tersedia)
-    dps: float = 0.0              # Dividend Per Share (TTM)
+    dps: float | None = None      # Dividend Per Share (TTM); None = missing, 0.0 = explicit zero
 
     # Balance sheet
     book_value_per_share: float = 0.0   # Ekuitas / jumlah saham beredar
@@ -112,6 +112,22 @@ def _clean_numeric(raw: str) -> float:
         return 0.0
 
 
+def _clean_numeric_or_none(raw: object) -> float | None:
+    """Parse a numeric source value while preserving missing values as None."""
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    if text in {"", "-", "N/A", "n/a", "null", "None"}:
+        return None
+    s = re.sub(r"[Rr][Pp]\.?\s*", "", text).strip()
+    s = re.sub(r"[,.](?=\d{3}(?!\d))", "", s)
+    s = s.replace("%", "").strip()
+    try:
+        return float(s)
+    except (ValueError, TypeError):
+        return None
+
+
 def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
     """
     Ekstrak field yang relevan dari response raw Stockbit keystats API.
@@ -130,7 +146,7 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
     flat = _parse_stockbit_flat(api_response)
     flat_lower = {k.lower(): v for k, v in flat.items()}
 
-    def _lookup(name_patterns: list[str], pct: bool = False) -> float:
+    def _lookup_optional(name_patterns: list[str], pct: bool = False) -> float | None:
         """
         Find the first matching name from flat dict.
 
@@ -158,11 +174,18 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
                     # Prefer the shortest key (most specific match)
                     val_str = min(partial_matches, key=lambda x: len(x[0]))[1]
             if val_str is not None:
-                v = _clean_numeric(val_str)
+                v = _clean_numeric_or_none(val_str)
+                if v is None:
+                    return None
                 if pct and v > 1.0:
                     v = v / 100.0
                 return v
-        return 0.0
+        return None
+
+    def _lookup(name_patterns: list[str], pct: bool = False) -> float:
+        """Return a parsed numeric field, defaulting missing non-DPS data to 0.0."""
+        value = _lookup_optional(name_patterns, pct=pct)
+        return 0.0 if value is None else value
 
     if flat:
         # ── Per-share data ───────────────────────────────────────────────────
@@ -188,7 +211,7 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
             "Current Book Value Per Share",
         ])
 
-        stats.dps = _lookup([
+        stats.dps = _lookup_optional([
             "Dividend Per Share (TTM)", "DPS (TTM)", "Dividend Per Share",
             "DPS", "Annual Dividend Per Share", "Cash Dividend Per Share",
             "Total Dividend Per Share", "Dividen Per Saham",
@@ -223,17 +246,23 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
 
     # ── Strategy B: legacy flat key-value fallback ────────────────────────────
     # Only runs if Strategy A found nothing useful (flat dict empty or all zeros)
-    if not flat or (stats.eps_ttm == 0 and stats.book_value_per_share == 0 and stats.dps == 0):
+    if not flat or (
+        stats.eps_ttm == 0
+        and stats.book_value_per_share == 0
+        and stats.dps in (None, 0)
+    ):
         logger.info("[FairValue] {}: closure_fin_items structure empty, trying legacy key-value", ticker)
 
-        def _get_legacy(keys: list[str], default: float = 0.0) -> float:
+        def _get_legacy_optional(keys: list[str]) -> float | None:
+            """Return a legacy numeric field while preserving missing values."""
             for key in keys:
                 try:
                     val = api_response
                     for part in key.split("."):
                         val = val[part]
-                    if val is not None:
-                        return float(val)
+                    parsed = _clean_numeric_or_none(val)
+                    if parsed is not None:
+                        return parsed
                 except (KeyError, TypeError, ValueError):
                     continue
             # Shallow sub-dict search — satu level dalam dari top-level api_response
@@ -243,15 +272,21 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
                     continue
                 for k, v in top_val.items():
                     if k.lower() in simple_keys and v is not None:
-                        try:
-                            return float(v)
-                        except (ValueError, TypeError):
-                            continue
-            return default
+                        parsed = _clean_numeric_or_none(v)
+                        if parsed is not None:
+                            return parsed
+            return None
+
+        def _get_legacy(keys: list[str], default: float = 0.0) -> float:
+            """Return a legacy numeric field, defaulting absent values to 0.0."""
+            parsed = _get_legacy_optional(keys)
+            return default if parsed is None else parsed
 
         stats.eps_ttm            = _get_legacy(["eps", "eps_ttm", "earningPerShare", "data.Current.EPS", "EPS"])
         stats.book_value_per_share = _get_legacy(["bookValuePerShare", "bvps", "data.Current.BVPS", "BVPS"])
-        stats.dps                = _get_legacy(["dps", "dividendPerShare", "data.Current.DPS", "DPS"])
+        legacy_dps = _get_legacy_optional(["dps", "dividendPerShare", "data.Current.DPS", "DPS"])
+        if legacy_dps is not None:
+            stats.dps = legacy_dps
         stats.roe                = _get_legacy(["roe", "returnOnEquity", "data.Current.ROE", "ROE"])
         stats.net_margin         = _get_legacy(["netMargin", "net_margin", "data.Current.NetProfitMargin"])
         stats.roa                = _get_legacy(["roa", "returnOnAssets", "data.Current.ROA"])
@@ -268,7 +303,7 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
     # ── Derive DPS from dividend yield × price if DPS still missing ──────────
     # BBCA dan bank besar lain kadang tidak expose DPS langsung di keystats
     # tapi selalu expose Dividend Yield (%). DPS = yield × current_price / 100
-    if stats.dps == 0.0 and flat:
+    if stats.dps is None and flat:
         div_yield_pct = _lookup([
             "Dividend Yield (TTM)", "Dividend Yield", "Yield",
             "Trailing Dividend Yield", "Dividend Yield (Annual)",
@@ -301,7 +336,10 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
         "pe":      stats.raw_pe_current,
         "pb":      stats.raw_pb_current,
     }
+    missing = [k for k, v in parsed.items() if v is None]
     zeros = [k for k, v in parsed.items() if str(v) in ("0", "0.0", "0.0%")]
+    if missing:
+        logger.info("[FairValue] {}: fields missing after parse: {}", ticker, missing)
     if zeros:
         logger.warning(
             "[FairValue] {}: fields still 0 after parse: {}. "
@@ -394,7 +432,7 @@ class FairValueCalculator:
         ke = self.stats.cost_of_equity
         g = self.stats.growth_rate
 
-        if dps <= 0:
+        if dps is None or dps <= 0:
             return None
         if ke <= g:
             return None  # model tidak valid
@@ -509,6 +547,11 @@ class FairValueCalculator:
         mos    = result["margin_of_safety_pct"]
         conf   = result["confidence"]
         verdict = result["valuation_verdict"]
+        dps_text = (
+            f"Rp {self.stats.dps:,.0f}"
+            if self.stats.dps is not None
+            else "N/A"
+        )
 
         lines = [
             "╔══════════════════════════════════════════════════════════════╗",
@@ -542,7 +585,7 @@ class FairValueCalculator:
 
         if "ddm" in bdown:
             lines.append(
-                f"  Metode DDM      : DPS Rp {self.stats.dps:,.0f} / "
+                f"  Metode DDM      : DPS {dps_text} / "
                 f"(ke {self.stats.cost_of_equity*100:.0f}% - g {self.stats.growth_rate*100:.0f}%) "
                 f"= Rp {bdown['ddm']:,}"
             )
@@ -593,7 +636,7 @@ class FairValueCalculator:
             "── KEY FUNDAMENTALS ────────────────────────────────────────────",
             f"  EPS TTM         : Rp {self.stats.eps_ttm:,.0f}",
             f"  BVPS            : Rp {self.stats.book_value_per_share:,.0f}",
-            f"  DPS             : Rp {self.stats.dps:,.0f}",
+            f"  DPS             : {dps_text}",
             f"  ROE             : {self.stats.roe * 100:.1f}%",
             f"  Net Margin      : {self.stats.net_margin * 100:.1f}%",
             f"  P/E saat ini    : {self.stats.raw_pe_current:.1f}x "

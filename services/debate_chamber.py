@@ -522,6 +522,8 @@ ROUND1_CONSENSUS_THRESHOLD = 0.80
 CONSENSUS_AGENT_COUNT = 5
 MAX_DEBATE_ROUNDS = 3
 SOFT_HOLD_CONFIDENCE_DELTA = 0.15
+MAX_EVIDENCE_AGE_HOURS = 24
+MAX_STALENESS_PENALTY = 0.30
 SENTIMENT_STREAM_PAGE_SIZE = 20
 SENTIMENT_STREAM_PAGE_LIMIT = 3
 SENTIMENT_POST_CONTENT_LIMIT = 280
@@ -540,6 +542,30 @@ RESPONSE FORMAT — You must respond with ONLY a valid JSON object, no other tex
 If data is insufficient (fewer than 5 posts), return:
 {"position": "HOLD", "confidence": 0.0, "status": "INSUFFICIENT_DATA", "reasoning": "...", "key_signals": []}
 """.strip()
+
+
+def apply_staleness_penalty(confidence: float, evidence_age_hours: float) -> float:
+    """Reduce confidence when selected RAG evidence is older than the freshness SLA."""
+    if evidence_age_hours <= MAX_EVIDENCE_AGE_HOURS:
+        return confidence
+    excess_hours = evidence_age_hours - MAX_EVIDENCE_AGE_HOURS
+    penalty = min(
+        MAX_STALENESS_PENALTY,
+        (excess_hours / 48) * MAX_STALENESS_PENALTY,
+    )
+    return confidence * (1 - penalty)
+
+
+def _bundle_evidence_age_hours(bundle: Any) -> float | None:
+    """Return the oldest selected evidence age in hours for a RAG bundle."""
+    freshness_values = [
+        float(chunk.freshness_seconds) / 3600.0
+        for chunk in getattr(bundle, "chunks", [])
+        if getattr(chunk, "freshness_seconds", None) is not None
+    ]
+    if not freshness_values:
+        return None
+    return max(freshness_values)
 
 SENTIMENT_SIGNAL_WEIGHTING_INSTRUCTION = """
 SIGNAL WEIGHTING: Posts with "_verified_weight": 1.5 are from verified Stockbit users (analysts, institutional accounts). Weight their sentiment signals more heavily in your analysis. Posts with "_verified_weight": 1.0 are from regular retail users and still count - do not ignore them.
@@ -2108,10 +2134,14 @@ Current Date (Asia/Jakarta): {current_date}
             )
             try:
                 metadata = state.get("metadata") or {}
+                evidence_age_hours = _bundle_evidence_age_hours(bundle)
                 metadata["rag_chunks_selected"] = bundle.total_chunks_selected
                 metadata["rag_chunks_considered"] = bundle.total_chunks_considered
                 metadata["rag_token_estimate"] = bundle.token_estimate
                 metadata["rag_rendered_char_count"] = bundle.rendered_char_count
+                if evidence_age_hours is not None:
+                    metadata["evidence_age_h"] = int(round(evidence_age_hours))
+                    metadata["evidence_age_hours"] = evidence_age_hours
                 metadata["rag_citation_ids"] = bundle.citation_ids
                 metadata["rag_citations"] = [
                     citation.model_dump(mode="json")
@@ -2130,6 +2160,14 @@ Current Date (Asia/Jakarta): {current_date}
                     f"[RAG] {ticker} has stale evidence: "
                     f"{bundle.staleness_warning}"
                 )
+                if "evidence_age_hours" in metadata:
+                    stale_reason = (
+                        f"stale_evidence_{int(metadata['evidence_age_hours'])}h"
+                    )
+                    reasons = list(metadata.get("reasons") or [])
+                    reasons.append(stale_reason)
+                    metadata["reasons"] = reasons
+                    state["metadata"] = metadata
             logger.info(
                 f"[RAG] {ticker} evidence: "
                 f"{bundle.total_chunks_selected}/"
@@ -3040,6 +3078,37 @@ Start your response with '{' and end with '}'. Nothing else."""
             )
             return p
 
+        def _apply_staleness_adjustment(parsed: dict) -> dict:
+            """Apply metadata-driven RAG staleness confidence penalty to CIO output."""
+            metadata = dict(_state_metadata(state))
+            evidence_age_hours = metadata.get("evidence_age_hours")
+            if evidence_age_hours is None:
+                return parsed
+            try:
+                age = float(evidence_age_hours)
+                original = float(parsed.get("confidence") or 0.0)
+            except (TypeError, ValueError):
+                return parsed
+            adjusted = max(0.0, min(1.0, apply_staleness_penalty(original, age)))
+            if adjusted == original:
+                return parsed
+            logger.info(
+                f"[Staleness] {ticker}: evidence {age:.0f}h old, "
+                f"confidence adjusted {original:.0%} -> {adjusted:.0%}"
+            )
+            stale_reason = f"stale_evidence_{int(age)}h"
+            reasons = list(metadata.get("reasons") or [])
+            reasons.append(stale_reason)
+            metadata["reasons"] = reasons
+            state["metadata"] = metadata
+            p = dict(parsed)
+            p["confidence"] = adjusted
+            p["weighted_reasoning"] = self._append_reason(
+                p.get("weighted_reasoning"),
+                f"RAG evidence staleness penalty applied: {stale_reason}.",
+            )
+            return p
+
         def _apply_citation_guard(parsed: dict) -> dict:
             citations = _rag_citations_from_metadata(_state_metadata(state))
             if not citations:
@@ -3079,6 +3148,7 @@ Start your response with '{' and end with '}'. Nothing else."""
             parsed = _apply_envelope(parsed)
             parsed = self._apply_consensus_override(parsed, state)
             parsed = _apply_news_adjustment(parsed)
+            parsed = _apply_staleness_adjustment(parsed)
             parsed = _apply_citation_guard(parsed)
             verdict_json = CIOVerdict(**parsed).model_dump_json()
             logger.info(f"[CIO] JSON parsed successfully for {ticker}")

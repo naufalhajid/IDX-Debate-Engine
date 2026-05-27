@@ -102,6 +102,33 @@ def test_extract_keystats_partial_match_prefers_shortest_key():
     assert stats.roe == pytest.approx(0.15)
 
 
+def test_extract_keystats_distinguishes_missing_dps_from_explicit_zero():
+    missing_dps = extract_keystats(
+        _stockbit_response(
+            [
+                ("Current EPS (TTM)", "10"),
+                ("Book Value Per Share", "100"),
+            ]
+        ),
+        "MISS",
+    )
+    zero_dps = extract_keystats(
+        _stockbit_response(
+            [
+                ("Current EPS (TTM)", "10"),
+                ("Book Value Per Share", "100"),
+                ("DPS", "0"),
+            ]
+        ),
+        "ZERO",
+    )
+
+    assert missing_dps.dps is None
+    assert zero_dps.dps == 0.0
+    assert FairValueCalculator(missing_dps).fair_value_ddm() is None
+    assert FairValueCalculator(zero_dps).fair_value_ddm() is None
+
+
 def test_sector_weight_assertion(monkeypatch):
     monkeypatch.setitem(
         FairValueCalculator.SECTOR_WEIGHTS,

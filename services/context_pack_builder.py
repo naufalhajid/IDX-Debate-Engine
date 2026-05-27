@@ -10,7 +10,35 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 
-MAX_PROMPT_CHARS = 3_200
+CONTEXT_CHAR_LIMIT = 3_200
+MAX_PROMPT_CHARS = CONTEXT_CHAR_LIMIT
+CONTEXT_FIELD_TIERS = {
+    "tier1": [
+        "rating",
+        "current_price",
+        "fair_value",
+        "rr",
+        "confidence",
+        "entry_low",
+        "entry_high",
+        "target",
+        "stop",
+    ],
+    "tier2": [
+        "roe",
+        "debt_ratio",
+        "net_margin",
+        "revenue_growth",
+        "eps",
+        "pe_ratio",
+        "pbv",
+    ],
+    "tier3": [
+        "news_summary",
+        "rag_evidence",
+        "analyst_notes",
+    ],
+}
 _FUNDAMENTALS_PLACEHOLDER = "__FUNDAMENTALS__"
 logger = logging.getLogger(__name__)
 
@@ -31,6 +59,7 @@ class ContextPack(BaseModel):
     source_timestamps: dict[str, str] = Field(default_factory=dict)
     missing_fields: list[str]
     token_estimate: int
+    priority_fields: dict[str, Any] = Field(default_factory=dict)
 
 
 def build_context_pack(ticker: str, raw_data: dict) -> ContextPack:
@@ -99,58 +128,172 @@ def build_context_pack(ticker: str, raw_data: dict) -> ContextPack:
         source_timestamps=source_timestamps,
         missing_fields=missing_fields,
         token_estimate=0,
+        priority_fields=_collect_priority_fields(
+            raw_data,
+            current_price=price,
+            fair_value=fair_value,
+        ),
     )
     pack.token_estimate = len(pack_to_prompt_string(pack)) // 4
     return pack
 
 
-def pack_to_prompt_string(pack: ContextPack) -> str:
-    """Render a context pack as compact text suitable for prompt injection."""
-    fundamentals_json = _compact_json(pack.fundamentals)
-    technicals_json = _compact_json(pack.technicals)
-    sources = ", ".join(pack.data_sources) if pack.data_sources else "unknown"
-    source_timestamps = (
-        _compact_json(pack.source_timestamps)
-        if pack.source_timestamps
-        else "unknown"
-    )
-    missing = ", ".join(pack.missing_fields) if pack.missing_fields else "none"
-    fair_value = (
-        f"Rp {pack.fair_value:,.0f}" if pack.fair_value is not None else "INSUFFICIENT_DATA"
-    )
-    sentiment = pack.sentiment_summary or "INSUFFICIENT_DATA"
+def pack_to_prompt_string(
+    pack: ContextPack,
+    char_limit: int | None = None,
+) -> str:
+    """Render a context pack using priority tiers instead of flat truncation."""
+    limit = CONTEXT_CHAR_LIMIT if char_limit is None else int(char_limit)
+    if limit <= 0:
+        raise ValueError("context char limit must be greater than zero")
 
-    def render(fundamentals: str) -> str:
-        return (
-            f"Ticker: {pack.ticker}\n"
-            f"As Of: {pack.as_of.isoformat()}\n"
-            f"Current Price: Rp {pack.price:,.0f}\n"
-            f"Fair Value Estimate: {fair_value}\n"
-            f"Data Sources: {sources}\n"
-            f"Source Timestamps: {source_timestamps}\n"
-            f"Missing Fields: {missing}\n"
-            f"Technical Indicators: {technicals_json}\n\n"
-            f"Fundamental Brief: {fundamentals}\n\n"
-            f"Sentiment Brief: {_compact_text(sentiment, 600)}"
+    fields = _priority_fields_for_pack(pack)
+    lines = [
+        f"Ticker: {pack.ticker}",
+        f"As Of: {pack.as_of.isoformat()}",
+        _format_priority_section("Tier1 Core Fields", fields, CONTEXT_FIELD_TIERS["tier1"]),
+        f"Data Sources: {', '.join(pack.data_sources) if pack.data_sources else 'unknown'}",
+        (
+            "Source Timestamps: "
+            + (_compact_json(pack.source_timestamps) if pack.source_timestamps else "unknown")
+        ),
+        f"Missing Fields: {', '.join(pack.missing_fields) if pack.missing_fields else 'none'}",
+    ]
+    omitted: list[str] = []
+
+    def candidate_text(extra_lines: list[str]) -> str:
+        return "\n".join([*lines, *extra_lines, *_truncation_footer(omitted)])
+
+    extra_lines: list[str] = []
+    buffer_limit = max(0, limit - 200)
+    for field_name in CONTEXT_FIELD_TIERS["tier2"]:
+        field_line = _format_priority_field(field_name, fields.get(field_name))
+        candidate = candidate_text([*extra_lines, field_line])
+        if len(candidate) <= buffer_limit or not extra_lines and len(candidate) <= limit:
+            extra_lines.append(field_line)
+        else:
+            omitted.append(field_name)
+
+    for field_name in CONTEXT_FIELD_TIERS["tier3"]:
+        field_line = _format_priority_field(field_name, fields.get(field_name))
+        candidate = candidate_text([*extra_lines, field_line])
+        if len(candidate) <= limit:
+            extra_lines.append(field_line)
+        else:
+            omitted.append(field_name)
+
+    prompt = candidate_text(extra_lines)
+    if omitted:
+        logger.warning(
+            "Context pack fields truncated for %s to keep prompt under %s chars: %s",
+            pack.ticker,
+            limit,
+            omitted,
         )
-
-    prompt = render(fundamentals_json)
-    if len(prompt) <= MAX_PROMPT_CHARS:
-        return prompt
-
-    overhead = len(render(_FUNDAMENTALS_PLACEHOLDER)) - len(_FUNDAMENTALS_PLACEHOLDER)
-    budget = max(80, MAX_PROMPT_CHARS - overhead - 20)
-    truncated_fundamentals = _compact_text(fundamentals_json, budget)
-    logger.warning(
-        "Context pack fundamentals truncated for %s to keep prompt under %s chars.",
-        pack.ticker,
-        MAX_PROMPT_CHARS,
-    )
-
-    prompt = render(truncated_fundamentals)
-    if len(prompt) > MAX_PROMPT_CHARS:
-        prompt = _compact_text(prompt, MAX_PROMPT_CHARS)
     return prompt
+
+
+def _collect_priority_fields(
+    raw_data: dict,
+    *,
+    current_price: float | None,
+    fair_value: float | None,
+) -> dict[str, Any]:
+    """Collect tiered context fields from raw provider and verdict payloads."""
+    verdict = _first_dict(raw_data, "verdict", "final_verdict")
+    fundamentals = _first_dict(raw_data, "fundamentals", "fundamental_data", "fundamental")
+    technicals = _first_dict(raw_data, "technicals", "technical_indicators", "technical_data")
+    metadata = _first_dict(raw_data, "metadata")
+    return {
+        "rating": _first_present(verdict, raw_data, "rating"),
+        "current_price": current_price,
+        "fair_value": fair_value,
+        "rr": _first_present(verdict, raw_data, "rr", "risk_reward_ratio", "rr_ratio"),
+        "confidence": _first_present(verdict, raw_data, "confidence", "model_confidence"),
+        "entry_low": _first_present(verdict, raw_data, "entry_low", "entry_price_low"),
+        "entry_high": _first_present(verdict, raw_data, "entry_high", "entry_price_high"),
+        "target": _first_present(verdict, raw_data, "target", "target_price"),
+        "stop": _first_present(verdict, raw_data, "stop", "stop_loss"),
+        "roe": _first_present(fundamentals, raw_data, "roe", "return_on_equity"),
+        "debt_ratio": _first_present(fundamentals, raw_data, "debt_ratio", "der"),
+        "net_margin": _first_present(fundamentals, raw_data, "net_margin"),
+        "revenue_growth": _first_present(fundamentals, raw_data, "revenue_growth"),
+        "eps": _first_present(fundamentals, raw_data, "eps", "eps_ttm"),
+        "pe_ratio": _first_present(fundamentals, raw_data, "pe_ratio", "pe", "per"),
+        "pbv": _first_present(fundamentals, raw_data, "pbv", "pb_ratio", "pb"),
+        "news_summary": _first_present(
+            raw_data,
+            metadata,
+            "news_summary",
+            "news_brief",
+            "sentiment_summary",
+            "sentiment",
+        ),
+        "rag_evidence": _first_present(raw_data, metadata, "rag_evidence", "decision_brief"),
+        "analyst_notes": _first_present(
+            raw_data,
+            fundamentals,
+            technicals,
+            "analyst_notes",
+            "brief",
+            "summary",
+        ),
+    }
+
+
+def _priority_fields_for_pack(pack: ContextPack) -> dict[str, Any]:
+    """Return priority fields with required tier1 fallback values populated."""
+    fields = dict(pack.priority_fields)
+    fields["current_price"] = fields.get("current_price", pack.price)
+    fields["fair_value"] = fields.get("fair_value", pack.fair_value)
+    fields.setdefault("news_summary", pack.sentiment_summary)
+    for field_name in CONTEXT_FIELD_TIERS["tier1"]:
+        fields.setdefault(field_name, "INSUFFICIENT_DATA")
+    return fields
+
+
+def _first_present(*dicts_and_keys: Any) -> Any:
+    """Return the first non-empty value from the provided dictionaries and keys."""
+    dicts = [item for item in dicts_and_keys if isinstance(item, dict)]
+    keys = [str(item) for item in dicts_and_keys if not isinstance(item, dict)]
+    for source in dicts:
+        for key in keys:
+            value = source.get(key)
+            if value not in (None, ""):
+                return value
+    return None
+
+
+def _format_priority_section(
+    title: str,
+    fields: dict[str, Any],
+    field_names: list[str],
+) -> str:
+    """Format a compact JSON-like section for a tier of priority fields."""
+    payload = {name: _display_field_value(fields.get(name)) for name in field_names}
+    return f"{title}: {_compact_json(payload)}"
+
+
+def _format_priority_field(field_name: str, value: Any) -> str:
+    """Format one optional context field for the prompt surface."""
+    return f"{field_name}: {_display_field_value(value)}"
+
+
+def _display_field_value(value: Any) -> Any:
+    """Normalize prompt field display without dropping real zero values."""
+    if value is None or value == "":
+        return "INSUFFICIENT_DATA"
+    if isinstance(value, dict | list):
+        return _compact_json(value)
+    return value
+
+
+def _truncation_footer(omitted: list[str]) -> list[str]:
+    """Return footer lines documenting omitted context fields."""
+    return [
+        f"[truncated: {field_name} omitted due to context limit]"
+        for field_name in omitted
+    ]
 
 
 def _resolve_as_of(raw_data: dict) -> datetime:

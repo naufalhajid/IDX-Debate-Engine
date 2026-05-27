@@ -1,6 +1,8 @@
 import logging
 
 from services.context_pack_builder import (
+    CONTEXT_FIELD_TIERS,
+    CONTEXT_CHAR_LIMIT,
     MAX_PROMPT_CHARS,
     build_context_pack,
     pack_to_prompt_string,
@@ -55,10 +57,12 @@ def test_pack_to_prompt_string_truncates_oversized_fundamentals(
     raw_data = {
         "price": 1000,
         "fair_value": 1300,
-        "fundamentals": {f"metric_{idx}": "x" * 80 for idx in range(100)},
+        "fundamentals": {field: "x" * 800 for field in CONTEXT_FIELD_TIERS["tier2"]},
         "technicals": {"ma50": 980},
         "sentiment_summary": "Neutral.",
         "data_sources": ["stockbit"],
+        "rag_evidence": "r" * 3000,
+        "analyst_notes": "a" * 3000,
     }
 
     caplog.set_level(logging.WARNING, logger="services.context_pack_builder")
@@ -66,6 +70,34 @@ def test_pack_to_prompt_string_truncates_oversized_fundamentals(
     prompt = pack_to_prompt_string(pack)
 
     assert len(prompt) <= MAX_PROMPT_CHARS
-    assert "Fundamental Brief:" in prompt
-    assert "..." in prompt
-    assert "fundamentals truncated" in caplog.text
+    assert "Tier1 Core Fields:" in prompt
+    assert "[truncated:" in prompt
+    assert "fields truncated" in caplog.text
+
+
+def test_pack_to_prompt_string_small_limit_preserves_tier1() -> None:
+    raw_data = {
+        "current_price": 1000,
+        "fair_value": 1300,
+        "verdict": {
+            "rating": "BUY",
+            "confidence": 0.61,
+            "risk_reward_ratio": 2.0,
+            "entry_low": 950,
+            "entry_high": 1000,
+            "target_price": 1150,
+            "stop_loss": 900,
+        },
+        "fundamentals": {field: "x" * 500 for field in CONTEXT_FIELD_TIERS["tier2"]},
+        "news_summary": "n" * 1000,
+        "rag_evidence": "r" * 1000,
+        "analyst_notes": "a" * 1000,
+    }
+    pack = build_context_pack("TEST", raw_data)
+    prompt = pack_to_prompt_string(pack, char_limit=120)
+
+    tier1_section = prompt.splitlines()[2]
+    for field_name in CONTEXT_FIELD_TIERS["tier1"]:
+        assert field_name in tier1_section
+    assert "[truncated:" in prompt
+    assert CONTEXT_CHAR_LIMIT == MAX_PROMPT_CHARS

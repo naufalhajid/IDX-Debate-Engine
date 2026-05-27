@@ -144,11 +144,15 @@ _RATING_STYLE: dict[str, str] = {
     "HOLD": "dim",
     "SELL": "red",
     "AVOID": "red",
+    "INSUFFICIENT_DATA": "dim",
     "ERROR": "bold red",
     "ABORTED": "dim red",
     "debating": "yellow",
     "queued": "dim",
 }
+
+MIN_CONFIDENCE_FOR_SETUP = 25
+EXTREME_OVERVALUATION_THRESHOLD = 3.0
 
 
 def _ensure_utf8_stdout() -> None:
@@ -211,6 +215,16 @@ def _format_cli_ratio(value: Any) -> str:
         return "-"
     try:
         return f"{float(value):.2f}x"
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _format_evidence_age(value: Any) -> str:
+    """Format an evidence-age value for compact terminal and markdown tables."""
+    if value in (None, ""):
+        return "-"
+    try:
+        return f"{int(round(float(value)))}h"
     except (TypeError, ValueError):
         return str(value)
 
@@ -454,9 +468,9 @@ class BatchProgressView:
                 {"justify": "center", "no_wrap": True, "max_width": 10},
             ),
             (
-                "Conf",
+                "Model Conf",
                 "confidence",
-                {"justify": "right", "no_wrap": True, "width": 6},
+                {"justify": "right", "no_wrap": True, "width": 10},
             ),
             (
                 "Note",
@@ -1382,7 +1396,7 @@ class CliRenderer:
         )
         setup_table.add_column("Ticker", style="bold", no_wrap=True, width=6)
         setup_table.add_column("Rating", no_wrap=True, max_width=10)
-        setup_table.add_column("Conf", justify="right", no_wrap=True, width=6)
+        setup_table.add_column("Model Conf", justify="right", no_wrap=True, width=10)
         setup_table.add_column("Current", justify="right", no_wrap=True, width=10)
         setup_table.add_column(
             "Entry",
@@ -1392,6 +1406,7 @@ class CliRenderer:
         setup_table.add_column("Target", justify="right", no_wrap=True, width=10)
         setup_table.add_column("Stop", justify="right", no_wrap=True, width=10)
         setup_table.add_column("R/R", justify="right", no_wrap=True, width=6)
+        setup_table.add_column("Evidence Age", justify="right", no_wrap=True, width=12)
 
         validation_table = Table(
             title="Final Results - Validation",
@@ -1451,6 +1466,7 @@ class CliRenderer:
                 _format_cli_money(verdict.get("target_price")),
                 _format_cli_money(verdict.get("stop_loss")),
                 _format_cli_ratio(verdict.get("risk_reward_ratio")),
+                _format_evidence_age(result.get("evidence_age_h")),
                 style=row_style,
             )
             validation_table.add_row(
@@ -2128,7 +2144,7 @@ ORCHESTRATOR_CONFIG: dict[str, Any] = {
     },
     "rr_normalization_cap": settings.CONVICTION_RR_NORMALIZATION_CAP,
     "max_concurrent_debates": int(os.getenv("MAX_CONCURRENT_DEBATES", "5")),
-    "excluded_ratings": {"AVOID", "HOLD", "SELL"},
+    "excluded_ratings": {"AVOID", "HOLD", "SELL", "INSUFFICIENT_DATA"},
     "top_n_selection": int(os.getenv("TOP_N_SELECTION", "3")),
     "max_price_retry_attempts": int(os.getenv("MAX_PRICE_RETRY_ATTEMPTS", "3")),
     "rpm_limit": int(os.getenv("GEMINI_RPM_LIMIT", "10")),
@@ -2763,6 +2779,235 @@ def _coerce_confidence(value: Any) -> float | None:
     return max(0.0, min(confidence, 1.0))
 
 
+class SetupCoherenceError(ValueError):
+    """Raised when a generated trade setup violates basic price geometry."""
+
+
+def validate_setup_coherence(
+    ticker: str,
+    current_price: float,
+    entry_low: float,
+    entry_high: float,
+    target: float,
+    stop: float,
+) -> None:
+    """Raise SetupCoherenceError when a trade setup is not actionable."""
+    if target <= entry_high:
+        raise SetupCoherenceError(
+            f"target ({target}) does not exceed top of entry range ({entry_high})"
+        )
+    if stop >= entry_low:
+        raise SetupCoherenceError(
+            f"stop ({stop}) is not below bottom of entry range ({entry_low})"
+        )
+    if current_price > entry_high * 1.10:
+        raise SetupCoherenceError(
+            f"current price ({current_price}) is more than 10% above entry range "
+            f"top ({entry_high}). Setup is not actionable."
+        )
+    risk = entry_high - stop
+    if risk <= 0:
+        raise SetupCoherenceError(
+            f"stop ({stop}) is not below bottom of entry range ({entry_low})"
+        )
+    rr = (target - entry_high) / risk
+    if rr < 1.5:
+        raise SetupCoherenceError(
+            f"R/R ({rr:.2f}x) below minimum threshold of 1.5x"
+        )
+
+
+def extract_model_confidence(verdict: dict[str, Any]) -> float | None:
+    """Return CIO model certainty on a 0.0-1.0 scale before R/R weighting."""
+    return _coerce_confidence(
+        verdict.get("model_confidence")
+        if verdict.get("model_confidence") is not None
+        else verdict.get("confidence")
+    )
+
+
+def _confidence_percent_label(confidence: float) -> str:
+    """Format normalized confidence as an integer percent label for reason codes."""
+    return str(int(round(confidence * 100)))
+
+
+def _append_result_reason(result: dict[str, Any], reason: str) -> None:
+    """Append a reason code to both top-level and verdict-level reason lists."""
+    if not reason:
+        return
+    reasons = result.setdefault("reasons", [])
+    if isinstance(reasons, list) and reason not in reasons:
+        reasons.append(reason)
+    verdict = result.get("verdict")
+    if isinstance(verdict, dict):
+        verdict_reasons = verdict.setdefault("reasons", [])
+        if isinstance(verdict_reasons, list) and reason not in verdict_reasons:
+            verdict_reasons.append(reason)
+
+
+def _clear_numeric_setup_fields(verdict: dict[str, Any]) -> None:
+    """Remove numeric setup levels while preserving the existing verdict payload shape."""
+    verdict["entry_price_range"] = None
+    verdict["entry_low"] = None
+    verdict["entry_high"] = None
+    verdict["target_price"] = None
+    verdict["stop_loss"] = None
+    verdict["risk_reward_ratio"] = None
+    verdict["expected_return"] = None
+
+
+def _set_reject_risk_payload(
+    result: dict[str, Any],
+    *,
+    ticker: str,
+    reason: str,
+    message: str,
+) -> None:
+    """Attach a deterministic reject risk payload without invoking risk scoring."""
+    result["risk_gov"] = "reject"
+    result["risk_governor"] = {
+        "ticker": ticker,
+        "status": "reject",
+        "sizing_allowed": False,
+        "reason_codes": [reason],
+        "message": message,
+        "current_price": None,
+        "entry_low": None,
+        "entry_high": None,
+        "target_price": None,
+        "stop_loss": None,
+    }
+
+
+def apply_minimum_confidence_gate(
+    ticker: str,
+    result: dict[str, Any],
+    setup_generator: Callable[[], Any] | None = None,
+) -> bool:
+    """Skip setup generation when CIO confidence is below the production floor."""
+    verdict = result.get("verdict") if isinstance(result.get("verdict"), dict) else {}
+    confidence = extract_model_confidence(verdict)
+    if confidence is None:
+        raise ValueError(f"{ticker}: confidence is missing and cannot be gated")
+    confidence_pct = confidence * 100
+    if confidence_pct >= MIN_CONFIDENCE_FOR_SETUP:
+        if setup_generator is not None:
+            setup_generator()
+        return False
+
+    label = _confidence_percent_label(confidence)
+    reason = f"confidence_{label}pct_below_minimum"
+    logger.warning(
+        f"[Gate] {ticker}: confidence {label}% below minimum "
+        f"{MIN_CONFIDENCE_FOR_SETUP}%. Skipping setup generation."
+    )
+    verdict["rating"] = "INSUFFICIENT_DATA"
+    verdict["action"] = "SKIP"
+    _clear_numeric_setup_fields(verdict)
+    result["sizing"] = "Skip — confidence below threshold"
+    _append_result_reason(result, reason)
+    _set_reject_risk_payload(
+        result,
+        ticker=ticker,
+        reason=reason,
+        message="Skip — confidence below threshold",
+    )
+    return True
+
+
+def apply_setup_coherence_gate(ticker: str, result: dict[str, Any]) -> bool:
+    """Reject incoherent setup levels before risk scoring and output formatting."""
+    verdict = result.get("verdict") if isinstance(result.get("verdict"), dict) else {}
+    if not verdict or verdict.get("entry_price_range") in (None, ""):
+        return False
+    current_price = _parse_price_value(verdict.get("current_price"))
+    entry_low, entry_high = _parse_entry_bounds(verdict.get("entry_price_range"))
+    target = _parse_price_value(verdict.get("target_price"))
+    stop = _parse_price_value(verdict.get("stop_loss"))
+    if None in (current_price, entry_low, entry_high, target, stop):
+        raise SetupCoherenceError(
+            f"{ticker}: setup coherence cannot be validated because price fields are missing"
+        )
+    try:
+        validate_setup_coherence(
+            ticker,
+            float(current_price),
+            float(entry_low),
+            float(entry_high),
+            float(target),
+            float(stop),
+        )
+        return False
+    except SetupCoherenceError as exc:
+        message = str(exc)
+        logger.warning(f"[Coherence] {ticker}: {message}")
+        verdict["rating"] = "AVOID"
+        _clear_numeric_setup_fields(verdict)
+        _append_result_reason(result, message)
+        _set_reject_risk_payload(
+            result,
+            ticker=ticker,
+            reason="setup_coherence_failed",
+            message=message,
+        )
+        return True
+
+
+def apply_extreme_overvaluation_flag(ticker: str, result: dict[str, Any]) -> bool:
+    """Flag price-to-fair-value ratios where valuation assumptions may not hold."""
+    verdict = result.get("verdict") if isinstance(result.get("verdict"), dict) else {}
+    current_price = _parse_price_value(verdict.get("current_price"))
+    fair_value = _parse_price_value(verdict.get("fair_value"))
+    if current_price is None or fair_value is None or fair_value <= 0:
+        return False
+    ratio = current_price / fair_value
+    if ratio <= EXTREME_OVERVALUATION_THRESHOLD:
+        return False
+
+    flag = "EXTREME_OVERVALUATION"
+    note = (
+        f"Caution: price/FV ratio {ratio:.1f}x — valuation model assumptions "
+        "may not hold for this stock type"
+    )
+    for container in (result, verdict):
+        flags = container.setdefault("flags", [])
+        if isinstance(flags, list) and flag not in flags:
+            flags.append(flag)
+        existing_note = str(container.get("note") or "").strip()
+        container["note"] = f"{existing_note} {note}".strip()
+    _append_result_reason(result, flag)
+    _append_result_reason(result, "fair_value_model_may_not_apply")
+    logger.warning(
+        f"[FairValue] {ticker}: price/FV = {ratio:.1f}x exceeds threshold "
+        f"{EXTREME_OVERVALUATION_THRESHOLD}x. Model reliability uncertain."
+    )
+    return True
+
+
+def sync_metric_aliases(entry: dict[str, Any]) -> None:
+    """Expose confidence and conviction under explicit, non-confusing names."""
+    verdict = entry.get("verdict") if isinstance(entry.get("verdict"), dict) else {}
+    model_confidence = extract_model_confidence(verdict)
+    if model_confidence is not None:
+        verdict["model_confidence"] = model_confidence
+        entry["model_confidence"] = model_confidence
+    trade_conviction = entry.get("trade_conviction", entry.get("conviction_score", 0.0))
+    try:
+        trade_conviction = float(trade_conviction or 0.0)
+    except (TypeError, ValueError):
+        trade_conviction = 0.0
+    entry["trade_conviction"] = trade_conviction
+
+
+def _merge_metadata_reasons(result: dict[str, Any]) -> None:
+    """Copy reason metadata from debate nodes into the output reason list."""
+    metadata = result.get("metadata") if isinstance(result.get("metadata"), dict) else {}
+    for reason in metadata.get("reasons") or []:
+        _append_result_reason(result, str(reason))
+    if "evidence_age_h" in metadata:
+        result["evidence_age_h"] = metadata.get("evidence_age_h")
+
+
 def _result_status(entry: dict[str, Any]) -> str:
     status = str(entry.get("status") or "").strip().lower()
     if status in {"success", "timeout", "failed", "skipped"}:
@@ -2907,11 +3152,25 @@ def _enhance_completed_results(
             if fetch_news:
                 _attach_news_signal(ticker, result)
             if status == "success" and result.get("verdict"):
-                _attach_risk_governor_to_result(
-                    ticker=ticker,
-                    run_id=run_id,
-                    result=result,
-                )
+                _merge_metadata_reasons(result)
+                risk_locked = apply_minimum_confidence_gate(ticker, result)
+                if not risk_locked:
+                    risk_locked = apply_setup_coherence_gate(ticker, result)
+                apply_extreme_overvaluation_flag(ticker, result)
+                sync_metric_aliases(result)
+                if not risk_locked:
+                    _attach_risk_governor_to_result(
+                        ticker=ticker,
+                        run_id=run_id,
+                        result=result,
+                    )
+                else:
+                    logger.info(
+                        f"[RiskGovernor] {ticker}: reject "
+                        f"({', '.join(result.get('reasons') or [])})"
+                    )
+            else:
+                sync_metric_aliases(result)
             _record_ticker_telemetry(
                 ticker=ticker,
                 run_id=run_id,
@@ -2922,6 +3181,30 @@ def _enhance_completed_results(
                 f"[Orchestrator] {result.get('ticker', 'UNKNOWN')} "
                 f"postprocess failed: {e}"
             )
+
+
+def _log_risk_warn_distribution(results: list[dict]) -> None:
+    """Summarize how often the live R column will display WARN for the batch."""
+    total = 0
+    warn_count = 0
+    status_counts: dict[str, int] = {}
+    for result in results:
+        if _result_status(result) != "success":
+            continue
+        risk = result.get("risk_governor")
+        if not isinstance(risk, dict):
+            continue
+        total += 1
+        status = str(risk.get("status") or "unknown")
+        status_counts[status] = status_counts.get(status, 0) + 1
+        if risk.get("sizing_allowed") is False:
+            warn_count += 1
+    if total == 0:
+        return
+    logger.info(
+        f"[Risk] {warn_count}/{total} tickers flagged WARN — consider whether "
+        f"market regime justifies this distribution; statuses={status_counts}"
+    )
 
 
 def _write_explainability_audit(
@@ -3455,6 +3738,11 @@ def compute_conviction_score(
     realized_outcomes: list[TradeOutcome] | None = None,
 ) -> tuple[float, str | None]:
     """
+    Metric note: this returns trade_conviction, a risk-adjusted score on 0.0-1.0.
+
+    It is intentionally different from model_confidence, which is the CIO's
+    model certainty before the R/R component is blended in.
+
     Hitung Conviction Score = W_confidence Ã— CIO Confidence + W_rr Ã— Normalized R/R.
 
     Weights dibaca dari ORCHESTRATOR_CONFIG (dapat di-override via env vars di settings).
@@ -3538,6 +3826,8 @@ def select_top_n(
             realized_outcomes=realized_outcomes,
         )
         entry["conviction_score"] = round(score, 4)
+        entry["trade_conviction"] = round(score, 4)
+        sync_metric_aliases(entry)
         if warning:
             entry["rr_warning"] = warning
         scorable.append(entry)
@@ -3596,6 +3886,7 @@ def save_full_results(results: list[dict], path: Path = FULL_RESULTS_PATH) -> No
     # Update or add new results
     for r in results:
         if isinstance(r, dict) and "ticker" in r:
+            sync_metric_aliases(r)
             data_dict[r["ticker"]] = r
             
     merged_results = list(data_dict.values())
@@ -4119,7 +4410,8 @@ def generate_top3_report(
             sizing_label = "Unknown"
         action_message = risk.get("message") or "Risk governor metadata missing."
         # [FIX-7] Reuse skor dari select_top3, bukan hitung ulang
-        score = entry.get("conviction_score", 0.0)
+        score = entry.get("trade_conviction", entry.get("conviction_score", 0.0))
+        model_confidence = extract_model_confidence(v) or 0.0
         disagreement = entry.get("disagreement_type")
         consensus_method = entry.get("consensus_method") or "unknown"
         dissenting_agents = entry.get("dissenting_agents") or []
@@ -4137,8 +4429,8 @@ def generate_top3_report(
             "| Metric | Value |",
             "|---|---|",
             f"| **Rating** | `{v.get('rating', 'N/A')}` |",
-            f"| **CIO Confidence** | {v.get('confidence', 0):.0%} |",
-            f"| **Conviction Score** | {score:.2%} |",
+            f"| **Model Confidence** | {model_confidence:.0%} |",
+            f"| **Trade Conviction** | {score:.2%} |",
             f"| **Debate Consensus** | {consensus_label} |",
             f"| **Dissenting Agents** | {', '.join(dissenting_agents) if dissenting_agents else '-'} |",
             f"| **Timeframe** | {v.get('timeframe', '1-3 Months')} |",
@@ -4226,8 +4518,8 @@ def generate_top3_report(
     lines += [
         "## Full Batch Summary",
         "",
-        "| Ticker | Rating | Confidence | R/R Ratio | Conviction Score | Actionability | Consensus | Method | Dissenting Agents | Disagreement | Status |",
-        "|---|---|---|---|---|---|---|---|---|---|---|",
+        "| Ticker | Rating | Model Confidence | R/R Ratio | Trade Conviction | Evidence Age | Actionability | Consensus | Method | Dissenting Agents | Disagreement | Status |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
 
     # [FIX-7] Untuk ticker yang sudah masuk select_top3, skor sudah ada di entry.
@@ -4242,9 +4534,10 @@ def generate_top3_report(
         v = entry.get("verdict", {})
         ticker = entry["ticker"]
         rating = v.get("rating", "ERROR") if v else "ERROR"
-        conf = v.get("confidence", 0) if v else 0
+        conf = (extract_model_confidence(v) or 0.0) if v else 0.0
         rr = v.get("risk_reward_ratio", "N/A") if v else "N/A"
-        cscore = entry.get("conviction_score", 0.0)
+        cscore = entry.get("trade_conviction", entry.get("conviction_score", 0.0))
+        evidence_age = _format_evidence_age(entry.get("evidence_age_h"))
         consensus = "YES" if entry.get("consensus_reached") else "NO"
         method = entry.get("consensus_method") or "-"
         dissent = ", ".join(entry.get("dissenting_agents") or []) or "-"
@@ -4268,7 +4561,7 @@ def generate_top3_report(
         rr_str = f"{rr:.2f}" if isinstance(rr, (int, float)) and rr else "N/A"
         lines.append(
             f"| {ticker} | {rating} | {conf:.0%} | {rr_str} | {cscore:.2%} "
-            f"| {actionability} | {consensus} | {method} | {dissent} | {disagreement} | {status} |"
+            f"| {evidence_age} | {actionability} | {consensus} | {method} | {dissent} | {disagreement} | {status} |"
         )
 
     lines += [
@@ -4551,6 +4844,7 @@ async def main(
                     chamber_factory=chamber_factory,
                 )
             _enhance_completed_results(results, ledger_run_id, fetch_news=not dry_run)
+            _log_risk_warn_distribution(results)
             for result in results:
                 _cli_renderer.update_batch_progress_from_result(result)
             try:
@@ -4884,7 +5178,7 @@ def _print_top3_summary(top_n: list[dict], all_results: list[dict] | None = None
     table.add_column("Rank", justify="right")
     table.add_column("Ticker", style="bold")
     table.add_column("Rating")
-    table.add_column("Conviction %", justify="right")
+    table.add_column("Trade Conv", justify="right")
     table.add_column("R/R", justify="right")
     table.add_column("Entry Range")
     table.add_column("Target")
@@ -4895,7 +5189,7 @@ def _print_top3_summary(top_n: list[dict], all_results: list[dict] | None = None
         v = entry.get("verdict", {})
         ticker = entry["ticker"]
         rating = v.get("rating", "N/A")
-        score = entry.get("conviction_score", 0.0)
+        score = entry.get("trade_conviction", entry.get("conviction_score", 0.0))
         entry_range = v.get("entry_price_range") or "N/A"
         style = _RATING_STYLE.get(rating, "white")
         risk = (

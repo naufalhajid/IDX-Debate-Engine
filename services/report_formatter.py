@@ -149,6 +149,15 @@ def _confidence(value: Any) -> float | None:
     return max(0.0, min(number, 1.0))
 
 
+def _model_confidence(verdict: dict[str, Any]) -> float | None:
+    """Return the explicit model confidence alias, falling back to legacy confidence."""
+    return _confidence(
+        verdict.get("model_confidence")
+        if verdict.get("model_confidence") is not None
+        else verdict.get("confidence")
+    )
+
+
 def _money(value: Any, *, include_prefix: bool = True) -> str:
     number = _safe_float(value)
     if number is None or number <= 0:
@@ -869,10 +878,9 @@ class RichFormatter:
             verdict = _verdict(data)
             rating = _rating(data, packet)
             rating_style = self._rating_style(rating)
-            confidence = _confidence(
-                verdict.get("confidence")
-                or (packet.verdict_confidence if packet else None)
-            )
+            confidence = _model_confidence(verdict)
+            if confidence is None and packet:
+                confidence = _confidence(packet.verdict_confidence)
             confidence_text = (
                 "Data unavailable"
                 if confidence is None
@@ -902,7 +910,7 @@ class RichFormatter:
                 Text.assemble(
                     ("RATING: ", "bold cyan"),
                     (f"{rating}  ", rating_style),
-                    ("CONFIDENCE: ", "bold cyan"),
+                    ("MODEL CONFIDENCE: ", "bold cyan"),
                     (confidence_text)
                 ),
                 Text.assemble(
@@ -1055,7 +1063,7 @@ class RichFormatter:
             table = Table(show_header=True, header_style="bold", expand=True)
             table.add_column("Ticker", style="bold", no_wrap=True)
             table.add_column("Rating", no_wrap=True)
-            table.add_column("Conf", justify="right", no_wrap=True)
+            table.add_column("Model Conf", justify="right", no_wrap=True)
             table.add_column("R/R", justify="right", no_wrap=True)
             table.add_column("Entry Zone")
             table.add_column("Target")
@@ -1069,7 +1077,7 @@ class RichFormatter:
                 table.add_row(
                     _ticker(row),
                     Text(rating, style=self._rating_style(rating)),
-                    _pct(verdict.get("confidence")),
+                    _pct(_model_confidence(verdict)),
                     _ratio(verdict.get("risk_reward_ratio")),
                     f"{_money(low, include_prefix=False)}-{_money(high, include_prefix=False)}",
                     _money(verdict.get("target_price")),
@@ -1131,7 +1139,7 @@ class RichFormatter:
     def _batch_recommendation_line(self, result: dict[str, Any], rating: str) -> Group:
         verdict = _verdict(result)
         ticker = _ticker(result)
-        confidence = _pct(verdict.get("confidence"))
+        confidence = _pct(_model_confidence(verdict))
         rr = _ratio(verdict.get("risk_reward_ratio"))
         low, high = _entry_bounds(verdict)
         target = _money(verdict.get("target_price"))
@@ -1142,12 +1150,12 @@ class RichFormatter:
         first = f"{rating:<5} - {ticker}"
         if rating == "BUY":
             second = (
-                f"   conf={confidence}  R/R={rr}\n"
+                f"   model_conf={confidence}  R/R={rr}\n"
                 f"   Entry: {_money(low)}-{_money(high)}\n"
                 f"   Target: {target}"
             )
         else:
-            second = f"   conf={confidence}  {reason}"
+            second = f"   model_conf={confidence}  {reason}"
         return Group(Text(first, style=self._rating_style(rating)), Text(second))
 
     def _deployable_line(self, result: dict[str, Any]) -> str:
@@ -1175,10 +1183,9 @@ class MarkdownFormatter:
             verdict = _verdict(data)
             ticker = _ticker(data, packet)
             rating = _rating(data, packet)
-            confidence = _confidence(
-                verdict.get("confidence")
-                or (packet.verdict_confidence if packet else None)
-            )
+            confidence = _model_confidence(verdict)
+            if confidence is None and packet:
+                confidence = _confidence(packet.verdict_confidence)
             confidence_text = "N/A" if confidence is None else f"{confidence:.0%}"
             current_price = verdict.get("current_price")
             fair_value = verdict.get("fair_value")
@@ -1209,7 +1216,7 @@ class MarkdownFormatter:
                 "| Item | Detail |",
                 "|------|--------|",
                 f"| **Recommendation** | **{rating}** |",
-                f"| **Confidence** | {confidence_text} |",
+                f"| **Model Confidence** | {confidence_text} |",
                 f"| **Current Price** | {_money(current_price)} |",
                 f"| **Fair Value** | {_money(fair_value)} |",
                 f"| **Gap** | {_signed_pct(value_gap)} ({value_status}) |",
@@ -1431,7 +1438,7 @@ class MarkdownFormatter:
             f"- Stop: {_money(verdict.get('stop_loss'))}",
             (
                 f"- R/R: {_ratio(verdict.get('risk_reward_ratio'))} | "
-                f"Confidence: {_pct(verdict.get('confidence'))}"
+                f"Model Confidence: {_pct(_model_confidence(verdict))}"
             ),
             "",
         ]
