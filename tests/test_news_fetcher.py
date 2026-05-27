@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
-from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from services.news_fetcher import (
@@ -11,6 +11,7 @@ from services.news_fetcher import (
     NewsEventTag,
     NewsFetcher,
     NewsSentiment,
+    fetch_news_rss,
 )
 
 
@@ -49,17 +50,20 @@ def _raw(
 
 
 def _mock_ticker(news: list[dict] | Exception):
-    mocked_ticker = Mock()
-    if isinstance(news, Exception):
-        mocked_ticker.side_effect = news
-    else:
-        mocked_ticker.return_value.news = news
+    mocked_fetch = Mock()
+
+    async def fake_fetch_news(self, ticker: str, company_name: str = "") -> list[dict]:
+        mocked_fetch(ticker, company_name=company_name)
+        if isinstance(news, Exception):
+            raise news
+        return news
+
     patcher = patch(
-        "services.news_fetcher._get_yfinance",
-        return_value=SimpleNamespace(Ticker=mocked_ticker),
+        "services.news_fetcher.NewsFetcher.fetch_news_async",
+        fake_fetch_news,
     )
     patcher.start()
-    return patcher, mocked_ticker
+    return patcher, mocked_fetch
 
 
 def test_classify_item_positive_title() -> None:
@@ -145,7 +149,7 @@ def test_lowercase_and_jk_suffix_ticker_normalization() -> None:
         patcher.stop()
 
     assert bundle.ticker == "BBCA"
-    mocked_ticker.assert_called_once_with("BBCA.JK")
+    mocked_ticker.assert_called_once_with("BBCA", company_name="")
 
 
 def test_build_bundle_empty_response_marks_unavailable() -> None:
@@ -351,7 +355,7 @@ def test_bundle_to_prompt_string_shows_breaking() -> None:
     assert "BREAKING" in prompt
 
 
-def test_cache_hit_avoids_second_yfinance_call() -> None:
+def test_cache_hit_avoids_second_news_fetch() -> None:
     patcher, mocked_ticker = _mock_ticker([_raw("BBCA profit growth", hours_ago=2)])
     try:
         fetcher = NewsFetcher()
@@ -376,11 +380,42 @@ def test_as_evidence_chunk_returns_sentiment_chunk() -> None:
     assert chunk["content"]
 
 
-def test_fetch_yfinance_news_failure_returns_empty_list() -> None:
-    patcher, _ = _mock_ticker(RuntimeError("network failed"))
+def test_fetch_news_failure_returns_empty_list() -> None:
+    async def failing_fetch(*args, **kwargs):
+        raise RuntimeError("network failed")
+
+    patcher = patch("services.news_fetcher.fetch_news_rss", failing_fetch)
+    patcher.start()
     try:
-        news = NewsFetcher().fetch_yfinance_news("BBCA")
+        news = NewsFetcher().fetch_news("BBCA")
     finally:
         patcher.stop()
 
     assert news == []
+
+
+def test_fetch_news_rss_uses_kontan_fallback_when_google_empty() -> None:
+    calls: list[str] = []
+    now = datetime.now(timezone.utc)
+    kontan_item = {
+        "title": "BBCA laba naik",
+        "link": "https://www.kontan.co.id/news/bbca-laba-naik",
+        "published": now.isoformat(),
+        "summary": "Kinerja BBCA positif.",
+    }
+
+    async def fake_fetch_rss_items(url: str, **kwargs) -> list[dict]:
+        calls.append(kwargs["source"])
+        if kwargs["source"] == "Google News RSS":
+            return []
+        return [kontan_item]
+
+    patcher = patch("services.news_fetcher._fetch_rss_items", fake_fetch_rss_items)
+    patcher.start()
+    try:
+        news = asyncio.run(fetch_news_rss("BBCA"))
+    finally:
+        patcher.stop()
+
+    assert calls == ["Google News RSS", "Kontan RSS"]
+    assert news == [kontan_item]

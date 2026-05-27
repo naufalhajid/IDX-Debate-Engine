@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
+from email.utils import parsedate_to_datetime
+import html
 import logging
 import re
+import threading
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any
+from urllib.parse import quote
+import xml.etree.ElementTree as ET
 
 from pydantic import BaseModel, ConfigDict, Field
-
-from core.failure_taxonomy import classify_exception
-
 
 NEWS_LOOKBACK_DAYS = 60
 MAX_NEWS_ITEMS = 10
@@ -22,12 +25,6 @@ CACHE_TTL_MINUTES = 30
 UNKNOWN_DATE_RECENCY_SCORE = 0.15
 
 IDX_TICKER_RE = re.compile(r"^[A-Z]{4}$")
-
-
-def _get_yfinance():
-    import yfinance as yf
-
-    return yf
 
 
 NEGATIVE_KEYWORDS = [
@@ -115,6 +112,246 @@ MACRO_KEYWORDS = [
 logger = logging.getLogger(__name__)
 
 
+async def fetch_news_rss(
+    ticker: str,
+    company_name: str = "",
+    lookback_days: int = 60,
+    limit: int = 10,
+) -> list[dict]:
+    """Fetch recent IDX news through Google News RSS with a best-effort Kontan fallback."""
+    normalized_ticker = _normalize_ticker(ticker)
+    query_name = company_name.strip() or normalized_ticker
+    query = quote(f"{query_name} saham")
+    google_url = (
+        "https://news.google.com/rss/search?"
+        f"q={query}&hl=id&gl=ID&ceid=ID:id"
+    )
+
+    google_items = await _fetch_rss_items(
+        google_url,
+        ticker=normalized_ticker,
+        source="Google News RSS",
+    )
+    selected = _recent_rss_items(
+        google_items,
+        lookback_days=lookback_days,
+        limit=limit,
+    )
+
+    if not selected:
+        kontan_url = f"https://www.kontan.co.id/search/?q={quote(normalized_ticker)}"
+        kontan_items = await _fetch_rss_items(
+            kontan_url,
+            ticker=normalized_ticker,
+            source="Kontan RSS",
+            silent_http_statuses={403},
+            silent_timeout=True,
+        )
+        selected = _recent_rss_items(
+            [*google_items, *kontan_items],
+            lookback_days=lookback_days,
+            limit=limit,
+        )
+
+    return selected
+
+
+async def _fetch_rss_items(
+    url: str,
+    *,
+    ticker: str,
+    source: str,
+    silent_http_statuses: set[int] | None = None,
+    silent_timeout: bool = False,
+) -> list[dict]:
+    try:
+        xml_text = await _fetch_text(
+            url,
+            silent_http_statuses=silent_http_statuses or set(),
+            silent_timeout=silent_timeout,
+        )
+    except Exception as exc:
+        if _should_silence_rss_error(exc, silent_http_statuses, silent_timeout):
+            logger.debug("[News] %s %s skipped: %s", ticker, source, exc)
+        else:
+            logger.warning("[News] %s %s fetch failed: %s", ticker, source, exc)
+        return []
+
+    if not xml_text:
+        return []
+
+    try:
+        return _parse_rss_items(xml_text)
+    except Exception as exc:
+        logger.warning("[News] %s %s parse failed: %s", ticker, source, exc)
+        return []
+
+
+async def _fetch_text(
+    url: str,
+    *,
+    silent_http_statuses: set[int],
+    silent_timeout: bool,
+) -> str:
+    try:
+        import aiohttp
+    except ImportError:
+        aiohttp = None
+
+    if aiohttp is not None:
+        timeout = aiohttp.ClientTimeout(total=10)
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(url) as response:
+                    if response.status in silent_http_statuses:
+                        raise _SilentHttpStatus(response.status)
+                    if response.status >= 400:
+                        raise RuntimeError(f"HTTP {response.status}")
+                    return await response.text()
+        except TimeoutError as exc:
+            if silent_timeout:
+                raise _SilentTimeout(str(exc)) from exc
+            raise
+
+    try:
+        import httpx
+    except ImportError as exc:
+        raise RuntimeError("Neither aiohttp nor httpx is available for RSS fetch") from exc
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+            response = await client.get(url)
+    except httpx.TimeoutException as exc:
+        if silent_timeout:
+            raise _SilentTimeout(str(exc)) from exc
+        raise
+
+    if response.status_code in silent_http_statuses:
+        raise _SilentHttpStatus(response.status_code)
+    response.raise_for_status()
+    return response.text
+
+
+def _parse_rss_items(xml_text: str) -> list[dict]:
+    root = ET.fromstring(xml_text)
+    parsed_items: list[dict] = []
+    for item in root.findall(".//item"):
+        title = _child_text(item, "title")
+        link = _child_text(item, "link")
+        published_dt = _parse_rss_pub_date(_child_text(item, "pubDate"))
+        if not title or not link or published_dt is None:
+            continue
+        parsed_items.append(
+            {
+                "title": title,
+                "link": link,
+                "published": published_dt.isoformat(),
+                "summary": _strip_html(_child_text(item, "description")),
+            }
+        )
+    return parsed_items
+
+
+def _child_text(item: ET.Element, tag: str) -> str:
+    child = item.find(tag)
+    return (child.text or "").strip() if child is not None else ""
+
+
+def _parse_rss_pub_date(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = parsedate_to_datetime(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _strip_html(value: str) -> str:
+    text = html.unescape(value or "")
+    text = re.sub(r"<[^>]+>", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _recent_rss_items(
+    items: list[dict],
+    *,
+    lookback_days: int,
+    limit: int,
+) -> list[dict]:
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=lookback_days)
+    deduped: dict[str, dict] = {}
+    for item in items:
+        published = _parse_publish_time(item.get("published"))
+        link = str(item.get("link") or "").strip()
+        if not published or published < cutoff or published > now + timedelta(days=1):
+            continue
+        if not link:
+            continue
+        key = link.lower().rstrip("/")
+        existing_published = (
+            _parse_publish_time(deduped[key].get("published"))
+            if key in deduped
+            else None
+        )
+        if key not in deduped or existing_published is None or published > existing_published:
+            deduped[key] = item
+
+    return sorted(
+        deduped.values(),
+        key=lambda raw: _parse_publish_time(raw.get("published")) or datetime.min.replace(
+            tzinfo=timezone.utc
+        ),
+        reverse=True,
+    )[:limit]
+
+
+class _SilentHttpStatus(RuntimeError):
+    def __init__(self, status_code: int) -> None:
+        super().__init__(f"HTTP {status_code}")
+        self.status_code = status_code
+
+
+class _SilentTimeout(TimeoutError):
+    pass
+
+
+def _should_silence_rss_error(
+    exc: Exception,
+    silent_http_statuses: set[int] | None,
+    silent_timeout: bool,
+) -> bool:
+    if isinstance(exc, _SilentHttpStatus):
+        return exc.status_code in (silent_http_statuses or set())
+    return silent_timeout and isinstance(exc, _SilentTimeout)
+
+
+def _run_async(coro):
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+
+    result: list[Any] = []
+    errors: list[BaseException] = []
+
+    def runner() -> None:
+        try:
+            result.append(asyncio.run(coro))
+        except BaseException as exc:
+            errors.append(exc)
+
+    thread = threading.Thread(target=runner, daemon=True)
+    thread.start()
+    thread.join()
+    if errors:
+        raise errors[0]
+    return result[0]
+
+
 class NewsSentiment(str, Enum):
     """Ticker news sentiment classes used by the debate prompt."""
 
@@ -179,22 +416,33 @@ class NewsFetcher:
     def __init__(self) -> None:
         self._cache: dict[str, tuple[NewsBundle, datetime]] = {}
 
-    def fetch_yfinance_news(self, ticker: str) -> list[dict]:
-        """Fetch raw yfinance news for an IDX ticker without raising."""
-        symbol = _normalize_symbol(ticker)
-        if symbol is None:
+    async def fetch_news_async(self, ticker: str, company_name: str = "") -> list[dict]:
+        """Fetch raw RSS news for an IDX ticker without raising."""
+        normalized = _normalize_ticker(ticker)
+        if not _is_valid_idx_ticker(normalized):
             return []
         try:
-            raw_news = _get_yfinance().Ticker(symbol).news
-            return [item for item in raw_news or [] if isinstance(item, dict)]
+            return await fetch_news_rss(
+                normalized,
+                company_name=company_name,
+                lookback_days=NEWS_LOOKBACK_DAYS,
+                limit=MAX_NEWS_ITEMS,
+            )
         except Exception as exc:
-            failure = classify_exception(exc, source="yfinance_news")
             logger.warning(
-                "[News] yfinance fetch failed for %s: %s",
-                symbol,
-                failure.message,
+                "[News] RSS fetch failed for %s: %s",
+                normalized,
+                exc,
             )
             return []
+
+    def fetch_news(self, ticker: str, company_name: str = "") -> list[dict]:
+        """Synchronous compatibility wrapper around the async RSS fetcher."""
+        return _run_async(self.fetch_news_async(ticker, company_name=company_name))
+
+    def fetch_yfinance_news(self, ticker: str) -> list[dict]:
+        """Compatibility wrapper; news now comes from RSS, not yfinance."""
+        return self.fetch_news(ticker)
 
     def classify_item(self, raw: dict, ticker: str) -> NewsItem:
         """Normalize and score one raw news dictionary."""
@@ -251,6 +499,14 @@ class NewsFetcher:
 
     def build_bundle(self, ticker: str, use_cache: bool = True) -> NewsBundle:
         """Fetch, classify, rank, and aggregate recent news."""
+        return _run_async(self.build_bundle_async(ticker, use_cache=use_cache))
+
+    async def build_bundle_async(
+        self,
+        ticker: str,
+        use_cache: bool = True,
+    ) -> NewsBundle:
+        """Async RSS-backed implementation for debate-time news fetching."""
         normalized_ticker = _normalize_ticker(ticker)
         now = datetime.now(timezone.utc)
         if not _is_valid_idx_ticker(normalized_ticker):
@@ -265,7 +521,7 @@ class NewsFetcher:
             if now - cached_at <= timedelta(minutes=CACHE_TTL_MINUTES):
                 return cached_bundle
 
-        raw_items = self.fetch_yfinance_news(normalized_ticker)
+        raw_items = await self.fetch_news_async(normalized_ticker)
         cutoff = now - timedelta(days=NEWS_LOOKBACK_DAYS)
         classified = [
             self.classify_item(raw, normalized_ticker)
@@ -342,7 +598,7 @@ class NewsFetcher:
         return {
             "category": "sentiment",
             "content": self.bundle_to_prompt_string(bundle),
-            "source": "yfinance_news",
+            "source": "google_news_rss",
             "fetched_at": bundle.fetched_at,
             "relevance_score": min(0.6 + abs(bundle.sentiment_score) * 0.4, 1.0),
             "is_stale": bundle.staleness_warning is not None,
@@ -471,13 +727,25 @@ def _extract_url(raw: dict) -> str | None:
 
 
 def _extract_publish_time(raw: dict) -> datetime | None:
-    for key in ("providerPublishTime", "publishTime", "pubDate", "displayTime"):
+    for key in (
+        "providerPublishTime",
+        "publishTime",
+        "pubDate",
+        "published",
+        "displayTime",
+    ):
         if parsed := _parse_publish_time(raw.get(key)):
             return parsed
 
     content = raw.get("content")
     if isinstance(content, dict):
-        for key in ("providerPublishTime", "publishTime", "pubDate", "displayTime"):
+        for key in (
+            "providerPublishTime",
+            "publishTime",
+            "pubDate",
+            "published",
+            "displayTime",
+        ):
             if parsed := _parse_publish_time(content.get(key)):
                 return parsed
     return None

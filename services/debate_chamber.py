@@ -306,11 +306,11 @@ def _ledger_stage_partial(
     )
 
 
-def _news_context_for_state(state: DebateChamberState, ticker: str) -> dict[str, object]:
+async def _news_context_for_state(state: DebateChamberState, ticker: str) -> dict[str, object]:
     try:
         from services.news_fetcher import DEFAULT_FETCHER
 
-        news_bundle = DEFAULT_FETCHER.build_bundle(ticker)
+        news_bundle = await DEFAULT_FETCHER.build_bundle_async(ticker)
         news_str = DEFAULT_FETCHER.bundle_to_prompt_string(news_bundle)
         if news_bundle.confidence_adjustment != 0:
             logger.info(
@@ -525,6 +525,19 @@ SOFT_HOLD_CONFIDENCE_DELTA = 0.15
 
 AGENT_SIGNAL_PROMPT = PROMPT_REGISTRY.prompts["AGENT_SIGNAL_PROMPT"]
 
+SENTIMENT_JSON_RESPONSE_FORMAT = """
+RESPONSE FORMAT — You must respond with ONLY a valid JSON object, no other text before or after:
+{
+  "position": "BUY" | "SELL" | "HOLD",
+  "confidence": <float between 0.0 and 1.0>,
+  "status": "OK" | "INSUFFICIENT_DATA",
+  "reasoning": "<one paragraph summary>",
+  "key_signals": ["<signal 1>", "<signal 2>"]
+}
+If data is insufficient (fewer than 5 posts), return:
+{"position": "HOLD", "confidence": 0.0, "status": "INSUFFICIENT_DATA", "reasoning": "...", "key_signals": []}
+""".strip()
+
 
 class DebateChamber:
     """
@@ -618,6 +631,137 @@ class DebateChamber:
             if value is not None:
                 return cls._llm_content_to_text(value)
         return str(content)
+
+    @staticmethod
+    def _extract_stockbit_posts(raw: Any) -> list[dict[str, Any]]:
+        if not raw:
+            return []
+        if isinstance(raw, list):
+            return [post for post in raw if isinstance(post, dict)]
+        if not isinstance(raw, dict):
+            return []
+
+        data = raw.get("data")
+        if isinstance(data, list):
+            return [post for post in data if isinstance(post, dict)]
+        if isinstance(data, dict):
+            stream = data.get("stream")
+            if isinstance(stream, list):
+                return [post for post in stream if isinstance(post, dict)]
+            if any(key in data for key in ("id", "post_id", "content")):
+                return [data]
+
+        stream = raw.get("stream")
+        if isinstance(stream, list):
+            return [post for post in stream if isinstance(post, dict)]
+        if any(key in raw for key in ("id", "post_id", "content")):
+            return [raw]
+        return []
+
+    @staticmethod
+    def _stockbit_post_id(post: dict[str, Any]) -> str | None:
+        for key in ("id", "post_id", "stream_id"):
+            value = post.get(key)
+            if value not in (None, ""):
+                return str(value)
+        return None
+
+    @classmethod
+    def _merge_stockbit_posts(
+        cls,
+        pinned_posts: list[dict[str, Any]],
+        stream_posts: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        seen_ids: set[str] = set()
+        combined: list[dict[str, Any]] = []
+        for post in [*pinned_posts, *stream_posts]:
+            post_id = cls._stockbit_post_id(post)
+            if post_id is not None:
+                if post_id in seen_ids:
+                    continue
+                seen_ids.add(post_id)
+            combined.append(post)
+        return combined
+
+    @staticmethod
+    def _sentiment_insufficient_payload(reasoning: str) -> dict[str, Any]:
+        return {
+            "position": "HOLD",
+            "confidence": 0.0,
+            "status": "INSUFFICIENT_DATA",
+            "reasoning": reasoning,
+            "key_signals": [],
+        }
+
+    @classmethod
+    def _sentiment_payload_from_response(cls, ticker: str, content: Any) -> dict[str, Any]:
+        raw_text = cls._llm_content_to_text(content).strip()
+        try:
+            payload = json.loads(raw_text)
+            if not isinstance(payload, dict):
+                raise ValueError("sentiment response JSON must be an object")
+            return payload
+        except (json.JSONDecodeError, ValueError) as exc:
+            raw_preview = raw_text[:500].replace("\n", "\\n")
+            logger.warning(
+                f"[Sentiment] JSON parse failed for {ticker}: {exc}; "
+                f"raw={raw_preview}"
+            )
+            return {
+                "position": "HOLD",
+                "confidence": 0.0,
+                "status": "PARSE_ERROR",
+                "reasoning": "LLM response could not be parsed as valid JSON.",
+                "key_signals": [],
+            }
+
+    @classmethod
+    def _sentiment_signal_from_payload(
+        cls,
+        payload: dict[str, Any],
+    ) -> dict[str, object]:
+        status = str(payload.get("status") or "").strip().upper()
+        raw_position = (
+            payload.get("position")
+            or payload.get("swing_signal")
+            or payload.get("sentiment")
+        )
+        position = cls._normalise_position(str(raw_position or ""))
+        if position == "UNKNOWN" and status in {"INSUFFICIENT_DATA", "PARSE_ERROR"}:
+            position = "HOLD"
+        if position == "UNKNOWN":
+            position = "HOLD"
+
+        raw_confidence = payload.get("confidence", 0.0)
+        if isinstance(raw_confidence, str):
+            confidence = {"HIGH": 0.75, "MEDIUM": 0.55, "LOW": 0.30}.get(
+                raw_confidence.strip().upper(),
+                0.0,
+            )
+        else:
+            try:
+                confidence = float(raw_confidence)
+            except (TypeError, ValueError):
+                confidence = 0.0
+        return {
+            "position": position,
+            "confidence": round(max(0.0, min(confidence, 1.0)), 2),
+        }
+
+    @classmethod
+    def _format_sentiment_content(
+        cls,
+        payload: dict[str, Any],
+        signal: dict[str, object],
+    ) -> str:
+        normalized_payload = dict(payload)
+        normalized_payload["confidence"] = float(signal.get("confidence") or 0.0)
+        json_content = json.dumps(normalized_payload, ensure_ascii=False)
+        return (
+            f"{json_content}\n\n"
+            f"Position: {signal['position']}\n"
+            f"Agent Confidence: {float(signal['confidence']):.2f}"
+        )
 
     @classmethod
     def _redact_debate_prices(cls, text: str) -> str:
@@ -1197,6 +1341,18 @@ Current Date (Asia/Jakarta): {current_date}
 
     # ── Phase 1 — Parallel Data Nodes (all on Flash) ────────────────────────
 
+    async def _fetch_sentiment_endpoint(
+        self,
+        ticker: str,
+        label: str,
+        url: str,
+    ) -> dict | None:
+        try:
+            return await self._fetch_url(url)
+        except Exception as exc:
+            logger.warning(f"[Sentiment] {ticker}: {label} endpoint failed: {exc}")
+            return None
+
     async def _fetch_market_data(self, ticker: str) -> dict:
         return await prefetch_market_data(ticker)
 
@@ -1460,34 +1616,79 @@ Current Date (Asia/Jakarta): {current_date}
         )
         await asyncio.sleep(1.0)   # stagger to avoid burst rate-limit
         try:
-            raw = await self._fetch_url(
-                f"{BASE_URL}/stream/v3/symbol/{ticker}/pinned"
+            pinned_raw, stream_raw = await asyncio.gather(
+                self._fetch_sentiment_endpoint(
+                    ticker,
+                    "pinned",
+                    f"{BASE_URL}/stream/v3/symbol/{ticker}/pinned",
+                ),
+                self._fetch_sentiment_endpoint(
+                    ticker,
+                    "stream",
+                    f"{BASE_URL}/stream/v3/symbol/{ticker}?limit=20",
+                ),
             )
-            if not raw:
-                content = "Data Unavailable"
-                self._record_observation(state, "sentiment_specialist", content)
+            pinned_posts = self._extract_stockbit_posts(pinned_raw)
+            stream_posts = self._extract_stockbit_posts(stream_raw)
+            combined_posts = self._merge_stockbit_posts(pinned_posts, stream_posts)
+            logger.debug(
+                f"[Sentiment] {ticker}: pinned_posts={len(pinned_posts)} "
+                f"stream_posts={len(stream_posts)} "
+                f"unique_posts={len(combined_posts)}"
+            )
+
+            if not combined_posts:
+                payload = self._sentiment_insufficient_payload(
+                    "No Stockbit social posts available from pinned or stream endpoints."
+                )
+                signal = self._sentiment_signal_from_payload(payload)
+                content = self._format_sentiment_content(payload, signal)
+                self._record_observation(state, "sentiment_specialist", content, signal)
                 _ledger_stage_success(
                     state,
                     stage="SENTIMENT_FETCH",
                     started_at=started_at,
-                    detail={"source": "stockbit", "available": False},
+                    detail={
+                        "source": "stockbit",
+                        "available": False,
+                        "pinned_posts": len(pinned_posts),
+                        "stream_posts": len(stream_posts),
+                        "unique_posts": len(combined_posts),
+                    },
                 )
-                news_update = _news_context_for_state(state, ticker)
+                news_update = await _news_context_for_state(state, ticker)
                 return {"sentiment_data": content, **news_update}
+
             messages = [
-                SystemMessage(content=SENTIMENT_PROMPT + AGENT_SIGNAL_PROMPT),
-                HumanMessage(content=json.dumps(raw)[:10_000]),
+                SystemMessage(
+                    content=(
+                        SENTIMENT_PROMPT
+                        + AGENT_SIGNAL_PROMPT
+                        + "\n\n"
+                        + SENTIMENT_JSON_RESPONSE_FORMAT
+                    )
+                ),
+                HumanMessage(
+                    content=json.dumps(combined_posts, ensure_ascii=False)[:10_000]
+                ),
             ]
             resp = await self._invoke_llm_for_state(state, self.flash_llm, messages)
-            content, signal = self._ensure_signal_footer(resp.content, "sentiment_specialist")
+            payload = self._sentiment_payload_from_response(ticker, resp.content)
+            signal = self._sentiment_signal_from_payload(payload)
+            content = self._format_sentiment_content(payload, signal)
             self._record_observation(state, "sentiment_specialist", content, signal)
             _ledger_stage_success(
                 state,
                 stage="SENTIMENT_FETCH",
                 started_at=started_at,
-                detail={"source": "stockbit"},
+                detail={
+                    "source": "stockbit",
+                    "pinned_posts": len(pinned_posts),
+                    "stream_posts": len(stream_posts),
+                    "unique_posts": len(combined_posts),
+                },
             )
-            news_update = _news_context_for_state(state, ticker)
+            news_update = await _news_context_for_state(state, ticker)
             return {"sentiment_data": content, **news_update}
         except Exception as e:
             logger.error(f"[Sentiment] Error: {e}")
@@ -1517,7 +1718,7 @@ Current Date (Asia/Jakarta): {current_date}
                     reason=decision.context_note or decision.reason,
                     confidence_penalty=decision.confidence_penalty,
                 )
-            news_update = _news_context_for_state(state, ticker)
+            news_update = await _news_context_for_state(state, ticker)
             return {
                 "sentiment_data": content,
                 **news_update,

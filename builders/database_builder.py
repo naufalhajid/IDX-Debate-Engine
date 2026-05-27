@@ -1,7 +1,7 @@
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from builders.builder_interface import BuilderInterface
+from builders.sentiment_lexicon import classify_sentiment_lexicon
 from db import (
     StockPrice,
     Sentiment,
@@ -169,10 +169,13 @@ class DatabaseBuilder(BuilderInterface):
         logger.info("Storing Sentiment")
         async with get_async_session() as session:
             for stock in self.stocks:
-                for sentiment in stock.sentiment:
+                for sentiment in stock.sentiment or []:
+                    post_text = sentiment.content or ""
+                    category, rate = classify_sentiment_lexicon(post_text)
                     sentiment_model = Sentiment(
-                        content=sentiment.content,
-                        rate=sentiment.rate,
+                        content=post_text,
+                        rate=rate,
+                        category=category,
                         stock_ticker=stock.ticker,
                         posted_at=sentiment.posted_at,
                     )
