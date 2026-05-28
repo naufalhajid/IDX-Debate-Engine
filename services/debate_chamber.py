@@ -79,6 +79,7 @@ from utils.market_data_cache import (
     scan_exdate_from_market_data,
 )
 from utils.technicals import compute_atr, compute_rsi, snap_to_tick
+from utils.trade_math import calculate_rr
 
 
 # ---------------------------------------------------------------------------
@@ -2682,10 +2683,10 @@ Current Date (Asia/Jakarta): {current_date}
         if target <= entry_high:
             target = self._next_tick_above(entry_high)
 
-        # Compute R/R ratio
+        # Compute display percentages from entry_mid, but canonical R/R from entry_high.
         gain_pct = ((target - entry_mid) / entry_mid) * 100 if entry_mid > 0 else 0
         loss_pct = ((entry_mid - stop) / entry_mid) * 100 if entry_mid > 0 and entry_mid > stop else 0
-        rr_ratio = round(gain_pct / loss_pct, 2) if loss_pct > 0 else 0.0
+        rr_ratio = calculate_rr(entry_high, target, stop)
 
         return {
             "entry_low": entry_low,

@@ -5,6 +5,7 @@
 logs/
 __pycache__/
 .pytest_cache/
+.pytest-tmp-run/
 .ruff_cache/
 .mypy_cache/
 .uv-cache/

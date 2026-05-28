@@ -8,6 +8,7 @@ import re
 from dataclasses import dataclass
 
 from utils.logger_config import logger
+from utils.trade_math import calculate_rr
 
 
 # ---------------------------------------------------------------------------
@@ -521,9 +522,7 @@ class FairValueCalculator:
         target_price = round(entry_mid * (1 + target_gain_pct / 100), -1)
         stop_loss    = round(entry_mid * (1 - stop_loss_pct / 100), -1)
 
-        gain_rp = target_price - entry_mid
-        loss_rp = entry_mid - stop_loss
-        rr = round(gain_rp / loss_rp, 2) if loss_rp > 0 else 0.0
+        rr = calculate_rr(entry_high, target_price, stop_loss)
 
         return {
             "entry_mid":          round(entry_mid, 0),

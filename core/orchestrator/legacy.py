@@ -123,6 +123,7 @@ from services.report_formatter import DEFAULT_MD, MarkdownFormatter, RichFormatt
 from services.single_agent_analyzer import SingleAgentAnalyzer
 from utils.logger_config import logger
 from utils.price_fetcher import fetch_current_price
+from utils.trade_math import calculate_rr
 
 
 def _as_debate_message(m):
@@ -2805,12 +2806,12 @@ def validate_setup_coherence(
             f"current price ({current_price}) is more than 10% above entry range "
             f"top ({entry_high}). Setup is not actionable."
         )
-    risk = entry_high - stop
-    if risk <= 0:
+    try:
+        rr = calculate_rr(entry_high, target, stop)
+    except ValueError as exc:
         raise SetupCoherenceError(
             f"stop ({stop}) is not below bottom of entry range ({entry_low})"
-        )
-    rr = (target - entry_high) / risk
+        ) from exc
     if rr < 1.5:
         raise SetupCoherenceError(
             f"R/R ({rr:.2f}x) below minimum threshold of 1.5x"
@@ -3244,6 +3245,13 @@ def _record_backtest_memory(
         if verdict_rating == "AVOID":
             logger.info(f"[BacktestMemory] {ticker}: skipped AVOID verdict")
             return
+        if verdict_rating == "INSUFFICIENT_DATA":
+            logger.debug(
+                "[BacktestMemory] %s: skipped - INSUFFICIENT_DATA verdict "
+                "(setup fields cleared by confidence gate)",
+                ticker,
+            )
+            return
 
         entry_price = _parse_entry_low(verdict.get("entry_price_range"))
         target_price = _parse_price_value(verdict.get("target_price"))
@@ -3271,6 +3279,11 @@ def _record_backtest_memory(
                 notes="auto-recorded at orchestrator completion",
             )
         )
+    except ValueError as ve:
+        if "missing trade price fields" in str(ve):
+            logger.debug("[BacktestMemory] %s: skipped - %s", ticker, ve)
+        else:
+            logger.warning("[BacktestMemory] %s: failed: %s", ticker, ve)
     except Exception as e:
         logger.warning(f"[BacktestMemory] {ticker}: failed: {e}")
 

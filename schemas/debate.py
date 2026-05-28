@@ -13,9 +13,11 @@ Swing Trade update (this session):
 """
 
 import re
-from typing import Annotated, Literal, TypedDict
+from typing import Annotated, Any, Literal, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from utils.trade_math import calculate_rr
 
 
 # ---------------------------------------------------------------------------
@@ -216,14 +218,23 @@ class CIOVerdict(BaseDataClass):
             gain_pct = 0.0
 
         # 3. Risk/reward ratio
+        entry_bounds = self._parse_entry_bounds()
         if (
-            entry_mid > 0
+            entry_bounds is not None
             and self.stop_loss is not None
             and self.stop_loss > 0
-            and entry_mid > self.stop_loss
+            and self.target_price is not None
+            and self.target_price > 0
         ):
-            loss_pct = ((entry_mid - self.stop_loss) / entry_mid) * 100
-            self.risk_reward_ratio = round(gain_pct / loss_pct, 2) if loss_pct > 0 else 0.0
+            _entry_low, entry_high = entry_bounds
+            try:
+                self.risk_reward_ratio = calculate_rr(
+                    entry_high,
+                    self.target_price,
+                    self.stop_loss,
+                )
+            except ValueError:
+                self.risk_reward_ratio = None
         else:
             self.risk_reward_ratio = None
 
@@ -260,7 +271,6 @@ class CIOVerdict(BaseDataClass):
         #    Prices are now kept so the UI can always display the trade setup;
         #    the rating + wait_and_see flag already communicate the caution signal.
 
-        entry_bounds = self._parse_entry_bounds()
         if (
             entry_bounds is not None
             and self.stop_loss is not None
@@ -457,6 +467,41 @@ def history_updater(
     return left_list + right_list
 
 
+def metadata_updater(
+    left: dict[str, Any] | None,
+    right: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Merge metadata emitted by parallel LangGraph nodes into one state value."""
+    if left is not None and not isinstance(left, dict):
+        raise TypeError(
+            f"metadata reducer expected dict or None for left, got {type(left).__name__}"
+        )
+    if right is not None and not isinstance(right, dict):
+        raise TypeError(
+            f"metadata reducer expected dict or None for right, got {type(right).__name__}"
+        )
+
+    merged: dict[str, Any] = dict(left or {})
+    for key, value in (right or {}).items():
+        existing = merged.get(key)
+        if isinstance(existing, dict) and isinstance(value, dict):
+            merged[key] = {**existing, **value}
+        elif isinstance(existing, list) and isinstance(value, list):
+            merged[key] = _merge_metadata_lists(existing, value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def _merge_metadata_lists(left: list[Any], right: list[Any]) -> list[Any]:
+    """Return a stable list union for metadata list fields such as reasons."""
+    merged = list(left)
+    for item in right:
+        if item not in merged:
+            merged.append(item)
+    return merged
+
+
 # ---------------------------------------------------------------------------
 # LangGraph State
 # ---------------------------------------------------------------------------
@@ -514,7 +559,7 @@ class DebateChamberState(TypedDict):
 
     # Final output
     final_verdict: str            # JSON-serialized CIOVerdict
-    metadata: dict
+    metadata: Annotated[dict, metadata_updater]
 
     # Error propagation
     error: str | None
