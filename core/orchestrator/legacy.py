@@ -123,7 +123,12 @@ from services.report_formatter import DEFAULT_MD, MarkdownFormatter, RichFormatt
 from services.single_agent_analyzer import SingleAgentAnalyzer
 from utils.logger_config import logger
 from utils.price_fetcher import fetch_current_price
-from utils.trade_math import calculate_rr
+from utils.trade_math import (
+    DEFAULT_RR_TIER_NAME,
+    calculate_rr,
+    format_rr_resolution_context,
+    get_rr_resolution,
+)
 
 
 def _as_debate_message(m):
@@ -1367,6 +1372,8 @@ class CliRenderer:
             warnings.append(str(result["error"]))
         if result.get("rr_warning"):
             warnings.append(str(result["rr_warning"]))
+        if result.get("rr_tier_note"):
+            warnings.append(str(result["rr_tier_note"]))
         risk = result.get("risk_governor")
         if isinstance(risk, dict) and risk.get("sizing_allowed") is False:
             warnings.append(
@@ -1832,6 +1839,8 @@ def _result_warning_notes(result: dict[str, Any]) -> list[str]:
             )
     if result.get("rr_warning"):
         notes.append(str(result["rr_warning"]))
+    if result.get("rr_tier_note"):
+        notes.append(str(result["rr_tier_note"]))
     if result.get("error"):
         notes.append(str(result["error"]))
     return notes
@@ -2015,6 +2024,8 @@ def _validation_reason_summary(
     target_gap = _format_target_vs_current(target_price, current_price)
     if target_gap != "-":
         parts.append(f"target {target_gap}")
+    if result.get("rr_tier_note"):
+        parts.append(str(result["rr_tier_note"]))
     if result.get("error"):
         parts.append(str(result.get("error")))
     return "; ".join(part for part in parts if part and part != "-") or "-"
@@ -2148,7 +2159,7 @@ ORCHESTRATOR_CONFIG: dict[str, Any] = {
     "excluded_ratings": {"AVOID", "HOLD", "SELL", "INSUFFICIENT_DATA"},
     "top_n_selection": int(os.getenv("TOP_N_SELECTION", "3")),
     "max_price_retry_attempts": int(os.getenv("MAX_PRICE_RETRY_ATTEMPTS", "3")),
-    "rpm_limit": int(os.getenv("GEMINI_RPM_LIMIT", "10")),
+    "rpm_limit": int(os.getenv("GEMINI_RPM_LIMIT", "30")),
     "batch_delay": float(os.getenv("BATCH_DELAY_SECONDS", "0.2")),
     # Diisi oleh regime detection di main()
     "min_conviction_override": settings.PORTFOLIO_MIN_CONVICTION,
@@ -2791,6 +2802,7 @@ def validate_setup_coherence(
     entry_high: float,
     target: float,
     stop: float,
+    yf_info: dict[str, Any] | None = None,
 ) -> None:
     """Raise SetupCoherenceError when a trade setup is not actionable."""
     if target <= entry_high:
@@ -2812,9 +2824,12 @@ def validate_setup_coherence(
         raise SetupCoherenceError(
             f"stop ({stop}) is not below bottom of entry range ({entry_low})"
         ) from exc
-    if rr < 1.5:
+    rr_resolution = get_rr_resolution(ticker, yf_info=yf_info)
+    rr_minimum = rr_resolution.rr_minimum
+    if rr < rr_minimum:
         raise SetupCoherenceError(
-            f"R/R ({rr:.2f}x) below minimum threshold of 1.5x"
+            f"R/R ({rr:.2f}x) below minimum threshold of {rr_minimum:.1f}x "
+            f"{format_rr_resolution_context(rr_resolution)}"
         )
 
 
@@ -2880,6 +2895,75 @@ def _set_reject_risk_payload(
     }
 
 
+def _extract_rr_yf_info(result: dict[str, Any]) -> dict[str, Any] | None:
+    """Return cached yfinance info or a minimal marketCap dict for R/R tiers."""
+    market_data = result.get("market_data")
+    if isinstance(market_data, dict):
+        yf_info = market_data.get("info")
+        if isinstance(yf_info, dict) and yf_info:
+            return yf_info
+
+    metadata = result.get("metadata")
+    if isinstance(metadata, dict):
+        for key in ("market_cap_idr", "market_cap", "marketCap"):
+            market_cap = metadata.get(key)
+            if market_cap not in (None, ""):
+                return {"marketCap": market_cap}
+
+    for key in ("market_cap_idr", "market_cap", "marketCap"):
+        market_cap = result.get(key)
+        if market_cap not in (None, ""):
+            return {"marketCap": market_cap}
+    return None
+
+
+def _rr_tier_note(ticker: str, yf_info: dict[str, Any] | None = None) -> str | None:
+    """Return a visible R/R tier note for non-default ticker thresholds."""
+    resolution = get_rr_resolution(ticker, yf_info=yf_info)
+    if resolution.tier_name == DEFAULT_RR_TIER_NAME:
+        return None
+    return f"R/R threshold: {resolution.rr_minimum:.1f}x ({resolution.tier_label} tier)"
+
+
+def _annotate_rr_tier(
+    result: dict[str, Any],
+    ticker: str,
+    yf_info: dict[str, Any] | None = None,
+) -> None:
+    """Attach R/R tier metadata to result and verdict without changing schemas."""
+    yf_info = yf_info if yf_info is not None else _extract_rr_yf_info(result)
+    resolution = get_rr_resolution(ticker, yf_info=yf_info)
+    verdict = result.get("verdict") if isinstance(result.get("verdict"), dict) else {}
+    metadata = result.get("metadata") if isinstance(result.get("metadata"), dict) else {}
+    tier_payload = {
+        "rr_tier": resolution.tier_name,
+        "rr_minimum": resolution.rr_minimum,
+        "rr_tier_label": resolution.tier_label,
+        "rr_tier_source": resolution.source,
+    }
+    if resolution.market_cap_idr is not None:
+        tier_payload["rr_market_cap_idr"] = resolution.market_cap_idr
+    result.update(tier_payload)
+    if verdict:
+        verdict.update(tier_payload)
+    metadata.update(tier_payload)
+    result["metadata"] = metadata
+    note = _rr_tier_note(ticker, yf_info=yf_info)
+    if note:
+        result["rr_tier_note"] = note
+        if verdict:
+            verdict["rr_tier_note"] = note
+
+
+def _confidence_gate_should_skip(confidence: float | int) -> bool:
+    """Return True when confidence is strictly below the setup threshold."""
+    confidence_value = float(confidence)
+    confidence_pct = (
+        confidence_value * 100 if confidence_value <= 1 else confidence_value
+    )
+    return confidence_pct < MIN_CONFIDENCE_FOR_SETUP
+
+
 def apply_minimum_confidence_gate(
     ticker: str,
     result: dict[str, Any],
@@ -2890,8 +2974,7 @@ def apply_minimum_confidence_gate(
     confidence = extract_model_confidence(verdict)
     if confidence is None:
         raise ValueError(f"{ticker}: confidence is missing and cannot be gated")
-    confidence_pct = confidence * 100
-    if confidence_pct >= MIN_CONFIDENCE_FOR_SETUP:
+    if not _confidence_gate_should_skip(confidence):
         if setup_generator is not None:
             setup_generator()
         return False
@@ -2929,6 +3012,8 @@ def apply_setup_coherence_gate(ticker: str, result: dict[str, Any]) -> bool:
         raise SetupCoherenceError(
             f"{ticker}: setup coherence cannot be validated because price fields are missing"
         )
+    yf_info = _extract_rr_yf_info(result)
+    _annotate_rr_tier(result, ticker, yf_info=yf_info)
     try:
         validate_setup_coherence(
             ticker,
@@ -2937,6 +3022,7 @@ def apply_setup_coherence_gate(ticker: str, result: dict[str, Any]) -> bool:
             float(entry_high),
             float(target),
             float(stop),
+            yf_info=yf_info,
         )
         return False
     except SetupCoherenceError as exc:
@@ -3405,6 +3491,15 @@ async def _run_single_debate(ticker: str, chamber: Any) -> dict:
         debate_history = [
             _as_debate_message(m) for m in result.get("debate_history", [])
         ]
+        metadata = dict(result.get("metadata") or {})
+        yf_info = _extract_rr_yf_info(result)
+        market_cap = (yf_info or {}).get("marketCap")
+        if (
+            isinstance(market_cap, (int, float))
+            and not isinstance(market_cap, bool)
+            and market_cap > 0
+        ):
+            metadata["market_cap_idr"] = int(market_cap)
         return {
             "ticker": result["ticker"],
             "verdict": verdict_dict,
@@ -3425,7 +3520,7 @@ async def _run_single_debate(ticker: str, chamber: Any) -> dict:
                 for m in debate_history
             ],
             "raw_data_summary": result["raw_data"],
-            "metadata": result.get("metadata", {}),
+            "metadata": metadata,
             "error": None,
             "status": "success",
             "conviction_score": 0.0,  # Diisi oleh select_top3

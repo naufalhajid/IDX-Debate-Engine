@@ -8,6 +8,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict
 
 from utils.logger_config import logger
+from utils.trade_math import get_rr_resolution
 
 
 RiskStatus = Literal[
@@ -19,10 +20,9 @@ RiskStatus = Literal[
 ]
 
 # These thresholds are intentionally conservative for swing-trade sizing:
-# confidence below 60% or R/R below 1.5x should remain a watchlist/reject signal,
-# not an executable allocation.
+# confidence below 60% or R/R below the ticker's tier-specific floor should
+# remain a watchlist/reject signal, not an executable allocation.
 MIN_BUYABLE_CONFIDENCE = 0.60
-MIN_BUYABLE_RR = 1.50
 UNBUYABLE_RATINGS = {"AVOID", "SELL"}
 SOFT_BUYABLE_RATINGS = {"HOLD"}
 HARD_REJECT_CODES = {
@@ -304,6 +304,7 @@ def _verdict_reason_codes(
     verdict: dict[str, Any],
 ) -> list[str]:
     reason_codes: list[str] = []
+    ticker = _clean_ticker(candidate.get("ticker") or verdict.get("ticker"))
     rating = _clean_rating(verdict.get("rating") or candidate.get("rating"))
     if rating in UNBUYABLE_RATINGS:
         reason_codes.append("rating_not_buyable")
@@ -325,7 +326,8 @@ def _verdict_reason_codes(
         candidate.get("risk_reward_ratio"),
         candidate.get("rr_ratio"),
     )
-    if rr_ratio is not None and rr_ratio < MIN_BUYABLE_RR:
+    rr_minimum = _rr_minimum_for_candidate(candidate, verdict, ticker)
+    if rr_ratio is not None and rr_ratio < rr_minimum:
         reason_codes.append("rr_too_low")
 
     if _technical_data_insufficient(candidate, verdict):
@@ -338,6 +340,60 @@ def _verdict_reason_codes(
 
 def _clean_rating(value: Any) -> str:
     return str(value or "").strip().upper().replace(" ", "_")
+
+
+def _rr_minimum_for_candidate(
+    candidate: dict[str, Any],
+    verdict: dict[str, Any],
+    ticker: str,
+) -> float:
+    """Return the tier-aware minimum R/R for risk-governor checks."""
+    metadata = (
+        candidate.get("metadata") if isinstance(candidate.get("metadata"), dict) else {}
+    )
+    explicit_minimum = _first_float(
+        verdict.get("rr_minimum"),
+        candidate.get("rr_minimum"),
+        metadata.get("rr_minimum"),
+    )
+    if explicit_minimum is not None and explicit_minimum > 0:
+        logger.debug(
+            "[Risk] {} rr_minimum={} source=orchestrator_metadata",
+            ticker,
+            explicit_minimum,
+        )
+        return explicit_minimum
+
+    resolution = get_rr_resolution(ticker, yf_info=_risk_yf_info(candidate, verdict))
+    logger.debug(
+        "[Risk] {} rr_minimum={} source={}",
+        ticker,
+        resolution.rr_minimum,
+        resolution.source,
+    )
+    return resolution.rr_minimum
+
+
+def _risk_yf_info(
+    candidate: dict[str, Any],
+    verdict: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Extract cached yfinance info or marketCap metadata for R/R tier resolution."""
+    market_data = candidate.get("market_data")
+    if isinstance(market_data, dict):
+        info = market_data.get("info")
+        if isinstance(info, dict) and info:
+            return info
+
+    metadata = (
+        candidate.get("metadata") if isinstance(candidate.get("metadata"), dict) else {}
+    )
+    for source in (verdict, candidate, metadata):
+        for key in ("marketCap", "market_cap_idr", "market_cap"):
+            value = source.get(key)
+            if value not in (None, ""):
+                return {"marketCap": value}
+    return None
 
 
 def _confidence(*values: Any) -> float | None:

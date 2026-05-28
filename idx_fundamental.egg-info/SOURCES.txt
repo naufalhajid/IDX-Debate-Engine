@@ -33,6 +33,7 @@ builders/__init__.py
 builders/builder_interface.py
 builders/database_builder.py
 builders/excel.py
+builders/sentiment_lexicon.py
 builders/spreadsheet.py
 builders/analysers/__init__.py
 builders/analysers/fundamental_analyser.py
@@ -132,6 +133,7 @@ tests/test_adaptive_planner.py
 tests/test_agent_eval_harness.py
 tests/test_artifact_validator.py
 tests/test_backtest_memory.py
+tests/test_backtest_memory_guard.py
 tests/test_backtest_outcome_evaluator.py
 tests/test_budget.py
 tests/test_candidate_intake.py
@@ -139,8 +141,10 @@ tests/test_cli_renderer_presentation.py
 tests/test_cli_v1.py
 tests/test_comparison_reporter.py
 tests/test_context_pack_builder.py
+tests/test_database_builder.py
 tests/test_debate_chamber_reliability.py
 tests/test_debate_run_guard.py
+tests/test_debate_state_reducers.py
 tests/test_dependency_validator.py
 tests/test_execution_ledger.py
 tests/test_explainability_auditor.py
@@ -152,6 +156,7 @@ tests/test_historical_scorer.py
 tests/test_news_fetcher.py
 tests/test_observation_store.py
 tests/test_ops_telemetry.py
+tests/test_orchestrator_quality_gates.py
 tests/test_orchestrator_realized_scoring.py
 tests/test_orchestrator_risk_governor.py
 tests/test_portfolio_optimizer.py
@@ -164,9 +169,13 @@ tests/test_report_consistency.py
 tests/test_report_formatter.py
 tests/test_risk_governor.py
 tests/test_run_debate_output.py
+tests/test_run_quant_filter.py
+tests/test_sentiment_node_data_volume.py
 tests/test_settings.py
 tests/test_single_agent_analyzer.py
+tests/test_stockbit_provider.py
 tests/test_tool_registry.py
+tests/test_trade_math.py
 tests/test_verification_runner.py
 utils/__init__.py
 utils/exdate_scanner.py
@@ -175,4 +184,5 @@ utils/logger_config.py
 utils/market_data_cache.py
 utils/price_fetcher.py
 utils/technicals.py
+utils/trade_math.py
 utils/xlsx_adapter.py

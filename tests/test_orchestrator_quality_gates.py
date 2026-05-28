@@ -77,7 +77,7 @@ def test_minimum_confidence_gate_skips_setup_generation() -> None:
         ),
         (
             {"current_price": 100, "entry_low": 95, "entry_high": 100, "target": 112, "stop": 90},
-            "R/R (1.20x) below minimum threshold of 1.5x",
+            "R/R (1.20x) below minimum threshold of 1.5x (default tier)",
         ),
     ],
 )
@@ -110,6 +110,85 @@ def test_apply_setup_coherence_gate_removes_gula_like_setup() -> None:
     assert result["verdict"]["stop_loss"] is None
     assert result["risk_governor"]["status"] == "reject"
     assert any("more than 10% above entry range" in reason for reason in result["reasons"])
+
+
+def test_coherence_uses_large_cap_threshold_for_bmri() -> None:
+    validate_setup_coherence(
+        ticker="BMRI",
+        current_price=4130,
+        entry_low=4050,
+        entry_high=4100,
+        target=4510,
+        stop=3800,
+        yf_info={"marketCap": 400_000_000_000_000},
+    )
+
+
+def test_coherence_still_fails_default_ticker_at_same_rr() -> None:
+    with pytest.raises(SetupCoherenceError, match="1.5x \\(default tier\\)"):
+        validate_setup_coherence(
+            ticker="CYBR",
+            current_price=590,
+            entry_low=580,
+            entry_high=590,
+            target=658.5,
+            stop=540,
+        )
+
+
+def test_rr_exactly_at_large_cap_threshold_passes_coherence() -> None:
+    validate_setup_coherence(
+        ticker="BBRI",
+        current_price=100,
+        entry_low=95,
+        entry_high=100,
+        target=113,
+        stop=90,
+        yf_info={"marketCap": 50_000_000_000_000},
+    )
+
+
+def test_rr_below_large_cap_threshold_fails_coherence() -> None:
+    with pytest.raises(
+        SetupCoherenceError,
+        match="1.3x \\(large_cap tier - marketCap Rp 400T\\)",
+    ):
+        validate_setup_coherence(
+            ticker="BMRI",
+            current_price=100,
+            entry_low=95,
+            entry_high=100,
+            target=112.9,
+            stop=90,
+            yf_info={"marketCap": 400_000_000_000_000},
+        )
+
+
+def test_apply_setup_coherence_gate_records_large_cap_threshold_note() -> None:
+    result = {
+        "ticker": "BMRI",
+        "verdict": {
+            "ticker": "BMRI",
+            "rating": "BUY",
+            "confidence": 0.62,
+            "current_price": 4130,
+            "entry_price_range": "4050 - 4100",
+            "target_price": 4510,
+            "stop_loss": 3800,
+            "risk_reward_ratio": 1.37,
+        },
+        "metadata": {"market_cap_idr": 400_000_000_000_000},
+    }
+
+    rejected = apply_setup_coherence_gate("BMRI", result)
+
+    assert rejected is False
+    assert result["rr_tier"] == "large_cap"
+    assert result["rr_minimum"] == 1.3
+    assert result["rr_tier_source"] == "market_cap"
+    assert result["rr_market_cap_idr"] == 400_000_000_000_000
+    assert result["rr_tier_note"] == "R/R threshold: 1.3x (Large Cap tier)"
+    assert result["verdict"]["rr_tier_note"] == result["rr_tier_note"]
 
 
 @pytest.mark.parametrize(

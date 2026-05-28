@@ -1,0 +1,24 @@
+# FALLBACK ONLY - used when market cap data is unavailable from yfinance.
+# Primary classification uses live market cap >= Rp 50 trillion.
+# Update this list only when yfinance consistently fails for a known
+# large-cap ticker.
+
+large_cap_fallback:
+  - BBCA
+  - BBRI
+  - BMRI
+  - BBNI
+  - TLKM
+  - ASII
+  - UNVR
+  - ICBP
+  - INDF
+  - ADRO
+  - SMGR
+  - KLBF
+  - GOTO
+  - PGAS
+  - JSMR
+  - BREN
+  - AMMN
+  - AMRT

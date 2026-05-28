@@ -2668,9 +2668,10 @@ Current Date (Asia/Jakarta): {current_date}
         if stop >= entry_low:  # double-check post snap
             stop = self._previous_tick_below(entry_low)
 
-        # Target calculation (ATR-based with floor and ceiling)
-        risk_per_share = entry_mid - stop
-        rr_target = entry_mid + (risk_per_share * 2.0)
+        # Target calculation (based on entry_high as worst-case fill to ensure
+        # that conservative R/R evaluated from entry_high is >= 2.0x)
+        risk_from_entry_high = entry_high - stop
+        rr_target = entry_high + (risk_from_entry_high * 2.0)
         
         # Floor: minimal 4% from entry for worthwhile swing
         min_target = entry_mid * 1.04

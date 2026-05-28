@@ -795,3 +795,15 @@ def test_cio_prompt_contains_confidence_calibration_rubric():
     assert "0.80" in prompt
     assert "kurangi 0.10" in prompt
     assert "0.10" in prompt
+
+
+def test_trade_envelope_guarantees_sufficient_rr_from_entry_high():
+    chamber = _chamber()
+    envelope = chamber._compute_trade_envelope(
+        current_price=127.0,
+        fair_value=423.0,
+        tech={"ma50": 140.0, "sma20": 133.0, "atr14": 5.0},
+    )
+    
+    # R/R must be calculated conservatively from entry_high
+    assert envelope["risk_reward_ratio"] >= 2.0

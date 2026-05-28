@@ -101,6 +101,46 @@ def test_avoid_verdict_rejects_even_inside_entry_range() -> None:
     assert "insufficient_technical_data" in decision.reason_codes
 
 
+def test_large_cap_rr_above_tier_threshold_is_not_too_low() -> None:
+    decision = evaluate_risk(
+        _candidate(
+            ticker="BBRI",
+            metadata={"market_cap_idr": 400_000_000_000_000},
+            verdict={
+                "ticker": "BBRI",
+                "rating": "AVOID",
+                "confidence": 0.25,
+                "risk_reward_ratio": 1.38,
+                "weighted_reasoning": "Counter-trend bounce below MA200.",
+            },
+        )
+    )
+
+    assert decision.status == "reject"
+    assert "rating_not_buyable" in decision.reason_codes
+    assert "low_confidence" in decision.reason_codes
+    assert "counter_trend_setup" in decision.reason_codes
+    assert "rr_too_low" not in decision.reason_codes
+
+
+def test_default_tier_rr_below_default_threshold_is_too_low() -> None:
+    decision = evaluate_risk(
+        _candidate(
+            ticker="CYBR",
+            metadata={"market_cap_idr": 5_000_000_000_000},
+            verdict={
+                "ticker": "CYBR",
+                "rating": "AVOID",
+                "confidence": 0.25,
+                "risk_reward_ratio": 1.38,
+            },
+        )
+    )
+
+    assert decision.status == "reject"
+    assert "rr_too_low" in decision.reason_codes
+
+
 def test_hold_low_confidence_inside_entry_is_conditional_not_sized() -> None:
     decision = evaluate_risk(
         _candidate(
