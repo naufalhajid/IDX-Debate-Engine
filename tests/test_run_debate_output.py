@@ -105,3 +105,37 @@ def test_run_debate_ledger_call_accepts_action_payload() -> None:
     )
 
     assert captured == {"action": "RETRY", "stage": "DEBATE"}
+
+
+def test_run_debate_updates_cli_renderer_if_active(tmp_path: Path) -> None:
+    from core.orchestrator.legacy import _cli_renderer
+    _cli_renderer.reset_run()
+    _cli_renderer.start_batch_progress(["BBCA"])
+    
+    try:
+        assert _cli_renderer.is_running() is True
+        
+        timestamp = "20260512_101530"
+        generated_at = "2026-05-12T10:15:30+07:00"
+
+        ok = asyncio.run(
+            _debate_one(
+                ticker="BBCA",
+                chamber=FakeDebateChamber(),
+                output_dir=tmp_path,
+                run_timestamp=timestamp,
+                generated_at=generated_at,
+            )
+        )
+        assert ok is True
+        
+        # Verify ticker row in progress view was updated to done
+        row = _cli_renderer.batch_progress._rows["BBCA"]
+        assert row["fetching"] == "done"
+        assert row["debating"] == "done"
+        assert row["done"] == "done"
+        assert row["rating"] == "BUY"
+        assert row["confidence"] == "72%"
+        
+    finally:
+        _cli_renderer.close_batch_progress()

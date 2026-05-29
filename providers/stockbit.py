@@ -39,7 +39,7 @@ class StockBit:
     A class to interact with the StockBit API and fetch key statistics, stock price, and sentiment for stocks.
     """
 
-    def __init__(self, stocks: [Stock]):
+    def __init__(self, stocks: list[Stock]):
         """
         Initializes the StockBit provider with necessary headers and URL.
         """
