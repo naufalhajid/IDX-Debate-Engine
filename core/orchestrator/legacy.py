@@ -4537,7 +4537,7 @@ def generate_top3_report(
             "| Metric | Value |",
             "|---|---|",
             f"| **Rating** | `{v.get('rating', 'N/A')}` |",
-            f"| **Model Confidence** | {model_confidence:.0%} |",
+            f"| **Trade Setup Conviction** | {model_confidence:.0%} |",
             f"| **Trade Conviction** | {score:.2%} |",
             f"| **Debate Consensus** | {consensus_label} |",
             f"| **Dissenting Agents** | {', '.join(dissenting_agents) if dissenting_agents else '-'} |",
@@ -4626,7 +4626,7 @@ def generate_top3_report(
     lines += [
         "## Full Batch Summary",
         "",
-        "| Ticker | Rating | Model Confidence | R/R Ratio | Trade Conviction | Evidence Age | Actionability | Consensus | Method | Dissenting Agents | Disagreement | Status |",
+        "| Ticker | Rating | Trade Setup Conviction | R/R Ratio | Trade Conviction | Evidence Age | Actionability | Consensus | Method | Dissenting Agents | Disagreement | Status |",
         "|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
 

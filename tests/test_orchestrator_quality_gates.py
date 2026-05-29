@@ -242,7 +242,7 @@ def test_metric_aliases_and_report_labels_are_unambiguous(tmp_path: Path) -> Non
         path=tmp_path / "TOP_3_SWING_TRADES.md",
     )
 
-    assert "| **Model Confidence** | 61% |" in report
+    assert "| **Trade Setup Conviction** | 61% |" in report
     assert "| **Trade Conviction** | 50.00% |" in report
-    assert "Model Confidence" in report
+    assert "Trade Setup Conviction" in report
     assert "Trade Conviction" in report

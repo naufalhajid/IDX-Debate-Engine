@@ -910,7 +910,7 @@ class RichFormatter:
                 Text.assemble(
                     ("RATING: ", "bold cyan"),
                     (f"{rating}  ", rating_style),
-                    ("MODEL CONFIDENCE: ", "bold cyan"),
+                    ("TRADE SETUP CONVICTION: ", "bold cyan"),
                     (confidence_text)
                 ),
                 Text.assemble(
@@ -1063,7 +1063,7 @@ class RichFormatter:
             table = Table(show_header=True, header_style="bold", expand=True)
             table.add_column("Ticker", style="bold", no_wrap=True)
             table.add_column("Rating", no_wrap=True)
-            table.add_column("Model Conf", justify="right", no_wrap=True)
+            table.add_column("Setup Conviction", justify="right", no_wrap=True)
             table.add_column("R/R", justify="right", no_wrap=True)
             table.add_column("Entry Zone")
             table.add_column("Target")
@@ -1216,7 +1216,7 @@ class MarkdownFormatter:
                 "| Item | Detail |",
                 "|------|--------|",
                 f"| **Recommendation** | **{rating}** |",
-                f"| **Model Confidence** | {confidence_text} |",
+                f"| **Trade Setup Conviction** | {confidence_text} |",
                 f"| **Current Price** | {_money(current_price)} |",
                 f"| **Fair Value** | {_money(fair_value)} |",
                 f"| **Gap** | {_signed_pct(value_gap)} ({value_status}) |",
@@ -1438,7 +1438,7 @@ class MarkdownFormatter:
             f"- Stop: {_money(verdict.get('stop_loss'))}",
             (
                 f"- R/R: {_ratio(verdict.get('risk_reward_ratio'))} | "
-                f"Model Confidence: {_pct(_model_confidence(verdict))}"
+                f"Trade Setup Conviction: {_pct(_model_confidence(verdict))}"
             ),
             "",
         ]
