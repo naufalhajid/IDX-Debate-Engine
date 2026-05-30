@@ -1,112 +1,82 @@
 # IDX Debate Engine
 
-> An institutional-grade, multi-agent AI research pipeline for swing-trade analysis on the Indonesian Stock Exchange (IDX/IHSG).
+> **An institutional-grade, multi-agent AI research pipeline for swing-trade analysis on the Indonesian Stock Exchange (IDX/IHSG).**
 
-Built for decision-support, not decision-making. This system automates the transition from quantitative screening to structured qualitative auditing through a LangGraph-powered debate architecture — engineered to surface blind spots, enforce financial guardrails, and produce auditable, deterministic trade setups.
+Built for *decision-support*, not decision-making. This system automates the transition from quantitative screening to structured qualitative auditing through a **LangGraph-powered debate architecture** — engineered to surface blind spots, enforce financial guardrails, and produce auditable, deterministic trade setups.
 
----
 
-![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?style=flat-square&logo=fastapi&logoColor=white)
-![Svelte](https://img.shields.io/badge/Svelte-5.0-FF3E00?style=flat-square&logo=svelte&logoColor=white)
-![LangGraph](https://img.shields.io/badge/LangGraph-0.4+-1C3C3C?style=flat-square&logo=langchain&logoColor=white)
-![SQLite](https://img.shields.io/badge/SQLite-aiosqlite-003B57?style=flat-square&logo=sqlite&logoColor=white)
-![UV](https://img.shields.io/badge/UV-package%20manager-DE5FE9?style=flat-square)
-![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
-![Tests](https://img.shields.io/badge/Tests-342%20passing-brightgreen?style=flat-square)
 
----
-
-## Example Output Preview
+## Live Demo — Debate Chamber CLI
 
 <p align="center">
-  <img src="docs/assets/sample_output_report.svg" alt="Sanitized IDX Debate Engine output preview" width="100%">
+  <img src="docs/assets/debate_terminal_preview.png" alt="IDX Debate Engine — Live terminal output showing a BBRI debate analysis with agent voting, trade plan, risk management, and final verdict" width="100%">
 </p>
 
-The preview above is generated from the sanitized sample artifacts in
-[`examples/sample_TOP_3_SWING_TRADES.md`](examples/sample_TOP_3_SWING_TRADES.md)
-and [`examples/sample_full_batch_results.json`](examples/sample_full_batch_results.json).
-It shows the shape of the final report without exposing live market analysis,
-private API responses, or local runtime data.
+<p align="center"><em>
+  Rich terminal dashboard running <code>uv run idx debate BBRI</code> — showing the Trade Plan & Valuation panel, Agent Voting & Integration matrix, Bull vs Bear key arguments, Decision Summary, System & Risk Management flags, and the final Debate Results table. All in real-time.
+</em></p>
+
+---
+
+## Table of Contents
+
+- [System Architecture](#system-architecture)
+- [Technical Highlights](#technical-highlights)
+  - [LangGraph Multi-Agent Debate Chamber](#1-langgraph-multi-agent-debate-chamber)
+  - [Quantitative Screener (v3.2)](#2-quantitative-screener-v32)
+  - [Market-Adaptive Regime Detection](#3-market-adaptive-regime-detection)
+  - [Deterministic Risk Governor](#4-deterministic-risk-governor)
+  - [Adaptive Planner & Resilience Engine](#5-adaptive-planner--resilience-engine)
+  - [FastAPI Backend + Svelte 5 Dashboard](#6-fastapi-backend--svelte-5-dashboard)
+  - [RAG Evidence Store](#7-rag-evidence-store)
+  - [Backtest Memory & Auto-Evaluator](#8-backtest-memory--auto-evaluator)
+- [Project Structure](#project-structure)
+- [Setup & Installation](#setup--installation)
+- [Execution & CLI Reference](#execution--cli-reference)
+- [Testing](#testing)
+- [License](#license)
 
 ---
 
 ## System Architecture
 
-The pipeline is sequential at the batch level and parallel at the agent level. Each ticker traverses the entire graph before the next one begins, ensuring clean state isolation and predictable token budgeting.
+The pipeline is **sequential at the batch level** and **parallel at the agent level**. Each ticker traverses the entire graph before the next one begins, ensuring clean state isolation and predictable token budgeting.
 
 ```mermaid
-flowchart TD
-    A[Excel Workbook\nIDX Fundamental Data] --> B
-
-    subgraph QUANT["① Quantitative Screener  ·  v3.2"]
-        B[Static Gate\nPrice · DER · PBV · ROE\nPiotroski F-Score · Altman Z] --> C
-        C[Technical Gate\nSMA50 · EMA20 · ADT · RSI] --> D
-        D[Composite Scorer\nValuation + Profitability\n+ RSI + Volume + Momentum]
+graph TD
+    %% Entry Points & Data Intake
+    EP[orchestrator.py / main.py] -->|1. Mulai Pipeline| MR[core/regime.py: Regime Detection]
+    MR -->|2. Klasifikasi Volatilitas| QF[core/quant_filter/pipeline.py: Quant Filter]
+    
+    %% LangGraph Orchestration
+    QF -->|3. Ticker Terpilih| DC[services/debate_chamber.py: DebateChamber]
+    
+    subgraph Debate Chamber (LangGraph State Machine)
+        DC -->|Flash LLM| FS[Fundamental Scout]
+        DC -->|Flash LLM| CS[Chartist Scout]
+        DC -->|Flash LLM| SS[Sentiment Scout]
+        
+        FS --> SYN[Synthesizer Node]
+        CS --> SYN
+        SS --> SYN
+        
+        SYN -->|Mulai Ronde| BA[Bullish Analyst]
+        BA -->|Argumen Beli| BR[Bearish Auditor]
+        BR -->|Audit Risiko| CE{Consensus Evaluator}
+        
+        CE -->|Belum Sepakat & R < 3| SC[State Cleaner: Context Pruning]
+        SC --> BA
+        
+        CE -->|Sepakat / R = 3| DA[Devil's Advocate: Bias Test]
+        DA -->|Pro LLM| CJ[CIO Judge: Final Decision]
     end
-
-    D --> E
-
-    subgraph REGIME["② Market Regime Detector"]
-        E[yfinance  ^JKSE\n20-day Realized Vol]
-        E --> F{Regime}
-        F -->|vol ≥ 2%| G[HIGH\ntop_n=2  rr_cap=4.0\nmin_conviction=0.45]
-        F -->|1% – 2%| H[NORMAL\ndefaults]
-        F -->|vol < 1%| I[LOW\ntop_n=5  rr_cap=6.0\nmin_conviction=0.20]
-    end
-
-    G & H & I --> J
-
-    subgraph SCOUTS["③ Parallel Data Scouts  ·  gemini-flash-lite"]
-        J[ ]:::hidden
-        J --> K[Fundamental Scout\nEPS · ROE · DER · PBV\nGraham Number · Fair Value]
-        J --> L[Chartist\nyfinance OHLCV\nMA50 · MA200 · RSI · ATR]
-        J --> M[Sentiment Scout\nNews · Stockbit · Analyst]
-    end
-
-    K & L & M --> N
-
-    subgraph DEBATE["④ LangGraph Debate Chamber"]
-        N[Context Pack\n+ RAG Evidence Store]
-        N --> O[Bull Analyst R1]
-        N --> P[Bear Auditor R1\nATR-downside challenge]
-        O & P --> Q{Consensus\nR1?}
-        Q -->|Yes| R[Devil's Advocate\nstress-tests agreement]
-        Q -->|No| S[Bull R2  ·  Bear R2\nanti-groupthink prompts\nBear forbidden to repeat R1]
-        R & S --> T[State Cleaner\ncontext pruning]
-    end
-
-    T --> U
-
-    subgraph CIO["⑤ CIO Judge  ·  gemini-pro-preview"]
-        U[Trade Envelope\nPython-computed\nentry · target · stop · fair value]
-        U --> V[Conflict Resolution Matrix\nFundamental × Technical × Sentiment]
-        V --> W[ExDate Check\nDividend risk gate]
-        W --> X[CIOVerdict\nPydantic-validated JSON]
-    end
-
-    X --> Y
-
-    subgraph RISK["⑥ Deterministic Risk Governor"]
-        Y[evaluate_risk\nno LLM involved]
-        Y --> Z{RiskStatus}
-        Z --> AA[deployable]
-        Z --> AB[conditional_deployable]
-        Z --> AC[wait_for_pullback]
-        Z --> AD[watchlist_only]
-        Z --> AE[reject]
-    end
-
-    AA & AB & AC & AD --> AF
-
-    subgraph PORTFOLIO["⑦ Sector-Cap Portfolio Optimizer"]
-        AF[Greedy Sector Filter\nmin_conviction gate\nmax_per_sector cap]
-        AF --> AG[Conviction Scorer\nconfidence × 0.5  +  rr_norm × 0.5]
-    end
-
-    AG --> AH[Auditable JSON\nfull_batch_results.json]
-    AG --> AI[Markdown Reports\nTop-N swing setups]
-    AH --> AJ[FastAPI SSE Stream\n+ Svelte 5 Dashboard]
+    
+    %% Output & Scoring
+    CJ -->|4. CIOVerdict JSON| HS[core/historical_scorer.py: Win-Rate Matcher]
+    HS -->|5. Skoring Akhir| PS[core/quant_filter/position_sizer.py: Money Management]
+    PS -->|6. Laporan Markdown| OUT[output/TOP_3_SWING_TRADES.md]
+    PS -->|7. Database| DB[(db.sqlite3 via SQLAlchemy)]
+    PS -->|8. Web UI| API[FastAPI Stream SSE -> SvelteKit UI]
 ```
 
 ---
@@ -115,26 +85,32 @@ flowchart TD
 
 ### 1. LangGraph Multi-Agent Debate Chamber
 
-**File:** `services/debate_chamber.py` (117 KB) · **Prompt corpus:** `services/debate_prompts/`
+**File:** [`debate_chamber.py`](services/debate_chamber.py) &nbsp;·&nbsp; **Prompt corpus:** [`debate_prompts/`](services/debate_prompts/)
 
 The debate engine models an institutional investment committee using a LangGraph `StateGraph` with typed `DebateChamberState`. The architecture is purpose-built to counteract positive-bias common in single-prompt LLM analysis.
 
-**Scout Phase (parallel, gemini-flash-lite):**
+**Scout Phase** *(parallel, gemini-flash-lite):*
+
 Three specialized agents run concurrently to extract distinct signal types before the debate begins:
-- **Fundamental Scout** — EPS TTM, ROE, DER, PBV, Graham Number margin of safety, and multi-method fair value from `services/fair_value_calculator.py`
-- **Chartist** — consumes real OHLCV from yfinance; MA50, MA200, RSI, and ATR are pre-computed in Python before LLM injection. The CIO judge cannot invent prices — it receives a Python-calculated Trade Envelope verbatim
-- **Sentiment Scout** — news freshness scoring, Stockbit analyst signals, breaking-news detection with confidence adjustment
 
-**Debate Phase (up to 3 rounds):**
-- **Anti-groupthink protocol:** Bull (R1 → R2) vs. Bear (R1 → R2). In R2, Bear is programmatically forbidden from repeating any argument from R1 and must challenge the Bull's margin of safety using ATR-based downside
-- **Devil's Advocate node:** triggered automatically if consensus is detected too early (Round 1). A contrarian agent stress-tests the agreement before it reaches the CIO
-- **State Cleaner:** prunes accumulated context between phases using a dedicated prompt to prevent token overflow in long debates
+| Agent | Signals | Source |
+|---|---|---|
+| **Fundamental Scout** | EPS TTM, ROE, DER, PBV, Graham Number, multi-method fair value | [`fair_value_calculator.py`](services/fair_value_calculator.py) |
+| **Chartist** | MA50, MA200, RSI, ATR — pre-computed in Python, not LLM-generated | yfinance OHLCV |
+| **Sentiment Scout** | News freshness scoring, Stockbit analyst signals, breaking-news detection | Multi-source aggregation |
 
-**CIO Judge (gemini-pro-preview):**
-- Applies a strict Conflict Resolution Matrix: `Fundamental ✅ + Technical ✅ → BUY`, `Fundamental ✅ + Technical ❌ → HOLD`, etc.
-- Checks disagreement type (`direction`, `valuation`, `catalyst`, `timing`) and applies corresponding confidence penalties (0.02–0.05)
-- Hard ExDate gate: if ex-dividend date is ≤7 days away, auto-disqualifies with AVOID regardless of fundamentals
-- Output is Pydantic-validated (`schemas/debate.py: CIOVerdict`) — LLM output that fails schema validation is rejected and retried
+**Debate Phase** *(up to 3 rounds):*
+
+- **Anti-groupthink protocol:** Bull (R1 → R2) vs. Bear (R1 → R2). In R2, Bear is programmatically forbidden from repeating any argument from R1 and must challenge the Bull's margin of safety using ATR-based downside.
+- **Devil's Advocate node:** triggered automatically if consensus is detected too early (Round 1). A contrarian agent stress-tests the agreement before it reaches the CIO.
+- **State Cleaner:** prunes accumulated context between phases to prevent token overflow in long debates.
+
+**CIO Judge** *(gemini-pro-preview):*
+
+- Applies a strict **Conflict Resolution Matrix**: `Fundamental ✅ + Technical ✅ → BUY`, `Fundamental ✅ + Technical ❌ → HOLD`, etc.
+- Checks disagreement type (`direction`, `valuation`, `catalyst`, `timing`) and applies confidence penalties (0.02–0.05).
+- **Hard ExDate gate:** if ex-dividend date is ≤7 days away, auto-disqualifies with AVOID regardless of fundamentals.
+- Output is **Pydantic-validated** ([`CIOVerdict`](schemas/debate.py)) — LLM output that fails schema validation is rejected and retried.
 
 **Token budget:** 500k tokens per run. Flash models for all data extraction; Pro model reserved for CIO synthesis only.
 
@@ -142,158 +118,171 @@ Three specialized agents run concurrently to extract distinct signal types befor
 
 ### 2. Quantitative Screener (v3.2)
 
-**Files:** `core/quant_filter/config.py`, `core/quant_filter/pipeline.py`
+**Files:** [`config.py`](core/quant_filter/config.py) · [`pipeline.py`](core/quant_filter/pipeline.py)
 
-A multi-stage screening engine that processes IDX Excel workbooks (scraped from Stockbit/IDX) into a ranked candidate list. All filters are deterministic and configurable.
+A multi-stage screening engine that processes IDX Excel workbooks into a ranked candidate list. All filters are deterministic and configurable.
 
-**Stage 1 — Static Gate (hard excludes):**
-- Minimum price Rp 100 (removes penny stocks with no institutional liquidity)
-- Sector-aware DER caps: banks allowed up to 8.0×, tech and healthcare capped at 1.0× (banking leverage is structural, not a risk signal)
-- Hard PBV ceiling of 6.0×; sector-relative PBV at 80th percentile
-- ROE ≥ 10% TTM
-- Piotroski F-Score ≥ 4 (eliminates deteriorating fundamentals)
-- Altman Z-Score > 1.1 (distress zone exclusion)
-- Excludes tickers on IDX Special Monitoring (`PEMANTAUAN KHUSUS`)
+**Stage 1 — Static Gate** *(hard excludes):*
+
+| Filter | Threshold | Rationale |
+|---|---|---|
+| Min price | Rp 100 | Remove penny stocks with no institutional liquidity |
+| DER cap | Sector-aware (banks: 8.0×, tech: 1.0×) | Banking leverage is structural, not a risk signal |
+| PBV ceiling | 6.0× (hard), 80th percentile (sector-relative) | Valuation ceiling |
+| ROE floor | ≥ 10% TTM | Minimum profitability |
+| Piotroski F-Score | ≥ 4 | Eliminate deteriorating fundamentals |
+| Altman Z-Score | > 1.1 | Distress zone exclusion |
+| Special Monitoring | Excluded | IDX `PEMANTAUAN KHUSUS` tickers are auto-rejected |
 
 **Stage 2 — Technical Gate:**
-- Price ≥ SMA50 and ≥ EMA20 (trend alignment for swing entry)
+
+- Price ≥ SMA50 and ≥ EMA20 (trend alignment)
 - RSI hard-reject above 80 (overbought exclusion)
-- 20-day Average Daily Turnover ≥ Rp 5 billion (minimum institutional liquidity)
+- 20-day ADT ≥ Rp 5 billion (institutional liquidity)
 - Minimum 60 OHLCV bars (data sufficiency)
-- Relative Strength vs. IHSG (1-month outperformance requirement)
+- Relative Strength vs. IHSG (1-month outperformance)
 
 **Stage 3 — Composite Scoring (0–100):**
 
 | Component | Weight | Method |
 |---|---|---|
-| Valuation | 20 | Graham Number gap, tiered: ≥50% → 100%, 20-50% → 70%, 5-20% → 40% |
-| Profitability | 10 | ROE tiered: ≥25% → 100%, 15-25% → 70%, 10-15% → 40% |
-| RSI Momentum | 25 | Accumulation zone (45-55) → 100%, Uptrend (55-70) → 80%, Oversold → 40% |
-| Volume Momentum | 25 | Surge tiers: ≥2× → 100%, 1.5-2× → 70%, 1.1-1.5× → 40% |
+| Valuation | 20 | Graham Number gap, tiered: ≥50% → 100%, 20–50% → 70%, 5–20% → 40% |
+| Profitability | 10 | ROE tiered: ≥25% → 100%, 15–25% → 70%, 10–15% → 40% |
+| RSI Momentum | 25 | Accumulation zone (45–55) → 100%, Uptrend (55–70) → 80%, Oversold → 40% |
+| Volume Momentum | 25 | Surge tiers: ≥2× → 100%, 1.5–2× → 70%, 1.1–1.5× → 40% |
 | Price Momentum | 20 | 22-day return vs. IHSG, tiered by outperformance |
 
-Piotroski F-Score ≥ 7 adds +5 bonus; ≤ 5 applies −5 penalty. Fresh breakout bonus: +15. Over-extended penalty: −15.
+Piotroski F-Score ≥ 7 adds **+5 bonus**; ≤ 5 applies **−5 penalty**. Fresh breakout bonus: +15. Over-extended penalty: −15.
 
 ---
 
 ### 3. Market-Adaptive Regime Detection
 
-**File:** `core/regime.py`
+**File:** [`regime.py`](core/regime.py)
 
-Indonesia's equity market lacks a public volatility index. The system builds its own regime signal by computing the 20-day realized volatility of `^JKSE` (IHSG) from daily returns via yfinance, running async to avoid blocking the event loop.
+Indonesia's equity market lacks a public volatility index. The system builds its own regime signal by computing the **20-day realized volatility** of `^JKSE` (IHSG) from daily returns via yfinance.
 
-```
-HIGH   (vol ≥ 2%)  →  top_n=2,  rpm_limit=5,   rr_cap=4.0,  min_conviction=0.45
-NORMAL (1%–2%)     →  defaults (no override)
-LOW    (vol < 1%)  →  top_n=5,  rpm_limit=15,  rr_cap=6.0,  min_conviction=0.20
-```
+| Regime | Volatility | top_n | rpm_limit | rr_cap | min_conviction |
+|---|---|---|---|---|---|
+| **HIGH** | ≥ 2% | 2 | 5 | 4.0 | 0.45 |
+| **NORMAL** | 1%–2% | *defaults* | *defaults* | *defaults* | *defaults* |
+| **LOW** | < 1% | 5 | 15 | 6.0 | 0.20 |
 
-Fetch failures (network timeout, yfinance rate-limit) fall back to `NORMAL` — the pipeline never aborts due to a regime detection error.
+> Fetch failures (network timeout, yfinance rate-limit) fall back to `NORMAL` — the pipeline **never aborts** due to a regime detection error.
 
 ---
 
 ### 4. Deterministic Risk Governor
 
-**File:** `core/risk_governor.py`
+**File:** [`risk_governor.py`](core/risk_governor.py)
 
-A fully deterministic, LLM-free gate that classifies every CIO verdict before it touches the portfolio optimizer. No randomness, no model calls — purely rule-based Python.
+A fully deterministic, **LLM-free gate** that classifies every CIO verdict before it touches the portfolio optimizer. No randomness, no model calls — purely rule-based Python.
 
-**Hard reject codes** (any one → `reject` status, no sizing allowed):
+**Hard reject codes** *(any one → `reject`, no sizing allowed):*
 - `rating_not_buyable` — verdict is AVOID or SELL
 - `overvalued` — current price exceeds fair value
 - `rr_too_low` — risk/reward ratio below 1.5×
 - `insufficient_technical_data` — OHLCV data too sparse for MA200 validation
 
 **Output statuses:**
-```
-deployable           →  price inside entry range, full sizing allowed
-conditional_deployable →  HOLD rating or counter-trend; sizing restricted
-wait_for_pullback    →  setup valid, price above entry zone
-watchlist_only       →  price below entry zone, monitor only
-reject               →  hard disqualification
-```
 
-Additional checks: stop-loss must be below current price, target must be above current price, MA200 context validated for counter-trend detection. IDX tick size snapping enforced on all price levels (`utils/technicals.py: snap_to_tick`).
+| Status | Meaning |
+|---|---|
+| `deployable` | Price inside entry range, full sizing allowed |
+| `conditional_deployable` | HOLD rating or counter-trend; sizing restricted |
+| `wait_for_pullback` | Setup valid, price above entry zone |
+| `watchlist_only` | Price below entry zone, monitor only |
+| `reject` | Hard disqualification |
+
+Additional checks: stop-loss must be below current price, target must be above current price, MA200 context validated for counter-trend detection. IDX tick-size snapping enforced on all price levels ([`snap_to_tick`](utils/technicals.py)).
 
 ---
 
-### 5. Adaptive Planner and Resilience Engine
+### 5. Adaptive Planner & Resilience Engine
 
-**Files:** `core/adaptive_planner.py`, `core/failure_taxonomy.py`
+**Files:** [`adaptive_planner.py`](core/adaptive_planner.py) · [`failure_taxonomy.py`](core/failure_taxonomy.py)
 
-External dependencies (Stockbit scraper, yfinance, Gemini API) are inherently unreliable. Instead of failing the entire batch on any error, the system uses a structured failure taxonomy to make context-aware recovery decisions.
+External dependencies (Stockbit scraper, yfinance, Gemini API) are inherently unreliable. Instead of failing the entire batch on any error, the system uses a structured **failure taxonomy** to make context-aware recovery decisions.
 
-**Failure taxonomy** (`core/failure_taxonomy.py`): Normalizes all exceptions into categorized error codes — `DNS`, `QUOTA`, `AUTHENTICATION`, `SCHEMA`, `TIMEOUT` — enabling deterministic routing logic that doesn't rely on raw exception message parsing.
+**Failure taxonomy** normalizes all exceptions into categorized error codes — `DNS`, `QUOTA`, `AUTHENTICATION`, `SCHEMA`, `TIMEOUT` — enabling deterministic routing logic.
 
 **Recovery actions** (`PlanAction` enum):
-- `RETRY` — exponential backoff, max 2 attempts
-- `PROCEED_PARTIAL` — continue with missing data; apply **15% confidence penalty** to final conviction score
-- `SKIP_TICKER` — exclude this ticker, proceed with batch
-- `FALLBACK` — switch to alternative data source
-- `ABORT_BATCH` — stop entire run (triggered when all providers are down, or ≥ 5 ticker failures in one batch)
-- `ESCALATE` — log critical event, notify operator
 
-**Stage-specific logic:** Sentiment fetch failure → `PROCEED_PARTIAL` (non-critical data). Debate timeout → `RETRY` up to 2× then `SKIP_TICKER`. CIO verdict failure → `RETRY` up to 2× then `SKIP_TICKER`. Any auth or billing error → immediate `ABORT_BATCH` (prevent pointless API billing).
+| Action | Behavior |
+|---|---|
+| `RETRY` | Exponential backoff, max 2 attempts |
+| `PROCEED_PARTIAL` | Continue with missing data; apply **15% confidence penalty** |
+| `SKIP_TICKER` | Exclude this ticker, proceed with batch |
+| `FALLBACK` | Switch to alternative data source |
+| `ABORT_BATCH` | Stop entire run (all providers down, or ≥ 5 ticker failures) |
+| `ESCALATE` | Log critical event, notify operator |
 
-Every decision is written to the **Execution Ledger** (`core/execution_ledger.py`) as a queryable JSONL event stream with structured `EventType`, `EventSeverity`, and causal trace fields.
+**Stage-specific logic:** Sentiment fetch failure → `PROCEED_PARTIAL`. Debate timeout → `RETRY` up to 2× then `SKIP_TICKER`. Any auth or billing error → immediate `ABORT_BATCH`.
+
+Every decision is written to the **Execution Ledger** ([`execution_ledger.py`](core/execution_ledger.py)) as a queryable JSONL event stream with structured `EventType`, `EventSeverity`, and causal trace fields.
 
 ---
 
 ### 6. FastAPI Backend + Svelte 5 Dashboard
 
-**Files:** `app/api/routers/stocks.py`, `app/ui/src/`
+**Files:** [`stocks.py`](app/api/routers/stocks.py) · [`app/ui/src/`](app/ui/src/)
 
-**SSE Streaming Debate (`POST /api/debate/stream`):**
-The API streams live debate progress to the frontend using Server-Sent Events. A `StreamingDebateChamber` subclass intercepts every LangGraph graph event and pushes it into an `asyncio.Queue`. A consumer loop drains the queue concurrently while the orchestrator runs, emitting typed SSE frames:
+**SSE Streaming Debate** (`POST /api/debate/stream`):
 
-```
-{ type: "progress",  ticker, phase, pct }     — pipeline phase progress 0–100
-{ type: "scout",     ticker, metrics }         — parallel scout results
-{ type: "round",     ticker, data }            — Bull/Bear round arguments
-{ type: "devil_advocate", ticker, question }   — Devil's Advocate trigger
-{ type: "verdict",   ticker, result }          — final CIOVerdict + RiskDecision
-{ type: "done",      ticker }                  — ticker complete
-{ type: "error",     ticker, message }         — recoverable error
-```
+The API streams live debate progress to the frontend using Server-Sent Events. A `StreamingDebateChamber` subclass intercepts every LangGraph graph event and pushes it into an `asyncio.Queue`:
 
-Heartbeat frames (`: heartbeat`) are emitted every 1 second on idle to prevent proxy timeout disconnections. Headers: `Cache-Control: no-cache`, `X-Accel-Buffering: no`, `Connection: keep-alive`.
+| Event Type | Payload | Purpose |
+|---|---|---|
+| `progress` | `ticker, phase, pct` | Pipeline phase progress 0–100 |
+| `scout` | `ticker, metrics` | Parallel scout results |
+| `round` | `ticker, data` | Bull/Bear round arguments |
+| `devil_advocate` | `ticker, question` | Devil's Advocate trigger |
+| `verdict` | `ticker, result` | Final CIOVerdict + RiskDecision |
+| `done` | `ticker` | Ticker complete |
+| `error` | `ticker, message` | Recoverable error |
 
-**In-Memory TTL Cache:** Batch results are cached in memory with a 60-second TTL. Cache invalidation is dual-keyed: time-based TTL **and** file `mtime` comparison — if the results file is updated by a new batch run, the cache is invalidated immediately on the next request regardless of TTL. Manual invalidation is called after every streaming debate completes.
+Heartbeat frames (`: heartbeat`) emitted every 1 second on idle. Headers: `Cache-Control: no-cache`, `X-Accel-Buffering: no`, `Connection: keep-alive`.
 
-**Svelte 5 Frontend (SvelteKit + TypeScript):**
-- `DebateTimeline.svelte` — reactive SSE event consumer; renders live round arguments with auto-scroll and user scroll override
-- `CandidatesTable.svelte` — sortable, filterable results grid with RiskStatus color-coding
-- `ServerStatusBar.svelte` — API health polling
-- `Sidebar.svelte` — ticker navigation and session state
-- `ToastStack.svelte` — non-blocking error surface
-- Stores: `dashboard.ts`, `metadata.ts`, `session.ts`, `toast.ts` — reactive state management via Svelte runes
+**In-Memory TTL Cache:** Batch results cached with 60-second TTL. Dual-key invalidation: time-based TTL **and** file `mtime` comparison — if the results file is updated, the cache invalidates immediately.
 
-The dashboard consumes the same normalized `StockResult` shape shown in the
-preview at the top of this README.
+**Svelte 5 Frontend** (SvelteKit + TypeScript):
+
+| Component | Purpose |
+|---|---|
+| `DebateTimeline.svelte` | Reactive SSE event consumer; live round arguments with auto-scroll |
+| `CandidatesTable.svelte` | Sortable, filterable results grid with RiskStatus color-coding |
+| `ServerStatusBar.svelte` | API health polling |
+| `Sidebar.svelte` | Ticker navigation and session state |
+| `ToastStack.svelte` | Non-blocking error surface |
+
+Stores: `dashboard.ts`, `metadata.ts`, `session.ts`, `toast.ts` — reactive state via Svelte runes.
 
 ---
 
 ### 7. RAG Evidence Store
 
-**File:** `services/rag_evidence_store.py`
+**File:** [`rag_evidence_store.py`](services/rag_evidence_store.py)
 
-A freshness-aware deterministic evidence selection layer that sits between the data scouts and the debate context. It is not a vector database; it scores normalized `ContextPack` chunks by category, query keywords, and per-source freshness, then injects a compact evidence brief with audit-friendly citation IDs.
+A freshness-aware, deterministic evidence selection layer between the data scouts and the debate context. Not a vector database — it scores normalized `ContextPack` chunks by category, query keywords, and per-source freshness.
 
-- Maximum 12 evidence chunks per bundle, with the final rendered evidence brief hard-capped at 2,400 characters
-- Stale threshold: 86,400 seconds (24 hours)
-- Category weights: `fair_value=1.0`, `fundamental=0.9`, `technical=0.85`, `sentiment=0.6`, `exdate=0.7`, `metadata=0.3`
-- Evidence logs include selected chunk content, content hashes, source timestamps, freshness flags, rendered character count, and citation IDs for post-run audit
-- Chunks scored by relevance × freshness × category weight; top-K selected per bundle
+| Parameter | Value |
+|---|---|
+| Max chunks per bundle | 12 |
+| Evidence brief hard cap | 2,400 characters |
+| Stale threshold | 86,400 seconds (24 hours) |
+| Category weights | `fair_value=1.0`, `fundamental=0.9`, `technical=0.85`, `sentiment=0.6`, `exdate=0.7`, `metadata=0.3` |
+
+Chunks scored by `relevance × freshness × category_weight`. Evidence logs include content hashes, source timestamps, freshness flags, and citation IDs for post-run audit.
 
 ---
 
-### 8. Backtest Memory and Auto-Evaluator
+### 8. Backtest Memory & Auto-Evaluator
 
-**Files:** `core/backtest_memory.py`, `core/backtest_outcome_evaluator.py`
+**Files:** [`backtest_memory.py`](core/backtest_memory.py) · [`backtest_outcome_evaluator.py`](core/backtest_outcome_evaluator.py)
 
-An append-only JSONL store (`TradeOutcome`) that persists every debate verdict with its trade parameters. The auto-evaluator re-reads open records and resolves them using historical OHLCV from yfinance — checking whether price hit the target, hit the stop-loss, or expired within the 63-day swing horizon.
+An append-only JSONL store (`TradeOutcome`) that persists every debate verdict with its trade parameters. The auto-evaluator re-reads open records and resolves them using historical OHLCV from yfinance — checking whether price hit the target, hit the stop-loss, or expired within the **63-day swing horizon**.
 
-This creates a feedback loop: verdict confidence and the scoring model can be calibrated against realized outcomes over time.
+This creates a **feedback loop**: verdict confidence and the scoring model can be calibrated against realized outcomes over time.
 
 ---
 
@@ -305,7 +294,7 @@ IDX-Debate-Engine/
 ├── app/
 │   ├── api/                        # FastAPI application
 │   │   ├── routers/stocks.py       # SSE streaming, results, health endpoints
-│   │   ├── result_adapter.py       # Normalizes raw JSON to frontend schema
+│   │   ├── result_adapter.py       # Normalizes raw JSON → frontend schema
 │   │   ├── cache.py                # TTL + mtime dual-key cache
 │   │   └── dependency_injections/  # API key and async DB session DI
 │   ├── cli/
@@ -373,9 +362,9 @@ IDX-Debate-Engine/
 │   ├── market_data_cache.py        # Shared OHLCV cache across pipeline stages
 │   └── logger_config.py / helpers.py
 │
-├── tests/                          # 342 test functions, 41 test files
+├── tests/                          # 49 test modules
 ├── docs/                           # Architecture notes, decision semantics
-├── examples/                       # Sample sanitized output artifacts
+├── examples/                       # Sanitized sample output artifacts
 ├── output/                         # Generated reports (git-ignored)
 ├── orchestrator.py                 # Batch pipeline entry point
 ├── run_debate.py                   # Single-ticker debate runner
@@ -386,17 +375,19 @@ IDX-Debate-Engine/
 
 ---
 
-## Setup and Installation
+## Setup & Installation
 
 ### Prerequisites
 
-- Python 3.12
-- [`uv`](https://docs.astral.sh/uv/) — fast Python package manager
-- Node.js 18+ and npm (for the Svelte dashboard only)
-- Google Chrome or Chromium (for Stockbit/IDX web scraping)
-- Gemini API key (required for live debate runs; not needed for dry-run mode)
+| Requirement | Version | Notes |
+|---|---|---|
+| Python | 3.14+ | Runtime |
+| [`uv`](https://docs.astral.sh/uv/) | latest | Fast Python package manager |
+| Node.js | 24+ | For the Svelte dashboard only |
+| Google Chrome | latest | For Stockbit/IDX web scraping |
+| Gemini API key | — | Required for live debate runs; not needed for dry-run |
 
-### Install Python Dependencies
+### 1. Clone & Install
 
 ```bash
 git clone https://github.com/your-username/IDX-Debate-Engine.git
@@ -404,7 +395,7 @@ cd IDX-Debate-Engine
 uv sync
 ```
 
-### Configure Environment
+### 2. Configure Environment
 
 ```bash
 cp .env.example .env
@@ -413,22 +404,22 @@ cp .env.example .env
 Edit `.env` with your credentials:
 
 ```bash
-# Required for live debate runs
+# ── LLM ──────────────────────────────────────────
 GEMINI_API_KEY=your-gemini-api-key
 GEMINI_FLASH_MODEL=gemini-3.1-flash-lite
 GEMINI_PRO_MODEL=gemini-3.1-pro-preview
 
-# Portfolio risk parameters (tune to your capital allocation)
+# ── Portfolio Risk Parameters ────────────────────
 PORTFOLIO_MAX_PER_SECTOR=2
 PORTFOLIO_MIN_CONVICTION=0.30
 
-# Regime thresholds (default: IHSG-calibrated)
+# ── Regime Thresholds (IHSG-calibrated) ──────────
 REGIME_VOLATILITY_HIGH_THRESHOLD=0.02
 REGIME_VOLATILITY_LOW_THRESHOLD=0.01
 REGIME_VOLATILITY_LOOKBACK_DAYS=20
 ```
 
-### Install Frontend Dependencies
+### 3. Install Frontend Dependencies
 
 ```bash
 cd app/ui
@@ -438,75 +429,40 @@ cd ../..
 
 ---
 
-## Execution
+## Execution & CLI Reference
 
-### Full Batch Pipeline (Orchestrator)
+All commands are accessed through the unified `idx` CLI, powered by [Typer](https://typer.tiangolo.com/) with [Rich](https://rich.readthedocs.io/) console output.
 
-Runs the complete pipeline: quant filter → regime detection → parallel scouts → debate chamber → CIO verdict → risk governor → portfolio optimization → reports.
+### Full Batch Pipeline
+
+Runs the complete pipeline end-to-end: quant filter → regime detection → parallel scouts → debate chamber → CIO verdict → risk governor → portfolio optimization → reports.
 
 ```bash
 uv run idx pipeline
 ```
 
-**Dry-run mode** (mock LLM responses, no API calls):
+**Dry-run mode** *(mock LLM responses, no API calls):*
 
 ```bash
 uv run idx pipeline --dry-run --no-interactive --output-dir tmp/dry_run
 ```
 
----
-
-### CLI Reference (`idx`)
-
-The unified CLI entry point, powered by Typer with Rich console output.
+### Individual Commands
 
 ```bash
-# Run the quantitative screener against the latest IDX Excel workbook
-uv run idx filter --top 10
+# ── Quantitative Screener ────────────────────────
+uv run idx filter --top 10          # Filter and rank candidates
+uv run idx scan                     # Quick fundamental sweep
 
-# Run the debate chamber for specific tickers
-uv run idx debate --tickers BBRI BBCA TLKM --output-dir output/debates
+# ── Debate Chamber ───────────────────────────────
+uv run idx debate BBRI BBCA TLKM    # Run debate for specific tickers
+uv run idx debate BBRI --output-dir output/debates
 
-# Market scan — quick fundamental sweep
-uv run idx scan
+# ── Sector Analysis ──────────────────────────────
+uv run idx sector list              # List sector classifications
 
-# Full pipeline via CLI
-uv run idx pipeline
-
-# Launch FastAPI server
-uv run idx serve
-
-# Sector analysis
-uv run idx sector list
-```
-
-Generated CLI and batch artifacts are represented by the sanitized examples in
-the `examples/` directory.
-
----
-
-### Run Isolated Debate
-
-```bash
-uv run idx debate BBRI BBCA --output-dir output/debates
-```
-
----
-
-### Regenerate Quantitative Candidates
-
-```bash
-uv run idx scan
-```
-
----
-
-### Start the API Server
-
-```bash
-uv run idx serve
-# FastAPI available at http://127.0.0.1:8000
-# Interactive docs at http://127.0.0.1:8000/docs
+# ── API & Dashboard ──────────────────────────────
+uv run idx serve                    # Launch FastAPI on :8000
 ```
 
 ### Start the Svelte 5 Dashboard
@@ -519,17 +475,19 @@ npm run dev
 # Dashboard at http://127.0.0.1:5173
 ```
 
+FastAPI Swagger UI available at `http://127.0.0.1:8000/docs`.
+
 ---
 
 ## Testing
 
-The test suite covers unit tests, integration tests, and pipeline reliability tests across 41 test files.
+The test suite spans **49 test modules** covering unit tests, integration tests, and pipeline reliability tests.
 
 ```bash
 # Run full test suite
 uv run pytest -q
 
-# Run with verbose output
+# Verbose output
 uv run pytest -v
 
 # Run specific module
@@ -541,16 +499,13 @@ uv run pytest tests/test_adaptive_planner.py -v
 **Code quality:**
 
 ```bash
-# Type-check all modules
-uv run python -m compileall -q .
-
-# Lint with Ruff
-uv run ruff check .
+uv run python -m compileall -q .   # Type-check all modules
+uv run ruff check .                # Lint with Ruff
 ```
 
 **Key test modules:**
 
-| File | Coverage |
+| Module | Coverage |
 |---|---|
 | `test_debate_chamber_reliability.py` | LangGraph state machine, partial failure, schema validation |
 | `test_risk_governor.py` | All `RiskStatus` paths, edge cases, IDX tick compliance |
@@ -567,4 +522,5 @@ uv run ruff check .
 
 ## License
 
-MIT License — see `pyproject.toml`. This software is built for research and decision-support. It does not constitute financial advice.
+MIT License — see [`pyproject.toml`](pyproject.toml). This software is built for research and decision-support. **It does not constitute financial advice.**
+
