@@ -73,12 +73,6 @@ from services.fair_value_calculator import build_fair_value_report
 from services.debate_prompt_registry import PROMPT_REGISTRY, PROMPT_VERSION
 from services.debate_run_guard import run_with_guard
 from utils.logger_config import logger
-
-try:
-    from core.orchestrator.legacy import _cli_renderer
-except ImportError:
-    _cli_renderer = None
-
 from utils.market_data_cache import (
     derive_current_price,
     prefetch_market_data,
@@ -613,22 +607,6 @@ class DebateChamber:
         self.app = self._build_graph()
         self.prompt_version = PROMPT_VERSION
         self._llm_call_counts: dict[tuple[str, str], dict[str, int]] = {}
-
-    def _update_cli_status(self, ticker: str | None, text: str):
-        if ticker and _cli_renderer and _cli_renderer.is_running():
-            changes = {}
-            if "Fetching" in text:
-                changes["active"] = "fetching"
-            elif "Evaluating" in text:
-                changes["active"] = "analysis"
-                changes["fetching"] = "done"
-            elif any(kw in text for kw in ("Bull", "Bear", "Consensus", "CIO")):
-                changes["active"] = "debating"
-                changes["fetching"] = "done"
-                changes["analysis"] = "done"
-                changes["risk"] = "done"
-            
-            _cli_renderer.update_batch_progress(ticker, status=f"Debate: {text}", **changes)
 
     # -- Agent signal helpers -------------------------------------------------
 
@@ -1623,7 +1601,6 @@ Current Date (Asia/Jakarta): {current_date}
 
     async def _fundamental_node(self, state: DebateChamberState) -> dict:
         ticker = state["ticker"]
-        self._update_cli_status(ticker, "Fetching market & fundamental data...")
         current_price = state.get("current_price", 0.0)
         logger.info(f"[Fundamental] Fetching for {ticker}")
         started_at = perf_counter()
@@ -1712,7 +1689,6 @@ Current Date (Asia/Jakarta): {current_date}
     async def _chartist_node(self, state: DebateChamberState) -> dict:
         """Chartist with real OHLCV from yfinance — pre-computes all technicals in Python."""
         ticker = state["ticker"]
-        self._update_cli_status(ticker, "Evaluating technical and news sentiment...")
         logger.info(f"[Chartist] Fetching OHLCV + orderbook for {ticker}")
         started_at = perf_counter()
         technical_partial = False
@@ -1874,7 +1850,6 @@ Current Date (Asia/Jakarta): {current_date}
 
     async def _sentiment_node(self, state: DebateChamberState) -> dict:
         ticker = state["ticker"]
-        self._update_cli_status(ticker, "Evaluating technical and news sentiment...")
         logger.info(f"[Sentiment] Fetching for {ticker}")
         started_at = perf_counter()
         _ledger_stage_start(
@@ -2293,7 +2268,6 @@ Current Date (Asia/Jakarta): {current_date}
 
     async def _bullish_node(self, state: DebateChamberState) -> dict:
         ticker = state["ticker"]
-        self._update_cli_status(ticker, "Bull agent analyzing target entry...")
         rc = state["round_count"]
         logger.info(f"[Bull] Round {rc + 1} for {ticker}")
 
@@ -2336,7 +2310,6 @@ Current Date (Asia/Jakarta): {current_date}
 
     async def _bearish_node(self, state: DebateChamberState) -> dict:
         ticker = state["ticker"]
-        self._update_cli_status(ticker, "Bear agent identifying key risks...")
         rc = state["round_count"]
         logger.info(f"[Bear] Round {rc + 1} for {ticker}")
 
@@ -2392,8 +2365,6 @@ Current Date (Asia/Jakarta): {current_date}
         skip Round 2 and proceed directly to Devil's Advocate → CIO.
         Uses Pro — this reasoning step should not be downgraded to Flash.
         """
-        ticker = state.get("ticker")
-        self._update_cli_status(ticker, "Calculating consensus votes...")
         logger.info("[Consensus] Evaluating 5-agent votes")
         votes = self._collect_agent_votes(state)
         result = self._evaluate_consensus_votes(votes, state["round_count"])
@@ -2893,7 +2864,6 @@ Current Date (Asia/Jakarta): {current_date}
         Python overrides any LLM-generated prices with the envelope values.
         """
         ticker = state["ticker"]
-        self._update_cli_status(ticker, "CIO drafting final trade setup...")
         current_price = state.get("current_price", 0.0)
         tech = state.get("technical_indicators", {})
         fair_value = state.get("fair_value_estimate", 0.0)
@@ -3504,7 +3474,6 @@ Start your response with '{' and end with '}'. Nothing else."""
             Access the verdict via: json.loads(result["final_verdict"])
             For the Svelte trade card: CIOVerdict(**json.loads(...)).to_trade_card()
         """
-        self._update_cli_status(ticker, "Fetching market & fundamental data...")
         market_data = await self._fetch_market_data(ticker)
         if current_price <= 0:
             current_price = derive_current_price(market_data)

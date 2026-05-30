@@ -342,7 +342,7 @@ class BatchProgressView:
             if self._live is not None:
                 return
             self._live = Live(
-                self._build_renderable(),
+                self._build_table(),
                 console=self.con,
                 refresh_per_second=8,
                 transient=False,
@@ -353,7 +353,7 @@ class BatchProgressView:
         with self._lock:
             if self._live is None:
                 return
-            self._live.update(self._build_renderable(), refresh=True)
+            self._live.update(self._build_table(), refresh=True)
             self._live.stop()
             self._live = None
 
@@ -383,7 +383,7 @@ class BatchProgressView:
             )
             row.update(changes)
             if self._live is not None:
-                self._live.update(self._build_renderable(), refresh=True)
+                self._live.update(self._build_table(), refresh=True)
 
     def update_from_result(self, result: dict[str, Any]) -> None:
         ticker = str(result.get("ticker") or "UNKNOWN").upper()
@@ -459,7 +459,7 @@ class BatchProgressView:
                 {"justify": "center", "no_wrap": True},
             ),
             (
-                "DB" if is_compact else "Debate",
+                "B" if is_compact else "Debate",
                 "debating",
                 {"justify": "center", "no_wrap": True},
             ),
@@ -474,7 +474,7 @@ class BatchProgressView:
                 {"justify": "center", "no_wrap": True, "max_width": 10},
             ),
             (
-                "Conviction",
+                "Model Conf",
                 "confidence",
                 {"justify": "right", "no_wrap": True, "width": 10},
             ),
@@ -508,11 +508,6 @@ class BatchProgressView:
                 style=style,
             )
         return table
-
-    def _build_renderable(self) -> Group:
-        table = self._build_table()
-        legend = Text("Legenda: [D] Data Fetching | [A] Quant Analysis | [R] Risk Evaluation | [DB] AI Debate | [OK] Completed\n", style="muted")
-        return Group(table, legend)
 
     def _step_cell(self, row: dict[str, Any], step: str) -> Any:
         if row.get("active") == step:
@@ -573,9 +568,6 @@ class CliRenderer:
 
     def live_active(self) -> bool:
         return self.batch_progress is not None and self.batch_progress.is_running()
-
-    def is_running(self) -> bool:
-        return self.live_active()
 
     def close_batch_progress(self) -> None:
         self.stop_batch_progress()
@@ -677,15 +669,6 @@ class CliRenderer:
         level = record["level"].name
         message = _clean_cli_text(record["message"])
         if not message or set(message) <= {"="}:
-            return
-
-        # Saring dan sembunyikan log peringatan yang bersifat pemulihan otomatis dari CLI
-        exclude_keywords = [
-            "Stockbit failure classified",
-            "Request failed: HTTPSConnectionPool",
-            "Failed to retrieve key statistics"
-        ]
-        if any(kw in message for kw in exclude_keywords):
             return
 
         if self._capture_non_counted_event(message, level):
@@ -1421,7 +1404,7 @@ class CliRenderer:
         )
         setup_table.add_column("Ticker", style="bold", no_wrap=True, width=6)
         setup_table.add_column("Rating", no_wrap=True, max_width=10)
-        setup_table.add_column("Conviction", justify="right", no_wrap=True, width=10)
+        setup_table.add_column("Model Conf", justify="right", no_wrap=True, width=10)
         setup_table.add_column("Current", justify="right", no_wrap=True, width=10)
         setup_table.add_column(
             "Entry",

@@ -964,7 +964,6 @@ async def _debate_one(
     run_timestamp: str,
     generated_at: str,
     render_details: bool = True,
-    out_reports: list[dict[str, Any]] | None = None,
 ) -> bool:
     """
     Run the full debate pipeline for a single ticker and save the result.
@@ -984,18 +983,6 @@ async def _debate_one(
     logger.info(f"[run_debate] Starting debate for {ticker}")
 
     started_at = perf_counter()
-    from core.orchestrator.legacy import _cli_renderer
-    _cli_renderer.update_batch_progress(
-        ticker,
-        fetching="pending",
-        analysis="pending",
-        risk="pending",
-        debating="pending",
-        done="pending",
-        active="fetching",
-        row_state="active",
-        status="Starting debate...",
-    )
     _ledger_call(
         "ticker start",
         DEFAULT_LEDGER.ticker_start,
@@ -1010,7 +997,6 @@ async def _debate_one(
             started_at=started_at,
         )
         if result is None:
-            _cli_renderer.record_failure_detail(ticker, "Debate chamber execution returned None")
             _ledger_ticker_end(
                 run_id=run_timestamp,
                 ticker=ticker,
@@ -1032,7 +1018,6 @@ async def _debate_one(
             started_at=started_at,
         )
         if verdict_payload is None:
-            _cli_renderer.record_failure_detail(ticker, "Parsing final verdict failed")
             _ledger_ticker_end(
                 run_id=run_timestamp,
                 ticker=ticker,
@@ -1093,7 +1078,6 @@ async def _debate_one(
                 logger.error(f"[Planner] Artifact write escalation for {ticker}: {exc}")
             else:
                 logger.error(f"[run_debate] Failed to save report for {ticker}: {exc}")
-            _cli_renderer.record_failure_detail(ticker, f"Artifact write error: {exc}")
             _batch_failed_count += 1
             _ledger_ticker_end(
                 run_id=run_timestamp,
@@ -1130,8 +1114,6 @@ async def _debate_one(
             run_timestamp=run_timestamp,
             render_details=render_details,
         )
-        if out_reports is not None:
-            out_reports.append(report)
         _record_ticker_telemetry(
             ticker=ticker,
             run_id=run_timestamp,
@@ -1150,7 +1132,6 @@ async def _debate_one(
             ticker=ticker,
             run_id=run_timestamp,
         )
-        _cli_renderer.update_batch_progress_from_result(report)
         _ledger_ticker_end(
             run_id=run_timestamp,
             ticker=ticker,
@@ -1164,7 +1145,6 @@ async def _debate_one(
         # Gemini connection dropped / timed out at the httpx layer.
         # debate_chamber wraps this in RuntimeError for tenacity, but in case
         # it ever escapes, catch it here so the loop continues.
-        _cli_renderer.record_failure_detail(ticker, "CancelledError (timeout / disconnected)")
         logger.error(
             f"[run_debate] {ticker}: CancelledError - connection dropped or timed out. "
             "Skipping to next ticker."
@@ -1185,7 +1165,6 @@ async def _debate_one(
         )
         return False
     except Exception as e:
-        _cli_renderer.record_failure_detail(ticker, str(e))
         logger.error(f"[run_debate] {ticker} failed unexpectedly: {e}")
         _record_ticker_telemetry(
             ticker=ticker,
@@ -1242,40 +1221,23 @@ async def main(argv: list[str] | None = None) -> None:
 
     # LLM instances created once and reused for all tickers
     from services.debate_chamber import DebateChamber
-    from core.orchestrator.legacy import _cli_renderer
 
     chamber = DebateChamber()
 
-    _cli_renderer.reset_run()
-    _cli_renderer.start_batch_progress(args.tickers)
-
     succeeded, failed = 0, 0
-    reports_to_render = []
-    try:
-        with _cli_renderer.defer_logs():
-            for ticker in args.tickers:
-                ok = await _debate_one(
-                    ticker,
-                    chamber,
-                    output_dir,
-                    run_timestamp,
-                    generated_at,
-                    render_details=False,
-                    out_reports=reports_to_render,
-                )
-                if ok:
-                    succeeded += 1
-                else:
-                    failed += 1
-    finally:
-        _cli_renderer.close_batch_progress()
-
-    if args.details:
-        for report in reports_to_render:
-            try:
-                RichFormatter(console=cli_console).render_ticker_panel(report)
-            except Exception as e:
-                logger.warning(f"[Formatter] {report.get('ticker')}: {e}")
+    for ticker in args.tickers:
+        ok = await _debate_one(
+            ticker,
+            chamber,
+            output_dir,
+            run_timestamp,
+            generated_at,
+            render_details=bool(args.details),
+        )
+        if ok:
+            succeeded += 1
+        else:
+            failed += 1
 
     logger.info(
         f"All debates complete. OK {succeeded} succeeded / FAIL {failed} failed "
