@@ -45,38 +45,38 @@ The pipeline is **sequential at the batch level** and **parallel at the agent le
 ```mermaid
 graph TD
     %% Entry Points & Data Intake
-    EP[orchestrator.py / main.py] -->|1. Mulai Pipeline| MR[core/regime.py: Regime Detection]
-    MR -->|2. Klasifikasi Volatilitas| QF[core/quant_filter/pipeline.py: Quant Filter]
-    
+    EP["orchestrator.py / main.py"] -->|1. Mulai Pipeline| MR["core/regime.py: Regime Detection"]
+    MR -->|2. Klasifikasi Volatilitas| QF["core/quant_filter/pipeline.py: Quant Filter"]
+
     %% LangGraph Orchestration
-    QF -->|3. Ticker Terpilih| DC[services/debate_chamber.py: DebateChamber]
-    
-    subgraph Debate Chamber (LangGraph State Machine)
+    QF -->|3. Ticker Terpilih| DC["services/debate_chamber.py: DebateChamber"]
+
+    subgraph SUB_DC ["Debate Chamber (LangGraph State Machine)"]
         DC -->|Flash LLM| FS[Fundamental Scout]
         DC -->|Flash LLM| CS[Chartist Scout]
         DC -->|Flash LLM| SS[Sentiment Scout]
-        
+
         FS --> SYN[Synthesizer Node]
         CS --> SYN
         SS --> SYN
-        
+
         SYN -->|Mulai Ronde| BA[Bullish Analyst]
         BA -->|Argumen Beli| BR[Bearish Auditor]
         BR -->|Audit Risiko| CE{Consensus Evaluator}
-        
-        CE -->|Belum Sepakat & R < 3| SC[State Cleaner: Context Pruning]
+
+        CE -->|"Belum Sepakat & R < 3"| SC["State Cleaner: Context Pruning"]
         SC --> BA
-        
-        CE -->|Sepakat / R = 3| DA[Devil's Advocate: Bias Test]
-        DA -->|Pro LLM| CJ[CIO Judge: Final Decision]
+
+        CE -->|Sepakat / R = 3| DA["Devil's Advocate: Bias Test"]
+        DA -->|Pro LLM| CJ["CIO Judge: Final Decision"]
     end
-    
+
     %% Output & Scoring
-    CJ -->|4. CIOVerdict JSON| HS[core/historical_scorer.py: Win-Rate Matcher]
-    HS -->|5. Skoring Akhir| PS[core/quant_filter/position_sizer.py: Money Management]
-    PS -->|6. Laporan Markdown| OUT[output/TOP_3_SWING_TRADES.md]
-    PS -->|7. Database| DB[(db.sqlite3 via SQLAlchemy)]
-    PS -->|8. Web UI| API[FastAPI Stream SSE -> SvelteKit UI]
+    CJ -->|4. CIOVerdict JSON| HS["core/historical_scorer.py: Win-Rate Matcher"]
+    HS -->|5. Skoring Akhir| PSIZ["core/quant_filter/position_sizer.py: Money Management"]
+    PSIZ -->|6. Laporan Markdown| OUT["output/TOP_3_SWING_TRADES.md"]
+    PSIZ -->|7. Database| DB[("db.sqlite3 via SQLAlchemy")]
+    PSIZ -->|8. Web UI| API["FastAPI Stream SSE → SvelteKit UI"]
 ```
 
 ---
