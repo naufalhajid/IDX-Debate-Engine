@@ -16,17 +16,42 @@ PROVIDERS = {
 
 MODELS = {
     "gemini": {
-        "flash": ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"],
-        "pro": ["gemini-3.1-pro-preview", "gemini-1.5-pro", "gemini-exp-1206"]
+        "flash": [
+            "gemini-3.5-flash",
+            "gemini-3.1-flash-lite",
+            "gemini-2.5-flash",
+            "gemini-2.5-flash-lite",
+        ],
+        "pro": [
+            "gemini-3-pro-preview",
+            "gemini-2.5-pro",
+        ],
     },
     "anthropic": {
-        "flash": ["claude-3-5-haiku-latest", "claude-3-haiku-20240307"],
-        "pro": ["claude-3-5-sonnet-latest", "claude-3-opus-latest"]
+        "flash": [
+            "claude-sonnet-4-5",
+            "claude-3-5-haiku-latest",
+        ],
+        "pro": [
+            "claude-opus-4-5",
+            "claude-sonnet-4-5",
+        ],
     },
     "codex": {
-        "flash": ["gpt-4o-mini", "gpt-3.5-turbo"],
-        "pro": ["gpt-4o", "gpt-4-turbo", "o1-preview", "o3-mini"]
-    }
+        "flash": [
+            "gpt-5.4-mini",
+            "gpt-4.1-mini",
+            "gpt-4o-mini",
+            "o4-mini",
+        ],
+        "pro": [
+            "gpt-5.5",
+            "gpt-5.4",
+            "o3",
+            "gpt-4.1",
+            "gpt-4o",
+        ],
+    },
 }
 
 def update_env_file(key: str, value: str):
@@ -136,7 +161,7 @@ def model_command(
             update_env_file("CODEX_FLASH_MODEL", flash_model)
             update_env_file("CODEX_PRO_MODEL", pro_model)
             
-        console.print(f"\n[bold green]✅ Berhasil! Default konfigurasi diubah:[/bold green]")
+        console.print("\n[bold green]✅ Berhasil! Default konfigurasi diubah:[/bold green]")
         console.print(f"   [cyan]Provider[/cyan]    : {selected_provider.capitalize()}")
         console.print(f"   [cyan]Flash Model[/cyan] : {flash_model}")
         console.print(f"   [magenta]Pro Model[/magenta]   : {pro_model}")

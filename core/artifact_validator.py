@@ -93,6 +93,7 @@ def validate_artifacts(
     _validate_latest_ticker(latest_result, latest_path, batch_by_ticker, errors)
     _validate_markdown_tickers(top3_text, top3_path, batch_by_ticker, errors)
     _validate_batch_risk_governor(batch_by_ticker, errors, warnings)
+    _validate_basic_run_scope(batch_results or [], top3_text, latest_result, errors)
 
     return ValidationReport(valid=not errors, errors=errors, warnings=warnings)
 
@@ -180,6 +181,28 @@ def reconcile_artifacts(
     )
     latest_ticker = _extract_ticker(latest_payload) if isinstance(latest_payload, dict) else None
     latest_run_id = _extract_run_id(latest_payload) if isinstance(latest_payload, dict) else None
+
+    batch_payload = _load_json(
+        _read_required_text(batch_path, "full_batch_results.json", []),
+        batch_path,
+        [],
+    )
+    batch_results = batch_payload if isinstance(batch_payload, list) else []
+    top3_text = _read_required_text(top3_path, "TOP_3_SWING_TRADES.md", [])
+    telemetry_records = (
+        _load_jsonl(telemetry_path, "telemetry_log.jsonl", warnings)
+        if telemetry_path.exists()
+        else []
+    )
+    _reconcile_run_scope(
+        batch_results=batch_results,
+        markdown_text=top3_text,
+        latest_payload=latest_payload if isinstance(latest_payload, dict) else None,
+        telemetry_records=telemetry_records,
+        issues=issues,
+        errors=errors,
+        warnings=warnings,
+    )
 
     surfaces = {
         "batch": batch_path.exists(),
@@ -357,6 +380,198 @@ def _validate_batch_risk_governor(
             )
 
 
+def _validate_basic_run_scope(
+    batch_results: list[Any],
+    markdown_text: str | None,
+    latest_result: dict[str, Any] | None,
+    errors: list[str],
+) -> None:
+    batch_entries = [item for item in batch_results if isinstance(item, dict)]
+    timestamps = _collect_batch_timestamps(batch_entries)
+    if len(timestamps) > 1:
+        errors.append(
+            "run_scope_batch_timestamp_mismatch: full_batch_results.json "
+            f"contains multiple batch_timestamp values: {sorted(timestamps)}."
+        )
+    batch_timestamp = _extract_batch_timestamp(batch_entries)
+    markdown_timestamp = _extract_markdown_field(markdown_text, "Batch Timestamp")
+    latest_timestamp = _extract_batch_timestamp([latest_result] if latest_result else [])
+
+    _compare_optional_value(
+        "batch_timestamp",
+        batch_timestamp,
+        markdown_timestamp,
+        "TOP_3_SWING_TRADES.md",
+        errors,
+    )
+    _compare_optional_value(
+        "batch_timestamp",
+        batch_timestamp,
+        latest_timestamp,
+        "latest_debate.json",
+        errors,
+    )
+
+    debated_count = _extract_markdown_debated_count(markdown_text)
+    if debated_count is not None and debated_count != len(batch_entries):
+        errors.append(
+            "run_scope_ticker_count_mismatch: TOP_3_SWING_TRADES.md "
+            f"reports {debated_count} debated ticker(s), but full_batch_results.json "
+            f"contains {len(batch_entries)}."
+        )
+
+
+def _reconcile_run_scope(
+    *,
+    batch_results: list[Any],
+    markdown_text: str | None,
+    latest_payload: dict[str, Any] | None,
+    telemetry_records: list[dict[str, Any]],
+    issues: list[ReconciliationIssue],
+    errors: list[str],
+    warnings: list[str],
+) -> None:
+    batch_entries = [item for item in batch_results if isinstance(item, dict)]
+    timestamps = _collect_batch_timestamps(batch_entries)
+    if len(timestamps) > 1:
+        _append_error_issue(
+            issues,
+            errors,
+            source="run_scope",
+            code="batch_timestamp_mismatch",
+            message=(
+                "full_batch_results.json contains multiple batch_timestamp "
+                f"values: {sorted(timestamps)}."
+            ),
+        )
+    batch_tickers = {
+        ticker
+        for item in batch_entries
+        if (ticker := _extract_ticker(item)) is not None
+    }
+    batch_timestamp = _extract_batch_timestamp(batch_entries)
+    batch_run_id = _extract_shared_run_id(batch_entries)
+    markdown_timestamp = _extract_markdown_field(markdown_text, "Batch Timestamp")
+    markdown_run_id = _extract_markdown_field(markdown_text, "Run ID")
+    latest_timestamp = _extract_batch_timestamp([latest_payload] if latest_payload else [])
+    latest_run_id = _extract_run_id(latest_payload) if latest_payload else None
+
+    _append_run_scope_mismatch(
+        issues,
+        errors,
+        field="batch_timestamp",
+        expected=batch_timestamp,
+        actual=markdown_timestamp,
+        surface="TOP_3_SWING_TRADES.md",
+    )
+    _append_run_scope_mismatch(
+        issues,
+        errors,
+        field="batch_timestamp",
+        expected=batch_timestamp,
+        actual=latest_timestamp,
+        surface="latest_debate.json",
+    )
+    _append_run_scope_mismatch(
+        issues,
+        errors,
+        field="run_id",
+        expected=batch_run_id,
+        actual=markdown_run_id,
+        surface="TOP_3_SWING_TRADES.md",
+    )
+    _append_run_scope_mismatch(
+        issues,
+        errors,
+        field="run_id",
+        expected=batch_run_id,
+        actual=latest_run_id,
+        surface="latest_debate.json",
+    )
+
+    debated_count = _extract_markdown_debated_count(markdown_text)
+    if debated_count is not None and debated_count != len(batch_entries):
+        _append_error_issue(
+            issues,
+            errors,
+            source="run_scope",
+            code="ticker_count_mismatch",
+            message=(
+                "TOP_3_SWING_TRADES.md reports "
+                f"{debated_count} debated ticker(s), but full_batch_results.json "
+                f"contains {len(batch_entries)}."
+            ),
+        )
+
+    if batch_run_id is None and batch_timestamp is None:
+        return
+
+    report = _find_matching_telemetry_report(
+        telemetry_records,
+        run_id=batch_run_id,
+        batch_timestamp=batch_timestamp,
+    )
+    if report is None:
+        if telemetry_records:
+            _append_warning_issue(
+                issues,
+                warnings,
+                source="run_scope",
+                code="missing_matching_telemetry",
+                message=(
+                    "No telemetry report matches the latest batch "
+                    f"run_id={batch_run_id or 'unknown'} "
+                    f"batch_timestamp={batch_timestamp or 'unknown'}."
+                ),
+            )
+        return
+
+    telemetry_timestamp = str(report.get("batch_timestamp") or "").strip() or None
+    telemetry_run_id = str(report.get("run_id") or "").strip() or None
+    _append_run_scope_mismatch(
+        issues,
+        errors,
+        field="batch_timestamp",
+        expected=batch_timestamp,
+        actual=telemetry_timestamp,
+        surface="telemetry_log.jsonl",
+    )
+    _append_run_scope_mismatch(
+        issues,
+        errors,
+        field="run_id",
+        expected=batch_run_id,
+        actual=telemetry_run_id,
+        surface="telemetry_log.jsonl",
+    )
+
+    total_tickers = report.get("total_tickers")
+    if isinstance(total_tickers, int) and total_tickers != len(batch_entries):
+        _append_error_issue(
+            issues,
+            errors,
+            source="run_scope",
+            code="telemetry_ticker_count_mismatch",
+            message=(
+                f"telemetry_log.jsonl reports {total_tickers} ticker(s), "
+                f"but full_batch_results.json contains {len(batch_entries)}."
+            ),
+        )
+
+    telemetry_tickers = _extract_telemetry_tickers(report)
+    if telemetry_tickers and telemetry_tickers != batch_tickers:
+        _append_error_issue(
+            issues,
+            errors,
+            source="run_scope",
+            code="telemetry_ticker_set_mismatch",
+            message=(
+                "telemetry_log.jsonl ticker set does not match "
+                "full_batch_results.json."
+            ),
+        )
+
+
 def _has_position_sizing(entry: dict[str, Any]) -> bool:
     value = entry.get("position_sizing")
     return isinstance(value, dict) and bool(value)
@@ -404,6 +619,142 @@ def _extract_run_id(payload: dict[str, Any]) -> str | None:
         if candidate is not None and str(candidate).strip():
             return str(candidate).strip()
     return None
+
+
+def _collect_batch_timestamps(entries: list[dict[str, Any]]) -> set[str]:
+    return {
+        str(value).strip()
+        for entry in entries
+        if (
+            value := (
+                _nested_get(entry, "metadata", "batch_timestamp")
+                or entry.get("batch_timestamp")
+            )
+        )
+    }
+
+
+def _extract_batch_timestamp(entries: list[dict[str, Any]]) -> str | None:
+    timestamps = _collect_batch_timestamps(entries)
+    if len(timestamps) == 1:
+        return next(iter(timestamps))
+    return None
+
+
+def _extract_shared_run_id(entries: list[dict[str, Any]]) -> str | None:
+    run_ids = {
+        run_id
+        for entry in entries
+        if (run_id := _extract_run_id(entry)) is not None
+    }
+    if len(run_ids) == 1:
+        return next(iter(run_ids))
+    return None
+
+
+def _extract_markdown_field(markdown_text: str | None, label: str) -> str | None:
+    if not markdown_text:
+        return None
+    pattern = rf"^\>\s+\*\*{re.escape(label)}\*\*:\s*(.+?)\s*$"
+    match = re.search(pattern, markdown_text, flags=re.MULTILINE)
+    if not match:
+        return None
+    value = match.group(1).strip()
+    return value if value and value != "-" else None
+
+
+def _extract_markdown_debated_count(markdown_text: str | None) -> int | None:
+    if not markdown_text:
+        return None
+    match = re.search(r"\*\*Stocks Debated\*\*:\s*(\d+)", markdown_text)
+    return int(match.group(1)) if match else None
+
+
+def _compare_optional_value(
+    field: str,
+    expected: str | None,
+    actual: str | None,
+    surface: str,
+    errors: list[str],
+) -> None:
+    if expected is None or actual is None or expected == actual:
+        return
+    errors.append(
+        f"run_scope_{field}_mismatch: {surface} has {actual}, "
+        f"but full_batch_results.json has {expected}."
+    )
+
+
+def _append_error_issue(
+    issues: list[ReconciliationIssue],
+    errors: list[str],
+    *,
+    source: str,
+    code: str,
+    message: str,
+    ticker: str | None = None,
+) -> None:
+    errors.append(message)
+    issues.append(
+        ReconciliationIssue(
+            source=source,
+            code=code,
+            severity="error",
+            message=message,
+            ticker=ticker,
+        )
+    )
+
+
+def _append_run_scope_mismatch(
+    issues: list[ReconciliationIssue],
+    errors: list[str],
+    *,
+    field: str,
+    expected: str | None,
+    actual: str | None,
+    surface: str,
+) -> None:
+    if expected is None or actual is None or expected == actual:
+        return
+    _append_error_issue(
+        issues,
+        errors,
+        source="run_scope",
+        code=f"{field}_mismatch",
+        message=(
+            f"{surface} has {field}={actual}, "
+            f"but full_batch_results.json has {field}={expected}."
+        ),
+    )
+
+
+def _find_matching_telemetry_report(
+    records: list[dict[str, Any]],
+    *,
+    run_id: str | None,
+    batch_timestamp: str | None,
+) -> dict[str, Any] | None:
+    for record in reversed(records):
+        record_run_id = str(record.get("run_id") or "").strip() or None
+        record_timestamp = str(record.get("batch_timestamp") or "").strip() or None
+        if run_id is not None and record_run_id == run_id:
+            return record
+        if batch_timestamp is not None and record_timestamp == batch_timestamp:
+            return record
+    return None
+
+
+def _extract_telemetry_tickers(record: dict[str, Any]) -> set[str]:
+    metrics = record.get("ticker_metrics")
+    if not isinstance(metrics, list):
+        return set()
+    return {
+        ticker
+        for metric in metrics
+        if isinstance(metric, dict)
+        if (ticker := _clean_ticker(metric.get("ticker"))) is not None
+    }
 
 
 def _record_matches(record: dict[str, Any], ticker: str, run_id: str | None) -> bool:

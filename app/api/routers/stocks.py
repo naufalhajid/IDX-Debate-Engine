@@ -1,6 +1,7 @@
 import asyncio
 import json
 import time
+from pathlib import Path
 from typing import Any
 
 import aiofiles
@@ -21,6 +22,7 @@ from utils.logger_config import logger
 
 router = APIRouter(prefix="/api", tags=["stocks"])
 RESULTS_PATH = settings.results_path
+MERGED_RESULTS_PATH = settings.merged_results_path
 
 _cache: dict[str, dict[str, Any]] = {}  # QW-FIX-PF1
 _cache_timestamp: float = 0.0  # QW-FIX-PF1
@@ -38,11 +40,12 @@ def _error(code: str, message: str, status_code: int) -> HTTPException:
 
 def _results_signature() -> float:
     signature = 0.0
-    try:
-        if RESULTS_PATH.exists():
-            signature = max(signature, RESULTS_PATH.stat().st_mtime)
-    except OSError:
-        pass
+    for path in (RESULTS_PATH, _merged_results_path()):
+        try:
+            if path.exists():
+                signature = max(signature, path.stat().st_mtime)
+        except OSError:
+            pass
 
     debates_dir = RESULTS_PATH.parent / "debates"
     if debates_dir.exists():
@@ -52,6 +55,17 @@ def _results_signature() -> float:
             except OSError:
                 continue
     return signature
+
+
+def _merged_results_path() -> Path:
+    if MERGED_RESULTS_PATH.parent == RESULTS_PATH.parent:
+        return MERGED_RESULTS_PATH
+    return RESULTS_PATH.parent / "merged_batch_results.json"
+
+
+def _primary_results_path() -> Path:
+    merged_path = _merged_results_path()
+    return merged_path if merged_path.exists() else RESULTS_PATH
 
 
 async def _load_results() -> dict[str, dict[str, Any]]:  # QW-FIX-PF1
@@ -77,8 +91,9 @@ async def _load_results() -> dict[str, dict[str, Any]]:  # QW-FIX-PF1
             return _cache
 
         raw_data = []
+        results_path = _primary_results_path()
         try:
-            async with aiofiles.open(RESULTS_PATH, mode="r", encoding="utf-8") as f:
+            async with aiofiles.open(results_path, mode="r", encoding="utf-8") as f:
                 content = await f.read()
             if content.strip():
                 loaded = json.loads(content)
@@ -86,7 +101,7 @@ async def _load_results() -> dict[str, dict[str, Any]]:  # QW-FIX-PF1
                     raw_data = loaded
         except Exception as exc:
             logger.warning(
-                f"[_load_results] Failed to read {RESULTS_PATH}: {exc}."
+                f"[_load_results] Failed to read {_primary_results_path()}: {exc}."
             )
 
         # Merge results: key by ticker. Start with full_batch_results.json items
@@ -107,9 +122,8 @@ async def _load_results() -> dict[str, dict[str, Any]]:  # QW-FIX-PF1
                         data = json.loads(file_content)
                         if isinstance(data, dict) and "ticker" in data:
                             ticker_key = data["ticker"]
-                            # Always update compiled_results with the individual debate file,
-                            # as it contains the most recent debate result for this ticker.
-                            compiled_results[ticker_key] = data
+                            if results_path == RESULTS_PATH or ticker_key not in compiled_results:
+                                compiled_results[ticker_key] = data
                 except Exception as e:
                     logger.warning(f"[_load_results] Failed to read fallback {f}: {e}")
         
@@ -241,7 +255,7 @@ async def health_check() -> dict[str, Any]:
 
     return {
         "status": "ok", 
-        "results_exist": RESULTS_PATH.exists() or bool(results),
+        "results_exist": RESULTS_PATH.exists() or _merged_results_path().exists() or bool(results),
         "latest_debate_date": latest_date_str,
         "debate_stats": debate_stats
     }

@@ -202,6 +202,7 @@ class OpsTelemetry:
                     f"{report.timed_out} timeout / {report.skipped} skip)"
                 ),
                 f"Success   : {report.success_rate:.0%}",
+                f"Run ID    : {report.run_id}",
                 f"Timestamp : {report.batch_timestamp}",
                 "",
                 "VERDICTS",

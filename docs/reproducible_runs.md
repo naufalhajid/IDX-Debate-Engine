@@ -30,7 +30,8 @@ After the run, inspect these files together:
 
 | File | Why it matters |
 | --- | --- |
-| `full_batch_results.json` | Source of truth for ticker status, verdicts, risk governor, and sizing data. |
+| `full_batch_results.json` | Source of truth for ticker status, verdicts, risk governor, and sizing data in this run only. |
+| `merged_batch_results.json` | Cross-run latest ticker state used by dashboard/history views. |
 | `TOP_3_SWING_TRADES.md` | User-facing report that should match the JSON semantics. |
 | `debates/{TICKER}/latest_debate.json` | Per-ticker evidence and debate provenance. |
 | `telemetry/latest_batch_report.txt` | Runtime health, call counts, and provider status. |

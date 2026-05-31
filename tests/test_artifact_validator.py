@@ -298,3 +298,90 @@ def test_reconcile_artifacts_warns_when_promoted_ticker_has_no_risk_governor(
 
     assert report.valid is True
     assert any(issue.code == "missing_risk_governor" for issue in report.issues)
+
+
+def test_validate_artifacts_rejects_batch_timestamp_mismatch(tmp_path: Path) -> None:
+    batch_path, top3_path, latest_path = _write_artifacts(
+        tmp_path,
+        batch=[
+            {
+                "ticker": "BBCA",
+                "status": "ok",
+                "metadata": {"batch_timestamp": "20260601_090000"},
+                "risk_governor": _risk_governor(),
+            }
+        ],
+        markdown=(
+            "# TOP 1\n\n"
+            "> **Batch Timestamp**: 20260601_091500\n"
+            "> **Stocks Debated**: 1 | **Eligible (BUY/STRONG_BUY)**: 1 | **Selected**: 1\n\n"
+            "## #1 - BBCA\n"
+        ),
+        latest={
+            "ticker": "BBCA",
+            "metadata": {"batch_timestamp": "20260601_090000"},
+        },
+    )
+
+    report = validate_artifacts(batch_path, top3_path, latest_path)
+
+    assert report.valid is False
+    assert any("run_scope_batch_timestamp_mismatch" in error for error in report.errors)
+
+
+def test_reconcile_artifacts_rejects_telemetry_count_mismatch(tmp_path: Path) -> None:
+    batch_path, top3_path, latest_path = _write_artifacts(
+        tmp_path,
+        batch=[
+            {
+                "ticker": "BBCA",
+                "status": "ok",
+                "metadata": {
+                    "batch_timestamp": "20260601_090000",
+                    "run_id": "run-1",
+                },
+                "verdict": {"rating": "BUY"},
+                "risk_governor": _risk_governor(),
+            }
+        ],
+        markdown=(
+            "# TOP 1\n\n"
+            "> **Batch Timestamp**: 20260601_090000\n"
+            "> **Run ID**: run-1\n"
+            "> **Stocks Debated**: 1 | **Eligible (BUY/STRONG_BUY)**: 1 | **Selected**: 1\n\n"
+            "## #1 - BBCA\nSignal: BUY\n"
+        ),
+        latest={
+            "ticker": "BBCA",
+            "metadata": {
+                "batch_timestamp": "20260601_090000",
+                "run_id": "run-1",
+            },
+        },
+    )
+    audit_path, _, rag_path = _write_optional_logs(tmp_path)
+    telemetry_path = tmp_path / "telemetry_log.jsonl"
+    telemetry_path.write_text(
+        json.dumps(
+            {
+                "run_id": "run-1",
+                "batch_timestamp": "20260601_090000",
+                "total_tickers": 2,
+                "ticker_metrics": [{"ticker": "BBCA", "status": "success"}],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    report = reconcile_artifacts(
+        batch_path,
+        top3_path,
+        latest_path,
+        audit_log_path=audit_path,
+        telemetry_log_path=telemetry_path,
+        rag_evidence_log_path=rag_path,
+    )
+
+    assert report.valid is False
+    assert any(issue.code == "telemetry_ticker_count_mismatch" for issue in report.issues)

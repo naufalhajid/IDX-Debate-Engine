@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     # Output artifact paths
     output_dir: Path = Path("output")
     results_path: Path = Path("output/full_batch_results.json")
+    merged_results_path: Path = Path("output/merged_batch_results.json")
     sector_cache_path: Path = Path("output/sector_cache.json")
     adaptive_planner_path: Path = Path("output/planner/plan_log.jsonl")
     execution_ledger_path: Path = Path("output/ledger/execution_ledger.jsonl")
@@ -67,7 +68,7 @@ class Settings(BaseSettings):
     # Gemini AI
     GEMINI_API_KEY: str = ""
     GEMINI_FLASH_MODEL: str = "gemini-2.5-flash"
-    GEMINI_PRO_MODEL: str = "gemini-3.1-pro-preview"
+    GEMINI_PRO_MODEL: str = "gemini-3-pro-preview"
 
     # Anthropic OAuth
     ANTHROPIC_API_KEY: str = ""

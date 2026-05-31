@@ -1,6 +1,7 @@
 from core.orchestrator import pipeline as _pipeline
 
 save_full_results = _pipeline.save_full_results
+save_merged_results = _pipeline.save_merged_results
 save_individual_debates = _pipeline.save_individual_debates
 save_individual_debates_versioned = _pipeline.save_individual_debates_versioned
 generate_top3_report = _pipeline.generate_top3_report

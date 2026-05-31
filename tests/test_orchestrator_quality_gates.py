@@ -12,6 +12,8 @@ from core.orchestrator.legacy import (
     apply_minimum_confidence_gate,
     apply_setup_coherence_gate,
     generate_top3_report,
+    save_full_results,
+    save_merged_results,
     sync_metric_aliases,
     validate_setup_coherence,
 )
@@ -246,3 +248,22 @@ def test_metric_aliases_and_report_labels_are_unambiguous(tmp_path: Path) -> Non
     assert "| **Trade Conviction** | 50.00% |" in report
     assert "Trade Setup Conviction" in report
     assert "Trade Conviction" in report
+
+
+def test_full_results_are_snapshot_and_merged_state_is_separate(tmp_path: Path) -> None:
+    full_path = tmp_path / "full_batch_results.json"
+    merged_path = tmp_path / "merged_batch_results.json"
+    current = [{"ticker": "NEW", "status": "success"}]
+    full_path.write_text(
+        '[{"ticker": "OLD", "status": "success"}]',
+        encoding="utf-8",
+    )
+
+    save_merged_results(current, path=merged_path, seed_path=full_path)
+    save_full_results(current, path=full_path)
+
+    assert "OLD" not in full_path.read_text(encoding="utf-8")
+    assert "NEW" in full_path.read_text(encoding="utf-8")
+    merged_text = merged_path.read_text(encoding="utf-8")
+    assert "OLD" in merged_text
+    assert "NEW" in merged_text

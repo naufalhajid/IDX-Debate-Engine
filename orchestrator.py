@@ -32,7 +32,13 @@ def __getattr__(name: str) -> Any:
 
 
 def _sync_path_globals() -> None:
-    for _name in ("OUTPUT_DIR", "JSON_PATH", "FULL_RESULTS_PATH", "TOP3_REPORT_PATH"):
+    for _name in (
+        "OUTPUT_DIR",
+        "JSON_PATH",
+        "FULL_RESULTS_PATH",
+        "MERGED_RESULTS_PATH",
+        "TOP3_REPORT_PATH",
+    ):
         globals()[_name] = getattr(_pipeline, _name)
 
 

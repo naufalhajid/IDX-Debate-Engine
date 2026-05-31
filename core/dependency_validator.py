@@ -104,10 +104,37 @@ def check_llm_api_key(required: bool = True) -> DependencyCheck:
         api_key = settings.ANTHROPIC_API_KEY or os.environ.get("ANTHROPIC_API_KEY", "")
         key_name = "ANTHROPIC_API_KEY"
     elif provider == "codex":
+        if not required:
+            return DependencyCheck(
+                name="llm_api_key",
+                is_valid=True,
+                message="Otentikasi Codex dilewati untuk dry-run.",
+                blocking=False,
+            )
+        try:
+            from providers.oauth_manager import resolve_codex_token
+
+            token = resolve_codex_token()
+        except Exception as exc:
+            return DependencyCheck(
+                name="llm_api_key",
+                is_valid=False,
+                message=f"Token Codex tidak valid atau tidak tersedia: {exc}",
+                hint="Jalankan `idx auth codex` atau refresh login Codex CLI.",
+                blocking=required,
+            )
+        if not str(token or "").strip():
+            return DependencyCheck(
+                name="llm_api_key",
+                is_valid=False,
+                message="Token Codex kosong.",
+                hint="Jalankan `idx auth codex` atau refresh login Codex CLI.",
+                blocking=required,
+            )
         return DependencyCheck(
             name="llm_api_key",
             is_valid=True,
-            message="Otentikasi Codex dikelola via auth store.",
+            message="Token Codex tersedia di auth store.",
             blocking=False,
         )
     else:
@@ -129,6 +156,17 @@ def check_llm_api_key(required: bool = True) -> DependencyCheck:
         hint=f"Isi {key_name} di .env untuk menjalankan debate real.",
         blocking=required,
     )
+
+
+def _invoke_llm_probe(provider: str, tier: str) -> None:
+    """Run a tiny live model call for providers that need real access proof."""
+    from providers.llm_factory import get_llm
+
+    model = get_llm("flash" if tier == "flash" else "pro", provider=provider)
+    response = model.invoke("Reply with OK only.")
+    content = getattr(response, "content", response)
+    if content is None or not str(content).strip():
+        raise RuntimeError(f"{provider} {tier} probe returned an empty response")
 
 
 def check_database_connection() -> DependencyCheck:
@@ -207,6 +245,40 @@ def check_llm_models(required: bool = True) -> DependencyCheck:
         missing.append("PRO_MODEL")
         
     if not missing:
+        if provider == "codex" and not required:
+            return DependencyCheck(
+                name="llm_models",
+                is_valid=True,
+                message=(
+                    "Codex model live probe dilewati untuk dry-run: "
+                    f"flash={flash}, pro={pro}."
+                ),
+                blocking=False,
+            )
+        if provider == "codex" and required:
+            try:
+                _invoke_llm_probe(provider, "flash")
+                _invoke_llm_probe(provider, "pro")
+            except Exception as exc:
+                return DependencyCheck(
+                    name="llm_models",
+                    is_valid=False,
+                    message=f"Codex model live probe gagal: {exc}",
+                    hint=(
+                        "Periksa DEFAULT_LLM_PROVIDER, CODEX_FLASH_MODEL, "
+                        "CODEX_PRO_MODEL, dan token Codex."
+                    ),
+                    blocking=required,
+                )
+            return DependencyCheck(
+                name="llm_models",
+                is_valid=True,
+                message=(
+                    f"Model {provider} live probe OK: "
+                    f"flash={flash}, pro={pro}."
+                ),
+                blocking=False,
+            )
         return DependencyCheck(
             name="llm_models",
             is_valid=True,

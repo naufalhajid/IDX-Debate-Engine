@@ -83,7 +83,7 @@ from core.adaptive_planner import (
     PipelineStage,
     PlanAction,
 )
-from core.artifact_validator import validate_artifacts
+from core.artifact_validator import reconcile_artifacts
 from core.candidate_intake import normalize_batch
 from core.dependency_validator import (
     DependencyCheckResult,
@@ -2168,6 +2168,7 @@ ORCHESTRATOR_CONFIG: dict[str, Any] = {
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", "output"))
 JSON_PATH = OUTPUT_DIR / "top10_candidates.json"
 FULL_RESULTS_PATH = OUTPUT_DIR / "full_batch_results.json"
+MERGED_RESULTS_PATH = OUTPUT_DIR / "merged_batch_results.json"
 TOP3_REPORT_PATH = OUTPUT_DIR / "TOP_3_SWING_TRADES.md"
 
 # Shorthand aliases â€” baca dari ORCHESTRATOR_CONFIG agar konsisten dengan
@@ -2322,10 +2323,11 @@ def _plan_orchestrator_decision(
 
 def configure_output_dir(output_dir: Path) -> None:
     """Update module-level output paths from CLI/env configuration."""
-    global OUTPUT_DIR, JSON_PATH, FULL_RESULTS_PATH, TOP3_REPORT_PATH
+    global OUTPUT_DIR, JSON_PATH, FULL_RESULTS_PATH, MERGED_RESULTS_PATH, TOP3_REPORT_PATH
     OUTPUT_DIR = output_dir
     JSON_PATH = OUTPUT_DIR / "top10_candidates.json"
     FULL_RESULTS_PATH = OUTPUT_DIR / "full_batch_results.json"
+    MERGED_RESULTS_PATH = OUTPUT_DIR / "merged_batch_results.json"
     TOP3_REPORT_PATH = OUTPUT_DIR / "TOP_3_SWING_TRADES.md"
 
 
@@ -3389,6 +3391,9 @@ def _write_batch_telemetry_report(
         report_text = DEFAULT_TELEMETRY.format_report(report)
         telemetry_dir = output_dir / "telemetry"
         telemetry_dir.mkdir(parents=True, exist_ok=True)
+        with (telemetry_dir / "telemetry_log.jsonl").open("a", encoding="utf-8") as file:
+            file.write(report.model_dump_json())
+            file.write("\n")
         (telemetry_dir / "latest_batch_report.txt").write_text(
             report_text,
             encoding="utf-8",
@@ -3973,33 +3978,59 @@ select_top3 = select_top_n
 # ---------------------------------------------------------------------------
 
 
-def save_full_results(results: list[dict], path: Path = FULL_RESULTS_PATH) -> None:
-    """Simpan semua hasil debate sebagai JSON tunggal, menggabungkan dengan hasil yang sudah ada."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    existing_data = []
-    if path.exists():
-        try:
-            content = path.read_text(encoding="utf-8")
-            if content.strip():
-                existing_data = json.loads(content)
-                if not isinstance(existing_data, list):
-                    existing_data = []
-        except Exception as e:
-            logger.warning(f"[Persist] Gagal membaca existing results untuk merge: {e}")
-            existing_data = []
+def _load_results_list(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    try:
+        content = path.read_text(encoding="utf-8")
+        if not content.strip():
+            return []
+        loaded = json.loads(content)
+    except Exception as e:
+        logger.warning(f"[Persist] Gagal membaca existing results dari {path}: {e}")
+        return []
+    if not isinstance(loaded, list):
+        return []
+    return [item for item in loaded if isinstance(item, dict)]
 
-    # Map existing data by ticker for quick updates
-    data_dict = {item["ticker"]: item for item in existing_data if isinstance(item, dict) and "ticker" in item}
-    
-    # Update or add new results
+
+def save_full_results(results: list[dict], path: Path = FULL_RESULTS_PATH) -> None:
+    """Simpan snapshot batch terakhir sebagai JSON tunggal."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    for r in results:
+        if isinstance(r, dict) and "ticker" in r:
+            sync_metric_aliases(r)
+    path.write_text(json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8")
+    logger.info(f"[Persist] Full batch snapshot ({len(results)} ticker) -> {path}")
+
+
+def save_merged_results(
+    results: list[dict],
+    path: Path = MERGED_RESULTS_PATH,
+    seed_path: Path = FULL_RESULTS_PATH,
+) -> None:
+    """Simpan latest ticker state gabungan untuk dashboard dan histori lokal."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    existing_data = _load_results_list(path)
+    if not existing_data and seed_path != path:
+        existing_data = _load_results_list(seed_path)
+
+    data_dict = {
+        item["ticker"]: item
+        for item in existing_data
+        if isinstance(item, dict) and "ticker" in item
+    }
     for r in results:
         if isinstance(r, dict) and "ticker" in r:
             sync_metric_aliases(r)
             data_dict[r["ticker"]] = r
-            
+
     merged_results = list(data_dict.values())
     path.write_text(json.dumps(merged_results, indent=2, ensure_ascii=False), encoding="utf-8")
-    logger.info(f"[Persist] Full results (merged {len(results)} new/updated into {len(merged_results)} total) -> {path}")
+    logger.info(
+        f"[Persist] Merged ticker state "
+        f"({len(results)} new/updated into {len(merged_results)} total) -> {path}"
+    )
 
 
 def save_single_agent_results(
@@ -4132,10 +4163,13 @@ def _latest_debate_path_for_validation(results: list[dict], output_dir: Path) ->
 
 
 def _log_artifact_validation(results: list[dict]) -> None:
-    report = validate_artifacts(
+    report = reconcile_artifacts(
         FULL_RESULTS_PATH,
         TOP3_REPORT_PATH,
         _latest_debate_path_for_validation(results, OUTPUT_DIR),
+        audit_log_path=OUTPUT_DIR / "audit" / "audit_log.jsonl",
+        telemetry_log_path=OUTPUT_DIR / "telemetry" / "telemetry_log.jsonl",
+        rag_evidence_log_path=OUTPUT_DIR / "rag_evidence" / "evidence_log.jsonl",
     )
     for warning in report.warnings:
         logger.warning(f"[ArtifactValidator] {warning}")
@@ -4457,6 +4491,17 @@ def _extract_devils_warning(entry: dict) -> str:
     return arg[:397] + "..." if len(arg) > 400 else arg
 
 
+def _batch_metadata_value(results: list[dict], key: str) -> str | None:
+    for entry in results:
+        metadata = entry.get("metadata") if isinstance(entry, dict) else None
+        if not isinstance(metadata, dict):
+            continue
+        value = metadata.get(key)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    return None
+
+
 def generate_top3_report(
     top_n: list[dict],
     all_results: list[dict],
@@ -4471,6 +4516,8 @@ def generate_top3_report(
     Untuk ticker error (tidak masuk select_top3), skor default 0.0.
     """
     timestamp = get_local_timestamp()
+    batch_timestamp = _batch_metadata_value(all_results, "batch_timestamp")
+    run_id = _batch_metadata_value(all_results, "run_id")
     total_debated = len(all_results)
     selected_count = len(top_n)
     eligible = sum(
@@ -4484,6 +4531,8 @@ def generate_top3_report(
         f"# TOP {selected_count} HIGH-CONVICTION IHSG SWING TRADES",
         "",
         f"> **Generated**: {timestamp}",
+        f"> **Batch Timestamp**: {batch_timestamp or '-'}",
+        f"> **Run ID**: {run_id or '-'}",
         "> **Pipeline**: Quant Scouting -> Multi-Agent Debate -> CIO Verdict",
         f"> **Stocks Debated**: {total_debated} | **Eligible (BUY/STRONG_BUY)**: {eligible} | **Selected**: {selected_count}",
         "",
@@ -5019,7 +5068,16 @@ async def main(
         if isinstance(r, dict):
             r.setdefault("metadata", {})
             r["metadata"]["batch_timestamp"] = batch_timestamp
+            if str(r["metadata"].get("run_id") or "").lower() in {"", "unknown"}:
+                r["metadata"]["run_id"] = ledger_run_id
+    save_merged_results(results, MERGED_RESULTS_PATH, seed_path=FULL_RESULTS_PATH)
     save_full_results(results, FULL_RESULTS_PATH)
+    _ledger_artifact_write(
+        run_id=ledger_run_id,
+        artifact="merged_batch_results.json",
+        path=MERGED_RESULTS_PATH,
+        ticker_count=len(results),
+    )
     _ledger_artifact_write(
         run_id=ledger_run_id,
         artifact="full_batch_results.json",
@@ -5038,12 +5096,12 @@ async def main(
         output_dir=OUTPUT_DIR,
     )
     generate_top3_report(top_n, results, TOP3_REPORT_PATH, sizing_result=sizing_result)
-    _log_artifact_validation(results)
     _write_batch_telemetry_report(
         output_dir=OUTPUT_DIR,
         run_id=ledger_run_id,
         batch_timestamp=batch_timestamp,
     )
+    _log_artifact_validation(results)
     _check_report_consistency(
         batch_json_path=FULL_RESULTS_PATH,
         top3_md_path=TOP3_REPORT_PATH,
@@ -5066,9 +5124,11 @@ async def main(
         )
     persistence_outputs = [
         FULL_RESULTS_PATH,
+        MERGED_RESULTS_PATH,
         TOP3_REPORT_PATH,
         OUTPUT_DIR / "latest_batch_report.md",
         OUTPUT_DIR / "debates",
+        OUTPUT_DIR / "telemetry" / "telemetry_log.jsonl",
         OUTPUT_DIR / "telemetry" / "latest_batch_report.txt",
         OUTPUT_DIR / "telemetry" / f"{ledger_run_id}_report.txt",
     ]
@@ -5084,6 +5144,7 @@ async def main(
     logger.info("[Orchestrator] Pipeline selesai")
     logger.info(f"[Orchestrator] Regime: {regime} | Top N: {len(top_n)}")
     logger.info(f"[Orchestrator] Full results -> {FULL_RESULTS_PATH}")
+    logger.info(f"[Orchestrator] Merged ticker state -> {MERGED_RESULTS_PATH}")
     logger.info(f"[Orchestrator] Top {len(top_n)} report -> {TOP3_REPORT_PATH}")
 
     _cli_renderer.phase("Final Results")

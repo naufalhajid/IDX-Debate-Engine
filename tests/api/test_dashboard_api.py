@@ -125,6 +125,40 @@ def test_results_normalizes_orchestrator_artifact(monkeypatch, tmp_path):
     assert payload[0]["devil_advocate_triggered"] is True
 
 
+def test_results_prefers_merged_ticker_state_when_present(monkeypatch, tmp_path):
+    results_path = tmp_path / "full_batch_results.json"
+    merged_path = tmp_path / "merged_batch_results.json"
+    results_path.write_text(
+        json.dumps(
+            [
+                {
+                    "ticker": "LAST",
+                    "verdict": {"ticker": "LAST", "rating": "HOLD"},
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    merged_path.write_text(
+        json.dumps(
+            [
+                {
+                    "ticker": "HIST",
+                    "verdict": {"ticker": "HIST", "rating": "BUY"},
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    _reset_results_path(monkeypatch, results_path)
+
+    response = client.get("/api/results")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [item["ticker"] for item in payload] == ["HIST"]
+
+
 def test_debate_stream_uses_stream_run(monkeypatch):
     class FakeDebateChamber:
         async def stream_run(self, ticker):

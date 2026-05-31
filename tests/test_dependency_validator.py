@@ -8,6 +8,8 @@ import pytest
 from core.dependency_validator import (
     ValidationResult,
     check_candidates_file,
+    check_llm_api_key,
+    check_llm_models,
     maybe_rerun_quant_filter,
 )
 
@@ -81,3 +83,66 @@ def test_maybe_rerun_quant_filter_passes_output_dir(
 
     assert maybe_rerun_quant_filter(script_path=str(script), output_dir=tmp_path / "dry")
     assert captured["command"][-2:] == ["--output-dir", str(tmp_path / "dry")]
+
+
+def test_codex_api_key_check_resolves_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "core.dependency_validator.settings",
+        SimpleNamespace(DEFAULT_LLM_PROVIDER="codex"),
+    )
+    monkeypatch.setattr(
+        "providers.oauth_manager.resolve_codex_token",
+        lambda: "token",
+    )
+
+    result = check_llm_api_key(required=True)
+
+    assert result.is_valid is True
+    assert "Token Codex tersedia" in result.message
+
+
+def test_codex_model_check_requires_live_probe(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[str, str]] = []
+
+    monkeypatch.setattr(
+        "core.dependency_validator.settings",
+        SimpleNamespace(
+            DEFAULT_LLM_PROVIDER="codex",
+            CODEX_FLASH_MODEL="gpt-5.4-mini",
+            CODEX_PRO_MODEL="gpt-5.5",
+        ),
+    )
+
+    def fake_probe(provider: str, tier: str) -> None:
+        calls.append((provider, tier))
+
+    monkeypatch.setattr("core.dependency_validator._invoke_llm_probe", fake_probe)
+
+    result = check_llm_models(required=True)
+
+    assert result.is_valid is True
+    assert calls == [("codex", "flash"), ("codex", "pro")]
+
+
+def test_codex_model_check_fails_when_probe_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "core.dependency_validator.settings",
+        SimpleNamespace(
+            DEFAULT_LLM_PROVIDER="codex",
+            CODEX_FLASH_MODEL="invalid-flash",
+            CODEX_PRO_MODEL="invalid-pro",
+        ),
+    )
+
+    def fake_probe(provider: str, tier: str) -> None:
+        raise RuntimeError("model not found")
+
+    monkeypatch.setattr("core.dependency_validator._invoke_llm_probe", fake_probe)
+
+    result = check_llm_models(required=True)
+
+    assert result.is_valid is False
+    assert result.blocking is True
+    assert "live probe gagal" in result.message

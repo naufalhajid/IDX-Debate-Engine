@@ -10,7 +10,8 @@ Keep these files locally during normal operation. They are ignored by Git:
 
 | Path | Purpose |
 | --- | --- |
-| `output/full_batch_results.json` | Latest aggregate batch result. This is the authority for the latest run. |
+| `output/full_batch_results.json` | Snapshot of the latest batch only. This is the authority for the latest run. |
+| `output/merged_batch_results.json` | Latest known state per ticker across runs for dashboard/history use. |
 | `output/TOP_3_SWING_TRADES.md` | Latest human-readable swing-trade report. |
 | `output/debates/{TICKER}/v{timestamp}/{TICKER}_debate.json` | Versioned local debate history used by `core/historical_scorer.py`. |
 | `output/debates/{TICKER}/latest_debate.json` | Latest debate snapshot for explainability, validation, and RAG evidence tools. |
@@ -55,4 +56,3 @@ git add .gitignore output/.gitkeep output/debates/.gitkeep output/backtest/.gitk
 
 Use that command only when you are ready for the next commit to remove generated
 runtime artifacts from the repository index.
-

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# ruff: noqa: E402
+
 import warnings
 
 _original_showwarning = warnings.showwarning

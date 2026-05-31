@@ -1257,10 +1257,10 @@ class DebateChamber:
             raise RuntimeError("Unable to classify LLM tier for budget accounting (model_name missing)")
 
         m = str(model_name).lower()
-        if any(x in m for x in ["pro", "sonnet", "opus"]) or m in ["gpt-4o", "gpt-4"]:
-            return "pro"
-        if any(x in m for x in ["flash", "haiku", "mini"]):
+        if any(x in m for x in ["flash", "haiku", "mini", "gpt-3.5"]):
             return "flash"
+        if any(x in m for x in ["pro", "sonnet", "opus", "o1", "o3", "gpt-4", "gpt-5", "exp-"]):
+            return "pro"
             
         raise RuntimeError(f"Unable to classify LLM tier for budget accounting: {m}")
 

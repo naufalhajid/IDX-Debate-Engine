@@ -13,5 +13,11 @@ def __getattr__(name: str) -> Any:
 
 def configure_output_dir(output_dir) -> None:
     _pipeline.configure_output_dir(output_dir)
-    for _name in ("OUTPUT_DIR", "JSON_PATH", "FULL_RESULTS_PATH", "TOP3_REPORT_PATH"):
+    for _name in (
+        "OUTPUT_DIR",
+        "JSON_PATH",
+        "FULL_RESULTS_PATH",
+        "MERGED_RESULTS_PATH",
+        "TOP3_REPORT_PATH",
+    ):
         globals()[_name] = getattr(_pipeline, _name)
