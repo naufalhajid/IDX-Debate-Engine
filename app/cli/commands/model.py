@@ -56,25 +56,16 @@ MODELS = {
         ],
     },
     "codex": {
-        # gpt-5.4-mini / gpt-5.4-nano: fast & cheap (Mar 2026)
-        # gpt-4.1-mini / gpt-4o-mini: older but stable options
-        # Note: o4-mini was retired Feb 13, 2026
+        # gpt-5.4-mini / gpt-5.3-codex: fast & cheap options for ChatGPT Plus / Responses API
         "flash": [
             "gpt-5.4-mini",
-            "gpt-5.4-nano",
-            "gpt-4.1-mini",
-            "gpt-4o-mini",
+            "gpt-5.3-codex",
         ],
-        # gpt-5.5: latest frontier (Apr 2026)
-        # gpt-5.4: previous frontier (Mar 2026)
-        # o3: reasoning model (still active in API)
-        # gpt-4.1 / gpt-4o: stable production options
+        # gpt-5.5 / gpt-5.4 / gpt-5.3-codex-spark: high-capability frontier models
         "pro": [
             "gpt-5.5",
             "gpt-5.4",
-            "o3",
-            "gpt-4.1",
-            "gpt-4o",
+            "gpt-5.3-codex-spark",
         ],
     },
 }

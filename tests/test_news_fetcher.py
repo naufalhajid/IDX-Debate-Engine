@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, patch
+import pandas as pd
 
 from services.news_fetcher import (
     BREAKING_NEWS_HOURS,
@@ -273,21 +274,68 @@ def test_duplicate_news_items_are_removed() -> None:
     assert len(bundle.items) == 1
 
 
-def test_dividend_or_buyback_not_automatically_negative() -> None:
-    patcher, _ = _mock_ticker(
+def test_dividend_or_buyback_upcoming_neutralizes_adjustment() -> None:
+    patcher_ticker, _ = _mock_ticker(
         [_raw("BBCA umumkan dividen dan buyback setelah laba naik", hours_ago=4)]
     )
+
+    async def mock_prefetch(ticker: str):
+        return {
+            "calendar": {"Ex-Dividend Date": datetime.now(timezone.utc) + timedelta(days=10)},
+            "dividends": pd.Series([100.0]),
+        }
+
+    patcher_cache = patch(
+        "utils.market_data_cache.DEFAULT_MARKET_DATA_CACHE.prefetch",
+        mock_prefetch,
+    )
+    patcher_cache.start()
+
     try:
         bundle = NewsFetcher().build_bundle("BBCA")
         prompt = NewsFetcher().bundle_to_prompt_string(bundle)
     finally:
-        patcher.stop()
+        patcher_cache.stop()
+        patcher_ticker.stop()
 
     assert bundle.has_corporate_action is True
     assert bundle.overall_sentiment is NewsSentiment.POSITIVE
-    assert bundle.confidence_adjustment >= 0
-    assert "Corporate action detected" in bundle.confidence_adjustment_reason
-    assert "Reason: Corporate action detected" in prompt
+    assert bundle.confidence_adjustment == 0.0
+    assert "Upcoming corporate action detected" in bundle.confidence_adjustment_reason
+    assert "Reason: Upcoming corporate action detected" in prompt
+
+
+def test_dividend_or_buyback_past_does_not_neutralize_adjustment() -> None:
+    patcher_ticker, _ = _mock_ticker(
+        [_raw("BBCA umumkan dividen dan buyback setelah laba naik", hours_ago=4)]
+    )
+
+    async def mock_prefetch(ticker: str):
+        # Ex-date is in the past, so it should be CLEAR
+        return {
+            "calendar": {"Ex-Dividend Date": datetime.now(timezone.utc) - timedelta(days=10)},
+            "dividends": pd.Series([100.0]),
+        }
+
+    patcher_cache = patch(
+        "utils.market_data_cache.DEFAULT_MARKET_DATA_CACHE.prefetch",
+        mock_prefetch,
+    )
+    patcher_cache.start()
+
+    try:
+        bundle = NewsFetcher().build_bundle("BBCA")
+        prompt = NewsFetcher().bundle_to_prompt_string(bundle)
+    finally:
+        patcher_cache.stop()
+        patcher_ticker.stop()
+
+    assert bundle.has_corporate_action is True
+    assert bundle.overall_sentiment is NewsSentiment.POSITIVE
+    assert bundle.confidence_adjustment == 0.05
+    assert "Positive news sentiment" in bundle.confidence_adjustment_reason
+    assert "Reason: Positive news sentiment" in prompt
+
 
 
 def test_confidence_reason_matches_configured_constants() -> None:

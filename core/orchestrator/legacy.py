@@ -3513,6 +3513,7 @@ async def _run_single_debate(ticker: str, chamber: Any) -> dict:
             "consensus_method": result.get("consensus_method"),
             "dissenting_agents": result.get("dissenting_agents", []),
             "agent_votes": result.get("agent_votes", []),
+            "consensus_winner": result.get("consensus_winner"),
             "disagreement_type": disagreement_type,
             "debate_history": [
                 {
@@ -4374,6 +4375,11 @@ def _generate_mock_debate_results(
                 "dissenting_agents": ["bear"]
                 if verdict["rating"] in {"BUY", "STRONG_BUY"}
                 else [],
+                "consensus_winner": {
+                    "agent": "fundamental_scout",
+                    "position": verdict["rating"],
+                    "confidence": verdict["confidence"],
+                },
                 "agent_votes": [
                     {
                         "agent": "fundamental_scout",

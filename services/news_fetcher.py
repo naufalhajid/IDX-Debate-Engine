@@ -558,11 +558,25 @@ class NewsFetcher:
             reverse=True,
         )[:MAX_NEWS_ITEMS]
 
+        # Check if there is an upcoming corporate action risk using scan_exdate
+        has_upcoming_exdate = False
+        if any(item.is_corporate_action for item in selected):
+            try:
+                from utils.market_data_cache import DEFAULT_MARKET_DATA_CACHE, scan_exdate_from_market_data
+                market_data = await DEFAULT_MARKET_DATA_CACHE.prefetch(normalized_ticker)
+                exdate_info = scan_exdate_from_market_data(normalized_ticker, market_data)
+                has_upcoming_exdate = exdate_info.get("has_upcoming_exdate", False)
+            except Exception as exc:
+                logger.warning(f"[News] Failed to check upcoming ex-date for {normalized_ticker}: {exc}")
+                # Fallback: assume it is upcoming for safety if there are corporate action news items
+                has_upcoming_exdate = True
+
         bundle = self._aggregate_bundle(
             ticker=normalized_ticker,
             fetched_at=now,
             raw_count=len(raw_items),
             items=selected,
+            has_upcoming_exdate=has_upcoming_exdate,
         )
         self._cache[normalized_ticker] = (bundle, now)
         return bundle
@@ -630,6 +644,7 @@ class NewsFetcher:
         fetched_at: datetime,
         raw_count: int,
         items: list[NewsItem],
+        has_upcoming_exdate: bool = False,
     ) -> NewsBundle:
         data_available = bool(items)
         has_breaking_news = any(item.is_breaking for item in items)
@@ -644,6 +659,7 @@ class NewsFetcher:
             overall_sentiment,
             data_available=data_available,
             items=items,
+            has_upcoming_exdate=has_upcoming_exdate,
         )
         staleness_warning = _staleness_warning(items, fetched_at)
         return NewsBundle(
@@ -941,6 +957,7 @@ def _confidence_adjustment(
     *,
     data_available: bool,
     items: list[NewsItem],
+    has_upcoming_exdate: bool = False,
 ) -> tuple[float, str]:
     if not data_available:
         return 0.0, "No news data available - sentiment unverified"
@@ -964,10 +981,10 @@ def _confidence_adjustment(
         )
     if sentiment is NewsSentiment.NEGATIVE:
         return -0.10, f"Negative news sentiment in last {NEWS_LOOKBACK_DAYS} days"
-    if has_corporate_action:
+    if has_upcoming_exdate:
         return (
             0.0,
-            "Corporate action detected - validate trade plan against corporate event",
+            "Upcoming corporate action detected - validate trade plan against corporate event",
         )
     if sentiment is NewsSentiment.POSITIVE:
         return 0.05, "Positive news sentiment supports trade"

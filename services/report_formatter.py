@@ -646,6 +646,8 @@ def _winner_agent(result: dict[str, Any], packet: AuditPacket | None = None) -> 
         or verdict.get("winner_agent")
         or verdict.get("consensus_winner")
     )
+    if isinstance(winner, dict):
+        winner = winner.get("agent")
     if _is_soft_hold_winner(method, winner):
         return _soft_hold_label()
     if not _winner_missing(winner):
@@ -709,6 +711,8 @@ def _soft_hold_override_note(
         or verdict.get("consensus_winner")
         or (packet.winner_agent if packet else None)
     )
+    if isinstance(winner, dict):
+        winner = winner.get("agent")
     if _is_soft_hold_winner(method, winner):
         return "All agents were overridden by soft_hold_rule because no consensus was reached."
     return None

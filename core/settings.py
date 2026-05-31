@@ -78,8 +78,8 @@ class Settings(BaseSettings):
 
     # OpenAI Codex OAuth
     CODEX_OAUTH_CLIENT_ID: str = "app_EMoamEEZ73f0CkXaXp7hrann"
-    CODEX_FLASH_MODEL: str = "gpt-4o-mini"
-    CODEX_PRO_MODEL: str = "gpt-4o"
+    CODEX_FLASH_MODEL: str = "gpt-5.4-mini"
+    CODEX_PRO_MODEL: str = "gpt-5.5"
 
     # Token storage directory for OAuth credentials
     TOKEN_STORAGE_DIR: str = "output/tokens"
