@@ -435,6 +435,8 @@ REGIME_VOLATILITY_LOW_THRESHOLD=0.01
 REGIME_VOLATILITY_LOOKBACK_DAYS=20
 ```
 
+> **Tip:** You can also configure the active LLM provider and models interactively by running `uv run idx model`.
+
 ### 3. Install Frontend Dependencies
 
 ```bash
@@ -479,6 +481,10 @@ uv run idx sector list              # List sector classifications
 
 # ── API & Dashboard ──────────────────────────────
 uv run idx serve                    # Launch FastAPI on :8000
+
+# ── Configuration & Auth ─────────────────────────
+uv run idx model                    # Interactive LLM model & provider config
+uv run idx auth add openai-codex    # Login via device code flow for Codex
 ```
 
 ### Start the Svelte 5 Dashboard
