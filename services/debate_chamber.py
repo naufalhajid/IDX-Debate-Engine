@@ -54,7 +54,7 @@ from core.execution_ledger import DEFAULT_LEDGER
 from core.failure_taxonomy import classify_exception
 from core.handoff_envelope import make_envelope
 from core.observation_store import AgentObservation, DEFAULT_STORE
-from providers.gemini import get_flash_llm, get_pro_llm
+from providers.llm_factory import get_llm
 from schemas.debate import (
     CIOVerdict,
     DebateChamberState,
@@ -597,8 +597,8 @@ class DebateChamber:
     """
 
     def __init__(self, flash_llm=None, pro_llm=None, stockbit_client=None):
-        self.flash_llm = flash_llm or get_flash_llm()
-        self.pro_llm = pro_llm or get_pro_llm()
+        self.flash_llm = flash_llm or get_llm("flash")
+        self.pro_llm = pro_llm or get_llm("pro")
         if stockbit_client is None:
             from services.stockbit_api_client import StockbitApiClient
 
@@ -1249,19 +1249,20 @@ class DebateChamber:
 
         Unknown tiers fail fast because budget accounting must be conservative.
         """
-        model_name = getattr(llm, "model", None)
+        model_name = getattr(llm, "model", getattr(llm, "model_name", None))
         if model_name is None:
-            bound = getattr(llm, "bound", None) or getattr(llm, "first", None)
-            model_name = getattr(bound, "model", None)
+            bound = getattr(llm, "bound", getattr(llm, "first", None))
+            model_name = getattr(bound, "model", getattr(bound, "model_name", None))
         if model_name is None:
-            raise RuntimeError("Unable to classify LLM tier for budget accounting")
+            raise RuntimeError("Unable to classify LLM tier for budget accounting (model_name missing)")
 
         m = str(model_name).lower()
-        if "pro" in m:
+        if any(x in m for x in ["pro", "sonnet", "opus"]) or m in ["gpt-4o", "gpt-4"]:
             return "pro"
-        if "flash" in m:
+        if any(x in m for x in ["flash", "haiku", "mini"]):
             return "flash"
-        raise RuntimeError("Unable to classify LLM tier for budget accounting")
+            
+        raise RuntimeError(f"Unable to classify LLM tier for budget accounting: {m}")
 
     def _reset_llm_counters(self, state: DebateChamberState) -> None:
         try:

@@ -1,11 +1,20 @@
 from __future__ import annotations
 
+import warnings
+
+_original_showwarning = warnings.showwarning
+def _custom_showwarning(message, category, filename, lineno, file=None, line=None):
+    if "allowed_objects" in str(message) or "LangChain" in category.__name__:
+        return
+    _original_showwarning(message, category, filename, lineno, file, line)
+warnings.showwarning = _custom_showwarning
+
 from importlib import metadata
 from typing import Annotated
 
 import typer
 
-from app.cli.commands import debate, filter, pipeline, scan, sector, serve
+from app.cli.commands import debate, filter, pipeline, scan, sector, serve, model, auth
 from app.cli.ui.console import console
 
 
@@ -58,8 +67,9 @@ app.command(
     context_settings={"allow_extra_args": True},
 )(pipeline.pipeline_command)
 app.command(name="serve")(serve.serve_command)
+app.command(name="model")(model.model_command)
 app.add_typer(sector.app, name="sector")
-
+app.add_typer(auth.app, name="auth")
 
 if __name__ == "__main__":
     app()

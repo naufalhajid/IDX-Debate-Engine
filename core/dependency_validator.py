@@ -93,22 +93,40 @@ def check_candidates_file(path: Path, max_age_hours: float) -> ValidationResult:
     )
 
 
-def check_gemini_api_key(required: bool = True) -> DependencyCheck:
-    """Verify that GEMINI_API_KEY is available when real debate calls are needed."""
-    api_key = settings.GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY", "")
+def check_llm_api_key(required: bool = True) -> DependencyCheck:
+    """Verify that the API key for the active provider is available."""
+    provider = settings.DEFAULT_LLM_PROVIDER.lower()
+    
+    if provider == "gemini":
+        api_key = settings.GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY", "")
+        key_name = "GEMINI_API_KEY"
+    elif provider == "anthropic":
+        api_key = settings.ANTHROPIC_API_KEY or os.environ.get("ANTHROPIC_API_KEY", "")
+        key_name = "ANTHROPIC_API_KEY"
+    elif provider == "codex":
+        return DependencyCheck(
+            name="llm_api_key",
+            is_valid=True,
+            message="Otentikasi Codex dikelola via auth store.",
+            blocking=False,
+        )
+    else:
+        key_name = f"{provider.upper()}_API_KEY"
+        api_key = ""
+
     if api_key.strip():
         return DependencyCheck(
-            name="gemini_api_key",
+            name="llm_api_key",
             is_valid=True,
-            message="GEMINI_API_KEY tersedia.",
+            message=f"{key_name} tersedia untuk provider {provider}.",
             blocking=False,
         )
 
     return DependencyCheck(
-        name="gemini_api_key",
+        name="llm_api_key",
         is_valid=not required,
-        message="GEMINI_API_KEY kosong.",
-        hint="Isi GEMINI_API_KEY di .env untuk menjalankan debate real.",
+        message=f"{key_name} kosong.",
+        hint=f"Isi {key_name} di .env untuk menjalankan debate real.",
         blocking=required,
     )
 
@@ -165,28 +183,41 @@ def check_disk_space(path: Path, required_gb: float = 5.0) -> DependencyCheck:
     )
 
 
-def check_gemini_models(required: bool = True) -> DependencyCheck:
-    """Validate configured Gemini model names are present for real debate mode."""
-    missing = [
-        name
-        for name, value in {
-            "GEMINI_FLASH_MODEL": settings.GEMINI_FLASH_MODEL,
-            "GEMINI_PRO_MODEL": settings.GEMINI_PRO_MODEL,
-        }.items()
-        if not str(value or "").strip()
-    ]
+def check_llm_models(required: bool = True) -> DependencyCheck:
+    """Validate configured model names are present for the active provider."""
+    provider = settings.DEFAULT_LLM_PROVIDER.lower()
+    
+    if provider == "gemini":
+        flash = settings.GEMINI_FLASH_MODEL
+        pro = settings.GEMINI_PRO_MODEL
+    elif provider == "anthropic":
+        flash = settings.ANTHROPIC_FLASH_MODEL
+        pro = settings.ANTHROPIC_PRO_MODEL
+    elif provider == "codex":
+        flash = settings.CODEX_FLASH_MODEL
+        pro = settings.CODEX_PRO_MODEL
+    else:
+        flash = ""
+        pro = ""
+
+    missing = []
+    if not str(flash or "").strip():
+        missing.append("FLASH_MODEL")
+    if not str(pro or "").strip():
+        missing.append("PRO_MODEL")
+        
     if not missing:
         return DependencyCheck(
-            name="gemini_models",
+            name="llm_models",
             is_valid=True,
-            message=f"Model configured: flash={settings.GEMINI_FLASH_MODEL}, pro={settings.GEMINI_PRO_MODEL}.",
+            message=f"Model {provider} configured: flash={flash}, pro={pro}.",
             blocking=False,
         )
     return DependencyCheck(
-        name="gemini_models",
+        name="llm_models",
         is_valid=not required,
-        message=f"Model Gemini belum lengkap: {', '.join(missing)}.",
-        hint="Isi GEMINI_FLASH_MODEL dan GEMINI_PRO_MODEL di .env.",
+        message=f"Model {provider} belum lengkap: {', '.join(missing)}.",
+        hint=f"Gunakan `idx model` untuk mengonfigurasi model {provider}.",
         blocking=required,
     )
 
@@ -194,15 +225,15 @@ def check_gemini_models(required: bool = True) -> DependencyCheck:
 def check_all_dependencies(
     output_dir: Path,
     *,
-    require_gemini: bool = True,
+    require_llm: bool = True,
     required_disk_gb: float = 5.0,
 ) -> DependencyCheckResult:
     """Run orchestrator pre-flight checks and return an aggregate report."""
     checks = {
-        "gemini_api_key": check_gemini_api_key(required=require_gemini),
+        "llm_api_key": check_llm_api_key(required=require_llm),
         "database": check_database_connection(),
         "disk_space": check_disk_space(output_dir, required_gb=required_disk_gb),
-        "gemini_models": check_gemini_models(required=require_gemini),
+        "llm_models": check_llm_models(required=require_llm),
     }
     failed = [name for name, result in checks.items() if not result.is_valid]
     blocking = [

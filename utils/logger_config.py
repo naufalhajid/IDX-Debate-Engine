@@ -1,10 +1,16 @@
 import logging
 import sys
+import warnings
 
 from dotenv import load_dotenv
 from loguru import logger
 
 from core.settings import settings
+
+# Suppress annoying LangChain & LangGraph deprecation warnings from cluttering CLI
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=PendingDeprecationWarning)
+warnings.filterwarnings("ignore", message=".*allowed_objects.*")
 
 load_dotenv()
 
@@ -32,12 +38,20 @@ logger.add(
     colorize=True,  # ensure ANSI colors are used
 )
 
-
-# Configure the logger to write to a log file
+# Configure the logger to write to agent.log (INFO+)
 logger.add(
-    settings.LOG_APP_FILENAME,
+    "logs/agent.log",
     format=("{time:YYYY-MM-DD HH:mm:ss.SSS} {level: <8} {file}:{line} | {message}"),
     level=level,
+    encoding="utf-8",
+    enqueue=True,
+)
+
+# Configure the logger to write to errors.log (WARNING+)
+logger.add(
+    "logs/errors.log",
+    format=("{time:YYYY-MM-DD HH:mm:ss.SSS} {level: <8} {file}:{line} | {message}"),
+    level="WARNING",
     encoding="utf-8",
     enqueue=True,
 )

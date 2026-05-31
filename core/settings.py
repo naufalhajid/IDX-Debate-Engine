@@ -59,10 +59,29 @@ class Settings(BaseSettings):
     GOOGLE_SERVICE_ACCOUNT: str = "{}"
     GOOGLE_DRIVE_EMAILS: str = '["example@gmail.com"]'
 
+    # ── LLM Provider Configuration ────────────────────────────────────────────
+    # DEFAULT_LLM_PROVIDER: which backend to use by default.
+    # Options: "gemini" | "anthropic" | "codex"
+    DEFAULT_LLM_PROVIDER: str = "gemini"
+
     # Gemini AI
     GEMINI_API_KEY: str = ""
     GEMINI_FLASH_MODEL: str = "gemini-2.5-flash"
     GEMINI_PRO_MODEL: str = "gemini-3.1-pro-preview"
+
+    # Anthropic OAuth
+    ANTHROPIC_API_KEY: str = ""
+    ANTHROPIC_OAUTH_CLIENT_ID: str = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
+    ANTHROPIC_FLASH_MODEL: str = "claude-3-5-haiku-latest"
+    ANTHROPIC_PRO_MODEL: str = "claude-3-5-sonnet-latest"
+
+    # OpenAI Codex OAuth
+    CODEX_OAUTH_CLIENT_ID: str = "app_EMoamEEZ73f0CkXaXp7hrann"
+    CODEX_FLASH_MODEL: str = "gpt-4o-mini"
+    CODEX_PRO_MODEL: str = "gpt-4o"
+
+    # Token storage directory for OAuth credentials
+    TOKEN_STORAGE_DIR: str = "output/tokens"
 
     # ── Conviction Scoring Weights (must sum to 1.0) ─────────────────────────
     # Override via: CONVICTION_WEIGHT_CONFIDENCE=0.6 CONVICTION_WEIGHT_RR_RATIO=0.4

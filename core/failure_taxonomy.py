@@ -179,6 +179,9 @@ def _is_auth(e: Exception, lower_message: str) -> bool:
         or bool(_AUTH_STATUS_PATTERN.search(lower_message))
         or "unauthorized" in lower_message
         or "forbidden" in lower_message
+        or "token expired" in lower_message
+        or "oauth" in lower_message and "invalid" in lower_message
+        or "invalid_grant" in lower_message
     )
 
 
@@ -222,6 +225,8 @@ def _is_quota(lower_message: str) -> bool:
         "too many requests",
         "budget exhausted",
         "429",
+        "rate_limit_exceeded",
+        "overloaded",
     )
     return any(marker in lower_message for marker in quota_markers)
 

@@ -43,6 +43,8 @@ dependencies = [
     "python-multipart>=0.0.9",
     "cachetools>=5.3.0",
     "aiofiles>=25.1.0",
+    "langchain-anthropic>=1.4.4",
+    "langchain-openai>=1.2.2",
 ]
 
 [project.scripts]

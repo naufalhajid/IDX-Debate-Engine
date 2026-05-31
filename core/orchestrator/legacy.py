@@ -4767,7 +4767,7 @@ async def main(
     _cli_renderer.phase("Pre-flight Checks")
     deps = check_all_dependencies(
         output_dir,
-        require_gemini=not dry_run,
+        require_llm=not dry_run,
     )
     _cli._print_dependency_report(deps)
     if not deps.is_valid:

@@ -34,6 +34,17 @@ AGENTS.md
 db/*.db
 *.sqlite
 *.sqlite3
+*.db-shm
+*.db-wal
+auth.json
+auth.json.lock
+
+# Python build artifacts
+*.egg-info/
+dist/
+build/
+.coverage
+htmlcov/
 
 # Scratch runtime artifacts; keep scratch scripts reviewable if needed.
 scratch/**/*.json
