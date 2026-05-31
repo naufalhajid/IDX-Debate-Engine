@@ -417,14 +417,8 @@ Rules:
 
     @staticmethod
     def _strip_json_fence(raw: str) -> str:
-        text = str(raw or "").strip()
-        text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE)
-        text = re.sub(r"\s*```$", "", text)
-        start = text.find("{")
-        end = text.rfind("}")
-        if start != -1 and end != -1 and end >= start:
-            text = text[start : end + 1]
-        return text.strip()
+        from services.debate_chamber import DebateChamber
+        return DebateChamber._sanitize_json(raw)
 
     @staticmethod
     def _to_float(value: Any) -> float | None:

@@ -646,8 +646,8 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         (df["Return on Equity (TTM)"] > cfg["min_roe"]) &
         # [NEW v3.0] Piotroski F-Score
         (df["Piotroski F-Score"] >= cfg["min_piotroski"]) &
-        # [NEW v3.0] Altman Z-Score — exclude distress zone
-        # (0 = data tidak ada, skip filter; > 0 harus > threshold)
+        # [NEW v3.0] Altman Z-Score — exclude distress zone (uses the Emerging Markets Altman Z''-Score model)
+        # (0 = data tidak ada, skip filter; > 0 harus > threshold 1.1; Z'' < 1.1 is distress zone)
         ((df[alt_col] == 0) | (df[alt_col].isna()) | (df[alt_col] > cfg["min_altman_z"]))
     ].copy()
 

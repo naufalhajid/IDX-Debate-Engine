@@ -1,4 +1,4 @@
-"""Freshness-aware evidence selection for compact RAG prompt injection."""
+"""Freshness-aware evidence selection for compact prompt injection."""
 
 from __future__ import annotations
 
@@ -105,7 +105,7 @@ class CitationGuardReport(BaseModel):
     errors: list[str] = Field(default_factory=list)
 
 
-class RAGEvidenceStore:
+class EvidenceRanker:
     """Select, score, and log compact evidence bundles from context packs."""
 
     def __init__(self, storage_path: str | Path = DEFAULT_PATH) -> None:
@@ -126,7 +126,8 @@ class RAGEvidenceStore:
             source = _source_for_category(pack.data_sources, category)
             fetched_at_dt = _resolve_chunk_timestamp(pack, category, source)
             fetched_at = fetched_at_dt.isoformat()
-            freshness_seconds = _freshness_seconds(fetched_at_dt)
+            pack_time = _resolve_pack_timestamp(pack)
+            freshness_seconds = _freshness_seconds(fetched_at_dt, pack_time)
             is_stale = (
                 freshness_seconds is not None
                 and freshness_seconds > STALE_THRESHOLD_SECONDS
@@ -313,7 +314,7 @@ class RAGEvidenceStore:
             with self.storage_path.open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps(record, ensure_ascii=False) + "\n")
         except OSError:
-            logger.exception("Failed to write RAG evidence bundle log.")
+            logger.exception("Failed to write evidence bundle log.")
 
 
 def citations_for_bundle(bundle: EvidenceBundle) -> list[EvidenceCitation]:
@@ -427,7 +428,7 @@ def _render_bundle_lines(bundle: EvidenceBundle) -> list[str]:
         f"Query: {bundle.query_context}",
     ]
     if bundle.has_stale_data:
-        lines.append("\u26a0\ufe0f WARNING: Some data may be stale")
+        lines.append("⚠️ WARNING: Some data may be stale")
     lines.append("")
 
     for chunk in bundle.chunks:
@@ -440,7 +441,7 @@ def _render_bundle_lines(bundle: EvidenceBundle) -> list[str]:
             ]
         )
         if chunk.is_stale:
-            lines.append("\u26a0\ufe0f STALE")
+            lines.append("⚠️ STALE")
         lines.append("")
 
     lines.extend(
@@ -527,11 +528,85 @@ def _parse_timestamp(value: Any) -> datetime:
     return timestamp.astimezone(timezone.utc)
 
 
-def _freshness_seconds(fetched_at: datetime) -> int | None:
+def _freshness_seconds(fetched_at: datetime, reference_time: datetime | None = None) -> int | None:
     try:
-        return max(0, int((datetime.now(timezone.utc) - fetched_at).total_seconds()))
+        ref = reference_time or datetime.now(timezone.utc)
+        return _market_freshness_seconds(fetched_at, ref)
     except TypeError:
         return None
+
+
+def _market_freshness_seconds(fetched_at: datetime, current_time: datetime) -> int:
+    """
+    Calculate the age of the data in seconds, excluding weekends and IDX holidays.
+    If the period spans Saturday, Sunday, or a bursa holiday, those periods are excluded
+    to prevent false positive staleness classifications during closures.
+    """
+    if fetched_at >= current_time:
+        return 0
+
+    total_seconds = int((current_time - fetched_at).total_seconds())
+
+    # Indonesian Stock Exchange (IDX) Trading Holidays for 2026
+    idx_holidays_2026 = {
+        "2026-01-01", "2026-01-16",
+        "2026-02-16", "2026-02-17",
+        "2026-03-18", "2026-03-19", "2026-03-20", "2026-03-23", "2026-03-24",
+        "2026-04-03",
+        "2026-05-01", "2026-05-14", "2026-05-15", "2026-05-27", "2026-05-28",
+        "2026-06-01", "2026-06-16",
+        "2026-08-17", "2026-08-25",
+        "2026-12-24", "2026-12-25", "2026-12-31"
+    }
+
+    # Parse custom/additional holidays from settings dynamically
+    additional_holidays = set()
+    if settings.IDX_ADDITIONAL_HOLIDAYS:
+        try:
+            val = settings.IDX_ADDITIONAL_HOLIDAYS.strip()
+            if val.startswith("[") and val.endswith("]"):
+                dates = json.loads(val)
+            else:
+                dates = [d.strip() for d in val.split(",") if d.strip()]
+            for d in dates:
+                if re.match(r"^\d{4}-\d{2}-\d{2}$", d):
+                    additional_holidays.add(d)
+        except Exception as e:
+            logger.warning(f"Failed to parse IDX_ADDITIONAL_HOLIDAYS settings: {e}")
+
+    all_holidays = idx_holidays_2026 | additional_holidays
+
+    import datetime as dt_mod
+    wib = dt_mod.timezone(dt_mod.timedelta(hours=7))
+
+    start_local = fetched_at.astimezone(wib)
+    end_local = current_time.astimezone(wib)
+
+    start_date = start_local.date()
+    end_date = end_local.date()
+
+    if start_date == end_date:
+        is_holiday = start_date.weekday() in (5, 6) or start_date.isoformat() in all_holidays
+        if is_holiday:
+            return 0
+        return total_seconds
+
+    closed_seconds = 0
+    curr = start_date
+    while curr <= end_date:
+        is_closed = curr.weekday() in (5, 6) or curr.isoformat() in all_holidays
+        if is_closed:
+            day_start_local = dt_mod.datetime.combine(curr, dt_mod.time.min, tzinfo=wib)
+            day_end_local = day_start_local + dt_mod.timedelta(days=1)
+
+            overlap_start = max(start_local, day_start_local)
+            overlap_end = min(end_local, day_end_local)
+            if overlap_start < overlap_end:
+                closed_seconds += int((overlap_end - overlap_start).total_seconds())
+        curr += dt_mod.timedelta(days=1)
+
+    return max(0, total_seconds - closed_seconds)
+
 
 
 def _fair_value_content(pack: ContextPack) -> str:
@@ -704,18 +779,18 @@ def _extract_data_sources(raw_summary: str, metadata: dict[str, Any]) -> list[st
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Build a RAG evidence brief for a ticker.")
+    parser = argparse.ArgumentParser(description="Build an evidence brief for a ticker.")
     parser.add_argument("--ticker", required=True, help="Ticker with latest_debate.json output.")
     args = parser.parse_args()
 
     payload = _load_debate_payload(args.ticker)
     pack = _build_dummy_pack_from_debate(args.ticker.upper(), payload)
     run_id = str(payload.get("metadata", {}).get("run_id") or "manual-cli")
-    bundle = DEFAULT_STORE.build_bundle(pack, run_id=run_id)
-    print(DEFAULT_STORE.bundle_to_prompt_string(bundle))
+    bundle = DEFAULT_RANKER.build_bundle(pack, run_id=run_id)
+    print(DEFAULT_RANKER.bundle_to_prompt_string(bundle))
 
 
-DEFAULT_STORE = RAGEvidenceStore()
+DEFAULT_RANKER = EvidenceRanker()
 
 
 if __name__ == "__main__":

@@ -5,11 +5,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from services.context_pack_builder import ContextPack
-from services.rag_evidence_store import (
+from services.evidence_ranker import (
     MAX_BUNDLE_CHARS,
     EvidenceBundle,
     EvidenceChunk,
-    RAGEvidenceStore,
+    EvidenceRanker,
     citations_for_bundle,
     guard_evidence_citation_ids,
     guard_evidence_citations,
@@ -62,7 +62,7 @@ def _chunk(
 def test_chunk_context_pack_returns_chunks_for_non_empty_categories(
     tmp_path: Path,
 ) -> None:
-    store = RAGEvidenceStore(tmp_path / "evidence.jsonl")
+    store = EvidenceRanker(tmp_path / "evidence.jsonl")
 
     chunks = store.chunk_context_pack(_pack(), run_id="run-1")
     categories = {chunk.category for chunk in chunks}
@@ -82,8 +82,8 @@ def test_chunk_context_pack_returns_chunks_for_non_empty_categories(
 def test_chunk_context_pack_uses_source_timestamp_for_staleness(
     tmp_path: Path,
 ) -> None:
-    old_yfinance = (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
-    store = RAGEvidenceStore(tmp_path / "evidence.jsonl")
+    old_yfinance = (datetime.now(timezone.utc) - timedelta(days=5)).isoformat()
+    store = EvidenceRanker(tmp_path / "evidence.jsonl")
 
     chunks = store.chunk_context_pack(
         _pack(source_timestamps={"yfinance": old_yfinance}),
@@ -96,7 +96,7 @@ def test_chunk_context_pack_uses_source_timestamp_for_staleness(
 
 
 def test_score_chunks_fair_value_scores_higher_than_metadata(tmp_path: Path) -> None:
-    store = RAGEvidenceStore(tmp_path / "evidence.jsonl")
+    store = EvidenceRanker(tmp_path / "evidence.jsonl")
     chunks = [
         _chunk(category="fair_value", chunk_id="BBCA_fair_value_0"),
         _chunk(category="metadata", chunk_id="BBCA_metadata_0"),
@@ -111,7 +111,7 @@ def test_score_chunks_fair_value_scores_higher_than_metadata(tmp_path: Path) -> 
 def test_score_chunks_stale_chunk_scores_lower_than_fresh_same_category(
     tmp_path: Path,
 ) -> None:
-    store = RAGEvidenceStore(tmp_path / "evidence.jsonl")
+    store = EvidenceRanker(tmp_path / "evidence.jsonl")
     chunks = [
         _chunk(category="technical", is_stale=False, chunk_id="fresh"),
         _chunk(category="technical", is_stale=True, chunk_id="stale"),
@@ -124,7 +124,7 @@ def test_score_chunks_stale_chunk_scores_lower_than_fresh_same_category(
 
 
 def test_score_chunks_rsi_keyword_boosts_technical_chunk(tmp_path: Path) -> None:
-    store = RAGEvidenceStore(tmp_path / "evidence.jsonl")
+    store = EvidenceRanker(tmp_path / "evidence.jsonl")
     technical = _chunk(category="technical")
 
     baseline = store.score_chunks([technical], query_context="swing trade analysis")[0]
@@ -136,7 +136,7 @@ def test_score_chunks_rsi_keyword_boosts_technical_chunk(tmp_path: Path) -> None
 def test_select_evidence_always_includes_fair_value_when_available(
     tmp_path: Path,
 ) -> None:
-    store = RAGEvidenceStore(tmp_path / "evidence.jsonl")
+    store = EvidenceRanker(tmp_path / "evidence.jsonl")
     chunks = [
         _chunk(category="fair_value", is_stale=True, chunk_id="fair"),
         _chunk(category="technical", content="RSI support", chunk_id="technical"),
@@ -150,7 +150,7 @@ def test_select_evidence_always_includes_fair_value_when_available(
 def test_select_evidence_total_content_does_not_exceed_max_bundle_chars(
     tmp_path: Path,
 ) -> None:
-    store = RAGEvidenceStore(tmp_path / "evidence.jsonl")
+    store = EvidenceRanker(tmp_path / "evidence.jsonl")
     chunks = [_chunk(category="fair_value", content="fair value", chunk_id="fair")]
     chunks.extend(
         _chunk(
@@ -167,7 +167,7 @@ def test_select_evidence_total_content_does_not_exceed_max_bundle_chars(
 
 
 def test_build_bundle_returns_consistent_counts(tmp_path: Path) -> None:
-    store = RAGEvidenceStore(tmp_path / "evidence.jsonl")
+    store = EvidenceRanker(tmp_path / "evidence.jsonl")
 
     bundle = store.build_bundle(_pack(), run_id="run-1")
 
@@ -180,7 +180,7 @@ def test_build_bundle_returns_consistent_counts(tmp_path: Path) -> None:
 
 def test_log_bundle_records_auditable_chunk_content(tmp_path: Path) -> None:
     log_path = tmp_path / "evidence.jsonl"
-    store = RAGEvidenceStore(log_path)
+    store = EvidenceRanker(log_path)
 
     bundle = store.build_bundle(_pack(), run_id="run-1")
     record = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
@@ -194,7 +194,7 @@ def test_log_bundle_records_auditable_chunk_content(tmp_path: Path) -> None:
 
 
 def test_bundle_to_prompt_string_contains_ticker_and_header(tmp_path: Path) -> None:
-    store = RAGEvidenceStore(tmp_path / "evidence.jsonl")
+    store = EvidenceRanker(tmp_path / "evidence.jsonl")
     bundle = store.build_bundle(_pack(), run_id="run-1")
 
     prompt = store.bundle_to_prompt_string(bundle)
@@ -205,7 +205,7 @@ def test_bundle_to_prompt_string_contains_ticker_and_header(tmp_path: Path) -> N
 
 
 def test_citations_for_bundle_returns_prompt_safe_references(tmp_path: Path) -> None:
-    store = RAGEvidenceStore(tmp_path / "evidence.jsonl")
+    store = EvidenceRanker(tmp_path / "evidence.jsonl")
     bundle = store.build_bundle(_pack(), run_id="run-1")
 
     citations = citations_for_bundle(bundle)
@@ -215,7 +215,7 @@ def test_citations_for_bundle_returns_prompt_safe_references(tmp_path: Path) -> 
 
 
 def test_guard_evidence_citations_accepts_known_ids(tmp_path: Path) -> None:
-    store = RAGEvidenceStore(tmp_path / "evidence.jsonl")
+    store = EvidenceRanker(tmp_path / "evidence.jsonl")
     bundle = store.build_bundle(_pack(), run_id="run-1")
 
     report = guard_evidence_citations(bundle, [bundle.citation_ids[0]])
@@ -228,7 +228,7 @@ def test_guard_evidence_citations_accepts_known_ids(tmp_path: Path) -> None:
 def test_guard_evidence_citations_reports_missing_or_insufficient_ids(
     tmp_path: Path,
 ) -> None:
-    store = RAGEvidenceStore(tmp_path / "evidence.jsonl")
+    store = EvidenceRanker(tmp_path / "evidence.jsonl")
     bundle = store.build_bundle(_pack(), run_id="run-1")
 
     report = guard_evidence_citations(bundle, ["missing-id"], min_citations=2)
@@ -241,7 +241,7 @@ def test_guard_evidence_citations_reports_missing_or_insufficient_ids(
 def test_guard_evidence_citation_ids_works_from_metadata_citations(
     tmp_path: Path,
 ) -> None:
-    store = RAGEvidenceStore(tmp_path / "evidence.jsonl")
+    store = EvidenceRanker(tmp_path / "evidence.jsonl")
     bundle = store.build_bundle(_pack(), run_id="run-1")
     citations = citations_for_bundle(bundle)
 
@@ -249,3 +249,29 @@ def test_guard_evidence_citation_ids_works_from_metadata_citations(
 
     assert report.valid is True
     assert report.cited_chunks[0].chunk_id == bundle.citation_ids[0]
+
+
+def test_market_freshness_seconds_excludes_weekends_and_holidays(monkeypatch):
+    from services.evidence_ranker import _market_freshness_seconds
+    # WIB is UTC+7
+    wib = timezone(timedelta(hours=7))
+    
+    # Friday 2026-05-15 16:00:00 WIB (is a holiday: Cuti Bersama Kenaikan Yesus Kristus)
+    # Saturday 2026-05-16 (weekend)
+    # Sunday 2026-05-17 (weekend)
+    # Monday 2026-05-18 10:00:00 WIB
+    
+    start = datetime(2026, 5, 15, 16, 0, 0, tzinfo=wib)
+    end = datetime(2026, 5, 18, 10, 0, 0, tzinfo=wib)
+    
+    # Raw elapsed duration is 66 hours (237,600 seconds)
+    # Excluded duration:
+    # - Friday 15 May (holiday): 8 hours (from 16:00 to 24:00)
+    # - Saturday 16 May (weekend): 24 hours
+    # - Sunday 17 May (weekend): 24 hours
+    # Total excluded = 56 hours (201,600 seconds)
+    # Market age should be 10 hours (36,000 seconds)
+    
+    age = _market_freshness_seconds(start.astimezone(timezone.utc), end.astimezone(timezone.utc))
+    assert age == 10 * 3600
+

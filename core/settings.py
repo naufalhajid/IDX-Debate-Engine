@@ -73,6 +73,10 @@ class Settings(BaseSettings):
     # Stockbit API
     STOCKBIT_MAX_WORKERS: int = 10
 
+    # ── Market Holidays ──────────────────────────────────────────────────────────
+    # IDX_ADDITIONAL_HOLIDAYS: Comma-separated list of YYYY-MM-DD dates to exclude from RAG staleness
+    IDX_ADDITIONAL_HOLIDAYS: str = ""
+
     # ── Orchestrator Configuration ────────────────────────────────────────────────
     # CANDIDATES_MAX_AGE_HOURS: max umur top10_candidates.json sebelum dianggap stale
     # CANDIDATES_AUTO_RERUN: jika True, jalankan run_quant_filter.py otomatis

@@ -66,7 +66,7 @@ CONFIG = {
     "pbv_sector_pctile":      0.80,       # Buang top 20% PBV per sektor
     "min_roe":                0.10,       # ROE minimum TTM (10%)
     "min_piotroski":          4,          # [NEW v3.0] Piotroski F-Score minimum
-    "min_altman_z":           1.1,        # [NEW v3.0] Altman Z > 1.1 (bukan distress zone)
+    "min_altman_z":           1.1,        # [NEW v3.0] Emerging Markets Altman Z''-Score (Modified) > 1.1 (Z'' < 1.1 = distress, 1.1-2.6 = grey, >2.6 = safe)
     "exclude_pemantauan":     True,       # [NEW v3.0] Exclude PEMANTAUAN KHUSUS
     # Trend Filter — harga harus di atas SMA50 saat entry
     "min_price_vs_sma50":     1.0,        # price >= SMA50 (1.0 = tepat di SMA50, boleh set 0.98 untuk toleransi)
@@ -113,6 +113,10 @@ CONFIG = {
     "stop_hard_floor_pct":    0.88,
 
     # ── Score Weights (total = 100)
+    # [NOTE] Hybrid quant-technical scoring optimized for swing trading:
+    # - 70% Technical Momentum (RSI [25] + Volume [25] + Price Momentum [20])
+    # - 30% Fundamentals (Valuation [20] + Profitability [10])
+    # Weak fundamentals are excluded in Stage 1 Static Gate, so the scoring stage focuses on momentum.
     "weight_valuation":       20,
     "weight_profitability":   10,
     "weight_momentum_rsi":    25,

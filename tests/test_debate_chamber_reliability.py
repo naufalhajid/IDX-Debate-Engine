@@ -807,3 +807,57 @@ def test_trade_envelope_guarantees_sufficient_rr_from_entry_high():
     
     # R/R must be calculated conservatively from entry_high
     assert envelope["risk_reward_ratio"] >= 2.0
+
+
+def test_sentiment_payload_from_response_sanitizes_markdown_json():
+    raw_markdown = """```json
+{
+  "position": "BUY",
+  "confidence": 0.7,
+  "status": "OK",
+  "reasoning": "Social sentiment is overwhelmingly bearish, but rebound expected."
+}
+```"""
+    payload = DebateChamber._sentiment_payload_from_response("BBRI", raw_markdown)
+    assert payload["position"] == "BUY"
+    assert payload["confidence"] == 0.7
+    assert payload["status"] == "OK"
+
+
+def test_sanitize_json_repairs_truncated_json_inside_string():
+    raw_truncated = """
+    {
+      "position": "HOLD",
+      "confidence": 0.6,
+      "status": "OK",
+      "reasoning": "Social sentiment is mixed, with significant bullishness observed for specific stocks, particularly BDMN, driven by speculative discussions around its potential privatization or free float increase by MUFG. Many users express high price targets and profit-taking opportunities on various stocks. However, this enthusiasm is tempered by a critical observation of abnormally low market trading volume for the broader 
+    """
+    sanitized = DebateChamber._sanitize_json(raw_truncated)
+    parsed = json.loads(sanitized)
+    assert parsed["position"] == "HOLD"
+    assert parsed["confidence"] == 0.6
+    assert parsed["status"] == "OK"
+    assert parsed["reasoning"].startswith("Social sentiment is mixed")
+
+
+def test_sanitize_json_repairs_truncated_json_with_trailing_comma():
+    raw_truncated = """
+    {
+      "position": "SELL",
+      "confidence": 0.5,
+    """
+    sanitized = DebateChamber._sanitize_json(raw_truncated)
+    parsed = json.loads(sanitized)
+    assert parsed["position"] == "SELL"
+    assert parsed["confidence"] == 0.5
+
+
+def test_sanitize_json_handles_single_quoted_json():
+    raw_single_quotes = "{'position': 'BUY', 'confidence': 0.85}"
+    sanitized = DebateChamber._sanitize_json(raw_single_quotes)
+    parsed = json.loads(sanitized)
+    assert parsed["position"] == "BUY"
+    assert parsed["confidence"] == 0.85
+
+
+

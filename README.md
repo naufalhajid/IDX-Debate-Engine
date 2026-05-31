@@ -28,7 +28,7 @@ Built for *decision-support*, not decision-making. This system automates the tra
   - [Deterministic Risk Governor](#4-deterministic-risk-governor)
   - [Adaptive Planner & Resilience Engine](#5-adaptive-planner--resilience-engine)
   - [FastAPI Backend + Svelte 5 Dashboard](#6-fastapi-backend--svelte-5-dashboard)
-  - [RAG Evidence Store](#7-rag-evidence-store)
+  - [Evidence Ranker](#7-evidence-ranker)
   - [Backtest Memory & Auto-Evaluator](#8-backtest-memory--auto-evaluator)
 - [Project Structure](#project-structure)
 - [Setup & Installation](#setup--installation)
@@ -131,8 +131,11 @@ A multi-stage screening engine that processes IDX Excel workbooks into a ranked 
 | PBV ceiling | 6.0× (hard), 80th percentile (sector-relative) | Valuation ceiling |
 | ROE floor | ≥ 10% TTM | Minimum profitability |
 | Piotroski F-Score | ≥ 4 | Eliminate deteriorating fundamentals |
-| Altman Z-Score | > 1.1 | Distress zone exclusion |
+| Altman Z-Score | > 1.1 | Distress zone exclusion (uses the **Emerging Markets Z''-Score** model) |
 | Special Monitoring | Excluded | IDX `PEMANTAUAN KHUSUS` tickers are auto-rejected |
+
+> [!NOTE]
+> **Altman Z-Score Model Calibration:** The system employs the **Emerging Markets Altman Z''-Score (Modified)** rather than the standard US manufacturing model. The EM-calibrated thresholds are: `Z'' < 1.1` (Distress Zone), `1.1 <= Z'' <= 2.6` (Grey Zone), and `Z'' > 2.6` (Safe Zone). The threshold of `> 1.1` is selected to exclude all bankrupt-risk distress-zone stocks.
 
 **Stage 2 — Technical Gate:**
 
@@ -153,6 +156,12 @@ A multi-stage screening engine that processes IDX Excel workbooks into a ranked 
 | Price Momentum | 20 | 22-day return vs. IHSG, tiered by outperformance |
 
 Piotroski F-Score ≥ 7 adds **+5 bonus**; ≤ 5 applies **−5 penalty**. Fresh breakout bonus: +15. Over-extended penalty: −15.
+
+> [!IMPORTANT]
+> **Hybrid Scoring Rationale & Heuristics:**
+> - **70/30 Technical-Fundamental Split:** The composite scoring is deliberately optimized for **swing trading**, which requires short-to-medium-term momentum. Thus, technical indicators are weighted at 70% and fundamentals at 30%. Low-quality stocks are not able to game this weight split because **Stage 1 (Static Gate)** acts as a hard exclude, filtering out weak fundamentals (poor ROE, high debt, distressed Altman Z-Score) before scoring ever begins.
+> - **Heuristic Thresholds:** The screener parameters (RSI, PBV, ROE, ADT thresholds) are **theoretical heuristics** from trading literature and manual IHSG observations, rather than historically backtested values. Systematic historical backtesting remains a roadmap item.
+> - **Backtest Memory is Forward-Looking:** The `backtest_memory.py` module tracks and auto-evaluates generated CIO trade verdicts against forward yfinance OHLCV prices (paper trading/forward validation). It is not a tool for historical backtesting of the initial screening thresholds.
 
 ---
 
@@ -217,7 +226,14 @@ External dependencies (Stockbit scraper, yfinance, Gemini API) are inherently un
 | `ABORT_BATCH` | Stop entire run (all providers down, or ≥ 5 ticker failures) |
 | `ESCALATE` | Log critical event, notify operator |
 
-**Stage-specific logic:** Sentiment fetch failure → `PROCEED_PARTIAL`. Debate timeout → `RETRY` up to 2× then `SKIP_TICKER`. Any auth or billing error → immediate `ABORT_BATCH`.
+**Stage-specific logic:**
+- **Sentiment Fetch Failure:** → `PROCEED_PARTIAL` (proceed with missing data, applying a **15% confidence penalty**).
+- **Technical Fetch Failure:** → `PROCEED_PARTIAL` (proceed with missing data, applying a **15% confidence penalty**).
+- **Fundamental Fetch Failure:** → `SKIP_TICKER` (fundamental data like price, ROE, and book value is critical; the engine cannot evaluate the ticker without them).
+- **Scraper Dependency Fragility:** The Stockbit provider queries REST endpoints directly using session cookies captured by `StockbitTokenFetcher`. The fetcher uses `undetected-chromedriver` (which requires a local Google Chrome installation, is not headless-friendly in basic CI/CD, and is subject to anti-bot changes). If the token fetcher fails, the system lacks a fallback for Stockbit fundamentals, and the affected tickers will be skipped.
+- **Debate Timeout:** → `RETRY` up to 2× then `SKIP_TICKER`.
+- **Critical Auth/Billing Failures:** → Immediate `ABORT_BATCH`.
+- **API Call Budget Exhaustion:** Capped per process run in terms of Gemini Pro calls (`MAX_PRO_CALLS_PER_RUN` = 200) and Flash calls (`MAX_FLASH_CALLS_PER_RUN` = 2000). When the budget is exhausted, a `BudgetExhaustedError` is raised, setting a batch `abort_event`. This immediately cancels all queued tickers to prevent additional API spend. Crucially, **completed tickers that finished prior to budget exhaustion are preserved and saved** in the database and JSON reports.
 
 Every decision is written to the **Execution Ledger** ([`execution_ledger.py`](core/execution_ledger.py)) as a queryable JSONL event stream with structured `EventType`, `EventSeverity`, and causal trace fields.
 
@@ -259,20 +275,20 @@ Stores: `dashboard.ts`, `metadata.ts`, `session.ts`, `toast.ts` — reactive sta
 
 ---
 
-### 7. RAG Evidence Store
+### 7. Evidence Ranker
 
-**File:** [`rag_evidence_store.py`](services/rag_evidence_store.py)
+**File:** [`evidence_ranker.py`](services/evidence_ranker.py)
 
-A freshness-aware, deterministic evidence selection layer between the data scouts and the debate context. Not a vector database — it scores normalized `ContextPack` chunks by category, query keywords, and per-source freshness.
+A freshness-aware, deterministic evidence selection and ranking layer between the data scouts and the debate context. To prevent prompt overflow and minimize token spend, it filters and scores normalized `ContextPack` chunks by category, query keywords, and per-source freshness rather than using a vector database.
 
 | Parameter | Value |
 |---|---|
 | Max chunks per bundle | 12 |
-| Evidence brief hard cap | 2,400 characters |
+| Evidence brief hard cap | 2,400 characters (approx. 600 tokens) |
 | Stale threshold | 86,400 seconds (24 hours) |
 | Category weights | `fair_value=1.0`, `fundamental=0.9`, `technical=0.85`, `sentiment=0.6`, `exdate=0.7`, `metadata=0.3` |
 
-Chunks scored by `relevance × freshness × category_weight`. Evidence logs include content hashes, source timestamps, freshness flags, and citation IDs for post-run audit.
+Chunks are scored by: `relevance_score = clamp(category_weight + keyword_boost)`. If the chunk is stale (>24h), the relevance score is penalized by multiplying it by `0.5`. Chunks are logged with their SHA-256 content hashes, source timestamps, freshness flags, and unique citation IDs for post-run audit and LLM hallucination check.
 
 ---
 
@@ -333,7 +349,7 @@ IDX-Debate-Engine/
 │   │   ├── fundamental_scout.txt / chartist.txt / sentiment.txt
 │   │   └── consensus.txt / state_cleaner.txt
 │   ├── fair_value_calculator.py    # Multi-method IDX fair value engine
-│   ├── rag_evidence_store.py       # Freshness-aware evidence selection
+│   ├── evidence_ranker.py          # Freshness-aware evidence selection
 │   ├── context_pack_builder.py     # Assembles scout data into debate context
 │   ├── report_formatter.py         # Markdown + JSON report generation
 │   ├── news_fetcher.py             # Multi-source news aggregation
@@ -513,7 +529,7 @@ uv run ruff check .                # Lint with Ruff
 | `test_quant_filter_pipeline.py` | Full screener pipeline, sector-DER matrix, scoring tiers |
 | `test_backtest_outcome_evaluator.py` | OHLCV-based outcome labeling, horizon expiry |
 | `test_fair_value_calculator.py` | Graham Number, DDM, multi-method valuation |
-| `test_rag_evidence_store.py` | Freshness scoring, chunk selection, stale data handling |
+| `test_evidence_ranker.py` | Freshness scoring, chunk selection, stale data handling |
 | `test_execution_ledger.py` | JSONL event writes, causal trace queries |
 | `test_regime.py` | Volatility classification, safe fallback on fetch failure |
 | `api/test_dashboard_api.py` | SSE stream, cache invalidation, health endpoint |

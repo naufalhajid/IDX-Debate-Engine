@@ -63,8 +63,8 @@ from schemas.debate import (
     validate_swing_targets,
 )
 from services.context_pack_builder import build_context_pack, pack_to_prompt_string
-from services.rag_evidence_store import (
-    DEFAULT_STORE as rag_store,
+from services.evidence_ranker import (
+    DEFAULT_RANKER as rag_store,
     EvidenceCitation,
     citations_for_bundle,
     guard_evidence_citation_ids,
@@ -873,7 +873,7 @@ class DebateChamber:
     def _sentiment_payload_from_response(cls, ticker: str, content: Any) -> dict[str, Any]:
         raw_text = cls._llm_content_to_text(content).strip()
         try:
-            payload = json.loads(raw_text)
+            payload = json.loads(cls._sanitize_json(raw_text))
             if not isinstance(payload, dict):
                 raise ValueError("sentiment response JSON must be an object")
             return payload
@@ -2764,24 +2764,56 @@ Current Date (Asia/Jakarta): {current_date}
             json.loads(text)
             return text
         except json.JSONDecodeError:
-            final = []
-            in_str = False
+            brackets = []
+            in_double_str = False
+            in_single_str = False
             esc = False
+            repaired_chars = []
             for ch in text:
                 if esc:
-                    final.append(ch)
+                    repaired_chars.append(ch)
                     esc = False
-                elif ch == "\\" and in_str:
-                    final.append(ch)
+                elif ch == "\\" and (in_double_str or in_single_str):
+                    repaired_chars.append(ch)
                     esc = True
                 elif ch == '"':
-                    in_str = not in_str
-                    final.append(ch)
-                elif ch == "'" and not in_str:
-                    final.append('"')
+                    if not in_single_str:
+                        in_double_str = not in_double_str
+                    repaired_chars.append(ch)
+                elif ch == "'":
+                    if not in_double_str:
+                        in_single_str = not in_single_str
+                        repaired_chars.append('"')
+                    else:
+                        repaired_chars.append(ch)
+                elif in_double_str or in_single_str:
+                    repaired_chars.append(ch)
                 else:
-                    final.append(ch)
-            return "".join(final).strip()
+                    if ch in ("{", "["):
+                        brackets.append(ch)
+                        repaired_chars.append(ch)
+                    elif ch in ("}", "]"):
+                        if brackets:
+                            last = brackets[-1]
+                            if (ch == "}" and last == "{") or (ch == "]" and last == "["):
+                                brackets.pop()
+                        repaired_chars.append(ch)
+                    else:
+                        repaired_chars.append(ch)
+            
+            if in_double_str or in_single_str:
+                repaired_chars.append('"')
+            
+            while brackets:
+                b = brackets.pop()
+                if b == "{":
+                    repaired_chars.append("}")
+                elif b == "[":
+                    repaired_chars.append("]")
+                    
+            repaired_text = "".join(repaired_chars).strip()
+            repaired_text = re.sub(r",\s*([\]}])", r"\1", repaired_text)
+            return repaired_text
 
     @staticmethod
     def _format_consensus_directive(state: DebateChamberState) -> str:
