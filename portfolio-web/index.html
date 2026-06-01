@@ -94,9 +94,9 @@
             <div class="container split-layout">
                 <div class="section-heading align-left">
                     <p class="kicker">Quick start</p>
-                    <h2>One pipeline, three useful surfaces.</h2>
+                    <h2>Install, run, and inspect the artifacts.</h2>
                     <p>
-                        The portfolio mirrors the real workflow: run the batch engine, inspect the artifacts, then open the API and dashboard when you need an interactive view.
+                        The portfolio mirrors the real workflow: install the project, run the batch engine, then review the generated JSON and Markdown evidence.
                     </p>
                 </div>
 
@@ -104,28 +104,26 @@
                     <article class="command-card">
                         <div class="step-number">1</div>
                         <div>
+                            <h3>Install with PowerShell</h3>
+                            <pre><code>irm https://raw.githubusercontent.com/naufalhajid/IDX-Debate-Engine/main/install.ps1 | iex</code></pre>
+                        </div>
+                        <button type="button" class="copy-button" data-copy="irm https://raw.githubusercontent.com/naufalhajid/IDX-Debate-Engine/main/install.ps1 | iex">Copy</button>
+                    </article>
+                    <article class="command-card">
+                        <div class="step-number">2</div>
+                        <div>
                             <h3>Run the full batch pipeline</h3>
                             <pre><code>uv run idx pipeline</code></pre>
                         </div>
                         <button type="button" class="copy-button" data-copy="uv run idx pipeline">Copy</button>
                     </article>
                     <article class="command-card">
-                        <div class="step-number">2</div>
+                        <div class="step-number">3</div>
                         <div>
                             <h3>Try a safe dry run</h3>
                             <pre><code>uv run idx pipeline --dry-run --no-interactive --output-dir tmp/dry_run</code></pre>
                         </div>
                         <button type="button" class="copy-button" data-copy="uv run idx pipeline --dry-run --no-interactive --output-dir tmp/dry_run">Copy</button>
-                    </article>
-                    <article class="command-card">
-                        <div class="step-number">3</div>
-                        <div>
-                            <h3>Serve API and dashboard</h3>
-                            <pre><code>uv run idx serve
-cd app/ui
-npm run dev</code></pre>
-                        </div>
-                        <button type="button" class="copy-button" data-copy="uv run idx serve">Copy</button>
                     </article>
                 </div>
             </div>
@@ -133,7 +131,7 @@ npm run dev</code></pre>
 
         <section class="product-shot-section" aria-label="Terminal preview">
             <div class="container">
-                <img src="../docs/assets/debate_terminal_preview.png" alt="IDX Debate Engine terminal preview showing agent voting, trade plan, risk management, and final verdict panels.">
+                <img src="assets/debate_terminal_preview.png" alt="IDX Debate Engine terminal preview showing agent voting, trade plan, risk management, and final verdict panels.">
             </div>
         </section>
 
@@ -186,38 +184,42 @@ npm run dev</code></pre>
             <div class="container split-layout">
                 <div class="section-heading align-left">
                     <p class="kicker">Latest artifact snapshot</p>
-                    <h2>The current run correctly says: no high-conviction BUY today.</h2>
+                    <h2>When the setup is not clean, the system says so.</h2>
                     <p>
-                        That is a strength for a decision-support system. The engine can preserve watchlist context without forcing a trade when the debate and risk gates disagree.
+                        The latest batch reviewed 10 candidates and chose capital protection over forced BUY signals. Every HOLD, AVOID, and SKIP TICKER verdict stays traceable through JSON, Markdown, and audit artifacts.
                     </p>
                 </div>
 
                 <div class="snapshot-panel">
                     <div class="snapshot-header">
-                        <span>Generated from local output artifacts</span>
-                        <strong>2026-06-01</strong>
+                        <span>Latest batch decision</span>
+                        <strong>June 1, 2026</strong>
+                    </div>
+                    <div class="decision-summary">
+                        <h3>No forced BUY</h3>
+                        <p>10 candidates reviewed. The system preserved watchlist context, but risk gates and debate consensus did not approve a high-conviction entry.</p>
                     </div>
                     <div class="rating-bars" aria-label="Verdict distribution">
                         <div>
-                            <span>HOLD</span>
+                            <span>Watchlist</span>
                             <meter min="0" max="10" value="4">4 of 10</meter>
                             <strong>4</strong>
                         </div>
                         <div>
-                            <span>AVOID</span>
+                            <span>Rejected</span>
                             <meter min="0" max="10" value="4">4 of 10</meter>
                             <strong>4</strong>
                         </div>
                         <div>
-                            <span>INSUFFICIENT</span>
+                            <span>SKIP TICKER</span>
                             <meter min="0" max="10" value="2">2 of 10</meter>
                             <strong>2</strong>
                         </div>
                     </div>
                     <div class="artifact-list">
-                        <a href="../output/top10_candidates.json">top10_candidates.json</a>
-                        <a href="../output/full_batch_results.json">full_batch_results.json</a>
-                        <a href="../output/TOP_3_SWING_TRADES.md">TOP_3_SWING_TRADES.md</a>
+                        <button type="button" data-artifact="shortlist">Candidate shortlist</button>
+                        <button type="button" data-artifact="results">Debate results</button>
+                        <button type="button" data-artifact="report">Final report</button>
                     </div>
                 </div>
             </div>
@@ -275,6 +277,15 @@ npm run dev</code></pre>
             </div>
         </section>
     </main>
+
+    <section class="artifact-viewer" id="artifact-viewer" aria-hidden="true">
+        <div class="artifact-dialog" role="dialog" aria-modal="true" aria-labelledby="artifact-title">
+            <button class="artifact-close" type="button" aria-label="Close artifact preview">Close</button>
+            <p class="kicker" id="artifact-eyebrow">Artifact preview</p>
+            <h2 id="artifact-title">Candidate shortlist</h2>
+            <div class="artifact-body" id="artifact-body"></div>
+        </div>
+    </section>
 
     <footer class="site-footer">
         <div>

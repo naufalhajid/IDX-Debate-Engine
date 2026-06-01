@@ -139,7 +139,7 @@ button {
     align-items: center;
     background-image:
         linear-gradient(90deg, rgba(251, 252, 247, 0.98) 0%, rgba(251, 252, 247, 0.9) 45%, rgba(251, 252, 247, 0.5) 78%, rgba(251, 252, 247, 0.94) 100%),
-        url("../docs/assets/debate_terminal_preview.png");
+        url("assets/debate_terminal_preview.png");
     background-position: center, center right;
     background-repeat: no-repeat;
     background-size: cover, min(980px, 72vw);
@@ -444,7 +444,6 @@ code {
     border-bottom: 1px solid var(--line);
     display: flex;
     justify-content: space-between;
-    margin-bottom: 1rem;
     padding-bottom: 1rem;
 }
 
@@ -454,9 +453,24 @@ code {
     font-size: 0.9rem;
 }
 
+.decision-summary {
+    border-bottom: 1px solid var(--line);
+    padding: 1.15rem 0;
+}
+
+.decision-summary h3 {
+    font-size: 1.55rem;
+}
+
+.decision-summary p {
+    color: var(--muted);
+    margin-top: 0.55rem;
+}
+
 .rating-bars {
     display: grid;
     gap: 0.85rem;
+    padding-top: 1rem;
 }
 
 .rating-bars div {
@@ -494,14 +508,224 @@ meter::-webkit-meter-optimum-value {
     margin-top: 1.25rem;
 }
 
-.artifact-list a {
+.artifact-list button {
     background: var(--paper);
     border: 1px solid var(--line);
     border-radius: var(--radius);
+    color: var(--ink);
+    cursor: pointer;
     font-size: 0.88rem;
     font-weight: 800;
     padding: 0.5rem 0.65rem;
-    text-decoration: none;
+}
+
+.artifact-list button:hover,
+.artifact-list button:focus-visible {
+    background: var(--ink);
+    color: var(--paper-strong);
+}
+
+.artifact-viewer {
+    align-items: center;
+    background: rgba(18, 21, 28, 0.56);
+    display: none;
+    inset: 0;
+    padding: 1.25rem;
+    position: fixed;
+    z-index: 90;
+}
+
+.artifact-viewer.open {
+    display: flex;
+}
+
+body.artifact-open {
+    overflow: hidden;
+}
+
+.artifact-dialog {
+    background:
+        linear-gradient(135deg, rgba(33, 185, 137, 0.08), transparent 35%),
+        linear-gradient(315deg, rgba(247, 189, 59, 0.12), transparent 35%),
+        var(--paper-strong);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: 0 30px 100px rgba(18, 21, 28, 0.32);
+    margin: 0 auto;
+    max-height: min(86vh, 880px);
+    max-width: 1040px;
+    overflow: auto;
+    padding: clamp(1.1rem, 3vw, 2rem);
+    position: relative;
+    width: 100%;
+}
+
+.artifact-close {
+    background: var(--ink);
+    border: 0;
+    border-radius: var(--radius);
+    color: var(--paper-strong);
+    cursor: pointer;
+    font-weight: 900;
+    min-height: 2.35rem;
+    padding: 0 0.85rem;
+    position: absolute;
+    right: 1rem;
+    top: 1rem;
+}
+
+.artifact-dialog h2 {
+    font-family: "Space Grotesk", Inter, sans-serif;
+    font-size: clamp(2rem, 5vw, 4rem);
+    letter-spacing: 0;
+    line-height: 1.02;
+    margin-right: 5.5rem;
+}
+
+.artifact-body {
+    margin-top: 1.5rem;
+}
+
+.artifact-summary-grid {
+    display: grid;
+    gap: 0.8rem;
+    grid-template-columns: repeat(3, 1fr);
+    margin-bottom: 1.1rem;
+}
+
+.artifact-stat,
+.verdict-card,
+.report-card {
+    background: var(--paper-strong);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 1rem;
+}
+
+.artifact-stat strong {
+    display: block;
+    font-family: "Space Grotesk", Inter, sans-serif;
+    font-size: 2rem;
+    line-height: 1;
+}
+
+.artifact-stat span {
+    color: var(--muted);
+    display: block;
+    font-size: 0.88rem;
+    margin-top: 0.35rem;
+}
+
+.artifact-table-wrap {
+    background: var(--paper-strong);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow-x: auto;
+}
+
+.artifact-table {
+    border-collapse: collapse;
+    min-width: 780px;
+    width: 100%;
+}
+
+.artifact-table th,
+.artifact-table td {
+    border-bottom: 1px solid var(--line);
+    padding: 0.82rem 0.9rem;
+    text-align: left;
+    vertical-align: top;
+}
+
+.artifact-table th {
+    background: var(--ink);
+    color: var(--paper-strong);
+    font-size: 0.86rem;
+}
+
+.artifact-table tr:last-child td {
+    border-bottom: 0;
+}
+
+.artifact-table td:first-child,
+.artifact-table td:nth-child(2) {
+    font-weight: 900;
+}
+
+.verdict-grid {
+    display: grid;
+    gap: 0.85rem;
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.verdict-card {
+    display: grid;
+    gap: 0.8rem;
+}
+
+.verdict-topline {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.verdict-ticker {
+    font-family: "Space Grotesk", Inter, sans-serif;
+    font-size: 1.55rem;
+    font-weight: 700;
+}
+
+.verdict-pill {
+    border-radius: var(--radius);
+    font-size: 0.78rem;
+    font-weight: 900;
+    padding: 0.35rem 0.5rem;
+}
+
+.verdict-pill.hold {
+    background: var(--sun-soft);
+    color: #8a5b09;
+}
+
+.verdict-pill.avoid {
+    background: var(--rose-soft);
+    color: #a7213a;
+}
+
+.verdict-pill.skip {
+    background: var(--sky-soft);
+    color: var(--sky);
+}
+
+.verdict-meta {
+    color: var(--muted);
+    display: grid;
+    font-size: 0.9rem;
+    gap: 0.25rem;
+}
+
+.report-card + .report-card {
+    margin-top: 0.85rem;
+}
+
+.report-card h3 {
+    margin-bottom: 0.5rem;
+}
+
+.report-card p {
+    color: var(--muted);
+}
+
+.artifact-error {
+    background: var(--rose-soft);
+    border: 1px solid #f5b5c2;
+    border-radius: var(--radius);
+    color: #8f1831;
+    font-weight: 800;
+    padding: 1rem;
 }
 
 .candidate-table {
@@ -629,7 +853,7 @@ meter::-webkit-meter-optimum-value {
     .hero {
         background-image:
             linear-gradient(180deg, rgba(251, 252, 247, 0.94), rgba(251, 252, 247, 0.98)),
-            url("../docs/assets/debate_terminal_preview.png");
+            url("assets/debate_terminal_preview.png");
         padding-top: 7.2rem;
     }
 
@@ -654,6 +878,16 @@ meter::-webkit-meter-optimum-value {
         align-items: start;
         display: grid;
         gap: 1.25rem;
+    }
+
+    .artifact-summary-grid,
+    .verdict-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .artifact-dialog h2 {
+        margin-right: 0;
+        padding-top: 2.6rem;
     }
 }
 
