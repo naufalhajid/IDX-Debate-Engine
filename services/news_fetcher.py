@@ -183,7 +183,7 @@ async def _fetch_rss_items(
         return []
 
     try:
-        return _parse_rss_items(xml_text, default_source=default_item_source)
+        return _parse_rss_items(xml_text, default_source=default_item_source, ticker=ticker)
     except Exception as exc:
         logger.warning("[News] %s %s parse failed: %s", ticker, source, exc)
         return []
@@ -234,15 +234,29 @@ async def _fetch_text(
     return response.text
 
 
-def _parse_rss_items(xml_text: str, default_source: str | None = None) -> list[dict]:
+def _parse_rss_items(xml_text: str, default_source: str | None = None, ticker: str | None = None) -> list[dict]:
     root = ET.fromstring(xml_text)
     parsed_items: list[dict] = []
+    
+    ticker_pattern = None
+    if ticker:
+        ticker_pattern = re.compile(rf'\b{re.escape(ticker.upper())}\b')
+        
     for item in root.findall(".//item"):
         title = _child_text(item, "title")
         link = _child_text(item, "link")
         published_dt = _parse_rss_pub_date(_child_text(item, "pubDate"))
         if not title or not link or published_dt is None:
             continue
+            
+        summary = _strip_html(_child_text(item, "description"))
+        
+        if ticker_pattern:
+            title_upper = title.upper()
+            summary_upper = summary.upper()
+            if not (ticker_pattern.search(title_upper) or ticker_pattern.search(summary_upper)):
+                continue
+
         source = _rss_item_source(item, title, default_source=default_source)
         parsed_items.append(
             {
@@ -250,7 +264,7 @@ def _parse_rss_items(xml_text: str, default_source: str | None = None) -> list[d
                 "link": link,
                 "published": published_dt.isoformat(),
                 "source": source,
-                "summary": _strip_html(_child_text(item, "description")),
+                "summary": summary,
             }
         )
     return parsed_items

@@ -168,6 +168,13 @@ CONFIG = {
     # ── Penalties & Bonuses
     "over_extended_penalty":  -15,
     "fresh_breakout_bonus":   +15,
+    
+    # ── Turnaround Momentum Penalties (v3.2)
+    # Fundamental yang buruk tidak lagi langsung dibuang, tapi diberi penalti berat.
+    # Hanya saham dengan skor teknikal/momentum sempurna yang bisa lolos Top 10.
+    "penalty_roe_fail":       -15,
+    "penalty_piotroski_fail": -15,
+    "penalty_altman_z_fail":  -20,
 
     # ── Output
     "top_n": 10,

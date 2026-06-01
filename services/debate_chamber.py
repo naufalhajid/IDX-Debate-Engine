@@ -23,6 +23,7 @@ from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
 import json
 import re
+from pathlib import Path
 from time import perf_counter
 from typing import Any, Literal
 
@@ -307,6 +308,26 @@ def _ledger_stage_partial(
     )
 
 
+def _breaking_news_headlines(news_bundle: Any, limit: int = 3) -> list[dict[str, str]]:
+    headlines: list[dict[str, str]] = []
+    for item in list(getattr(news_bundle, "items", []) or []):
+        if not bool(getattr(item, "is_breaking", False)):
+            continue
+        title = str(getattr(item, "title", "") or "").strip()
+        if not title:
+            continue
+        headlines.append(
+            {
+                "title": title,
+                "source": str(getattr(item, "source", "") or "unknown"),
+                "timestamp": str(getattr(item, "published_at", "") or "unknown"),
+            }
+        )
+        if len(headlines) >= limit:
+            break
+    return headlines
+
+
 async def _news_context_for_state(state: DebateChamberState, ticker: str) -> dict[str, object]:
     try:
         from services.news_fetcher import DEFAULT_FETCHER
@@ -323,7 +344,10 @@ async def _news_context_for_state(state: DebateChamberState, ticker: str) -> dic
             logger.warning(f"[News] {ticker}: BREAKING NEWS DETECTED")
 
         metadata = dict(state.get("metadata") or {})
+        # FIX: ISSUE 3 — Preserve breaking-news headlines for final report display.
+        breaking_headlines = _breaking_news_headlines(news_bundle)
         metadata["has_breaking_news"] = news_bundle.has_breaking_news
+        metadata["breaking_news_headlines"] = breaking_headlines
         metadata["news_confidence_adjustment"] = news_bundle.confidence_adjustment
         metadata["news_overall_sentiment"] = news_bundle.overall_sentiment.value
         metadata["news_brief"] = news_str
@@ -339,6 +363,7 @@ async def _news_context_for_state(state: DebateChamberState, ticker: str) -> dic
         logger.warning(f"[News] {ticker}: fetch failed: {exc}")
         metadata = dict(state.get("metadata") or {})
         metadata["has_breaking_news"] = False
+        metadata["breaking_news_headlines"] = []
         metadata["news_confidence_adjustment"] = 0.0
         metadata["news_brief"] = ""
         state["news_brief"] = ""
@@ -360,6 +385,65 @@ def _news_adjustment_from_state(state: DebateChamberState) -> float:
         return float(raw_adjustment or 0.0)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _safe_rag_id_part(value: Any) -> str:
+    clean = re.sub(r"[^A-Za-z0-9]+", "_", str(value or "unknown")).strip("_")
+    return clean or "unknown"
+
+
+def _has_current_run_fair_value_evidence(
+    *,
+    metadata: dict[str, Any],
+    ticker: str,
+    run_id: str,
+) -> bool:
+    if not run_id or run_id.lower() == "unknown":
+        return False
+    prefix = f"{ticker}_{_safe_rag_id_part(run_id)}_fair_value_"
+    for citation in metadata.get("rag_citations") or []:
+        if not isinstance(citation, dict):
+            continue
+        if citation.get("category") != "fair_value":
+            continue
+        if str(citation.get("chunk_id") or "").startswith(prefix):
+            return True
+    return False
+
+
+def _reject_unverified_fair_value_if_needed(
+    *,
+    ticker: str,
+    run_id: str,
+    fair_value: Any,
+    metadata: dict[str, Any],
+) -> tuple[float, dict[str, Any]]:
+    try:
+        fair_value_number = float(fair_value or 0.0)
+    except (TypeError, ValueError):
+        fair_value_number = 0.0
+    if fair_value_number <= 0:
+        return 0.0, metadata
+    if _has_current_run_fair_value_evidence(
+        metadata=metadata,
+        ticker=ticker,
+        run_id=run_id,
+    ):
+        metadata["fair_value_rag_verified"] = True
+        return fair_value_number, metadata
+
+    # FIX: ISSUE 1 — Reject fair value figures without current-run RAG backing.
+    logger.warning(
+        f"Fair value rejected: no RAG evidence match for {ticker} run_id={run_id}"
+    )
+    metadata["fair_value_rag_verified"] = False
+    metadata["fair_value_rejected"] = True
+    metadata["valuation_gap"] = "unverified"
+    reasons = list(metadata.get("reasons") or [])
+    if "fair_value_unverified" not in reasons:
+        reasons.append("fair_value_unverified")
+    metadata["reasons"] = reasons
+    return 0.0, metadata
 
 
 def _planner_decision_for_state(
@@ -528,6 +612,68 @@ MAX_STALENESS_PENALTY = 0.30
 SENTIMENT_STREAM_PAGE_SIZE = 20
 SENTIMENT_STREAM_PAGE_LIMIT = 3
 SENTIMENT_POST_CONTENT_LIMIT = 280
+AGENT_CALIBRATION_CONFIG_PATH = Path("config") / "agents.yaml"
+
+# FIX: ISSUE 2 — Calibrate confidence-winner scores before selecting a winner.
+DEFAULT_AGENT_CALIBRATION_WEIGHTS: dict[str, float] = {
+    "fundamental_scout": 1.0,
+    "chartist": 1.0,
+    "sentiment_specialist": 1.0,
+    "bull": 1.0,
+    "bear": 1.0,
+}
+
+
+def load_agent_calibration_weights(
+    config_path: Path = AGENT_CALIBRATION_CONFIG_PATH,
+) -> dict[str, float]:
+    """Load optional per-agent confidence calibration weights."""
+    weights = dict(DEFAULT_AGENT_CALIBRATION_WEIGHTS)
+    if not config_path.exists():
+        logger.warning(
+            "Agent calibration weights not configured — defaulting to 1.0 for all agents."
+        )
+        return weights
+    try:
+        import yaml
+
+        with config_path.open(encoding="utf-8") as handle:
+            config = yaml.safe_load(handle) or {}
+    except Exception as exc:
+        logger.warning(
+            "Agent calibration weights not configured — defaulting to 1.0 for all agents. "
+            f"Failed to load {config_path}: {exc}"
+        )
+        return weights
+
+    raw_agents = config.get("agents") if isinstance(config, dict) else None
+    raw_flat = (
+        config.get("agent_calibration_weights")
+        if isinstance(config, dict)
+        else None
+    )
+    configured = False
+    for agent in weights:
+        raw_weight = None
+        if isinstance(raw_agents, dict) and isinstance(raw_agents.get(agent), dict):
+            raw_weight = raw_agents[agent].get("calibration_weight")
+        elif isinstance(raw_flat, dict):
+            raw_weight = raw_flat.get(agent)
+        if raw_weight is None:
+            continue
+        try:
+            weights[agent] = max(0.0, float(raw_weight))
+            configured = True
+        except (TypeError, ValueError):
+            logger.warning(
+                f"[Calibration] Invalid calibration_weight for {agent}: {raw_weight!r}; "
+                "defaulting to 1.0"
+            )
+    if not configured:
+        logger.warning(
+            "Agent calibration weights not configured — defaulting to 1.0 for all agents."
+        )
+    return weights
 
 AGENT_SIGNAL_PROMPT = PROMPT_REGISTRY.prompts["AGENT_SIGNAL_PROMPT"]
 
@@ -607,6 +753,7 @@ class DebateChamber:
         self.app = self._build_graph()
         self.prompt_version = PROMPT_VERSION
         self._llm_call_counts: dict[tuple[str, str], dict[str, int]] = {}
+        self.agent_calibration_weights = load_agent_calibration_weights()
 
     # -- Agent signal helpers -------------------------------------------------
 
@@ -1120,10 +1267,23 @@ class DebateChamber:
         for agent, content, role, round_num in specs:
             signal = self._extract_agent_signal(str(content), role)
             confidence = signal.get("confidence")
+            raw_confidence = 0.0 if confidence is None else float(confidence)
+            weights = getattr(
+                self,
+                "agent_calibration_weights",
+                DEFAULT_AGENT_CALIBRATION_WEIGHTS,
+            )
+            calibration_weight = float(weights.get(agent, 1.0) or 1.0)
+            effective_confidence = max(
+                0.0,
+                min(raw_confidence * calibration_weight, 1.0),
+            )
             votes.append({
                 "agent": agent,
                 "position": signal.get("position", "UNKNOWN"),
-                "confidence": 0.0 if confidence is None else float(confidence),
+                "confidence": raw_confidence,
+                "calibration_weight": calibration_weight,
+                "effective_confidence": effective_confidence,
                 "round": round_num,
             })
         return votes
@@ -1216,7 +1376,9 @@ class DebateChamber:
             known_votes = [v for v in votes if v.get("position") in {"BUY", "HOLD", "AVOID"}]
             winner = max(
                 known_votes or votes,
-                key=lambda v: float(v.get("confidence", 0.0) or 0.0),
+                key=lambda v: float(
+                    v.get("effective_confidence", v.get("confidence", 0.0)) or 0.0
+                ),
             )
             winner_position = str(winner.get("position") or "HOLD")
             if winner_position == "UNKNOWN":
@@ -1725,6 +1887,10 @@ Current Date (Asia/Jakarta): {current_date}
                 atr_val = float(compute_atr(high, low, close).iloc[-1])
                 current_price = float(close.iloc[-1])
 
+                high_20d = float(high.tail(20).max()) if len(high) >= 20 else float(high.max())
+                high_50d = float(high.tail(50).max()) if len(high) >= 50 else float(high.max())
+
+
                 if ma200_raw is None or pd.isna(ma200_raw):
                     ma200_context = "INSUFFICIENT_DATA"
                 else:
@@ -1756,6 +1922,8 @@ Current Date (Asia/Jakarta): {current_date}
                     "avg_volume_20d": round(float(volume.tail(20).mean()), 0),
                     "52w_high": round(float(close.max()), 0),
                     "52w_low": round(float(close.min()), 0),
+                    "high_20d": round(high_20d, 0),
+                    "high_50d": round(high_50d, 0),
                 }
                 logger.info(f"[Chartist] Technicals computed: MA50={tech_indicators.get('ma50')}, RSI={tech_indicators.get('rsi14')}")
         except Exception as e:
@@ -2127,8 +2295,8 @@ Current Date (Asia/Jakarta): {current_date}
             logger.warning(
                 f"[ContextPack] {ticker} token_estimate={context_pack.token_estimate}"
             )
+        run_id = str((state.get("metadata") or {}).get("run_id", "unknown"))
         try:
-            run_id = state.get("metadata", {}).get("run_id", "unknown")
             bundle = rag_store.build_bundle(
                 pack=context_pack,
                 run_id=run_id,
@@ -2243,6 +2411,14 @@ Current Date (Asia/Jakarta): {current_date}
                         )
                     decision_brief = raw
                     state["metadata"] = metadata
+        fair_value_estimate, verified_metadata = _reject_unverified_fair_value_if_needed(
+            ticker=ticker,
+            run_id=run_id,
+            fair_value=fair_value_estimate,
+            metadata=dict(state.get("metadata") or {}),
+        )
+        state["fair_value_estimate"] = fair_value_estimate
+        state["metadata"] = verified_metadata
         if news_brief:
             decision_brief = f"{decision_brief}\n\n{news_brief}"
         raw = decision_brief
@@ -2369,6 +2545,26 @@ Current Date (Asia/Jakarta): {current_date}
         logger.info("[Consensus] Evaluating 5-agent votes")
         votes = self._collect_agent_votes(state)
         result = self._evaluate_consensus_votes(votes, state["round_count"])
+        if result.get("consensus_method") == "confidence_winner":
+            winner = result.get("consensus_winner") or {}
+            raw_confidence = float(winner.get("confidence", 0.0) or 0.0)
+            effective_confidence = float(
+                winner.get("effective_confidence", raw_confidence) or 0.0
+            )
+            logger.info(
+                "[Consensus] confidence_winner audit: "
+                f"agent={winner.get('agent')} "
+                f"raw={raw_confidence:.2f} "
+                f"effective={effective_confidence:.2f}"
+            )
+            metadata = dict(state.get("metadata") or {})
+            metadata["confidence_winner_audit"] = {
+                "agent": winner.get("agent"),
+                "raw_confidence": raw_confidence,
+                "effective_confidence": effective_confidence,
+                "calibration_weight": winner.get("calibration_weight", 1.0),
+            }
+            result["metadata"] = metadata
         logger.info(
             "[Consensus] Result: "
             f"reached={result['consensus_reached']} "
@@ -2676,14 +2872,34 @@ Current Date (Asia/Jakarta): {current_date}
         
         # Floor: minimal 4% from entry for worthwhile swing
         min_target = entry_mid * 1.04
-        target = max(rr_target, min_target)
-        target = snap_to_tick(target)
+        
+        high_20d = tech.get("high_20d", 0)
+        high_50d = tech.get("high_50d", 0)
+        high_52w = tech.get("52w_high", 0)
+        
+        target_basis = "Minimum R/R"
+        target_candidate = max(rr_target, min_target)
+        
+        if high_20d >= target_candidate:
+            target_candidate = high_20d
+            target_basis = "Resistance 20-Day"
+        elif high_50d >= target_candidate:
+            target_candidate = high_50d
+            target_basis = "Resistance 50-Day"
+        elif high_52w >= target_candidate:
+            target_candidate = high_52w
+            target_basis = "Resistance 52-Week"
+
+        target = snap_to_tick(target_candidate)
         
         # Ceiling: blend with Fair Value if target > FV
         if fair_value > 0 and target > fair_value:
             target = snap_to_tick((target + fair_value) / 2)
+            target_basis += " (FV Blend)"
+            
         if target <= entry_high:
             target = self._next_tick_above(entry_high)
+            target_basis = "Tick Increment (Fallback)"
 
         # Compute display percentages from entry_mid, but canonical R/R from entry_high.
         gain_pct = ((target - entry_mid) / entry_mid) * 100 if entry_mid > 0 else 0
@@ -2695,6 +2911,7 @@ Current Date (Asia/Jakarta): {current_date}
             "entry_high": entry_high,
             "entry_mid": round(entry_mid, 0),
             "target_price": target,
+            "target_basis": target_basis,
             "stop_loss": stop,
             "expected_return_pct": round(gain_pct, 1),
             "max_risk_pct": round(loss_pct, 1),
@@ -2712,6 +2929,7 @@ Current Date (Asia/Jakarta): {current_date}
             f"ENTRY ZONE         : Rp {envelope['entry_low']:,.0f} – Rp {envelope['entry_high']:,.0f}\n"
             f"ENTRY MIDPOINT     : Rp {envelope['entry_mid']:,.0f}\n"
             f"TARGET PRICE       : Rp {envelope['target_price']:,.0f}\n"
+            f"TARGET BASIS       : {envelope.get('target_basis', 'Unknown')}\n"
             f"STOP LOSS          : Rp {envelope['stop_loss']:,.0f}\n"
             f"ATR(14)            : Rp {envelope['atr14']:,.0f}\n"
             f"EXPECTED RETURN    : +{envelope['expected_return_pct']:.1f}%\n"
@@ -2878,7 +3096,10 @@ Current Date (Asia/Jakarta): {current_date}
                 (
                     "Consensus override: no 60% vote after 3 rounds, so "
                     f"{winner.get('agent', 'highest-confidence agent')} wins by "
-                    "highest numeric confidence. CIO did not override the winner."
+                    "highest calibrated effective confidence "
+                    f"(raw {float(winner.get('confidence', 0.0) or 0.0):.0%}, "
+                    f"effective {float(winner.get('effective_confidence', winner.get('confidence', 0.0)) or 0.0):.0%}). "
+                    "CIO did not override the winner."
                 ),
             )
             return p
@@ -2899,7 +3120,12 @@ Current Date (Asia/Jakarta): {current_date}
         ticker = state["ticker"]
         current_price = state.get("current_price", 0.0)
         tech = state.get("technical_indicators", {})
-        fair_value = state.get("fair_value_estimate", 0.0)
+        state_metadata = dict(_state_metadata(state))
+        fair_value = (
+            0.0
+            if state_metadata.get("fair_value_rejected")
+            else state.get("fair_value_estimate", 0.0)
+        )
         logger.info(f"[CIO] Deliberating on {ticker} (current price: {current_price:,.0f})")
         started_at = perf_counter()
         _ledger_stage_start(
@@ -2917,8 +3143,14 @@ Current Date (Asia/Jakarta): {current_date}
                 summary="Harga pasar tidak valid; trade envelope tidak dibuat.",
                 current_price=current_price,
                 fair_value=fair_value if fair_value and fair_value > 0 else None,
+                valuation_gap=(
+                    "unverified"
+                    if _state_metadata(state).get("fair_value_rejected")
+                    else None
+                ),
                 entry_price_range=None,
                 target_price=None,
+                target_basis=None,
                 stop_loss=None,
                 consensus_reached=bool(state.get("consensus_reached", False)),
                 consensus_method=state.get("consensus_method"),
@@ -3041,6 +3273,7 @@ no trailing text. The JSON must have exactly these keys:
   "timeframe": "<string e.g. '1-3 Months'>",
   "entry_price_range": "<string e.g. '4800 - 5000'>",
   "target_price": <number>,
+  "target_basis": "<string>",
   "stop_loss": <number>,
   "current_price": <number>,
   "fair_value": <number or null>,
@@ -3080,6 +3313,10 @@ Start your response with '{' and end with '}'. Nothing else."""
             except Exception:
                 p["target_price"] = p.get("target_price")
             try:
+                p["target_basis"] = envelope.get("target_basis") if envelope.get("target_basis") is not None else p.get("target_basis")
+            except Exception:
+                p["target_basis"] = p.get("target_basis")
+            try:
                 p["stop_loss"] = int(envelope.get("stop_loss")) if envelope.get("stop_loss") is not None else p.get("stop_loss")
             except Exception:
                 p["stop_loss"] = p.get("stop_loss")
@@ -3091,6 +3328,13 @@ Start your response with '{' and end with '}'. Nothing else."""
                     p["fair_value"] = fv_env
             else:
                 p["fair_value"] = p.get("fair_value") or None
+            if _state_metadata(state).get("fair_value_rejected"):
+                p["fair_value"] = None
+                p["valuation_gap"] = "unverified"
+                p["weighted_reasoning"] = self._append_reason(
+                    p.get("weighted_reasoning"),
+                    "Fair value rejected because no matching current-run RAG evidence was available.",
+                )
             return p
 
         def _apply_news_adjustment(parsed: dict) -> dict:
@@ -3196,8 +3440,14 @@ Start your response with '{' and end with '}'. Nothing else."""
                 summary=f"CIO parse error — raw response stored. Error: {e}",
                 current_price=current_price,
                 fair_value=envelope["fair_value"],
+                valuation_gap=(
+                    "unverified"
+                    if _state_metadata(state).get("fair_value_rejected")
+                    else None
+                ),
                 entry_price_range=f"{int(envelope['entry_low'])} - {int(envelope['entry_high'])}",
                 target_price=envelope["target_price"],
+                target_basis=envelope.get("target_basis", "Unknown"),
                 stop_loss=envelope["stop_loss"],
                 consensus_reached=bool(state.get("consensus_reached", False)),
                 consensus_method=state.get("consensus_method"),

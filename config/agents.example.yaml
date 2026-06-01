@@ -1,0 +1,14 @@
+# FIX: ISSUE 2 — Document default confidence calibration weights.
+# Default agent confidence calibration weights.
+# Copy to config/agents.yaml and tune per agent when calibration data is available.
+agents:
+  fundamental_scout:
+    calibration_weight: 1.0
+  chartist:
+    calibration_weight: 1.0
+  sentiment_specialist:
+    calibration_weight: 1.0
+  bull:
+    calibration_weight: 1.0
+  bear:
+    calibration_weight: 1.0

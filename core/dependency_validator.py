@@ -256,9 +256,13 @@ def check_llm_models(required: bool = True) -> DependencyCheck:
                 blocking=False,
             )
         if provider == "codex" and required:
+            import concurrent.futures
             try:
-                _invoke_llm_probe(provider, "flash")
-                _invoke_llm_probe(provider, "pro")
+                with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                    f1 = executor.submit(_invoke_llm_probe, provider, "flash")
+                    f2 = executor.submit(_invoke_llm_probe, provider, "pro")
+                    f1.result()
+                    f2.result()
             except Exception as exc:
                 return DependencyCheck(
                     name="llm_models",

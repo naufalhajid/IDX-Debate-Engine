@@ -319,6 +319,79 @@ async def test_consensus_round_three_uses_confidence_winner(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_confidence_winner_uses_effective_calibrated_confidence(monkeypatch):
+    chamber = _chamber()
+    chamber.agent_calibration_weights = {
+        **dc.DEFAULT_AGENT_CALIBRATION_WEIGHTS,
+        "bear": 0.5,
+    }
+
+    async def fake_invoke(llm, messages, inject_rules=True):
+        raise AssertionError("consensus evaluator should be deterministic")
+
+    monkeypatch.setattr(chamber, "_invoke_llm", fake_invoke)
+
+    result = await chamber._consensus_evaluator_node(
+        {
+            "round_count": 3,
+            "metadata": {"run_id": "run-1"},
+            "fundamental_data": "Position: HOLD\nAgent Confidence: 0.10",
+            "technical_data": "Position: BUY\nAgent Confidence: 0.11",
+            "sentiment_data": "Position: HOLD\nAgent Confidence: 0.12",
+            "debate_history": [
+                DebateMessage(role="bull", content="Position: BUY\nAgent Confidence: 0.64", round_num=3),
+                DebateMessage(role="bear", content="Position: AVOID\nAgent Confidence: 0.93", round_num=3),
+            ],
+        }
+    )
+
+    assert result["consensus_method"] == "confidence_winner"
+    assert result["consensus_winner"]["agent"] == "bull"
+    bear_vote = next(v for v in result["agent_votes"] if v["agent"] == "bear")
+    assert bear_vote["confidence"] == 0.93
+    assert bear_vote["effective_confidence"] == pytest.approx(0.465)
+    assert result["metadata"]["confidence_winner_audit"] == {
+        "agent": "bull",
+        "raw_confidence": 0.64,
+        "effective_confidence": 0.64,
+        "calibration_weight": 1.0,
+    }
+
+
+def test_fair_value_rejected_without_current_run_rag_evidence():
+    fair_value, metadata = dc._reject_unverified_fair_value_if_needed(
+        ticker="BBCA",
+        run_id="run-1",
+        fair_value=10474,
+        metadata={"rag_citations": []},
+    )
+
+    assert fair_value == 0.0
+    assert metadata["fair_value_rejected"] is True
+    assert metadata["valuation_gap"] == "unverified"
+    assert "fair_value_unverified" in metadata["reasons"]
+
+
+def test_fair_value_accepted_with_current_run_rag_evidence():
+    fair_value, metadata = dc._reject_unverified_fair_value_if_needed(
+        ticker="BBCA",
+        run_id="run-1",
+        fair_value=10474,
+        metadata={
+            "rag_citations": [
+                {
+                    "chunk_id": "BBCA_run_1_fair_value_0",
+                    "category": "fair_value",
+                }
+            ]
+        },
+    )
+
+    assert fair_value == 10474
+    assert metadata["fair_value_rag_verified"] is True
+
+
+@pytest.mark.asyncio
 async def test_chartist_node_uses_pro_llm(monkeypatch):
     chamber = _chamber()
     chamber.flash_llm = FakeLLM(model="gemini-2.5-flash")
@@ -858,6 +931,4 @@ def test_sanitize_json_handles_single_quoted_json():
     parsed = json.loads(sanitized)
     assert parsed["position"] == "BUY"
     assert parsed["confidence"] == 0.85
-
-
 

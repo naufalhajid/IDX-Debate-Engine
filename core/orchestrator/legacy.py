@@ -1599,6 +1599,7 @@ class CliRenderer:
         regime: str,
         sizing_result: dict[str, Any] | None,
         output_files: list[Path],
+        corrupt_lines: int = 0,
     ) -> None:
         self.budget_usage = get_usage()
         elapsed = time.monotonic() - started_at
@@ -1638,6 +1639,12 @@ class CliRenderer:
             table.add_row("Warnings", str(self.warning_count))
             if self.batch_error_count:
                 table.add_row("Errors", str(self.batch_error_count))
+            if corrupt_lines > 0:
+                # FIX: ISSUE 4 — Surface audit-log corruption in the summary footer.
+                table.add_row(
+                    "Audit integrity",
+                    f"⚠️  Audit integrity: {corrupt_lines} corrupt line(s) — see audit_corrupt.jsonl",
+                )
             if portfolio_note:
                 table.add_row("Catatan", portfolio_note)
             output_detail = "\n".join(output_file_strings) or "-"
@@ -1673,6 +1680,14 @@ class CliRenderer:
             if self.batch_error_count:
                 warning_text = f"{warning_text}, {self.batch_error_count} error(s)"
             table.add_row("Warnings", warning_text, "Output Files", output_detail)
+            if corrupt_lines > 0:
+                # FIX: ISSUE 4 — Surface audit-log corruption in the summary footer.
+                table.add_row(
+                    "Audit Integrity",
+                    f"⚠️  Audit integrity: {corrupt_lines} corrupt line(s) — see audit_corrupt.jsonl",
+                    "",
+                    "",
+                )
             if portfolio_note:
                 table.add_row("Catatan", portfolio_note, "", "")
         self.con.print(Panel(table, title="Summary Footer", border_style="green"))
@@ -3109,6 +3124,39 @@ def _result_status(entry: dict[str, Any]) -> str:
     return "failed"
 
 
+# FIX: ISSUE 1 — Suppress unverified fair value in final trade displays.
+def _valuation_gap_unverified(entry: dict[str, Any]) -> bool:
+    verdict = _dict_or_empty(entry.get("verdict"))
+    metadata = _dict_or_empty(entry.get("metadata"))
+    return (
+        str(verdict.get("valuation_gap") or "").lower() == "unverified"
+        or str(entry.get("valuation_gap") or "").lower() == "unverified"
+        or str(metadata.get("valuation_gap") or "").lower() == "unverified"
+        or bool(metadata.get("fair_value_rejected"))
+    )
+
+
+# FIX: ISSUE 3 — Extract breaking-news headlines for report display.
+def _breaking_news_headlines_from_bundle(news_bundle: Any, limit: int = 3) -> list[dict[str, str]]:
+    headlines: list[dict[str, str]] = []
+    for item in list(getattr(news_bundle, "items", []) or []):
+        if not bool(getattr(item, "is_breaking", False)):
+            continue
+        title = str(getattr(item, "title", "") or "").strip()
+        if not title:
+            continue
+        headlines.append(
+            {
+                "title": title,
+                "source": str(getattr(item, "source", "") or "unknown"),
+                "timestamp": str(getattr(item, "published_at", "") or "unknown"),
+            }
+        )
+        if len(headlines) >= limit:
+            break
+    return headlines
+
+
 def _attach_news_signal(ticker: str, result: dict[str, Any]) -> None:
     try:
         news_bundle = DEFAULT_FETCHER.build_bundle(ticker)
@@ -3126,6 +3174,14 @@ def _attach_news_signal(ticker: str, result: dict[str, Any]) -> None:
             logger.warning(f"[News] {ticker}: BREAKING NEWS DETECTED")
         result["news_sentiment"] = news_bundle.overall_sentiment.value
         result["news_confidence_adjustment"] = news_bundle.confidence_adjustment
+        # FIX: ISSUE 3 — Carry breaking-news content into persisted outputs.
+        result["has_breaking_news"] = news_bundle.has_breaking_news
+        result["breaking_news_headlines"] = _breaking_news_headlines_from_bundle(
+            news_bundle
+        )
+        metadata = _result_metadata(result)
+        metadata["has_breaking_news"] = news_bundle.has_breaking_news
+        metadata["breaking_news_headlines"] = result["breaking_news_headlines"]
     except Exception as e:
         logger.warning(f"[News] {ticker}: fetch failed: {e}")
 
@@ -3812,6 +3868,9 @@ async def run_batch_debates(
         else:
             from services.debate_chamber import DebateChamber
             chamber = DebateChamber()
+        if run_id:
+            # FIX: ISSUE 1 — Propagate the batch run_id before RAG evidence IDs are built.
+            setattr(chamber, "run_id", run_id)
         results = await asyncio.gather(
             *[_guarded(t) for t in tickers],
             return_exceptions=True,
@@ -4163,7 +4222,7 @@ def _latest_debate_path_for_validation(results: list[dict], output_dir: Path) ->
     return output_dir / "debates" / "UNKNOWN" / "latest_debate.json"
 
 
-def _log_artifact_validation(results: list[dict]) -> None:
+def _log_artifact_validation(results: list[dict]):
     report = reconcile_artifacts(
         FULL_RESULTS_PATH,
         TOP3_REPORT_PATH,
@@ -4180,6 +4239,7 @@ def _log_artifact_validation(results: list[dict]) -> None:
         logger.error(
             f"[ArtifactValidator] Output artifact validation failed: {report.errors}"
         )
+    return report
 
 
 def _build_sizing_candidates(top_n: list[dict]) -> list[dict]:
@@ -4616,10 +4676,16 @@ def generate_top3_report(
                 if v.get("stop_loss")
                 else "| **Stop Loss** | N/A |"
             ),
-            (
-                f"| **Fair Value** | Rp {v['fair_value']:,.0f} |"
-                if v.get("fair_value")
-                else "| **Fair Value** | N/A |"
+            *(
+                []
+                if _valuation_gap_unverified(entry)
+                else [
+                    (
+                        f"| **Fair Value** | Rp {v['fair_value']:,.0f} |"
+                        if v.get("fair_value")
+                        else "| **Fair Value** | N/A |"
+                    )
+                ]
             ),
             f"| **Expected Return** | {v.get('expected_return', 'N/A')} |",
             f"| **Risk/Reward** | {v.get('risk_reward_ratio', 'N/A')} |",
@@ -5107,7 +5173,7 @@ async def main(
         run_id=ledger_run_id,
         batch_timestamp=batch_timestamp,
     )
-    _log_artifact_validation(results)
+    artifact_report = _log_artifact_validation(results)
     _check_report_consistency(
         batch_json_path=FULL_RESULTS_PATH,
         top3_md_path=TOP3_REPORT_PATH,
@@ -5168,6 +5234,7 @@ async def main(
         regime=str(regime),
         sizing_result=sizing_result,
         output_files=persistence_outputs,
+        corrupt_lines=getattr(artifact_report, "corrupt_lines", 0),
     )
     _cli_renderer.flush_buffered_alerts()
 

@@ -58,6 +58,23 @@ def test_summary_footer_uses_explicit_metric_labels() -> None:
     assert "Value" not in output
 
 
+def test_summary_footer_displays_audit_corrupt_line_count() -> None:
+    console = _recording_console(width=200)
+    renderer = CliRenderer(con=console)
+
+    renderer.render_summary_footer(
+        started_at=time.monotonic() - 2.0,
+        regime="NORMAL",
+        sizing_result={"summary": {"total_deployed": 0, "deployed_pct": 0}},
+        output_files=[Path("output/full_batch_results.json")],
+        corrupt_lines=2,
+    )
+
+    output = console.export_text()
+    assert "Audit integrity: 2 corrupt line(s)" in output
+    assert "audit_corrupt.jsonl" in output
+
+
 def test_final_results_table_explains_price_validation_context() -> None:
     console = _recording_console(width=180)
     renderer = CliRenderer(con=console)

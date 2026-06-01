@@ -282,9 +282,37 @@ def test_vote_table_soft_hold_uses_override_note() -> None:
 
     report = MarkdownFormatter().generate_ticker_report(result)
 
-    assert "| Agent | Position | Confidence |" in report
+    assert "| Agent | Position | Confidence | Effective Confidence |" in report
     assert "| Agent | Position | Confidence | Outcome |" not in report
     assert "overridden by soft_hold_rule" in report
+
+
+def test_generate_ticker_report_shows_breaking_news_section() -> None:
+    result = _mock_result()
+    result["has_breaking_news"] = True
+    result["breaking_news_headlines"] = [
+        {
+            "title": "BBCA faces sudden regulatory pressure",
+            "source": "IDX News",
+            "timestamp": "2026-06-01T09:00:00+07:00",
+        }
+    ]
+
+    report = MarkdownFormatter().generate_ticker_report(result)
+
+    assert "⚠️  BREAKING NEWS" in report
+    assert "BBCA faces sudden regulatory pressure — IDX News" in report
+
+
+def test_generate_ticker_report_suppresses_unverified_fair_value() -> None:
+    result = _mock_result()
+    result["verdict"]["fair_value"] = None
+    result["verdict"]["valuation_gap"] = "unverified"
+
+    report = MarkdownFormatter().generate_ticker_report(result)
+
+    assert "| **Fair Value** |" not in report
+    assert "| **Gap** | unverified |" in report
 
 
 def test_render_ticker_panel_handles_minimal_result() -> None:
@@ -310,6 +338,27 @@ def test_render_ticker_panel_contains_debate_argument_highlights() -> None:
     assert "Agent rationale" in output
     assert "News Sentiment" not in output
     assert "Advocatus" not in output
+
+
+def test_render_ticker_panel_shows_breaking_news_headlines() -> None:
+    console = Console(record=True, width=140)
+    formatter = RichFormatter(console=console)
+    result = _mock_result()
+    result["metadata"]["has_breaking_news"] = True
+    result["metadata"]["breaking_news_headlines"] = [
+        {
+            "title": "BBCA headline risk escalates",
+            "source": "Kontan",
+            "timestamp": "2026-06-01T09:00:00+07:00",
+        }
+    ]
+
+    formatter.render_ticker_panel(result)
+
+    output = console.export_text()
+    assert "BREAKING NEWS" in output
+    assert "BBCA headline risk escalates" in output
+    assert "Kontan" in output
 
 
 def test_argument_highlight_uses_latest_round_and_strips_footer() -> None:

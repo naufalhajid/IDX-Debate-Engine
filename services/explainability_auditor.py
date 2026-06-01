@@ -29,6 +29,10 @@ AGENT_ROLES = {
 CONSENSUS_AGENT_ROLES = AGENT_ROLES - {"devils_advocate"}
 
 
+def _format_optional_float(value: float | None) -> str:
+    return "?" if value is None else f"{value:.2f}"
+
+
 class AgentVoteSummary(BaseModel):
     """Compact per-agent vote extracted from the debate transcript."""
 
@@ -37,6 +41,8 @@ class AgentVoteSummary(BaseModel):
     agent: str
     position: str
     confidence: float | None
+    calibration_weight: float | None = None
+    effective_confidence: float | None = None
     round_num: int
     supporting_winner: bool
     summary: str
@@ -72,6 +78,8 @@ class AuditPacket(BaseModel):
     winner_agent: str | None
     winner_position: str | None
     winner_confidence: float | None
+    winner_raw_confidence: float | None = None
+    winner_effective_confidence: float | None = None
     dissenting_agents: list[str]
     dissent_rate: float
 
@@ -114,7 +122,11 @@ class ExplainabilityAuditor:
         debate_rounds = self._int_or_default(debate_json.get("debate_rounds"), 0)
         dissenting_agents = self._string_list(verdict.get("dissenting_agents"))
 
-        agent_votes = self._parse_agent_votes(
+        # FIX: ISSUE 2 — Preserve effective calibrated confidence in audit packets.
+        agent_votes = self._parse_explicit_agent_votes(
+            debate_json.get("agent_votes"),
+            verdict_rating=rating,
+        ) or self._parse_agent_votes(
             debate_json.get("debate_history"),
             verdict_rating=rating,
         )
@@ -123,14 +135,22 @@ class ExplainabilityAuditor:
             winner_agent = "soft_hold_rule"
             winner_position = "HOLD"
             winner_confidence = confidence
+            winner_raw_confidence = confidence
+            winner_effective_confidence = confidence
         elif consensus_method == "confidence_winner":
-            winner_agent = dissenting_agents[0] if dissenting_agents else "confidence_winner"
-            winner_position = self._canonical_position(rating)
-            winner_confidence = confidence
+            winner_agent = explicit_winner.get("agent") or (
+                dissenting_agents[0] if dissenting_agents else "confidence_winner"
+            )
+            winner_position = explicit_winner.get("position") or self._canonical_position(rating)
+            winner_confidence = explicit_winner.get("confidence") or confidence
+            winner_raw_confidence = explicit_winner.get("confidence") or confidence
+            winner_effective_confidence = explicit_winner.get("effective_confidence")
         else:
             winner_agent = explicit_winner.get("agent")
             winner_position = explicit_winner.get("position")
             winner_confidence = explicit_winner.get("confidence")
+            winner_raw_confidence = explicit_winner.get("confidence")
+            winner_effective_confidence = explicit_winner.get("effective_confidence")
 
         raw_data_summary = str(debate_json.get("raw_data_summary") or "")
         evidence_used = self._extract_evidence(raw_data_summary)
@@ -186,6 +206,8 @@ class ExplainabilityAuditor:
             winner_agent=winner_agent,
             winner_position=winner_position,
             winner_confidence=winner_confidence,
+            winner_raw_confidence=winner_raw_confidence,
+            winner_effective_confidence=winner_effective_confidence,
             dissenting_agents=dissenting_agents,
             dissent_rate=len(dissenting_agents) / 5,
             agent_votes=agent_votes,
@@ -245,6 +267,14 @@ class ExplainabilityAuditor:
                 f"{packet.verdict_rating} "
                 f"(confidence: {packet.verdict_confidence:.0%})",
                 f"Method     : {packet.consensus_method}",
+                (
+                    "Winner    : "
+                    f"{packet.winner_agent or 'unknown'} "
+                    f"(raw={_format_optional_float(packet.winner_raw_confidence)}, "
+                    f"effective={_format_optional_float(packet.winner_effective_confidence)})"
+                    if packet.consensus_method == "confidence_winner"
+                    else f"Winner    : {packet.winner_agent or 'unknown'}"
+                ),
                 f"Consensus  : {consensus}",
                 f"Rounds     : {packet.debate_rounds}",
                 "Dissent    : "
@@ -268,6 +298,46 @@ class ExplainabilityAuditor:
                 f"Missing      : {missing_fields}",
             ]
         )
+
+    @classmethod
+    def _parse_explicit_agent_votes(
+        cls,
+        raw_votes: Any,
+        verdict_rating: str,
+    ) -> list[AgentVoteSummary]:
+        votes: list[AgentVoteSummary] = []
+        if not isinstance(raw_votes, list):
+            return votes
+        winner_position = cls._canonical_position(verdict_rating)
+        for raw_vote in raw_votes:
+            if not isinstance(raw_vote, dict):
+                continue
+            agent = str(raw_vote.get("agent") or "")
+            if agent not in AGENT_ROLES:
+                continue
+            position = str(raw_vote.get("position") or "UNKNOWN")
+            votes.append(
+                AgentVoteSummary(
+                    agent=agent,
+                    position=position,
+                    confidence=cls._float_or_none(raw_vote.get("confidence")),
+                    calibration_weight=cls._float_or_none(
+                        raw_vote.get("calibration_weight")
+                    ),
+                    effective_confidence=cls._float_or_none(
+                        raw_vote.get("effective_confidence")
+                    ),
+                    round_num=cls._int_or_default(
+                        raw_vote.get("round_num", raw_vote.get("round")),
+                        0,
+                    ),
+                    supporting_winner=(
+                        cls._canonical_position(position) == winner_position
+                    ),
+                    summary=str(raw_vote.get("summary") or "")[:200],
+                )
+            )
+        return votes
 
     @classmethod
     def _parse_agent_votes(
@@ -340,14 +410,23 @@ class ExplainabilityAuditor:
                 "agent": cls._optional_string(raw_winner.get("agent")),
                 "position": cls._optional_string(raw_winner.get("position")),
                 "confidence": cls._float_or_none(raw_winner.get("confidence")),
+                "effective_confidence": cls._float_or_none(
+                    raw_winner.get("effective_confidence")
+                ),
             }
         if raw_winner:
             return {
                 "agent": str(raw_winner),
                 "position": None,
                 "confidence": None,
+                "effective_confidence": None,
             }
-        return {"agent": None, "position": None, "confidence": None}
+        return {
+            "agent": None,
+            "position": None,
+            "confidence": None,
+            "effective_confidence": None,
+        }
 
     @classmethod
     def _extract_evidence(cls, raw_data_summary: str) -> list[EvidenceItem]:
@@ -511,10 +590,15 @@ class ExplainabilityAuditor:
     @staticmethod
     def _format_agent_vote(vote: AgentVoteSummary) -> str:
         confidence = "?" if vote.confidence is None else f"{vote.confidence:.2f}"
+        effective = (
+            "?"
+            if vote.effective_confidence is None
+            else f"{vote.effective_confidence:.2f}"
+        )
         support_mark = "✅" if vote.supporting_winner else "❌"
         return (
             f"  {vote.agent:<22} {vote.position:<8} "
-            f"conf={confidence:>5}  {support_mark}"
+            f"conf={confidence:>5} eff={effective:>5}  {support_mark}"
         )
 
     @staticmethod

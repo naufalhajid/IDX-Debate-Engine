@@ -276,6 +276,48 @@ def _valuation_status(fair_value: Any, current_price: Any) -> str:
     return "FAIR VALUE"
 
 
+# FIX: ISSUE 1 — Treat rejected fair value as an unverified valuation gap.
+def _valuation_gap_is_unverified(result: dict[str, Any], verdict: dict[str, Any]) -> bool:
+    metadata = _dict_or_empty(result.get("metadata"))
+    return (
+        str(verdict.get("valuation_gap") or "").lower() == "unverified"
+        or str(result.get("valuation_gap") or "").lower() == "unverified"
+        or str(metadata.get("valuation_gap") or "").lower() == "unverified"
+        or bool(metadata.get("fair_value_rejected"))
+    )
+
+
+# FIX: ISSUE 3 — Format breaking-news headlines for Rich and Markdown reports.
+def _breaking_news_lines(result: dict[str, Any]) -> list[str]:
+    metadata = _dict_or_empty(result.get("metadata"))
+    has_breaking = bool(
+        result.get("has_breaking_news")
+        or metadata.get("has_breaking_news")
+    )
+    if not has_breaking:
+        return []
+    raw_items = (
+        result.get("breaking_news_headlines")
+        or metadata.get("breaking_news_headlines")
+        or []
+    )
+    lines: list[str] = []
+    for item in _list_or_empty(raw_items)[:3]:
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("title") or item.get("headline") or "").strip()
+        if not title:
+            continue
+        source = str(item.get("source") or "unknown").strip() or "unknown"
+        timestamp = str(item.get("timestamp") or item.get("published_at") or "unknown")
+        lines.append(f"• {title} — {source} ({timestamp})")
+    if not lines:
+        lines.append(
+            "Breaking news detected but headline content unavailable — verify manually."
+        )
+    return lines
+
+
 def _short_text(value: Any, limit: int = 60) -> str:
     text = str(value or "").strip()
     if not text:
@@ -721,14 +763,14 @@ def _soft_hold_override_note(
 def _agent_rows(
     result: dict[str, Any],
     packet: AuditPacket | None = None,
-) -> list[tuple[str, str, str, str, str | None]]:
+) -> list[tuple[str, str, str, str, str, str | None]]:
     votes = _agent_votes(result, packet)
     if not votes:
         return []
     by_agent = _votes_by_agent(votes)
     rating = _rating(result, packet)
     winner = _winner_agent(result, packet)
-    rows: list[tuple[str, str, str, str, str | None]] = []
+    rows: list[tuple[str, str, str, str, str, str | None]] = []
     for agent_key in _AGENT_ORDER:
         vote = by_agent.get(agent_key)
         is_adversarial = _is_devils_advocate_agent(agent_key)
@@ -747,19 +789,22 @@ def _agent_rows(
         if vote is None:
             result_text = "N/A" if is_adversarial else "NO VOTE"
             style = "dim" if is_adversarial else None
-            rows.append((agent_label, "--", "--", result_text, style))
+            rows.append((agent_label, "--", "--", "--", result_text, style))
             continue
         position = str(_vote_value(vote, "position") or "--").upper()
         confidence = _confidence(_vote_value(vote, "confidence"))
         confidence_text = "--" if confidence is None else f"{confidence:.0%}"
+        effective = _confidence(_vote_value(vote, "effective_confidence"))
+        effective_text = "--" if effective is None else f"{effective:.0%}"
         if is_adversarial:
-            rows.append((agent_label, position, confidence_text, "N/A", "dim"))
+            rows.append((agent_label, position, confidence_text, effective_text, "N/A", "dim"))
             continue
         rows.append(
             (
                 agent_label,
                 position,
                 confidence_text,
+                effective_text,
                 _support_mark(
                     vote=vote,
                     rating=rating,
@@ -892,6 +937,7 @@ class RichFormatter:
             )
             current_price = verdict.get("current_price")
             fair_value = verdict.get("fair_value")
+            valuation_unverified = _valuation_gap_is_unverified(data, verdict)
             value_gap = _price_diff_pct(fair_value, current_price)
             value_style = "green" if (value_gap or 0) >= 0 else "red"
             entry_low, entry_high = _entry_bounds(verdict)
@@ -930,12 +976,17 @@ class RichFormatter:
             left_table.add_column(style="bold cyan", no_wrap=True)
             left_table.add_column(style="white")
             left_table.add_row("Current Price", _money(current_price))
-            left_table.add_row("Fair Value", _money(fair_value))
+            if not valuation_unverified:
+                left_table.add_row("Fair Value", _money(fair_value))
             left_table.add_row(
                 "Valuation Gap",
                 Text(
-                    f"{_signed_pct(value_gap)} ({_valuation_status(fair_value, current_price)})",
-                    style=value_style,
+                    (
+                        "unverified"
+                        if valuation_unverified
+                        else f"{_signed_pct(value_gap)} ({_valuation_status(fair_value, current_price)})"
+                    ),
+                    style="yellow" if valuation_unverified else value_style,
                 ),
             )
             left_table.add_row("Entry Zone", f"{_money(entry_low)} – {_money(entry_high)}")
@@ -993,6 +1044,18 @@ class RichFormatter:
                 expand=True,
             )
 
+            # FIX: ISSUE 3 — Display breaking-news headlines below debate arguments.
+            breaking_lines = _breaking_news_lines(data)
+            breaking_panel = None
+            if breaking_lines:
+                breaking_panel = Panel(
+                    Text("\n".join(breaking_lines)),
+                    title="[bold red]⚠️  BREAKING NEWS[/bold red]",
+                    border_style="red",
+                    padding=(1, 2),
+                    expand=True,
+                )
+
             # 5. System & Risk Management
             risks = _key_risks(data)[:3]
             catalysts = _catalysts(data)[:2] if rating == "BUY" else []
@@ -1021,6 +1084,7 @@ class RichFormatter:
                 Rule(style="dim"),
                 columns_table,
                 arg_panel,
+                *([breaking_panel] if breaking_panel is not None else []),
                 sys_panel,
                 Text(f"Generated: {_generated_at(data, packet)}", style="dim", justify="right")
             )
@@ -1126,12 +1190,14 @@ class RichFormatter:
         table.add_column("Agent")
         table.add_column("Position")
         table.add_column("Confidence", justify="right")
+        table.add_column("Effective", justify="right")
         table.add_column("Outcome")
-        for agent, position, confidence, result_text, style in rows:
+        for agent, position, confidence, effective, result_text, style in rows:
             table.add_row(
                 agent,
                 position,
                 confidence,
+                effective,
                 result_text,
                 style=style,
             )
@@ -1193,8 +1259,13 @@ class MarkdownFormatter:
             confidence_text = "N/A" if confidence is None else f"{confidence:.0%}"
             current_price = verdict.get("current_price")
             fair_value = verdict.get("fair_value")
+            valuation_unverified = _valuation_gap_is_unverified(data, verdict)
             value_gap = _price_diff_pct(fair_value, current_price)
-            value_status = _valuation_status(fair_value, current_price)
+            value_status = (
+                "unverified"
+                if valuation_unverified
+                else _valuation_status(fair_value, current_price)
+            )
             low, high = _entry_bounds(verdict)
             target = verdict.get("target_price")
             stop = verdict.get("stop_loss")
@@ -1222,8 +1293,12 @@ class MarkdownFormatter:
                 f"| **Recommendation** | **{rating}** |",
                 f"| **Trade Setup Conviction** | {confidence_text} |",
                 f"| **Current Price** | {_money(current_price)} |",
-                f"| **Fair Value** | {_money(fair_value)} |",
-                f"| **Gap** | {_signed_pct(value_gap)} ({value_status}) |",
+                *([] if valuation_unverified else [f"| **Fair Value** | {_money(fair_value)} |"]),
+                (
+                    f"| **Gap** | {value_status} |"
+                    if valuation_unverified
+                    else f"| **Gap** | {_signed_pct(value_gap)} ({value_status}) |"
+                ),
                 "",
                 f"> {_summary(data, packet)}",
                 "",
@@ -1262,6 +1337,16 @@ class MarkdownFormatter:
                 "**Decision Summary & Agent Rationale:**",
                 f"> {_debate_decision_summary(data, packet, limit=900)}",
                 "",
+                *(
+                    [
+                        "⚠️  BREAKING NEWS",
+                        "",
+                        *_breaking_news_lines(data),
+                        "",
+                    ]
+                    if _breaking_news_lines(data)
+                    else []
+                ),
                 "---",
                 "",
                 "## Risk Analysis",
@@ -1416,11 +1501,11 @@ class MarkdownFormatter:
         if not rows:
             return ["No voting data"]
         lines = [
-            "| Agent | Position | Confidence |",
-            "|-------|--------|-----------|",
+            "| Agent | Position | Confidence | Effective Confidence |",
+            "|-------|--------|-----------|----------------------|",
         ]
-        for agent, position, confidence, _outcome, _style in rows:
-            lines.append(f"| {agent} | {position} | {confidence} |")
+        for agent, position, confidence, effective, _outcome, _style in rows:
+            lines.append(f"| {agent} | {position} | {confidence} | {effective} |")
         override_note = _soft_hold_override_note(result, packet)
         if override_note:
             lines.extend(["", f"*{override_note}*"])

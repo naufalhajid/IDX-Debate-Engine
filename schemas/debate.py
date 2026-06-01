@@ -86,6 +86,11 @@ class CIOVerdict(BaseDataClass):
             "Pass null if INSUFFICIENT_DATA or 0."
         ),
     )
+    # FIX: ISSUE 1 — Carry unverified valuation state into final artifacts.
+    valuation_gap: str | None = Field(
+        default=None,
+        description="Set to 'unverified' when fair value is rejected by evidence checks.",
+    )
 
     entry_price_range: str | None = Field(
         default=None,
@@ -139,6 +144,11 @@ class CIOVerdict(BaseDataClass):
     )
 
     # ── Auto-computed (never sent by LLM; derived post-validation) ────────────
+    target_basis: str | None = Field(
+        default=None,
+        description="Basis for the swing profit target price (e.g. '20-day high resistance').",
+    )
+
     expected_return: str | None = Field(
         default=None,
         description="Auto-calculated: % gain from entry midpoint to target_price. null if invalid.",

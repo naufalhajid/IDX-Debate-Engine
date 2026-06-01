@@ -12,6 +12,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from core.settings import settings
+from utils.logger_config import logger
 
 
 class ValidationReport(BaseModel):
@@ -51,6 +52,7 @@ class ReconciliationReport(BaseModel):
     latest_ticker: str | None = None
     latest_run_id: str | None = None
     surfaces: dict[str, bool] = Field(default_factory=dict)
+    corrupt_lines: int = 0
 
 
 _TOP_PICK_HEADING = re.compile(
@@ -118,6 +120,7 @@ def reconcile_artifacts(
     validation_report = validate_artifacts(batch_path, top3_path, latest_path)
     errors = list(validation_report.errors)
     warnings = list(validation_report.warnings)
+    corrupt_audit_lines: list[dict[str, Any]] = []
     issues: list[ReconciliationIssue] = [
         ReconciliationIssue(
             source="artifact_validator",
@@ -214,7 +217,14 @@ def reconcile_artifacts(
     }
 
     if latest_ticker is not None:
-        _reconcile_audit_log(audit_path, latest_ticker, latest_run_id, issues, warnings)
+        _reconcile_audit_log(
+            audit_path,
+            latest_ticker,
+            latest_run_id,
+            issues,
+            warnings,
+            corrupt_audit_lines,
+        )
         _reconcile_telemetry_log(
             telemetry_path,
             latest_ticker,
@@ -246,6 +256,7 @@ def reconcile_artifacts(
         latest_ticker=latest_ticker,
         latest_run_id=latest_run_id,
         surfaces=surfaces,
+        corrupt_lines=len(corrupt_audit_lines),
     )
 
 
@@ -272,7 +283,12 @@ def _load_json(text: str | None, path: Path, errors: list[str]) -> Any | None:
         return None
 
 
-def _load_jsonl(path: Path | None, label: str, warnings: list[str]) -> list[dict[str, Any]]:
+def _load_jsonl(
+    path: Path | None,
+    label: str,
+    warnings: list[str],
+    corrupt_lines: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
     if path is None:
         return []
     if not path.exists():
@@ -285,13 +301,39 @@ def _load_jsonl(path: Path | None, label: str, warnings: list[str]) -> list[dict
         try:
             payload = json.loads(line)
         except json.JSONDecodeError as exc:
-            warnings.append(f"{label} line {line_number} is not valid JSON: {exc}")
+            # FIX: ISSUE 4 — Preserve corrupt audit JSONL lines for diagnosis.
+            preview = line[:80]
+            message = (
+                f"{label} line {line_number} is not valid JSON at char {exc.pos}: "
+                f"{exc}; raw={preview!r}"
+            )
+            logger.warning(message)
+            warnings.append(message)
+            if label == "audit_log.jsonl" and corrupt_lines is not None:
+                corrupt_record = {
+                    "error": "invalid_json",
+                    "line": line_number,
+                    "raw": line,
+                }
+                corrupt_lines.append(corrupt_record)
+                _write_corrupt_audit_line(path, corrupt_record)
             continue
         if isinstance(payload, dict):
             records.append(payload)
         else:
             warnings.append(f"{label} line {line_number} is not a JSON object.")
     return records
+
+
+def _write_corrupt_audit_line(path: Path, record: dict[str, Any]) -> None:
+    output_dir = path.parent.parent if path.parent.name == "audit" else path.parent
+    corrupt_path = output_dir / "audit_corrupt.jsonl"
+    try:
+        corrupt_path.parent.mkdir(parents=True, exist_ok=True)
+        with corrupt_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except OSError as exc:
+        logger.warning(f"Failed to write {corrupt_path}: {exc}")
 
 
 def _index_batch_results(
@@ -794,8 +836,9 @@ def _reconcile_audit_log(
     run_id: str | None,
     issues: list[ReconciliationIssue],
     warnings: list[str],
+    corrupt_lines: list[dict[str, Any]] | None = None,
 ) -> None:
-    records = _load_jsonl(audit_path, "audit_log.jsonl", warnings)
+    records = _load_jsonl(audit_path, "audit_log.jsonl", warnings, corrupt_lines)
     if not records:
         _append_warning_issue(
             issues,

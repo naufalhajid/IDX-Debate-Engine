@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Naufal Hajid portfolio case study for IDX Debate Engine, a multi-agent AI research pipeline for Indonesian stock swing-trade decision support.">
+    <title>Naufal Hajid | IDX Debate Engine</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header">
+        <a class="brand" href="#hero" aria-label="Naufal Hajid home">
+            <span class="brand-mark">NH</span>
+            <span>IDX Debate Engine</span>
+        </a>
+        <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-menu">
+            Menu
+        </button>
+        <nav id="site-menu" class="site-nav" aria-label="Primary navigation">
+            <a href="#project">Project</a>
+            <a href="#run">Run</a>
+            <a href="#architecture">Architecture</a>
+            <a href="#evidence">Evidence</a>
+            <a href="#stack">Stack</a>
+        </nav>
+    </header>
+
+    <main id="main">
+        <section id="hero" class="hero">
+            <div class="hero-inner">
+                <p class="kicker">Open source / MIT license / IDX research system</p>
+                <h1>The stock-analysis engine that argues before it recommends.</h1>
+                <p class="hero-copy">
+                    A portfolio case study for an institutional-style swing-trade pipeline: quantitative screening, LangGraph debate, CIO verdicts, risk gates, and audit-ready outputs for Indonesian stocks.
+                </p>
+                <div class="hero-actions">
+                    <a class="button primary" href="#run">See quick start</a>
+                    <a class="button secondary" href="https://github.com/naufalhajid/IDX-Debate-Engine" target="_blank" rel="noopener noreferrer">View repository</a>
+                </div>
+                <div class="hero-stats" aria-label="Latest local run summary">
+                    <div>
+                        <strong>10</strong>
+                        <span>candidates debated</span>
+                    </div>
+                    <div>
+                        <strong>2.2</strong>
+                        <span>avg debate rounds</span>
+                    </div>
+                    <div>
+                        <strong>0</strong>
+                        <span>BUY setups selected</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="project" class="section intro-section">
+            <div class="container">
+                <div class="section-heading">
+                    <p class="kicker">What it is</p>
+                    <h2>Not a stock-tip page. A decision-support system with traceable reasoning.</h2>
+                    <p>
+                        The project automates the path from raw IDX candidates to reviewable trade decisions. It is designed to surface disagreement, protect capital with guardrails, and leave enough evidence behind to audit each conclusion.
+                    </p>
+                </div>
+
+                <div class="feature-grid">
+                    <article class="feature-card">
+                        <span class="feature-label">Screen</span>
+                        <h3>Quantitative candidate intake</h3>
+                        <p>Ranks the IDX universe with valuation gap, Piotroski F-Score, momentum, liquidity, ex-date risk, and sector-aware constraints.</p>
+                    </article>
+                    <article class="feature-card">
+                        <span class="feature-label">Debate</span>
+                        <h3>Multi-agent investment committee</h3>
+                        <p>Fundamental, chart, sentiment, bull, bear, and CIO roles challenge one another before a verdict is accepted.</p>
+                    </article>
+                    <article class="feature-card">
+                        <span class="feature-label">Audit</span>
+                        <h3>Evidence-first outputs</h3>
+                        <p>Every batch produces JSON, Markdown, debate history, audit logs, and risk-governor fields for post-run review.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section id="run" class="section run-section">
+            <div class="container split-layout">
+                <div class="section-heading align-left">
+                    <p class="kicker">Quick start</p>
+                    <h2>One pipeline, three useful surfaces.</h2>
+                    <p>
+                        The portfolio mirrors the real workflow: run the batch engine, inspect the artifacts, then open the API and dashboard when you need an interactive view.
+                    </p>
+                </div>
+
+                <div class="command-steps" aria-label="Project commands">
+                    <article class="command-card">
+                        <div class="step-number">1</div>
+                        <div>
+                            <h3>Run the full batch pipeline</h3>
+                            <pre><code>uv run idx pipeline</code></pre>
+                        </div>
+                        <button type="button" class="copy-button" data-copy="uv run idx pipeline">Copy</button>
+                    </article>
+                    <article class="command-card">
+                        <div class="step-number">2</div>
+                        <div>
+                            <h3>Try a safe dry run</h3>
+                            <pre><code>uv run idx pipeline --dry-run --no-interactive --output-dir tmp/dry_run</code></pre>
+                        </div>
+                        <button type="button" class="copy-button" data-copy="uv run idx pipeline --dry-run --no-interactive --output-dir tmp/dry_run">Copy</button>
+                    </article>
+                    <article class="command-card">
+                        <div class="step-number">3</div>
+                        <div>
+                            <h3>Serve API and dashboard</h3>
+                            <pre><code>uv run idx serve
+cd app/ui
+npm run dev</code></pre>
+                        </div>
+                        <button type="button" class="copy-button" data-copy="uv run idx serve">Copy</button>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="product-shot-section" aria-label="Terminal preview">
+            <div class="container">
+                <img src="../docs/assets/debate_terminal_preview.png" alt="IDX Debate Engine terminal preview showing agent voting, trade plan, risk management, and final verdict panels.">
+            </div>
+        </section>
+
+        <section id="architecture" class="section architecture-section">
+            <div class="container">
+                <div class="section-heading">
+                    <p class="kicker">Architecture</p>
+                    <h2>Built like a research console, not a one-shot prompt.</h2>
+                    <p>
+                        The core engine separates screening, evidence building, debate orchestration, verdict validation, risk sizing, and presentation.
+                    </p>
+                </div>
+
+                <div class="flow-grid">
+                    <article>
+                        <span>01</span>
+                        <h3>Data intake</h3>
+                        <p>IDX, yfinance, StockBit, sector cache, price history, ex-date metadata.</p>
+                    </article>
+                    <article>
+                        <span>02</span>
+                        <h3>Quant filter</h3>
+                        <p>Composite ranking with valuation, quality, trend, liquidity, and risk penalties.</p>
+                    </article>
+                    <article>
+                        <span>03</span>
+                        <h3>Context pack</h3>
+                        <p>Freshness-aware evidence briefs keep the debate grounded and token-bounded.</p>
+                    </article>
+                    <article>
+                        <span>04</span>
+                        <h3>LangGraph debate</h3>
+                        <p>Specialized agents debate up to three rounds with anti-groupthink pressure.</p>
+                    </article>
+                    <article>
+                        <span>05</span>
+                        <h3>CIO verdict</h3>
+                        <p>Pydantic-validated rating, confidence, entry range, stop loss, and target price.</p>
+                    </article>
+                    <article>
+                        <span>06</span>
+                        <h3>Delivery</h3>
+                        <p>CLI reports, FastAPI, Svelte dashboard, JSON artifacts, and audit logs.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section id="evidence" class="section evidence-section">
+            <div class="container split-layout">
+                <div class="section-heading align-left">
+                    <p class="kicker">Latest artifact snapshot</p>
+                    <h2>The current run correctly says: no high-conviction BUY today.</h2>
+                    <p>
+                        That is a strength for a decision-support system. The engine can preserve watchlist context without forcing a trade when the debate and risk gates disagree.
+                    </p>
+                </div>
+
+                <div class="snapshot-panel">
+                    <div class="snapshot-header">
+                        <span>Generated from local output artifacts</span>
+                        <strong>2026-06-01</strong>
+                    </div>
+                    <div class="rating-bars" aria-label="Verdict distribution">
+                        <div>
+                            <span>HOLD</span>
+                            <meter min="0" max="10" value="4">4 of 10</meter>
+                            <strong>4</strong>
+                        </div>
+                        <div>
+                            <span>AVOID</span>
+                            <meter min="0" max="10" value="4">4 of 10</meter>
+                            <strong>4</strong>
+                        </div>
+                        <div>
+                            <span>INSUFFICIENT</span>
+                            <meter min="0" max="10" value="2">2 of 10</meter>
+                            <strong>2</strong>
+                        </div>
+                    </div>
+                    <div class="artifact-list">
+                        <a href="../output/top10_candidates.json">top10_candidates.json</a>
+                        <a href="../output/full_batch_results.json">full_batch_results.json</a>
+                        <a href="../output/TOP_3_SWING_TRADES.md">TOP_3_SWING_TRADES.md</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="container">
+                <div class="candidate-table" role="table" aria-label="Top candidate snapshot">
+                    <div class="table-row table-head" role="row">
+                        <span role="columnheader">Ticker</span>
+                        <span role="columnheader">Score</span>
+                        <span role="columnheader">Price</span>
+                        <span role="columnheader">Valuation gap</span>
+                        <span role="columnheader">F-Score</span>
+                    </div>
+                    <div class="table-row" role="row">
+                        <span>DMAS</span><span>89.5</span><span>Rp 156</span><span>72.7%</span><span>7</span>
+                    </div>
+                    <div class="table-row" role="row">
+                        <span>GGRM</span><span>86.5</span><span>Rp 17,000</span><span>94.9%</span><span>9</span>
+                    </div>
+                    <div class="table-row" role="row">
+                        <span>INDF</span><span>74.0</span><span>Rp 6,925</span><span>106.8%</span><span>6</span>
+                    </div>
+                    <div class="table-row" role="row">
+                        <span>MAPA</span><span>72.0</span><span>Rp 640</span><span>1.9%</span><span>9</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="stack" class="section stack-section">
+            <div class="container">
+                <div class="section-heading">
+                    <p class="kicker">What the portfolio should communicate</p>
+                    <h2>Signals recruiters and reviewers can evaluate quickly.</h2>
+                </div>
+
+                <div class="signal-grid">
+                    <article>
+                        <h3>Systems thinking</h3>
+                        <p>Batch CLI, API, dashboard, model routing, budget limits, and artifacts are treated as one workflow.</p>
+                    </article>
+                    <article>
+                        <h3>LLM reliability</h3>
+                        <p>Schema validation, retry paths, debate state, evidence ranking, and CIO rules reduce free-form model drift.</p>
+                    </article>
+                    <article>
+                        <h3>Financial guardrails</h3>
+                        <p>Risk/reward thresholds, ex-date gating, stop-loss math, position sizing, and no-trade outcomes are explicit.</p>
+                    </article>
+                    <article>
+                        <h3>Frontend readiness</h3>
+                        <p>FastAPI streams debate events to a Svelte dashboard with candidates, timelines, health, and notifications.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <div>
+            <strong>Naufal Hajid</strong>
+            <span>Software Engineer / AI Developer</span>
+        </div>
+        <nav aria-label="Social links">
+            <a href="https://github.com/naufalhajid" target="_blank" rel="noopener noreferrer">GitHub</a>
+            <a href="https://www.linkedin.com/in/naufalhajid/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+            <a href="mailto:naufalhajid@gmail.com">Email</a>
+        </nav>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

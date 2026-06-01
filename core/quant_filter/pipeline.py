@@ -460,17 +460,31 @@ def _analyze_ticker(
         total_score -= 7
         mom_note.append("Below MA200 (-7)")
 
-    # [v3.1 NEW] Piotroski F-Score adjustment — diintegrasikan ke composite score.
-    # Sebelumnya F-Score hanya jadi gate di static filter (>=4) tanpa membedakan
-    # kualitas antara saham F-Score 4 vs F-Score 9. Sekarang ada reward/penalty
-    # eksplisit untuk mencerminkan perbedaan kualitas fundamental yang nyata.
+    # [v3.2 FIX] Piotroski F-Score adjustment & Turnaround Penalty.
     piotroski = int(row.get("Piotroski F-Score", 0) or 0)
     if piotroski >= cfg["piotroski_strong_min"]:
         total_score += cfg["piotroski_strong_bonus"]
         mom_note.append(f"F-Score Kuat ({piotroski}/9)")
+    elif piotroski < cfg["min_piotroski"]:
+        total_score += cfg.get("penalty_piotroski_fail", -15)
+        mom_note.append(f"Penalty: F-Score Buruk ({piotroski}/9) ({cfg.get('penalty_piotroski_fail', -15)})")
     elif piotroski <= cfg["piotroski_weak_max"]:
         total_score += cfg["piotroski_weak_penalty"]
         mom_note.append(f"F-Score Lemah ({piotroski}/9)")
+
+    # [v3.2 FIX] Altman Z-Score Turnaround Penalty
+    altman_z_raw = row.get("Altman Z-Score (Modified)", 0)
+    altman_z_val = float(altman_z_raw) if not pd.isna(altman_z_raw) and altman_z_raw else 0.0
+    if 0 < altman_z_val < cfg["min_altman_z"]:
+        total_score += cfg.get("penalty_altman_z_fail", -20)
+        mom_note.append(f"Penalty: Altman-Z Distress ({altman_z_val:.2f}) ({cfg.get('penalty_altman_z_fail', -20)})")
+
+    # [v3.2 FIX] ROE Turnaround Penalty
+    roe_raw = row.get("Return on Equity (TTM)", 0)
+    roe_val = float(roe_raw) if not pd.isna(roe_raw) and roe_raw else 0.0
+    if roe_val < cfg["min_roe"]:
+        total_score += cfg.get("penalty_roe_fail", -15)
+        mom_note.append(f"Penalty: ROE Buruk ({roe_val*100:.1f}%) ({cfg.get('penalty_roe_fail', -15)})")
 
     # Penalti jika tidak ada margin of safety (Valuation gap == 0)
     try:
@@ -638,17 +652,15 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
     # ── 3. STATIC FILTERING ───────────────────────────────────────────────────
     alt_col = "Altman Z-Score (Modified)"
 
+    # [v3.2 FIX] Turnaround-friendly filtering
+    # Menghapus filter absolut untuk ROE, Piotroski, dan Altman Z.
+    # Saham dengan fundamental buruk dibiarkan lolos ke scoring, 
+    # di mana mereka akan mendapatkan PENALTI BERAT.
     filtered = df[
         (df["Close Price"] > cfg["min_close_price"]) &
         (df["Debt to Equity Ratio (Quarter)"] <= df["Max_DER_Allowed"]) &
         (df["PBV_Sector_Pctile"] < cfg["pbv_sector_pctile"]) &
-        (df["Current Price to Book Value"] < cfg["max_pbv_hard"]) &
-        (df["Return on Equity (TTM)"] > cfg["min_roe"]) &
-        # [NEW v3.0] Piotroski F-Score
-        (df["Piotroski F-Score"] >= cfg["min_piotroski"]) &
-        # [NEW v3.0] Altman Z-Score — exclude distress zone (uses the Emerging Markets Altman Z''-Score model)
-        # (0 = data tidak ada, skip filter; > 0 harus > threshold 1.1; Z'' < 1.1 is distress zone)
-        ((df[alt_col] == 0) | (df[alt_col].isna()) | (df[alt_col] > cfg["min_altman_z"]))
+        (df["Current Price to Book Value"] < cfg["max_pbv_hard"])
     ].copy()
 
     logger.info(f"Lolos static filter: {len(filtered)} ticker")
@@ -663,9 +675,9 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
     k    = cfg["graham_k"]
 
     valid_graham = (eps > 0) & (bvps > 0)
-    filtered["Graham_Number"] = np.where(valid_graham, np.sqrt(k * eps * bvps), 0)
-    filtered["Graham_Bear"]   = np.where(valid_graham, np.sqrt(k * eps * cfg["graham_bear_eps"] * bvps), 0)
-    filtered["Graham_Bull"]   = np.where(valid_graham, np.sqrt(k * eps * cfg["graham_bull_eps"] * bvps), 0)
+    filtered["Graham_Number"] = np.where(valid_graham, np.sqrt(np.clip(k * eps * bvps, 0, None)), 0)
+    filtered["Graham_Bear"]   = np.where(valid_graham, np.sqrt(np.clip(k * eps * cfg["graham_bear_eps"] * bvps, 0, None)), 0)
+    filtered["Graham_Bull"]   = np.where(valid_graham, np.sqrt(np.clip(k * eps * cfg["graham_bull_eps"] * bvps, 0, None)), 0)
 
     # Graham FV Sanity Cap: prevent extreme EPS/BVPS outliers from dominating ranking.
     fv_cap = filtered["Close Price"] * cfg["graham_fv_cap_multiplier"]
@@ -759,6 +771,7 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         logger=logger,
     )
 
+    ihsg_close = None
     ihsg_return_1m: float = 0.0
     try:
         ihsg_data = _get_yfinance().download(
@@ -800,6 +813,8 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
             logger.warning(f"[{row['Ticker']}] Data yfinance tidak tersedia, skip.")
             continue
         df_t = data[t_yf].dropna(how="all")
+        if ihsg_close is not None and not ihsg_close.empty:
+            df_t = df_t.reindex(ihsg_close.index).dropna(how="all")
         if len(df_t) < cfg["min_bars"]:
             continue
         result = _analyze_ticker(

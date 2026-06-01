@@ -163,6 +163,52 @@ def test_reconcile_artifacts_all_valid(tmp_path: Path) -> None:
     assert report.surfaces["audit"] is True
 
 
+def test_reconcile_artifacts_preserves_corrupt_audit_jsonl(tmp_path: Path) -> None:
+    batch_path, top3_path, latest_path = _write_artifacts(
+        tmp_path,
+        batch=[
+            {
+                "ticker": "BBCA",
+                "status": "ok",
+                "verdict": {"rating": "BUY"},
+                "risk_governor": _risk_governor(),
+            }
+        ],
+        markdown="# TOP 3\n\n## #1 - BBCA\nSignal: BUY\n",
+        latest={"ticker": "BBCA", "metadata": {"run_id": "run-1"}},
+    )
+    audit_path, telemetry_path, rag_path = _write_optional_logs(tmp_path)
+    audit_path.write_text(
+        json.dumps({"ticker": "BBCA", "run_id": "run-1"}) + "\n"
+        + '{"ticker":"BBCA","run_id":"run-1","summary":"unterminated\n',
+        encoding="utf-8",
+    )
+
+    report = reconcile_artifacts(
+        batch_path,
+        top3_path,
+        latest_path,
+        audit_log_path=audit_path,
+        telemetry_log_path=telemetry_path,
+        rag_evidence_log_path=rag_path,
+    )
+
+    corrupt_path = tmp_path / "audit_corrupt.jsonl"
+    corrupt_records = [
+        json.loads(line)
+        for line in corrupt_path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert report.corrupt_lines == 1
+    assert any("line 2" in warning and "char" in warning for warning in report.warnings)
+    assert corrupt_records == [
+        {
+            "error": "invalid_json",
+            "line": 2,
+            "raw": '{"ticker":"BBCA","run_id":"run-1","summary":"unterminated',
+        }
+    ]
+
+
 def test_reconcile_artifacts_flags_failed_promoted_ticker(tmp_path: Path) -> None:
     batch_path, top3_path, latest_path = _write_artifacts(
         tmp_path,
