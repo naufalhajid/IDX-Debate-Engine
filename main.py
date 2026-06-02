@@ -1,9 +1,9 @@
 # ruff: noqa: E402
 
 import argparse
-import asyncio  # QW-FIX-AR2
-import signal  # QW-FIX-AR2
-import sys  # QW-FIX-AR2
+import asyncio
+import signal
+import sys
 import time
 from datetime import date
 
@@ -39,17 +39,15 @@ def parse_arguments():
     return parser.parse_args()
 
 
-async def main_async() -> None:  # QW-FIX-AR2
-    """Async entry point for ETL pipeline. # QW-FIX-AR2"""
+async def main_async() -> None:
+    """Async entry point for ETL pipeline."""
 
-    def _handle_shutdown(sig, frame):  # noqa: ANN001  # QW-FIX-AR2
-        logger.warning(  # QW-FIX-AR2
-            f"[main] Received signal {sig}. Shutting down ETL gracefully..."  # QW-FIX-AR2
-        )  # QW-FIX-AR2
-        sys.exit(0)  # QW-FIX-AR2
+    def _handle_shutdown(sig, frame):  # noqa: ANN001
+        logger.warning(f"[main] Received signal {sig}. Shutting down ETL gracefully...")
+        sys.exit(0)
 
-    signal.signal(signal.SIGINT, _handle_shutdown)  # QW-FIX-AR2
-    signal.signal(signal.SIGTERM, _handle_shutdown)  # QW-FIX-AR2
+    signal.signal(signal.SIGINT, _handle_shutdown)
+    signal.signal(signal.SIGTERM, _handle_shutdown)
 
     logger.info("IDX Composite Fundamental Analysis")
     start_time = time.time()
@@ -57,23 +55,19 @@ async def main_async() -> None:  # QW-FIX-AR2
     args = parse_arguments()
 
     # Setup database
-    await asyncio.to_thread(database.setup_db, is_drop_table=False)  # QW-FIX-AR2
+    await asyncio.to_thread(database.setup_db, is_drop_table=False)
 
     # Retrieve stocks from IDX
-    idx = await asyncio.to_thread(  # QW-FIX-AR2
-        IDX, is_full_retrieve=args.full_retrieve  # QW-FIX-AR2
-    )  # QW-FIX-AR2
-    stocks = await asyncio.to_thread(idx.stocks)  # QW-FIX-AR2
+    idx = await asyncio.to_thread(IDX, is_full_retrieve=args.full_retrieve)
+    stocks = await asyncio.to_thread(idx.stocks)
     logger.debug("Stocks: {}".format(stocks))
     logger.info("Total Stocks: {}".format(len(stocks)))
 
     # Process stocks key statistics, price, fundamental, and stream data (news) from Stockbit
-    def _run_stockbit_pipeline() -> None:  # QW-FIX-AR2
-        StockBit(  # QW-FIX-AR2
-            stocks=stocks  # QW-FIX-AR2
-        ).with_stock_price().with_fundamental().with_stream_data()  # QW-FIX-AR2
+    def _run_stockbit_pipeline() -> None:
+        StockBit(stocks=stocks).with_stock_price().with_fundamental().with_stream_data()
 
-    await asyncio.to_thread(_run_stockbit_pipeline)  # QW-FIX-AR2
+    await asyncio.to_thread(_run_stockbit_pipeline)
 
     # Analyser to build the output
     title = f"IDX Fundamental Analysis {date.today().strftime('%Y-%m-%d')}"
@@ -95,9 +89,9 @@ async def main_async() -> None:  # QW-FIX-AR2
     logger.info(f"Elapsed time: {elapsed_minutes:.2f} minutes")
 
 
-def main() -> None:  # QW-FIX-AR2
-    """Sync wrapper - preserves CLI compatibility. # QW-FIX-AR2"""
-    asyncio.run(main_async())  # QW-FIX-AR2
+def main() -> None:
+    """Sync wrapper - preserves CLI compatibility."""
+    asyncio.run(main_async())
 
 
 if __name__ == "__main__":
