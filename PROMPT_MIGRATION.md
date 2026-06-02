@@ -53,3 +53,46 @@ Sentiment guard prevents pump stocks with negative sentiment from benefiting.
 - DSSA (R/R 9.22x, Sentiment HOLD) → HOLD not AVOID
 - Stock with Fund ❌ + Tech ❌ + R/R 2.0 + any sentiment → still AVOID
 - Stock with Fund ❌ + Tech ❌ + R/R 6.0 + Sentiment BEARISH → still AVOID
+
+---
+
+## 2026-06-03 — `momentum-rr-override-v3` (CODE-LEVEL, not prompt)
+
+**File changed:** `services/debate_chamber.py`
+
+### Problem
+v1/v2 prompt fixes were correct but never took effect. After the CIO judge
+LLM runs, `_apply_consensus_override` hard-forces the rating to the
+`confidence_winner`'s position (Bear, AVOID @ 0.93) when no agent reaches the
+60% vote threshold. The DSSA report literally shows the CIO reasoning
+"normally R/R 9.22 would keep it on an asymmetry watchlist, but the mandatory
+consensus directive says..." — i.e. the prompt logic fired and was then
+overridden by code.
+
+### Change
+`_apply_consensus_override` (method == "confidence_winner"): when the winner
+position is AVOID but R/R ≥ 5.0 and the sentiment specialist is non-bearish,
+escalate to HOLD (Extreme Asymmetry Watchlist) and cap confidence at 0.55.
+
+Two correctness fixes over the first v3 draft:
+1. Sentiment guard checked `!= "BEARISH"`, but `_normalise_position` maps
+   BEARISH/SELL → "AVOID", so the literal "BEARISH" never appeared and the
+   guard was a no-op. Corrected to `!= "AVOID"`.
+2. R/R was read from the LLM-echoed `risk_reward_ratio`. `_apply_envelope` now
+   writes the canonical Python envelope R/R into the dict so the override keys
+   off the deterministic number.
+
+### Tests
+`tests/test_debate_chamber_reliability.py`:
+- `test_asymmetry_override_escalates_avoid_to_hold_on_high_rr`
+- `test_asymmetry_override_blocked_by_bearish_sentiment`
+- `test_asymmetry_override_blocked_by_low_rr`
+Full file: 37 passed.
+
+### Known limitation (not fixed here)
+DSSA's R/R 9.22x is partly an artifact: when `fair_value_rejected` is set (RAG
+could not verify the Graham number), the envelope receives `fair_value=0`, so
+the FV-blend target ceiling is skipped and the target jumps to the 52-week high
+(Rp 1,030), inflating R/R. Meanwhile the display + CIO "overvalued" reasoning
+still use FV Rp 304. The overvalued flag and the R/R are computed from
+contradictory fair-value assumptions. See assessment notes for follow-ups.
