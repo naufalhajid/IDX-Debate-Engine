@@ -30,3 +30,26 @@ it as a hard AVOID gate discards setups with extreme asymmetric payoff.
 ### Success Criteria
 Re-run DSSA debate → expect HOLD or BUY (Momentum) instead of AVOID.
 Existing value setups (R/R < 2.0, overvalued) should still get AVOID.
+
+---
+
+## 2026-06-03 — `momentum-rr-override-v2`
+
+**File changed:** `services/debate_prompts/cio_judge.txt`
+
+### Problem
+v1 fix (STEP 1 + STEP 4) was insufficient. Even with STEP 1 passing R/R ≥ 5.0
+cases to STEP 3, the STEP 3 matrix still had "Fund ❌ + Tech ❌ → AVOID" as an
+absolute rule. DSSA (R/R 9.22x, Sentiment HOLD/non-bearish) still got AVOID.
+
+### Change
+**STEP 3** — Added R/R + Sentiment guard to "Fund ❌ + Tech ❌" case:
+- IF R/R ≥ 5.0 AND Sentiment ≠ BEARISH → HOLD (Extreme Asymmetry Watchlist)
+- OTHERWISE → AVOID (unchanged)
+
+Sentiment guard prevents pump stocks with negative sentiment from benefiting.
+
+### Success Criteria
+- DSSA (R/R 9.22x, Sentiment HOLD) → HOLD not AVOID
+- Stock with Fund ❌ + Tech ❌ + R/R 2.0 + any sentiment → still AVOID
+- Stock with Fund ❌ + Tech ❌ + R/R 6.0 + Sentiment BEARISH → still AVOID

@@ -590,7 +590,7 @@ async def test_debate_run_derives_current_price_and_adds_prompt_metadata(monkeyp
 def test_prompt_registry_loads_required_prompts_and_version():
     registry = debate_prompt_registry.PROMPT_REGISTRY
 
-    assert registry.prompt_version == "2026-06-03-momentum-rr-override-v1"
+    assert registry.prompt_version == "2026-06-03-momentum-rr-override-v2"
     assert set(debate_prompt_registry.REQUIRED_PROMPTS).issubset(registry.prompts)
     assert "CONFIDENCE CALIBRATION" in registry.prompts["CIO_SYSTEM_PROMPT"]
 
