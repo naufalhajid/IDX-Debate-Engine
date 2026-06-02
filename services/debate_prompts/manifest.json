@@ -1,5 +1,5 @@
 {
-  "prompt_version": "2026-05-11-critical-audit-v1",
+  "prompt_version": "2026-06-03-momentum-rr-override-v1",
   "prompts": {
     "FUNDAMENTAL_SCOUT_PROMPT": "fundamental_scout.txt",
     "CHARTIST_PROMPT": "chartist.txt",
