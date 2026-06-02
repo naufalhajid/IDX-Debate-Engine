@@ -61,7 +61,12 @@ STEP 3 — CONFLICT RESOLUTION (MANDATORY):
   • Fundamental ✅ + Technical ✅  → BUY; choose final confidence using the calibration rubric, caps, and Devil's Advocate penalty.
   • Fundamental ✅ + Technical ❌  → HOLD ("Wait for technical confirmation")
   • Fundamental ❌ + Technical ✅  → If strongly positive Foreign Flow / Momentum with Volume breakout, Lean BUY (Momentum Play, size 50%). Otherwise, HOLD.
-  • Fundamental ❌ + Technical ❌  → AVOID
+  • Fundamental ❌ + Technical ❌  →
+      IF R/R ≥ 5.0 AND Sentiment ≠ BEARISH: HOLD (Extreme Asymmetry Watchlist).
+        Add to weighted_reasoning: "EXTREME ASYMMETRY WATCHLIST — both fundamental
+        and technical are weak, but R/R ≥ 5.0 with non-bearish sentiment prevents
+        outright rejection. Monitor for technical confirmation before entry."
+      OTHERWISE: AVOID
   • Any ✅ + Sentiment EXTREME    → Lower confidence by 0.10 (contrarian caution)
 
   CONSENSUS DISAGREEMENT ADJUSTMENT:
