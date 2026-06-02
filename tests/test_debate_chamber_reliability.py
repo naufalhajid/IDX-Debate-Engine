@@ -358,6 +358,52 @@ async def test_confidence_winner_uses_effective_calibrated_confidence(monkeypatc
     }
 
 
+def _confidence_winner_state(sentiment_position: str = "HOLD") -> dict:
+    """Minimal state where bear wins by confidence (AVOID at 0.93)."""
+    return {
+        "consensus_reached": False,
+        "consensus_method": "confidence_winner",
+        "consensus_winner": {"agent": "bear", "position": "AVOID", "confidence": 0.93},
+        "dissenting_agents": ["bull", "fundamental_scout"],
+        "agent_votes": [
+            {"agent": "bear", "position": "AVOID", "confidence": 0.93},
+            {"agent": "sentiment_specialist", "position": sentiment_position},
+        ],
+    }
+
+
+def test_asymmetry_override_escalates_avoid_to_hold_on_high_rr():
+    chamber = _chamber()
+    parsed = {"rating": "AVOID", "confidence": 0.0, "risk_reward_ratio": 9.22}
+
+    result = chamber._apply_consensus_override(parsed, _confidence_winner_state("HOLD"))
+
+    assert result["rating"] == "HOLD"
+    assert result["confidence"] == 0.55
+    assert "EXTREME ASYMMETRY WATCHLIST" in result["weighted_reasoning"]
+
+
+def test_asymmetry_override_blocked_by_bearish_sentiment():
+    chamber = _chamber()
+    parsed = {"rating": "AVOID", "confidence": 0.0, "risk_reward_ratio": 9.22}
+
+    # Sentiment specialist bearish → normalises to AVOID → no escalation.
+    result = chamber._apply_consensus_override(parsed, _confidence_winner_state("BEARISH"))
+
+    assert result["rating"] == "AVOID"
+    assert "EXTREME ASYMMETRY WATCHLIST" not in (result.get("weighted_reasoning") or "")
+
+
+def test_asymmetry_override_blocked_by_low_rr():
+    chamber = _chamber()
+    parsed = {"rating": "AVOID", "confidence": 0.0, "risk_reward_ratio": 1.3}
+
+    result = chamber._apply_consensus_override(parsed, _confidence_winner_state("HOLD"))
+
+    assert result["rating"] == "AVOID"
+    assert "EXTREME ASYMMETRY WATCHLIST" not in (result.get("weighted_reasoning") or "")
+
+
 def test_fair_value_rejected_without_current_run_rag_evidence():
     fair_value, metadata = dc._reject_unverified_fair_value_if_needed(
         ticker="BBCA",

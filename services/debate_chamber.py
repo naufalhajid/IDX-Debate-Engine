@@ -3087,23 +3087,22 @@ Current Date (Asia/Jakarta): {current_date}
             if winner_position == "UNKNOWN":
                 winner_position = "HOLD"
 
-            # R/R asymmetry override: if confidence_winner is AVOID but R/R ≥ 5.0
-            # and sentiment is non-bearish, escalate to HOLD. A trade with R/R ≥ 5.0
-            # only needs a 17% win rate to be profitable — hard AVOID discards valid
-            # momentum setups (e.g. DSSA R/R 9.22x rejected purely on Graham overvaluation).
+            # R/R asymmetry override: a confidence_winner of AVOID is escalated to HOLD
+            # (Extreme Asymmetry Watchlist) when R/R >= 5.0 and the sentiment agent is
+            # not bearish. A trade with R/R >= 5.0 only needs a ~17% win rate to be
+            # profitable, so a hard AVOID discards valid momentum setups (e.g. DSSA
+            # R/R 9.22x rejected purely on Graham overvaluation). risk_reward_ratio is
+            # the canonical Python envelope value (set in _apply_envelope above).
+            asymmetry_escalated = False
             if winner_position == "AVOID":
-                rr = None
                 try:
                     rr = float(p.get("risk_reward_ratio") or 0.0)
                 except (TypeError, ValueError):
-                    pass
-                if rr is None or rr == 0.0:
-                    try:
-                        envelope = state.get("trade_envelope") or {}
-                        rr = float(envelope.get("risk_reward_ratio") or 0.0)
-                    except (TypeError, ValueError):
-                        rr = 0.0
+                    rr = 0.0
                 if rr >= 5.0:
+                    # _normalise_position maps BEARISH/SELL -> "AVOID", so a bearish
+                    # sentiment agent surfaces here as "AVOID". Escalate only when the
+                    # sentiment specialist is non-bearish (anything other than AVOID).
                     sentiment_position = "UNKNOWN"
                     for vote in (state.get("agent_votes") or []):
                         if str(vote.get("agent", "")).lower() == "sentiment_specialist":
@@ -3111,26 +3110,28 @@ Current Date (Asia/Jakarta): {current_date}
                                 str(vote.get("position", "UNKNOWN"))
                             )
                             break
-                    if sentiment_position != "BEARISH":
+                    if sentiment_position != "AVOID":
                         winner_position = "HOLD"
-                        p["confidence"] = min(float(p.get("confidence") or 0.52), 0.55)
+                        asymmetry_escalated = True
                         p["weighted_reasoning"] = self._append_reason(
                             p.get("weighted_reasoning"),
                             (
                                 f"EXTREME ASYMMETRY WATCHLIST — confidence_winner was AVOID "
-                                f"({winner.get('agent', 'bear')}) but R/R {rr:.2f}x ≥ 5.0 with "
+                                f"({winner.get('agent', 'bear')}) but R/R {rr:.2f}x >= 5.0 with "
                                 f"non-bearish sentiment ({sentiment_position}) prevents hard rejection. "
                                 "Escalated to HOLD. Monitor for technical confirmation before entry."
                             ),
                         )
 
             p["rating"] = "BUY" if winner_position == "BUY" else winner_position
-            try:
-                p["confidence"] = max(0.0, min(float(winner.get("confidence", p.get("confidence", 0.0))), 1.0))
-            except (TypeError, ValueError):
-                p["confidence"] = max(0.0, min(float(p.get("confidence") or 0.0), 1.0))
-            if winner_position == "HOLD" and (p.get("confidence") or 0.0) > 0.55:
+            if asymmetry_escalated:
+                # HOLD is not a high-conviction setup; mirror the prompt's HOLD cap.
                 p["confidence"] = 0.55
+            else:
+                try:
+                    p["confidence"] = max(0.0, min(float(winner.get("confidence", p.get("confidence", 0.0))), 1.0))
+                except (TypeError, ValueError):
+                    p["confidence"] = max(0.0, min(float(p.get("confidence") or 0.0), 1.0))
             p["weighted_reasoning"] = self._append_reason(
                 p.get("weighted_reasoning"),
                 (
@@ -3360,6 +3361,14 @@ Start your response with '{' and end with '}'. Nothing else."""
                 p["stop_loss"] = int(envelope.get("stop_loss")) if envelope.get("stop_loss") is not None else p.get("stop_loss")
             except Exception:
                 p["stop_loss"] = p.get("stop_loss")
+            # Canonical Python R/R — overrides any LLM-echoed value so downstream
+            # logic (e.g. the asymmetry override) keys off the deterministic number.
+            rr_env = envelope.get("risk_reward_ratio")
+            if rr_env is not None:
+                try:
+                    p["risk_reward_ratio"] = float(rr_env)
+                except (TypeError, ValueError):
+                    pass
             fv_env = envelope.get("fair_value")
             if fv_env is not None and fv_env != 0:
                 try:
