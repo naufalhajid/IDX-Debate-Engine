@@ -650,8 +650,6 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
     df["Max_DER_Allowed"] = df["Sector"].map(max_der_map).fillna(max_der_map["default"])
 
     # ── 3. STATIC FILTERING ───────────────────────────────────────────────────
-    alt_col = "Altman Z-Score (Modified)"
-
     # [v3.2 FIX] Turnaround-friendly filtering
     # Menghapus filter absolut untuk ROE, Piotroski, dan Altman Z.
     # Saham dengan fundamental buruk dibiarkan lolos ke scoring, 

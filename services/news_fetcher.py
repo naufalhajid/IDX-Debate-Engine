@@ -984,8 +984,6 @@ def _confidence_adjustment(
         item.is_corporate_action and item.sentiment_score < -0.2
         for item in items
     )
-    has_corporate_action = any(item.is_corporate_action for item in items)
-
     if has_breaking_negative_news:
         return -0.20, f"Breaking negative news in last {BREAKING_NEWS_HOURS}h - significant risk detected"
     if has_negative_corporate_action:

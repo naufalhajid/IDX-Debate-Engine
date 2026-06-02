@@ -25,7 +25,7 @@ from langchain_core.messages import (
 )
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 from openai import AsyncOpenAI, OpenAI
-from pydantic import Field, SecretStr, PrivateAttr
+from pydantic import SecretStr, PrivateAttr
 
 from utils.logger_config import logger
 
@@ -152,8 +152,6 @@ class ChatCodexResponses(BaseChatModel):
             logger.error(f"[Codex Responses] Connection failed: {exc}")
             raise
             
-        current_tool_call = None
-        
         async for event in stream:
             event_type = getattr(event, "type", "")
             
@@ -210,14 +208,14 @@ class ChatCodexResponses(BaseChatModel):
                     for tc in msg_chunk.tool_call_chunks:
                         try:
                             args = json.loads(tc["args"])
-                        except:
+                        except (json.JSONDecodeError, KeyError):
                             args = {}
                         tool_calls.append({
                             "id": tc["id"],
                             "name": tc["name"],
                             "args": args,
                         })
-                        
+
         ai_msg = AIMessage(content=content, tool_calls=tool_calls)
         return ChatResult(generations=[ChatGeneration(message=ai_msg)])
 
@@ -293,13 +291,13 @@ class ChatCodexResponses(BaseChatModel):
                     for tc in msg_chunk.tool_call_chunks:
                         try:
                             args = json.loads(tc["args"])
-                        except:
+                        except (json.JSONDecodeError, KeyError):
                             args = {}
                         tool_calls.append({
                             "id": tc["id"],
                             "name": tc["name"],
                             "args": args,
                         })
-                        
+
         ai_msg = AIMessage(content=content, tool_calls=tool_calls)
         return ChatResult(generations=[ChatGeneration(message=ai_msg)])
