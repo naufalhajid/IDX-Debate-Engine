@@ -35,8 +35,16 @@ asumsikan CLEAR dan lanjutkan normal.
 
 STEP 1 — FAIR VALUE:
   Read the fair value from the Trade Envelope. It is pre-calculated by Python.
-  If current price is ABOVE fair value, you MUST flag this in weighted_reasoning and
-  strongly consider a HOLD or AVOID rating — a negative margin of safety is the #1 swing trade killer.
+  If current price is ABOVE fair value, flag this in weighted_reasoning.
+  DO NOT auto-AVOID based on overvaluation alone — use R/R to determine the right response:
+
+  • R/R < 2.0  → Strongly consider AVOID. Overvalued + poor setup = no edge.
+  • R/R 2.0–4.9 → Strongly consider HOLD. Overvalued but asymmetric risk warrants watchlist.
+  • R/R ≥ 5.0  → Proceed to STEP 3 conflict resolution. Extreme asymmetry may justify entry
+                  despite overvaluation — let technical/momentum signals decide.
+
+  Rationale: A trade with R/R ≥ 5.0 only needs a 17% win rate to be profitable.
+  Rejecting it purely on Graham Number overvaluation discards valid momentum setups.
 
 STEP 2 — TRADE ENVELOPE VALIDATION:
   Review the Python-calculated entry/target/stop prices.
@@ -81,10 +89,14 @@ STEP 3 — CONFLICT RESOLUTION (MANDATORY):
     → Bonus: +0.02 confidence (kedua agent sepakat).
 
 STEP 4 — FINAL RATING RULES:
-  • STRONG_BUY  : Price < Fair Value, R/R ≥ 2.0, clear catalyst, strong support confirmed.
-  • BUY         : Price ≤ Fair Value, R/R ≥ 1.5, support holds.
-  • HOLD        : Price near Fair Value OR R/R < 1.5 OR target < 3%.
-  • AVOID       : Price > Fair Value (overvalued) OR R/R < 1.0 OR no clear catalyst.
+  • STRONG_BUY        : Price < Fair Value, R/R ≥ 2.0, clear catalyst, strong support confirmed.
+  • BUY               : Price ≤ Fair Value, R/R ≥ 1.5, support holds.
+  • BUY (Momentum)    : Price > Fair Value, R/R ≥ 5.0, Technical ✅, Volume breakout confirmed.
+                        Use size 50%. Add to weighted_reasoning: "MOMENTUM PLAY — overvalued
+                        by Graham but extreme R/R + technical setup justifies reduced-size entry."
+  • HOLD              : Price near Fair Value OR R/R < 1.5 OR target < 3%
+                        OR (Price > Fair Value AND R/R 2.0–4.9).
+  • AVOID             : (Price > Fair Value AND R/R < 2.0) OR R/R < 1.0 OR no clear catalyst.
 
 CONFIDENCE CALIBRATION — MANDATORY DERIVATION PROCESS:
 
