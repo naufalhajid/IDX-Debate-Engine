@@ -1424,19 +1424,10 @@ class CliRenderer:
             pad_edge=False,
         )
         validation_table.add_column("Ticker", style="bold", no_wrap=True, width=6)
-        validation_table.add_column(
-            "Risk Gov",
-            no_wrap=True,
-            overflow="fold",
-            max_width=18 if is_compact else 24,
-        )
-        validation_table.add_column("Sizing", no_wrap=True, max_width=16)
-        validation_table.add_column(
-            "Reason",
-            overflow="fold",
-            max_width=36 if is_compact else 56,
-            ratio=1,
-        )
+        validation_table.add_column("Status", no_wrap=True, max_width=14)
+        validation_table.add_column("Action", no_wrap=True, max_width=14)
+        validation_table.add_column("Codes", overflow="fold", max_width=28)
+        validation_table.add_column("Context", no_wrap=True, max_width=22)
 
         for result in results:
             ticker = str(result.get("ticker") or "-").upper()
@@ -1479,17 +1470,10 @@ class CliRenderer:
             )
             validation_table.add_row(
                 ticker,
-                str(risk.get("status") or "-"),
+                _risk_status_text(str(risk.get("status") or "")),
                 sizing_text,
-                Text(
-                    _validation_reason_summary(
-                        result,
-                        verdict,
-                        risk,
-                        current_price,
-                        target_price,
-                    )
-                ),
+                Text(_validation_reason_codes(risk)),
+                Text(_validation_price_context(result, verdict, risk, current_price, target_price)),
                 style=row_style,
             )
         self.con.print(setup_table)
@@ -2012,6 +1996,60 @@ def _validator_reason_full(risk: dict[str, Any]) -> str:
     return "-"
 
 
+_STATUS_DISPLAY: dict[str, tuple[str, str]] = {
+    "deployable":             ("Ready",       "idx.bull"),
+    "conditional_deployable": ("Conditional", "cyan"),
+    "wait_for_pullback":      ("Wait",        "amber"),
+    "watchlist_only":         ("Watchlist",   "amber"),
+    "reject":                 ("Reject",      "idx.bear"),
+}
+
+_PRICE_POSITION_CODES = frozenset({
+    "price_above_entry_range",
+    "price_inside_entry_range",
+    "price_below_entry_range",
+})
+
+
+def _risk_status_text(status: str) -> Text:
+    label, style = _STATUS_DISPLAY.get(
+        str(status).lower(),
+        (str(status).replace("_", " ").title(), ""),
+    )
+    return Text(label, style=style)
+
+
+def _validation_reason_codes(risk: dict[str, Any]) -> str:
+    codes = risk.get("reason_codes")
+    if not isinstance(codes, list):
+        for key in ("message", "error"):
+            v = risk.get(key)
+            if v:
+                return str(v)[:50]
+        return "-"
+    non_price = [c for c in codes if c not in _PRICE_POSITION_CODES]
+    return ", ".join(_reason_token_label(c) for c in non_price) or "-"
+
+
+def _validation_price_context(
+    result: dict[str, Any],
+    verdict: dict[str, Any],
+    risk: dict[str, Any],
+    current_price: float | None,
+    target_price: float | None,
+) -> str:
+    entry_gap = _format_entry_gap(current_price, verdict, risk)
+    target_gap = _format_target_vs_current(target_price, current_price)
+    parts = []
+    if entry_gap != "-":
+        parts.append(entry_gap)
+    if target_gap != "-":
+        parts.append(f"tgt {target_gap}")
+    if result.get("rr_tier_note"):
+        parts.append(str(result["rr_tier_note"]))
+    return " | ".join(parts) or "-"
+
+
 def _validator_reason(risk: dict[str, Any]) -> str:
     return _short_err(_validator_reason_full(risk), 60)
 
@@ -2049,7 +2087,7 @@ def _validation_reason_summary(
 def _final_selection_label(result: dict[str, Any], *, selected: bool) -> Text:
     try:
         if result.get("error"):
-            return Text("Gagal analisis", style="danger")
+            return Text("Analysis Error", style="danger")
         verdict = result.get("verdict") if isinstance(result.get("verdict"), dict) else {}
         rating = str(verdict.get("rating") or "").upper()
         risk = (
@@ -2063,19 +2101,19 @@ def _final_selection_label(result: dict[str, Any], *, selected: bool) -> Text:
         if rating == "HOLD":
             return Text("Watchlist", style="warn")
         if rating in {"AVOID", "SELL"}:
-            return Text("Hindari", style="danger")
+            return Text("Avoid", style="danger")
         if rating in {"BUY", "STRONG_BUY"}:
             if risk_status == "deployable":
-                return Text("Siap masuk", style="ok")
+                return Text("Enter Now", style="ok")
             if risk_status == "wait_for_pullback":
-                return Text("Tunggu entry", style="warn")
+                return Text("Watch Entry", style="warn")
             if risk_status == "watchlist_only":
-                return Text("Pantau", style="warn")
+                return Text("Watchlist", style="warn")
             if selected:
-                return Text("Siap masuk", style="ok")
+                return Text("Enter Now", style="ok")
         if selected:
-            return Text("Siap masuk", style="ok")
-        return Text("Excluded", style="muted")
+            return Text("Enter Now", style="ok")
+        return Text("Exclude", style="muted")
     except Exception as exc:
         logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
         return Text(_short_err(_exclusion_reason(result)), style="muted")

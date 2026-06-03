@@ -664,7 +664,7 @@ CONSENSUS_THRESHOLD = 0.60
 ROUND1_CONSENSUS_THRESHOLD = 0.80
 CONSENSUS_AGENT_COUNT = 5
 MAX_DEBATE_ROUNDS = 3
-SOFT_HOLD_CONFIDENCE_DELTA = 0.15
+SOFT_HOLD_CONFIDENCE_DELTA = 0.27
 MAX_EVIDENCE_AGE_HOURS = 24
 MAX_STALENESS_PENALTY = 0.30
 SENTIMENT_STREAM_PAGE_SIZE = 20
@@ -678,7 +678,9 @@ DEFAULT_AGENT_CALIBRATION_WEIGHTS: dict[str, float] = {
     "chartist": 1.0,
     "sentiment_specialist": 1.0,
     "bull": 1.0,
-    "bear": 1.0,
+    # Bear tends to over-state confidence in bear markets; discount to 0.85 so it
+    # does not automatically win the confidence_winner tiebreaker over a bull at ~0.63.
+    "bear": 0.85,
 }
 
 
@@ -1953,6 +1955,9 @@ Current Date (Asia/Jakarta): {current_date}
                 ma200_raw = ma200_series.iloc[-1] if len(close) >= 50 else None
                 rsi_val = float(compute_rsi(close).iloc[-1])
                 atr_val = float(compute_atr(high, low, close).iloc[-1])
+                if pd.isna(atr_val) or atr_val <= 0:
+                    # Proxy: average daily high-low range when ATR series is too short
+                    atr_val = float((high - low).tail(14).mean())
                 current_price = float(close.iloc[-1])
 
                 high_20d = float(high.tail(20).max()) if len(high) >= 20 else float(high.max())
@@ -1999,7 +2004,7 @@ Current Date (Asia/Jakarta): {current_date}
                     "ma200": round(float(ma200_raw), 0) if ma200_raw is not None and not pd.isna(ma200_raw) else None,
                     "ma200_context": ma200_context,
                     "rsi14": round(rsi_val, 1),
-                    "atr14": round(atr_val, 0),
+                    "atr14": round(atr_val, 0) if not pd.isna(atr_val) else None,
                     "avg_volume_20d": round(avg_volume_20d, 0),
                     "52w_high": round(float(close.max()), 0),
                     "52w_low": round(float(close.min()), 0),

@@ -308,7 +308,9 @@ async def test_consensus_round_three_uses_confidence_winner(monkeypatch):
             "sentiment_data": "Position: HOLD\nAgent Confidence: 0.63",
             "debate_history": [
                 DebateMessage(role="bull", content="Position: BUY\nAgent Confidence: 0.64", round_num=3),
-                DebateMessage(role="bear", content="Position: AVOID\nAgent Confidence: 0.80", round_num=3),
+                # 0.93 keeps |bull-bear| = 0.29 > SOFT_HOLD_CONFIDENCE_DELTA (0.27)
+                # so soft_hold does not claim this case — confidence_winner fires
+                DebateMessage(role="bear", content="Position: AVOID\nAgent Confidence: 0.93", round_num=3),
             ],
         }
     )

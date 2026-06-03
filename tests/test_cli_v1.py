@@ -16,7 +16,7 @@ def test_root_help_lists_v1_commands():
     result = runner.invoke(app, ["--help"])
 
     assert result.exit_code == 0
-    for command in ("scan", "filter", "debate", "pipeline", "serve", "sector"):
+    for command in ("scan", "filter", "debate", "pipeline", "sector"):
         assert command in result.output
 
 
@@ -26,7 +26,6 @@ def test_command_help_pages_render():
         ["filter", "--help"],
         ["debate", "--help"],
         ["pipeline", "--help"],
-        ["serve", "--help"],
         ["sector", "--help"],
         ["sector", "build", "--help"],
         ["sector", "list", "--help"],
@@ -268,23 +267,6 @@ def test_run_debate_cli_invokes_isolated_debate_runner(monkeypatch):
             "--no-details",
         ]
     ]
-
-
-def test_serve_maps_uvicorn_options(monkeypatch):
-    calls = []
-
-    def fake_run_server(*, host, port, reload):
-        calls.append((host, port, reload))
-
-    monkeypatch.setattr("app.cli.commands.serve.run_server", fake_run_server)
-
-    result = runner.invoke(
-        app,
-        ["serve", "--host", "0.0.0.0", "--port", "3000", "--no-reload"],
-    )
-
-    assert result.exit_code == 0, result.output
-    assert calls == [("0.0.0.0", 3000, False)]
 
 
 def test_sector_list_and_show_use_cache_file():

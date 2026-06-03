@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -33,10 +34,16 @@ def load_sector_cache(path: Path) -> dict[str, Any]:
     return payload
 
 
-def build_command() -> None:
+def build_command(ctx: typer.Context = typer.Context) -> None:
     """Build sector_cache.json using the existing yfinance builder."""
-    console.print("[idx.header]Building sector cache[/idx.header]")
-    run_sector_build()
+    verbose = (ctx.obj or {}).get("verbose", False)
+    if verbose:
+        console.print("[idx.header]Building sector cache[/idx.header]")
+        run_sector_build()
+    else:
+        with console.status("[idx.header]Fetching sector data from yfinance...[/idx.header]"):
+            run_sector_build()
+    console.print("[idx.ok]Sector cache built.[/idx.ok]")
 
 
 def list_command(
@@ -47,6 +54,15 @@ def list_command(
 ) -> None:
     """List sector distribution from the current cache."""
     cache = load_sector_cache(cache_file)
+
+    if cache_file.exists():
+        mtime = datetime.fromtimestamp(cache_file.stat().st_mtime)
+        age_h = (datetime.now() - mtime).total_seconds() / 3600
+        console.print(
+            f"[idx.muted]{len(cache)} tickers  |  {cache_file}  |  "
+            f"updated {mtime:%Y-%m-%d %H:%M} ({age_h:.1f}h ago)[/idx.muted]"
+        )
+
     console.print(build_sector_distribution_table(cache))
 
 
@@ -69,9 +85,20 @@ def show_command(
         )
         if cached_sector.lower() == sector_key:
             members.append((ticker, payload))
+
     if not members:
         console.print(f"[idx.warn]No tickers found for sector:[/idx.warn] {sector_key}")
+        aliases = [f"'{k}' -> '{v}'" for k, v in SECTOR_ALIASES.items()]
+        console.print(f"[idx.muted]Known aliases: {', '.join(aliases)}[/idx.muted]")
         return
+
+    if sector_key != sector.strip().lower():
+        console.print(
+            f"[idx.muted]Alias resolved: '{sector}' -> '{sector_key}'[/idx.muted]"
+        )
+    console.print(
+        f"[idx.header]{len(members)} tickers[/idx.header] in [idx.ticker]{sector_key}[/idx.ticker]"
+    )
     console.print(build_sector_members_table(sector_key, members))
 
 

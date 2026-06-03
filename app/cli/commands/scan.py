@@ -47,6 +47,7 @@ def scan_command(
         bool,
         typer.Option("--dry-run", help="Show the planned ETL run without executing it."),
     ] = False,
+    ctx: typer.Context = typer.Context,
 ) -> None:
     """Collect IDX data and build the existing ETL outputs."""
     if dry_run:
@@ -60,9 +61,33 @@ def scan_command(
         )
         return
 
-    console.print(f"[idx.header]Starting IDX scan[/idx.header] export={export.value}")
-    run_scan(full=full, export=export)
-    console.print("[idx.ok]Scan complete.[/idx.ok]")
+    verbose = (ctx.obj or {}).get("verbose", False)
+    mode_label = "full universe" if full else "first page"
+
+    if verbose:
+        console.print(
+            f"[idx.header]Starting IDX scan[/idx.header] "
+            f"mode={mode_label} export={export.value}"
+        )
+        run_scan(full=full, export=export)
+    else:
+        from app.cli.ui.progress import suppress_stderr
+
+        with suppress_stderr():
+            with console.status(
+                f"[idx.header]Collecting IDX data ({mode_label})...[/idx.header]"
+            ):
+                run_scan(full=full, export=export)
+
+    console.print(
+        Panel.fit(
+            f"[idx.ok]Scan complete.[/idx.ok]\n"
+            f"[idx.label]Mode:[/idx.label]    {mode_label}\n"
+            f"[idx.label]Format:[/idx.label]  {export.value}",
+            title="IDX Scan",
+            border_style="idx.ok",
+        )
+    )
 
 
 app = typer.Typer(help="Data collection and ETL commands.")

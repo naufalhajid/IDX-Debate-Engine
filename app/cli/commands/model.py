@@ -1,9 +1,12 @@
-import typer
+from __future__ import annotations
+
 import re
 from pathlib import Path
-from rich.console import Console
 
-console = Console()
+import typer
+from rich.panel import Panel
+
+from app.cli.ui.console import console
 
 # Path to the .env file in the root of the project
 ENV_PATH = Path(__file__).resolve().parents[3] / ".env"
@@ -11,7 +14,7 @@ ENV_PATH = Path(__file__).resolve().parents[3] / ".env"
 PROVIDERS = {
     "1": "gemini",
     "2": "anthropic",
-    "3": "codex"
+    "3": "codex",
 }
 
 # Model strings verified via official API docs (June 2026)
@@ -71,8 +74,8 @@ MODELS = {
 }
 
 
-def update_env_file(key: str, value: str):
-    """Memperbarui atau menambahkan variabel ke dalam file .env."""
+def update_env_file(key: str, value: str) -> None:
+    """Update or add a variable in .env."""
     if not ENV_PATH.exists():
         ENV_PATH.write_text(f"{key}={value}\n", encoding="utf-8")
         return
@@ -91,25 +94,36 @@ def update_env_file(key: str, value: str):
 
 
 def get_current_provider() -> str:
-    """Membaca provider saat ini dari .env atau default ke gemini."""
+    """Read the active provider from .env, defaulting to gemini."""
     if not ENV_PATH.exists():
         return "gemini"
-
     content = ENV_PATH.read_text(encoding="utf-8")
     match = re.search(r"^DEFAULT_LLM_PROVIDER=(.*)$", content, re.MULTILINE)
-    if match:
-        return match.group(1).strip()
-    return "gemini"
+    return match.group(1).strip() if match else "gemini"
+
+
+def _get_current_models(provider: str) -> tuple[str, str]:
+    """Return (flash_model, pro_model) for provider from .env."""
+    if not ENV_PATH.exists():
+        return "(default)", "(default)"
+    content = ENV_PATH.read_text(encoding="utf-8")
+    p = provider.upper()
+
+    def _read(key: str) -> str:
+        m = re.search(rf"^{key}=(.*)$", content, re.MULTILINE)
+        return m.group(1).strip() if m else "(default)"
+
+    return _read(f"{p}_FLASH_MODEL"), _read(f"{p}_PRO_MODEL")
 
 
 def select_model(provider: str, tier: str) -> str:
     choices = MODELS[provider][tier]
     console.print(
-        f"\nPilih model untuk [bold cyan]{provider.capitalize()} - {tier.capitalize()} Tier[/bold cyan]:"
+        f"\nPilih model untuk [idx.highlight]{provider.capitalize()} - {tier.capitalize()} Tier[/idx.highlight]:"
     )
     for i, m in enumerate(choices, 1):
-        console.print(f"  [[cyan]{i}[/cyan]] {m}")
-    console.print("  [[cyan]c[/cyan]] Masukkan nama model kustom")
+        console.print(f"  [[idx.highlight]{i}[/idx.highlight]] {m}")
+    console.print("  [[idx.highlight]c[/idx.highlight]] Masukkan nama model kustom")
 
     choice = input(f"Pilihan Anda [1-{len(choices)}/c]: ").strip().lower()
 
@@ -124,47 +138,56 @@ def select_model(provider: str, tier: str) -> str:
     except ValueError:
         pass
 
-    console.print("[yellow]Pilihan tidak valid, menggunakan default.[/yellow]")
+    console.print("[idx.warn]Pilihan tidak valid, menggunakan default.[/idx.warn]")
     return choices[0]
 
 
 def model_command(
     provider: str = typer.Argument(None, help="Nama provider (gemini, anthropic, codex)"),
-):
+) -> None:
     """Pilih Default Model/Provider LLM dan set spesifik model untuk Flash/Pro."""
     if provider:
         provider = provider.lower()
         if provider not in ["gemini", "anthropic", "codex"]:
-            console.print(f"[bold red]❌ Provider '{provider}' tidak valid.[/bold red]")
+            console.print(
+                f"[idx.error]❌ Provider '{provider}' tidak valid.[/idx.error]"
+            )
             raise typer.Exit(1)
 
         update_env_file("DEFAULT_LLM_PROVIDER", provider)
         console.print(
-            f"[bold green]✅ Default provider telah diubah ke: {provider}[/bold green]"
+            f"[idx.ok]✅ Default provider telah diubah ke: [idx.highlight]{provider}[/idx.highlight][/idx.ok]"
         )
         return
 
     current = get_current_provider()
+    flash_model, pro_model = _get_current_models(current)
 
-    console.print("\n[bold]Konfigurasi Model Default LLM (IDX Fundamental)[/bold]")
-    console.print("=" * 50)
-    console.print(f"Model aktif saat ini: [[bold cyan]{current}[/bold cyan]]\n")
+    console.print(
+        Panel(
+            f"[idx.label]Provider:[/idx.label]     [idx.highlight]{current.capitalize()}[/idx.highlight]\n"
+            f"[idx.label]Flash:[/idx.label]        [idx.value]{flash_model}[/idx.value]\n"
+            f"[idx.label]Pro:[/idx.label]          [idx.value]{pro_model}[/idx.value]",
+            title="[idx.header]Current LLM Configuration[/idx.header]",
+            border_style="idx.header",
+            expand=False,
+        )
+    )
 
-    console.print("Pilih provider yang ingin digunakan sebagai default:")
+    console.print("\nPilih provider yang ingin digunakan sebagai default:")
     for num, name in PROVIDERS.items():
-        marker = " [bold green]← (Aktif)[/bold green]" if name == current else ""
-        console.print(f"  [[cyan]{num}[/cyan]] {name.capitalize()}{marker}")
-
-    console.print("  [[cyan]0[/cyan]] Batal / Keluar")
+        marker = " [idx.ok]← (Aktif)[/idx.ok]" if name == current else ""
+        console.print(f"  [[idx.highlight]{num}[/idx.highlight]] {name.capitalize()}{marker}")
+    console.print("  [[idx.highlight]0[/idx.highlight]] Batal / Keluar")
 
     try:
         choice = input("\nMasukkan pilihan Anda [0-3]: ").strip()
     except (KeyboardInterrupt, EOFError):
-        console.print("\n[yellow]Dibatalkan.[/yellow]")
+        console.print("\n[idx.warn]Dibatalkan.[/idx.warn]")
         raise typer.Exit()
 
     if choice == "0" or not choice:
-        console.print("[yellow]Dibatalkan.[/yellow]")
+        console.print("[idx.warn]Dibatalkan.[/idx.warn]")
         raise typer.Exit()
 
     if choice in PROVIDERS:
@@ -185,10 +208,18 @@ def model_command(
             update_env_file("CODEX_FLASH_MODEL", flash_model)
             update_env_file("CODEX_PRO_MODEL", pro_model)
 
-        console.print("\n[bold green]✅ Berhasil! Default konfigurasi diubah:[/bold green]")
-        console.print(f"   [cyan]Provider[/cyan]    : {selected_provider.capitalize()}")
-        console.print(f"   [cyan]Flash Model[/cyan] : {flash_model}")
-        console.print(f"   [magenta]Pro Model[/magenta]   : {pro_model}")
+        console.print(
+            Panel(
+                f"[idx.label]Provider:[/idx.label]     [idx.highlight]{selected_provider.capitalize()}[/idx.highlight]\n"
+                f"[idx.label]Flash:[/idx.label]        [idx.value]{flash_model}[/idx.value]\n"
+                f"[idx.label]Pro:[/idx.label]          [idx.value]{pro_model}[/idx.value]",
+                title="[idx.ok]✅ Configuration Updated[/idx.ok]",
+                border_style="idx.ok",
+                expand=False,
+            )
+        )
     else:
-        console.print(f"\n[bold red]❌ Pilihan '{choice}' tidak valid.[/bold red]")
+        console.print(
+            f"\n[idx.error]❌ Pilihan '{choice}' tidak valid.[/idx.error]"
+        )
         raise typer.Exit(1)

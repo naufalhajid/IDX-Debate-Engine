@@ -16,7 +16,7 @@ from typing import Annotated
 
 import typer
 
-from app.cli.commands import debate, filter, pipeline, scan, sector, serve, model, auth
+from app.cli.commands import debate, filter, pipeline, scan, sector, model, auth
 from app.cli.ui.console import console
 
 
@@ -68,7 +68,6 @@ app.command(
     name="pipeline",
     context_settings={"allow_extra_args": True},
 )(pipeline.pipeline_command)
-app.command(name="serve")(serve.serve_command)
 app.command(name="model")(model.model_command)
 app.add_typer(sector.app, name="sector")
 app.add_typer(auth.app, name="auth")

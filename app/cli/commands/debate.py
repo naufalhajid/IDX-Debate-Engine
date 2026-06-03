@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from pathlib import Path
 from typing import Annotated
 
 import typer
+from rich.panel import Panel
 
 from app.cli.ui.console import console
+from app.cli.ui.tables import build_verdict_summary_table
 
 
 def _normalize_tickers(tickers: list[str]) -> list[str]:
@@ -14,6 +17,18 @@ def _normalize_tickers(tickers: list[str]) -> list[str]:
     if not normalized:
         raise typer.BadParameter("Provide at least one ticker.")
     return normalized
+
+
+def _read_debate_results(tickers: list[str], output_dir: Path) -> list[dict]:
+    results = []
+    for ticker in tickers:
+        path = output_dir / ticker / "latest_debate.json"
+        if path.exists():
+            try:
+                results.append(json.loads(path.read_text(encoding="utf-8")))
+            except Exception:
+                pass
+    return results
 
 
 def run_debate_cli(
@@ -70,19 +85,32 @@ def debate_command(
     root_ctx = ctx.find_root()
     global_verbose = bool(((root_ctx.obj or {}) if root_ctx else {}).get("verbose"))
     selected_verbose = verbose or global_verbose
+
     console.print(
-        "[idx.header]Memulai debate[/idx.header] "
-        f"tickers={', '.join(normalized)}"
+        Panel(
+            f"[idx.label]Tickers:[/idx.label]   [idx.ticker]{' '.join(normalized)}[/idx.ticker]\n"
+            f"[idx.label]Output:[/idx.label]    [idx.path]{output_dir}[/idx.path]\n"
+            f"[idx.label]Details:[/idx.label]   {'On' if details else 'Off'}",
+            title="[idx.header]IDX Debate Chamber[/idx.header]",
+            border_style="idx.header",
+            expand=False,
+        )
     )
+
     run_debate_cli(
         tickers=normalized,
         output_dir=output_dir,
         verbose=selected_verbose,
         details=details,
     )
+
+    results = _read_debate_results(normalized, output_dir)
+    if results:
+        console.print(build_verdict_summary_table(results))
+
     console.print(
-        "[idx.ok]Debate selesai.[/idx.ok] "
-        f"Output: [idx.path]{output_dir}[/idx.path]"
+        f"\n[idx.ok]Debate complete.[/idx.ok]  "
+        f"[idx.muted]{len(normalized)} tickers  |  [idx.path]{output_dir}[/idx.path][/idx.muted]"
     )
 
 

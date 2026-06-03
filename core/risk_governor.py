@@ -512,6 +512,14 @@ def _is_conditional_setup(reason_codes: list[str], verdict: dict[str, Any]) -> b
     if any(code in HARD_REJECT_CODES for code in reason_codes):
         return False
     rating = _clean_rating(verdict.get("rating"))
+    # High-R/R counter-trend HOLD setups don't need to wait for breakout confirmation.
+    # When the only soft flags are counter_trend + rating_hold and R/R >= 3.5x, the
+    # valuation margin is wide enough to deploy without waiting for MA crossover.
+    if "counter_trend_setup" in reason_codes and rating in SOFT_BUYABLE_RATINGS:
+        soft_only = [c for c in reason_codes if c not in {"counter_trend_setup", "rating_hold"}]
+        rr = float(verdict.get("risk_reward_ratio") or 0)
+        if not soft_only and rr >= 3.5:
+            return False
     return rating in SOFT_BUYABLE_RATINGS or "counter_trend_setup" in reason_codes
 
 

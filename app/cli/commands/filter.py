@@ -6,6 +6,7 @@ from typing import Annotated
 import typer
 
 from app.cli.ui.console import console
+from app.cli.ui.tables import build_filter_results_table
 
 
 def run_filter(
@@ -38,12 +39,40 @@ def filter_command(
         Path,
         typer.Option("--output-dir", help="Directory for top10_candidates.json."),
     ] = Path("output"),
+    ctx: typer.Context = typer.Context,
 ) -> None:
     """Run the quantitative swing-trade screener."""
-    console.print(f"[idx.header]Running quantitative filter[/idx.header] top={top}")
-    run_filter(top=top, input_file=input_file, output_dir=output_dir)
+    from core.quant_filter.config import CONFIG
+
+    verbose = (ctx.obj or {}).get("verbose", False)
+    scratch_dir = str(CONFIG.get("scratch_dir", "scratch"))
+
+    if verbose:
+        console.print(f"[idx.header]Running quantitative filter[/idx.header] top={top}")
+        df = run_filter(top=top, input_file=input_file, output_dir=output_dir)
+    else:
+        from app.cli.ui.progress import quiet_filter_pipeline
+
+        status_obj = console.status(
+            "[idx.header]Screening IHSG universe...[/idx.header]"
+        )
+        with status_obj:
+            with quiet_filter_pipeline(
+                scratch_dir,
+                lambda msg: status_obj.update(f"[idx.header]{msg}[/idx.header]"),
+            ):
+                df = run_filter(top=top, input_file=input_file, output_dir=output_dir)
+
+    if df is None or df.empty:
+        console.print("[idx.warn]No candidates passed all filters.[/idx.warn]")
+        return
+
+    console.print(build_filter_results_table(df, top_n=top))
+    json_path = output_dir / "top10_candidates.json"
     console.print(
-        f"[idx.ok]Filter complete.[/idx.ok] Results: [idx.path]{output_dir / 'top10_candidates.json'}[/idx.path]"
+        f"\n[idx.ok]Top {len(df)} candidates[/idx.ok]  →  "
+        f"[idx.path]{json_path}[/idx.path]  "
+        f"[idx.muted]| report: {scratch_dir}/report.md[/idx.muted]"
     )
 
 
