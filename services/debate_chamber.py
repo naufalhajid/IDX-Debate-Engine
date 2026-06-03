@@ -328,16 +328,74 @@ def _breaking_news_headlines(news_bundle: Any, limit: int = 3) -> list[dict[str,
     return headlines
 
 
-async def _news_context_for_state(state: DebateChamberState, ticker: str) -> dict[str, object]:
+def _news_adjustment_from_sentiment(sentiment: str, has_breaking: bool) -> tuple[float, str]:
+    """Map an LLM-judged news sentiment to a CIO confidence adjustment.
+
+    Single source of truth so the displayed news sentiment and the numeric
+    adjustment can never contradict each other (the keyword path could — e.g.
+    BREN showed POSITIVE overall but a -0.20 adjustment).
+    """
+    label = str(sentiment or "").strip().upper()
+    if label == "NEGATIVE":
+        if has_breaking:
+            return -0.20, "LLM-judged negative breaking news"
+        return -0.10, "LLM-judged negative news sentiment"
+    if label == "POSITIVE":
+        return 0.05, "LLM-judged positive news sentiment"
+    return 0.0, "LLM-judged neutral news sentiment"
+
+
+async def _news_headlines_for_llm(ticker: str, limit: int = 6) -> str:
+    """Recent headlines (titles only, no keyword labels) for LLM news judgment.
+
+    Deliberately omits the keyword sentiment tags so the LLM judges the raw
+    headlines itself. Relies on NewsFetcher's cache so the later
+    _news_context_for_state call does not re-hit the network.
+    """
+    try:
+        from services.news_fetcher import DEFAULT_FETCHER
+
+        bundle = await DEFAULT_FETCHER.build_bundle_async(ticker)
+    except Exception:
+        return ""
+    if not bundle.items:
+        return ""
+    lines = ["=== RECENT NEWS HEADLINES ==="]
+    for index, item in enumerate(bundle.items[:limit], 1):
+        published = item.published_at[:10] if item.published_at else "unknown"
+        lines.append(f"{index}. [{published}] {item.title} — {item.source}")
+    return "\n".join(lines)
+
+
+async def _news_context_for_state(
+    state: DebateChamberState,
+    ticker: str,
+    llm_news_sentiment: str | None = None,
+) -> dict[str, object]:
     try:
         from services.news_fetcher import DEFAULT_FETCHER
 
         news_bundle = await DEFAULT_FETCHER.build_bundle_async(ticker)
         news_str = DEFAULT_FETCHER.bundle_to_prompt_string(news_bundle)
-        if news_bundle.confidence_adjustment != 0:
+
+        # Default to the keyword-derived signal; override with the LLM judgment
+        # when available (preferred). Keyword stays only as the sparse-social
+        # fallback (the LLM bails to INSUFFICIENT_DATA under 5 social posts).
+        overall_sentiment = news_bundle.overall_sentiment.value
+        adjustment = news_bundle.confidence_adjustment
+        normalized_llm = str(llm_news_sentiment or "").strip().upper()
+        if normalized_llm in {"POSITIVE", "NEGATIVE", "NEUTRAL"}:
+            overall_sentiment = normalized_llm
+            adjustment, _reason = _news_adjustment_from_sentiment(
+                normalized_llm, news_bundle.has_breaking_news
+            )
+            logger.info(
+                f"[News] {ticker}: LLM news_sentiment={normalized_llm} adj={adjustment:+.2f}"
+            )
+        elif adjustment != 0:
             logger.info(
                 f"[News] {ticker}: "
-                f"adjustment={news_bundle.confidence_adjustment:+.2f} "
+                f"adjustment={adjustment:+.2f} "
                 f"({news_bundle.confidence_adjustment_reason})"
             )
         if news_bundle.has_breaking_news:
@@ -348,15 +406,15 @@ async def _news_context_for_state(state: DebateChamberState, ticker: str) -> dic
         breaking_headlines = _breaking_news_headlines(news_bundle)
         metadata["has_breaking_news"] = news_bundle.has_breaking_news
         metadata["breaking_news_headlines"] = breaking_headlines
-        metadata["news_confidence_adjustment"] = news_bundle.confidence_adjustment
-        metadata["news_overall_sentiment"] = news_bundle.overall_sentiment.value
+        metadata["news_confidence_adjustment"] = adjustment
+        metadata["news_overall_sentiment"] = overall_sentiment
         metadata["news_brief"] = news_str
         state["news_brief"] = news_str
-        state["news_confidence_adjustment"] = news_bundle.confidence_adjustment
+        state["news_confidence_adjustment"] = adjustment
         state["metadata"] = metadata
         return {
             "news_brief": news_str,
-            "news_confidence_adjustment": news_bundle.confidence_adjustment,
+            "news_confidence_adjustment": adjustment,
             "metadata": metadata,
         }
     except Exception as exc:
@@ -684,7 +742,8 @@ RESPONSE FORMAT — You must respond with ONLY a valid JSON object, no other tex
   "confidence": <float between 0.0 and 1.0>,
   "status": "OK" | "INSUFFICIENT_DATA",
   "reasoning": "<one paragraph summary>",
-  "key_signals": ["<signal 1>", "<signal 2>"]
+  "key_signals": ["<signal 1>", "<signal 2>"],
+  "news_sentiment": "POSITIVE" | "NEGATIVE" | "NEUTRAL"
 }
 If data is insufficient (fewer than 5 posts), return:
 {"position": "HOLD", "confidence": 0.0, "status": "INSUFFICIENT_DATA", "reasoning": "...", "key_signals": []}
@@ -716,6 +775,15 @@ def _bundle_evidence_age_hours(bundle: Any) -> float | None:
 
 SENTIMENT_SIGNAL_WEIGHTING_INSTRUCTION = """
 SIGNAL WEIGHTING: Posts with "_verified_weight": 1.5 are from verified Stockbit users (analysts, institutional accounts). Weight their sentiment signals more heavily in your analysis. Posts with "_verified_weight": 1.0 are from regular retail users and still count - do not ignore them.
+""".strip()
+
+SENTIMENT_NEWS_INSTRUCTION = """
+NEWS HEADLINE EVALUATION: In addition to the social posts, you receive a "RECENT NEWS HEADLINES" section. Judge the STOCK-SPECIFIC news sentiment and report it in the "news_sentiment" field (POSITIVE / NEGATIVE / NEUTRAL). Rules:
+- Market/index round-ups that merely list this ticker among many gainers/losers (e.g. "IHSG menguat 1%, top gainers: X, Y, Z") are NOT stock-specific news → NEUTRAL.
+- A stock hitting ARA / auto reject atas / limit-up is bullish → POSITIVE. A stock hitting ARB / suspensi / suspension / delisting / fraud is bearish → NEGATIVE.
+- Apply negation: "tidak naik", "gagal", "batal", "bukan rekomendasi" reverse the surface word. Do not score on isolated keywords.
+- Ignore a headline if the ticker appears only as a common word (e.g. "cuan" meaning profit, not the company CUAN) rather than the actual issuer.
+- If no headlines are provided, set "news_sentiment": "NEUTRAL".
 """.strip()
 
 
@@ -2116,6 +2184,12 @@ Current Date (Asia/Jakarta): {current_date}
                     f"serialized_chars={len(serialized_posts)}"
                 )
 
+            news_headlines = await _news_headlines_for_llm(ticker)
+            human_content = (
+                f"{serialized_posts}\n\n{news_headlines}"
+                if news_headlines
+                else serialized_posts
+            )
             messages = [
                 SystemMessage(
                     content=(
@@ -2124,9 +2198,11 @@ Current Date (Asia/Jakarta): {current_date}
                         + SENTIMENT_JSON_RESPONSE_FORMAT
                         + "\n\n"
                         + SENTIMENT_SIGNAL_WEIGHTING_INSTRUCTION
+                        + "\n\n"
+                        + SENTIMENT_NEWS_INSTRUCTION
                     )
                 ),
-                HumanMessage(content=serialized_posts),
+                HumanMessage(content=human_content),
             ]
             resp = await self._invoke_llm_for_state(state, self.flash_llm, messages)
             payload = self._sentiment_payload_from_response(ticker, resp.content)
@@ -2149,7 +2225,9 @@ Current Date (Asia/Jakarta): {current_date}
                     "truncated_posts": truncated_count,
                 },
             )
-            news_update = await _news_context_for_state(state, ticker)
+            news_update = await _news_context_for_state(
+                state, ticker, llm_news_sentiment=payload.get("news_sentiment")
+            )
             return {"sentiment_data": content, **news_update}
         except Exception as e:
             logger.error(f"[Sentiment] {ticker}: SENTIMENT_FETCH error: {e}")
