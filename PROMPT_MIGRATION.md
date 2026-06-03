@@ -89,10 +89,62 @@ Two correctness fixes over the first v3 draft:
 - `test_asymmetry_override_blocked_by_low_rr`
 Full file: 37 passed.
 
-### Known limitation (not fixed here)
-DSSA's R/R 9.22x is partly an artifact: when `fair_value_rejected` is set (RAG
-could not verify the Graham number), the envelope receives `fair_value=0`, so
-the FV-blend target ceiling is skipped and the target jumps to the 52-week high
-(Rp 1,030), inflating R/R. Meanwhile the display + CIO "overvalued" reasoning
-still use FV Rp 304. The overvalued flag and the R/R are computed from
-contradictory fair-value assumptions. See assessment notes for follow-ups.
+### Known limitation (FIXED in v4 below)
+DSSA's R/R 9.22x is partly an artifact: when the Graham fair value is missing,
+the envelope receives `fair_value≈0`, so the FV-blend target ceiling is skipped
+and the target runs up to a recent pre-crash high (Rp 1,030), inflating R/R.
+
+---
+
+## 2026-06-03 — `momentum-rr-override-v4` (CODE-LEVEL, not prompt)
+
+**Files changed:** `services/debate_chamber.py`, `tests/test_debate_chamber_reliability.py`
+
+### Root cause (confirmed empirically)
+`_compute_trade_envelope(current_price=615, fair_value, tech)` with DSSA inputs:
+- `fair_value=304` → target Rp 665 (+9.9%), **R/R 1.11x**
+- `fair_value=0/None` → target Rp 1,030 (+70%), **R/R 9.22x**
+
+`build_fair_value_report()` returned `None` for DSSA (Graham uncomputable), so
+`state["fair_value_estimate"]` was None and the envelope ran the FV-less path →
+R/R 9.22x. The `304` + "(FV Blend)" shown in the verdict come from the separate
+RAG/LLM path → the verdict was internally inconsistent. So R/R-as-a-gate (v3)
+was fragile: it fired on an artifact, not a real setup.
+
+### Changes
+**Part 1 — realistic R/R (`_compute_trade_envelope`):**
+- New `MAX_TARGET_RETURN_NO_FV = 0.15`. When `fair_value` is missing/≤0, cap the
+  target at `entry_high × 1.15` (basis tag "(No-FV Cap)") so resistance levels
+  can't inflate R/R. DSSA FV-less R/R now 2.0x (was 9.22x); FV-anchored path
+  (1.11x) untouched.
+- Fixed a latent `None > 0` crash in the returned `fair_value` field.
+
+**Part 2 — momentum-based watchlist (`_apply_consensus_override`):**
+- Replaced the `R/R ≥ 5.0` escalation trigger with a momentum gate. A
+  confidence_winner of AVOID escalates to HOLD only when **all** hold:
+  value-driven AVOID (overvalued or no FV anchor) **AND** a volume-confirmed
+  breakout (`volume_surge_ratio ≥ VOL_SURGE_THRESHOLD=1.5` **AND**
+  `return_5d_pct ≥ MOMENTUM_RETURN_THRESHOLD=5.0`) **AND** sentiment non-bearish.
+- Added `volume_surge_ratio` and `return_5d_pct` to the chartist's
+  `technical_indicators` (computed from raw OHLCV; MA-based signals miss a
+  single-day surge on a name still below its MAs).
+
+### Tests (38 passed)
+- `test_momentum_override_escalates_avoid_to_hold`
+- `test_momentum_override_blocked_by_bearish_sentiment`
+- `test_momentum_override_blocked_without_volume_breakout`
+- `test_momentum_override_blocked_when_not_overvalued`
+
+### Important behavioural note
+The gate is now **data-driven**. DSSA shows HOLD only if its loaded data carries
+the volume-confirmed up-move. The cached run used June-1 data (pre-ARA); if DSSA
+was crashing into June 1, `return_5d_pct` is negative → momentum gate → AVOID,
+which is the honest call (the June-2 ARA surge is not in the data). Thresholds
+are named constants for tuning once real numbers are observed.
+
+### Follow-up (not done — flagged)
+The CIO prompt (`cio_judge.txt`) still contains `R/R ≥ 5.0 → BUY (Momentum)` /
+asymmetry-watchlist language (STEP 1/3/4). After Part 1, R/R can no longer reach
+5.0 for overvalued/FV-less names, so those branches are effectively inert, but
+the prompt text is now inconsistent with the momentum-based code path. Cleaning
+it up needs a prompt_version bump + the version-assertion test update.
