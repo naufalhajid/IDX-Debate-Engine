@@ -1890,6 +1890,19 @@ Current Date (Asia/Jakarta): {current_date}
                 high_20d = float(high.tail(20).max()) if len(high) >= 20 else float(high.max())
                 high_50d = float(high.tail(50).max()) if len(high) >= 50 else float(high.max())
 
+                # Momentum / volume-breakout signals — feed the asymmetry watchlist gate
+                # in _apply_consensus_override. A recent volume-confirmed up-move is what
+                # distinguishes a live momentum name (e.g. DSSA pre-ARA) from a stock that
+                # is merely below its MAs; MA-based trend signals miss the single-day surge.
+                last_volume = float(volume.iloc[-1]) if len(volume) else 0.0
+                avg_volume_20d = float(volume.tail(20).mean()) if len(volume) else 0.0
+                volume_surge_ratio = (last_volume / avg_volume_20d) if avg_volume_20d > 0 else 0.0
+                return_5d_pct = (
+                    (current_price / float(close.iloc[-6]) - 1.0) * 100.0
+                    if len(close) >= 6 and float(close.iloc[-6]) > 0
+                    else 0.0
+                )
+
 
                 if ma200_raw is None or pd.isna(ma200_raw):
                     ma200_context = "INSUFFICIENT_DATA"
@@ -1919,11 +1932,13 @@ Current Date (Asia/Jakarta): {current_date}
                     "ma200_context": ma200_context,
                     "rsi14": round(rsi_val, 1),
                     "atr14": round(atr_val, 0),
-                    "avg_volume_20d": round(float(volume.tail(20).mean()), 0),
+                    "avg_volume_20d": round(avg_volume_20d, 0),
                     "52w_high": round(float(close.max()), 0),
                     "52w_low": round(float(close.min()), 0),
                     "high_20d": round(high_20d, 0),
                     "high_50d": round(high_50d, 0),
+                    "volume_surge_ratio": round(volume_surge_ratio, 2),
+                    "return_5d_pct": round(return_5d_pct, 1),
                 }
                 logger.info(f"[Chartist] Technicals computed: MA50={tech_indicators.get('ma50')}, RSI={tech_indicators.get('rsi14')}")
         except Exception as e:
@@ -2817,6 +2832,11 @@ Current Date (Asia/Jakarta): {current_date}
                 break
         return max(base - max(cls._tick_size_for_price(base), 1.0), 0.0)
 
+    #: Max target return (from entry_high) when no fair-value anchor is available.
+    #: Without an FV ceiling, resistance-based targets can run to a recent pre-crash
+    #: high and inflate R/R; this caps the implied upside to a realistic swing.
+    MAX_TARGET_RETURN_NO_FV = 0.15
+
     def _compute_trade_envelope(
         self,
         current_price: float,
@@ -2891,12 +2911,22 @@ Current Date (Asia/Jakarta): {current_date}
             target_basis = "Resistance 52-Week"
 
         target = snap_to_tick(target_candidate)
-        
+
         # Ceiling: blend with Fair Value if target > FV
-        if fair_value > 0 and target > fair_value:
+        if fair_value and fair_value > 0 and target > fair_value:
             target = snap_to_tick((target + fair_value) / 2)
             target_basis += " (FV Blend)"
-            
+        elif not fair_value or fair_value <= 0:
+            # No valuation anchor (Graham FV missing/0): the FV-blend ceiling cannot
+            # apply, so resistance levels — especially a recent pre-crash high still
+            # inside the 20-day window — push the target far above price and inflate
+            # R/R (e.g. DSSA target Rp 1,030 / R/R 9.22x vs the FV-anchored Rp 665 /
+            # 1.11x). Cap at a realistic swing ceiling so R/R stays trustworthy.
+            capped = snap_to_tick(entry_high * (1 + self.MAX_TARGET_RETURN_NO_FV))
+            if 0 < capped < target:
+                target = capped
+                target_basis += " (No-FV Cap)"
+
         if target <= entry_high:
             target = self._next_tick_above(entry_high)
             target_basis = "Tick Increment (Fallback)"
@@ -2916,7 +2946,7 @@ Current Date (Asia/Jakarta): {current_date}
             "expected_return_pct": round(gain_pct, 1),
             "max_risk_pct": round(loss_pct, 1),
             "risk_reward_ratio": rr_ratio,
-            "fair_value": fair_value if fair_value > 0 else None,
+            "fair_value": fair_value if (fair_value and fair_value > 0) else None,
             "atr14": atr14,
         }
 
@@ -3059,6 +3089,12 @@ Current Date (Asia/Jakarta): {current_date}
             return addition
         return f"{existing_text} {addition}"
 
+    #: Momentum watchlist thresholds (used by _apply_consensus_override): a volume
+    #: surge of >= VOL_SURGE_THRESHOLD x the 20-day average AND a >= MOMENTUM_RETURN
+    #: 5-day gain together mark a live, volume-confirmed breakout.
+    VOL_SURGE_THRESHOLD = 1.5
+    MOMENTUM_RETURN_THRESHOLD = 5.0
+
     def _apply_consensus_override(self, parsed: dict, state: DebateChamberState) -> dict:
         p = dict(parsed) if isinstance(parsed, dict) else {}
         method = state.get("consensus_method")
@@ -3087,19 +3123,38 @@ Current Date (Asia/Jakarta): {current_date}
             if winner_position == "UNKNOWN":
                 winner_position = "HOLD"
 
-            # R/R asymmetry override: a confidence_winner of AVOID is escalated to HOLD
-            # (Extreme Asymmetry Watchlist) when R/R >= 5.0 and the sentiment agent is
-            # not bearish. A trade with R/R >= 5.0 only needs a ~17% win rate to be
-            # profitable, so a hard AVOID discards valid momentum setups (e.g. DSSA
-            # R/R 9.22x rejected purely on Graham overvaluation). risk_reward_ratio is
-            # the canonical Python envelope value (set in _apply_envelope above).
+            # Momentum watchlist override: a value-/trend-driven confidence_winner of
+            # AVOID is escalated to HOLD when there is a genuine volume-confirmed up-move
+            # AND the sentiment agent is non-bearish. This REPLACES the earlier
+            # "R/R >= 5.0" trigger, which was unreliable: R/R inflates when the Graham
+            # fair value is missing and the target defaults to a recent pre-crash high
+            # (DSSA showed R/R 9.22x vs a realistic ~2x). Momentum + non-bearish
+            # sentiment on an overvalued/FV-less name is the honest reason to watchlist
+            # (HOLD), not buy. See PROMPT_MIGRATION.md momentum-rr-override-v4.
             asymmetry_escalated = False
             if winner_position == "AVOID":
                 try:
-                    rr = float(p.get("risk_reward_ratio") or 0.0)
+                    cp = float(p.get("current_price") or 0.0)
+                    fv = float(p.get("fair_value") or 0.0)
                 except (TypeError, ValueError):
-                    rr = 0.0
-                if rr >= 5.0:
+                    cp, fv = 0.0, 0.0
+                value_driven_avoid = fv <= 0 or cp > fv  # overvalued or no FV anchor
+
+                tech = state.get("technical_indicators") or {}
+                try:
+                    volume_surge = float(tech.get("volume_surge_ratio") or 0.0)
+                except (TypeError, ValueError):
+                    volume_surge = 0.0
+                try:
+                    recent_return = float(tech.get("return_5d_pct") or 0.0)
+                except (TypeError, ValueError):
+                    recent_return = 0.0
+                momentum_breakout = (
+                    volume_surge >= self.VOL_SURGE_THRESHOLD
+                    and recent_return >= self.MOMENTUM_RETURN_THRESHOLD
+                )
+
+                if value_driven_avoid and momentum_breakout:
                     # _normalise_position maps BEARISH/SELL -> "AVOID", so a bearish
                     # sentiment agent surfaces here as "AVOID". Escalate only when the
                     # sentiment specialist is non-bearish (anything other than AVOID).
@@ -3116,10 +3171,12 @@ Current Date (Asia/Jakarta): {current_date}
                         p["weighted_reasoning"] = self._append_reason(
                             p.get("weighted_reasoning"),
                             (
-                                f"EXTREME ASYMMETRY WATCHLIST — confidence_winner was AVOID "
-                                f"({winner.get('agent', 'bear')}) but R/R {rr:.2f}x >= 5.0 with "
-                                f"non-bearish sentiment ({sentiment_position}) prevents hard rejection. "
-                                "Escalated to HOLD. Monitor for technical confirmation before entry."
+                                f"MOMENTUM WATCHLIST — confidence_winner was AVOID "
+                                f"({winner.get('agent', 'bear')}) but a volume-confirmed breakout "
+                                f"(vol {volume_surge:.1f}x avg, +{recent_return:.1f}% 5d) with "
+                                f"non-bearish sentiment ({sentiment_position}) on an "
+                                "overvalued/FV-less name prevents hard rejection. Escalated to "
+                                "HOLD watchlist — monitor for trend confirmation before entry."
                             ),
                         )
 

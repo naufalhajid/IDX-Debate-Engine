@@ -358,8 +358,14 @@ async def test_confidence_winner_uses_effective_calibrated_confidence(monkeypatc
     }
 
 
-def _confidence_winner_state(sentiment_position: str = "HOLD") -> dict:
-    """Minimal state where bear wins by confidence (AVOID at 0.93)."""
+def _confidence_winner_state(
+    sentiment_position: str = "HOLD",
+    *,
+    volume_surge: float = 2.0,
+    return_5d: float = 10.0,
+) -> dict:
+    """Minimal state where bear wins by confidence (AVOID at 0.93), with a
+    volume-confirmed momentum breakout in the technicals by default."""
     return {
         "consensus_reached": False,
         "consensus_method": "confidence_winner",
@@ -369,39 +375,69 @@ def _confidence_winner_state(sentiment_position: str = "HOLD") -> dict:
             {"agent": "bear", "position": "AVOID", "confidence": 0.93},
             {"agent": "sentiment_specialist", "position": sentiment_position},
         ],
+        "technical_indicators": {
+            "volume_surge_ratio": volume_surge,
+            "return_5d_pct": return_5d,
+        },
     }
 
 
-def test_asymmetry_override_escalates_avoid_to_hold_on_high_rr():
-    chamber = _chamber()
-    parsed = {"rating": "AVOID", "confidence": 0.0, "risk_reward_ratio": 9.22}
+# DSSA-like overvalued name: price > fair value → value_driven_avoid is True.
+_OVERVALUED_PARSED = {
+    "rating": "AVOID",
+    "confidence": 0.0,
+    "current_price": 615.0,
+    "fair_value": 304.0,
+}
 
-    result = chamber._apply_consensus_override(parsed, _confidence_winner_state("HOLD"))
+
+def test_momentum_override_escalates_avoid_to_hold():
+    chamber = _chamber()
+
+    result = chamber._apply_consensus_override(
+        dict(_OVERVALUED_PARSED), _confidence_winner_state("HOLD")
+    )
 
     assert result["rating"] == "HOLD"
     assert result["confidence"] == 0.55
-    assert "EXTREME ASYMMETRY WATCHLIST" in result["weighted_reasoning"]
+    assert "MOMENTUM WATCHLIST" in result["weighted_reasoning"]
 
 
-def test_asymmetry_override_blocked_by_bearish_sentiment():
+def test_momentum_override_blocked_by_bearish_sentiment():
     chamber = _chamber()
-    parsed = {"rating": "AVOID", "confidence": 0.0, "risk_reward_ratio": 9.22}
 
     # Sentiment specialist bearish → normalises to AVOID → no escalation.
-    result = chamber._apply_consensus_override(parsed, _confidence_winner_state("BEARISH"))
+    result = chamber._apply_consensus_override(
+        dict(_OVERVALUED_PARSED), _confidence_winner_state("BEARISH")
+    )
 
     assert result["rating"] == "AVOID"
-    assert "EXTREME ASYMMETRY WATCHLIST" not in (result.get("weighted_reasoning") or "")
+    assert "MOMENTUM WATCHLIST" not in (result.get("weighted_reasoning") or "")
 
 
-def test_asymmetry_override_blocked_by_low_rr():
+def test_momentum_override_blocked_without_volume_breakout():
     chamber = _chamber()
-    parsed = {"rating": "AVOID", "confidence": 0.0, "risk_reward_ratio": 1.3}
 
+    # Volume surge below threshold → no momentum breakout → stays AVOID.
+    result = chamber._apply_consensus_override(
+        dict(_OVERVALUED_PARSED),
+        _confidence_winner_state("HOLD", volume_surge=1.0, return_5d=10.0),
+    )
+
+    assert result["rating"] == "AVOID"
+    assert "MOMENTUM WATCHLIST" not in (result.get("weighted_reasoning") or "")
+
+
+def test_momentum_override_blocked_when_not_overvalued():
+    chamber = _chamber()
+
+    # Undervalued (price < fair value) → AVOID is not value-driven → no escalation,
+    # even with a volume-confirmed breakout and non-bearish sentiment.
+    parsed = {"rating": "AVOID", "confidence": 0.0, "current_price": 615.0, "fair_value": 900.0}
     result = chamber._apply_consensus_override(parsed, _confidence_winner_state("HOLD"))
 
     assert result["rating"] == "AVOID"
-    assert "EXTREME ASYMMETRY WATCHLIST" not in (result.get("weighted_reasoning") or "")
+    assert "MOMENTUM WATCHLIST" not in (result.get("weighted_reasoning") or "")
 
 
 def test_fair_value_rejected_without_current_run_rag_evidence():
