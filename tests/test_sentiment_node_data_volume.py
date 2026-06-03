@@ -86,11 +86,15 @@ def chamber(monkeypatch) -> DebateChamber:
     async def no_sleep(delay: float) -> None:
         return None
 
-    async def no_news(state: dict, ticker: str) -> dict:
+    async def no_news(state: dict, ticker: str, llm_news_sentiment: str | None = None) -> dict:
         return {}
+
+    async def no_headlines(ticker: str, limit: int = 6) -> str:
+        return ""
 
     monkeypatch.setattr(dc.asyncio, "sleep", no_sleep)
     monkeypatch.setattr(dc, "_news_context_for_state", no_news)
+    monkeypatch.setattr(dc, "_news_headlines_for_llm", no_headlines)
     monkeypatch.setattr(dc, "_ledger_stage_start", lambda *args, **kwargs: None)
     monkeypatch.setattr(dc, "_ledger_stage_success", lambda *args, **kwargs: None)
     monkeypatch.setattr(dc, "_ledger_stage_failure", lambda *args, **kwargs: None)

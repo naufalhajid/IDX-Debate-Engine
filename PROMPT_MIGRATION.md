@@ -148,3 +148,61 @@ asymmetry-watchlist language (STEP 1/3/4). After Part 1, R/R can no longer reach
 5.0 for overvalued/FV-less names, so those branches are effectively inert, but
 the prompt text is now inconsistent with the momentum-based code path. Cleaning
 it up needs a prompt_version bump + the version-assertion test update.
+
+---
+
+## 2026-06-03 — `sentiment-llm-news-v1` (CODE-LEVEL, no prompt_version bump)
+
+**Files changed:** `services/debate_chamber.py`,
+`tests/test_debate_chamber_reliability.py`, `tests/test_sentiment_node_data_volume.py`
+
+### Problem (from the sentiment audit)
+News sentiment was scored by a keyword lexicon (`news_fetcher.py`):
+- 1 keyword = ±1.00 saturation; no negation; no "ARA"/limit-up; ticker
+  false-positives ("Bagi Cuan" matched ticker CUAN); index round-ups that merely
+  list the ticker drove a "POSITIVE" stock sentiment (price echo / circular).
+- `overall_sentiment` and `confidence_adjustment` could contradict (BREN: shown
+  POSITIVE but −0.20 because one macro "melemah" headline tripped the breaking
+  penalty).
+
+### Approach — reuse the existing LLM (no new API call)
+The sentiment-specialist LLM already runs per debate on Stockbit social posts.
+Feed it the recent news headlines too and have it judge them; demote the keyword
+scorer to a fallback.
+
+### Changes
+- Output schema (`SENTIMENT_JSON_RESPONSE_FORMAT`) gains a `news_sentiment` field.
+- New `SENTIMENT_NEWS_INSTRUCTION` constant: round-ups → NEUTRAL, ARA/limit-up →
+  POSITIVE, suspensi/delisting/fraud → NEGATIVE, apply negation, ignore
+  common-word ticker matches (e.g. "cuan").
+- `_news_headlines_for_llm()` formats raw titles (no keyword labels) and is
+  appended to the existing LLM Human message (NewsFetcher cache avoids a 2nd fetch).
+- `_news_context_for_state(..., llm_news_sentiment=…)` derives BOTH
+  `news_overall_sentiment` and `news_confidence_adjustment` from the LLM label via
+  `_news_adjustment_from_sentiment()` → they can no longer contradict.
+
+### Design decisions
+- **D1** — `news_sentiment` is SEPARATE from the social vote (which drives the
+  debate + the v4 momentum gate). Protects v4; the social vote is untouched.
+- **D2** — social < 5 posts → LLM bails to INSUFFICIENT_DATA, news falls back to
+  the keyword scorer. Hot stocks (the target) have ≥5 posts. Documented limitation.
+- **D3** — adjustment map: POSITIVE +0.05 / NEGATIVE −0.10 (−0.20 if breaking) /
+  NEUTRAL 0. Single source ⇒ overall ≡ adjustment.
+- No `prompt_version` bump: the change is code constants + node logic, not a
+  `debate_prompts/*.txt` edit, so the registry pack is unchanged.
+
+### Tests (82 passed across the 3 files)
+- `test_news_adjustment_from_sentiment_is_consistent`
+- `test_news_context_llm_sentiment_overrides_keyword` (keyword POSITIVE → LLM
+  NEGATIVE wins, overall≡adjustment — proves the BREN/CUAN contradiction is gone)
+- `test_news_context_falls_back_to_keyword_when_no_llm_sentiment`
+- Updated the sentiment-node fixture to mock `_news_headlines_for_llm`.
+
+### Known limitations / follow-ups
+- The 4 LLM-judgment criteria (round-up→NEUTRAL, ARA→POSITIVE, "cuan" not matched,
+  suspensi→NEGATIVE) are prompt behaviours — verified via a live flash call, not
+  unit tests.
+- The `news_brief` shown to agents still carries the per-item keyword `[POSITIVE]`
+  tags; only the overall sentiment + adjustment are LLM-driven. Minor; could
+  regenerate the brief later.
+- D2 couples news judgment to social volume; decouple later if needed.

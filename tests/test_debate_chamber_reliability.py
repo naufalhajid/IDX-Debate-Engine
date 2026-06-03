@@ -440,6 +440,65 @@ def test_momentum_override_blocked_when_not_overvalued():
     assert "MOMENTUM WATCHLIST" not in (result.get("weighted_reasoning") or "")
 
 
+def test_news_adjustment_from_sentiment_is_consistent():
+    # Adjustment is derived from the sentiment label, so the two can never
+    # contradict (the keyword path could: BREN was POSITIVE overall + -0.20 adj).
+    assert dc._news_adjustment_from_sentiment("POSITIVE", False)[0] == 0.05
+    assert dc._news_adjustment_from_sentiment("NEGATIVE", False)[0] == -0.10
+    assert dc._news_adjustment_from_sentiment("NEGATIVE", True)[0] == -0.20
+    assert dc._news_adjustment_from_sentiment("NEUTRAL", False)[0] == 0.0
+    assert dc._news_adjustment_from_sentiment("garbage", False)[0] == 0.0
+    # Sign never disagrees with the label.
+    assert dc._news_adjustment_from_sentiment("POSITIVE", False)[0] > 0
+    assert dc._news_adjustment_from_sentiment("NEGATIVE", True)[0] < 0
+
+
+def _fake_news_fetcher(monkeypatch, *, kw_sentiment="POSITIVE", kw_adjustment=0.05):
+    """Patch the news fetcher with a keyword bundle to test the LLM override."""
+    from types import SimpleNamespace
+
+    bundle = SimpleNamespace(
+        overall_sentiment=SimpleNamespace(value=kw_sentiment),
+        sentiment_score=0.5,
+        confidence_adjustment=kw_adjustment,
+        confidence_adjustment_reason="keyword path",
+        has_breaking_news=False,
+        items=[],
+    )
+
+    class _FakeFetcher:
+        async def build_bundle_async(self, ticker):
+            return bundle
+
+        def bundle_to_prompt_string(self, b):
+            return "NEWS BRIEF"
+
+    monkeypatch.setattr("services.news_fetcher.DEFAULT_FETCHER", _FakeFetcher())
+
+
+def test_news_context_llm_sentiment_overrides_keyword(monkeypatch):
+    # Keyword path says POSITIVE (+0.05), but the LLM judges the stock-specific
+    # news NEGATIVE → LLM wins, and overall ≡ adjustment (no contradiction).
+    _fake_news_fetcher(monkeypatch, kw_sentiment="POSITIVE", kw_adjustment=0.05)
+
+    out = asyncio.run(
+        dc._news_context_for_state({}, "DSSA", llm_news_sentiment="NEGATIVE")
+    )
+
+    assert out["news_confidence_adjustment"] == -0.10
+    assert out["metadata"]["news_overall_sentiment"] == "NEGATIVE"
+
+
+def test_news_context_falls_back_to_keyword_when_no_llm_sentiment(monkeypatch):
+    # Sparse-social path: no LLM news_sentiment → keyword value is used as-is.
+    _fake_news_fetcher(monkeypatch, kw_sentiment="POSITIVE", kw_adjustment=0.05)
+
+    out = asyncio.run(dc._news_context_for_state({}, "DSSA", llm_news_sentiment=None))
+
+    assert out["news_confidence_adjustment"] == 0.05
+    assert out["metadata"]["news_overall_sentiment"] == "POSITIVE"
+
+
 def test_fair_value_rejected_without_current_run_rag_evidence():
     fair_value, metadata = dc._reject_unverified_fair_value_if_needed(
         ticker="BBCA",
