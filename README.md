@@ -23,11 +23,11 @@ Indonesia has over 13 million retail investors — but nearly all of them make d
 </em></p>
 
 <p align="center">
-  <img src="docs/assets/idx_debate.png" alt="uv run idx debate KUAS — full debate analysis with agent voting matrix, bull vs bear arguments, risk management, and BUY verdict" width="100%">
+  <img src="docs/assets/Video Project 1.gif" alt="uv run idx debate — live demo showing full debate analysis with agent voting, bull vs bear arguments, and CIO verdict" width="100%">
 </p>
 
 <p align="center"><em>
-  <code>uv run idx debate KUAS</code> — real-time debate output: Trade Plan & Valuation, Agent Voting matrix (Bull / Bear / Chartist / Scouts), Key Arguments, and final CIO Verdict with Risk Governor.
+  <code>uv run idx debate</code> — live debate: Trade Plan & Valuation, Agent Voting matrix (Bull / Bear / Chartist / Scouts), Key Arguments, and final CIO Verdict with Risk Governor.
 </em></p>
 
 <p align="center">
@@ -261,7 +261,7 @@ uv run pytest tests/test_debate_chamber_reliability.py -v
 LLM provider can be switched interactively at runtime — no code changes needed:
 
 <p align="center">
-  <img src="docs/assets/idx_model_switcher.png" alt="uv run idx model — interactive LLM provider switcher showing Gemini, Anthropic, and Codex options" width="80%">
+  <img src="docs/assets/idx model.gif" alt="uv run idx model — interactive LLM provider switcher showing Gemini, Anthropic, and Codex options" width="80%">
 </p>
 
 ---
