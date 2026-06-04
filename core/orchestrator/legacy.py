@@ -93,9 +93,11 @@ from core.dependency_validator import (
 )
 from core.execution_ledger import DEFAULT_LEDGER, EventSeverity, EventType, LedgerEvent
 from core.historical_scorer import (
+    apply_ev_adjustment,
     apply_historical_adjustment,
     apply_realized_adjustment,
     compute_historical_win_rate,
+    compute_realized_ev,
     compute_realized_win_rate,
     load_debate_history,
     load_realized_outcomes,
@@ -3986,16 +3988,35 @@ def compute_conviction_score(
     rr_score = min(max(rr_ratio / rr_cap, 0.0), 1.0)
     base_score = (w_confidence * confidence) + (w_rr * rr_score)
 
-    # Historical adjustment â€” hanya jika data tersedia dan cukup
+    # Historical adjustment — EV preferred over win rate; n passed for proportional scaling
     if ticker and realized_outcomes is not None:
+        ev = compute_realized_ev(ticker, realized_outcomes)
+        if ev is not None:
+            n_real = sum(
+                1 for r in realized_outcomes
+                if r.ticker.upper() == ticker.upper()
+                and r.verdict_rating.upper() in {“BUY”, “STRONG_BUY”}
+                and r.outcome in {“win”, “loss”, “breakeven”}
+                and r.pnl_pct is not None
+            )
+            base_score = apply_ev_adjustment(base_score, ev, n=n_real)
+            return base_score, warning
+        # Fall back to win rate when pnl_pct not yet populated
         realized_win_rate = compute_realized_win_rate(ticker, realized_outcomes)
         if realized_win_rate is not None:
-            base_score = apply_realized_adjustment(base_score, realized_win_rate)
+            n_wr = sum(
+                1 for r in realized_outcomes
+                if r.ticker.upper() == ticker.upper()
+                and r.verdict_rating.upper() in {“BUY”, “STRONG_BUY”}
+                and r.outcome in {“win”, “loss”}
+            )
+            base_score = apply_realized_adjustment(base_score, realized_win_rate, n=n_wr)
             return base_score, warning
 
     if ticker and debate_records is not None:
         win_rate = compute_historical_win_rate(ticker, debate_records)
-        base_score = apply_historical_adjustment(base_score, win_rate)
+        n_hist = sum(1 for r in debate_records if r.get(“ticker”) == ticker)
+        base_score = apply_historical_adjustment(base_score, win_rate, n=n_hist)
 
     return base_score, warning
 
@@ -4606,6 +4627,49 @@ def _batch_metadata_value(results: list[dict], key: str) -> str | None:
     return None
 
 
+def _conviction_breakdown_row(score: float, model_confidence: float, verdict: dict) -> str:
+    """Markdown table row showing how the conviction score was computed."""
+    try:
+        w_conf = float(ORCHESTRATOR_CONFIG["conviction_weights"]["confidence"])
+        w_rr = float(ORCHESTRATOR_CONFIG["conviction_weights"]["rr_ratio"])
+        rr_cap = float(ORCHESTRATOR_CONFIG["rr_normalization_cap"])
+        rr = float(verdict.get("risk_reward_ratio") or 0.0)
+        rr_norm = min(rr / rr_cap, 1.0) if rr_cap > 0 else 0.0
+        base = w_conf * model_confidence + w_rr * rr_norm
+        hist_adj = score - base
+        breakdown = (
+            f"conf {model_confidence:.0%}x{w_conf:.0%} + "
+            f"R/R {rr:.1f}/{rr_cap:.0f}x{w_rr:.0%} = {base:.3f}"
+        )
+        if abs(hist_adj) > 0.001:
+            sign = "+" if hist_adj > 0 else ""
+            breakdown += f" ({sign}{hist_adj:.2f} hist adj)"
+        return f"| **Score Breakdown** | `{breakdown}` |"
+    except Exception:
+        return f"| **Score Breakdown** | - |"
+
+
+def _win_rate_row(ticker: str) -> str:
+    """Markdown table row showing backtest track record for this ticker."""
+    try:
+        stats = DEFAULT_MEMORY.summary_stats(ticker)
+        total = stats.get("total", 0)
+        wins = stats.get("wins", 0)
+        losses = stats.get("losses", 0)
+        wr = stats.get("win_rate", 0.0)
+        avg_pnl = stats.get("avg_pnl_pct")
+        if total >= 3:
+            pnl_str = f", avg PnL {avg_pnl:+.1f}%" if avg_pnl is not None else ""
+            value = f"{wins}W/{losses}L ({wr:.0%} win rate{pnl_str})"
+        elif total > 0:
+            value = f"Limited data ({total} record{'s' if total > 1 else ''})"
+        else:
+            value = "No backtest records yet"
+        return f"| **Historical Signal Quality** | {value} |"
+    except Exception:
+        return "| **Historical Signal Quality** | - |"
+
+
 def generate_top3_report(
     top_n: list[dict],
     all_results: list[dict],
@@ -4692,6 +4756,8 @@ def generate_top3_report(
             f"| **Rating** | `{v.get('rating', 'N/A')}` |",
             f"| **Trade Setup Conviction** | {model_confidence:.0%} |",
             f"| **Trade Conviction** | {score:.2%} |",
+            _conviction_breakdown_row(score, model_confidence, v),
+            _win_rate_row(ticker),
             f"| **Debate Consensus** | {consensus_label} |",
             f"| **Dissenting Agents** | {', '.join(dissenting_agents) if dissenting_agents else '-'} |",
             f"| **Timeframe** | {v.get('timeframe', '1-3 Months')} |",
@@ -5364,7 +5430,16 @@ def _watchlist_rows(results: list[dict]) -> list[dict[str, Any]]:
             rating = str(verdict.get("rating") or "").upper()
             if rating != "HOLD":
                 continue
+            risk = (
+                entry.get("risk_governor")
+                if isinstance(entry.get("risk_governor"), dict)
+                else {}
+            )
             low, high = _parse_entry_bounds(verdict.get("entry_price_range"))
+            rr = float(verdict.get("risk_reward_ratio") or 0.0)
+            reason_codes = risk.get("reason_codes") if isinstance(risk.get("reason_codes"), list) else []
+            non_price = [c for c in reason_codes if c not in _PRICE_POSITION_CODES]
+            reason = ", ".join(_reason_token_label(c) for c in non_price[:2]) or "-"
             rows.append(
                 {
                     "ticker": str(entry.get("ticker") or "-").upper(),
@@ -5372,6 +5447,9 @@ def _watchlist_rows(results: list[dict]) -> list[dict[str, Any]]:
                     "confidence": _coerce_confidence(verdict.get("confidence")) or 0.0,
                     "entry_low": low,
                     "entry_high": high,
+                    "rr": rr,
+                    "target_price": verdict.get("target_price"),
+                    "reason": reason,
                 }
             )
         return rows
@@ -5380,37 +5458,59 @@ def _watchlist_rows(results: list[dict]) -> list[dict[str, Any]]:
         return []
 
 
-def _print_watchlist_summary(watchlist_rows: list[dict[str, Any]]) -> None:
+def _strong_watchlist_rows(results: list[dict]) -> list[dict[str, Any]]:
+    """HOLDs with R/R >= 2.0 and confidence >= 0.35, sorted by R/R desc."""
+    rows = [
+        row for row in _watchlist_rows(results)
+        if row.get("rr", 0.0) >= 2.0 and row.get("confidence", 0.0) >= 0.35
+    ]
+    return sorted(rows, key=lambda r: r.get("rr", 0.0), reverse=True)
+
+
+def _print_strong_watchlist(strong_rows: list[dict[str, Any]]) -> None:
+    """Render a Rich table of HOLD candidates with strong R/R as near-BUY watchlist."""
     try:
-        body = Table.grid(padding=(0, 1))
-        body.add_column()
-        body.add_row("Tidak ada BUY yang siap dieksekusi.")
-        body.add_row("")
-        body.add_row(Text("WATCHLIST HARI INI:", style="bold"))
-        body.add_row("")
-        for row in watchlist_rows:
+        tbl = Table(
+            box=box.SIMPLE,
+            expand=False,
+            show_edge=False,
+            pad_edge=False,
+            title="[amber]Watchlist Candidates[/amber]  —  Wait for Entry Signal (R/R >= 2.0)",
+        )
+        tbl.add_column("Ticker", style="bold", no_wrap=True)
+        tbl.add_column("Conf", justify="right", no_wrap=True)
+        tbl.add_column("R/R", justify="right", no_wrap=True)
+        tbl.add_column("Entry Zone", no_wrap=True)
+        tbl.add_column("Target", justify="right", no_wrap=True)
+        tbl.add_column("Why HOLD", overflow="fold", max_width=28)
+        for row in strong_rows:
             low = row.get("entry_low")
             high = row.get("entry_high")
+            target = row.get("target_price")
             if low is not None and high is not None:
                 entry_text = f"Rp {float(low):,.0f}-{float(high):,.0f}"
+            elif low is not None:
+                entry_text = f"Rp {float(low):,.0f}+"
             else:
                 entry_text = "N/A"
-            body.add_row(
-                f"{row.get('ticker', '-')} - "
-                f"{row.get('rating', '-')} ({float(row.get('confidence') or 0):.0%})"
+            target_text = f"Rp {float(target):,.0f}" if target else "N/A"
+            tbl.add_row(
+                str(row.get("ticker", "-")),
+                f"{float(row.get('confidence') or 0):.0%}",
+                f"{float(row.get('rr') or 0):.2f}x",
+                entry_text,
+                target_text,
+                str(row.get("reason", "-")),
             )
-            body.add_row(f"   Entry jika koreksi ke {entry_text}")
         console.print()
-        console.print(
-            Panel(
-                body,
-                title="[bold]Top Swing Trade Picks[/bold]",
-                subtitle=f"[muted]{TOP3_REPORT_PATH}[/muted]",
-                border_style="yellow",
-            )
-        )
+        console.print(tbl)
     except Exception as exc:
-        logger.warning(f"[Formatter] Watchlist panel failed: {exc}")
+        logger.warning(f"[Formatter] Strong watchlist table failed: {exc}")
+
+
+def _print_watchlist_summary(watchlist_rows: list[dict[str, Any]]) -> None:
+    """Fallback display when no BUY setups exist — kept for legacy call sites."""
+    _print_strong_watchlist(watchlist_rows)
 
 
 def _print_top3_summary(top_n: list[dict], all_results: list[dict] | None = None) -> None:
@@ -5418,19 +5518,27 @@ def _print_top3_summary(top_n: list[dict], all_results: list[dict] | None = None
     Tampilkan ringkasan Top N hasil debate sebagai panel statis.
     """
     if not top_n:
-        watchlist_rows = _watchlist_rows(all_results or [])
-        if watchlist_rows:
-            _print_watchlist_summary(watchlist_rows)
-            return
+        strong_rows = _strong_watchlist_rows(all_results or [])
         console.print()
-        console.print(
-            Panel(
-                "[warn]Tidak ada saham yang memenuhi syarat (semua HOLD/AVOID/SELL).[/warn]",
-                title="[bold]Top Swing Trade Picks[/bold]",
-                subtitle=f"[muted]{TOP3_REPORT_PATH}[/muted]",
-                border_style="yellow",
+        if strong_rows:
+            console.print(
+                Panel(
+                    "[warn]No executable BUY setups. Watchlist candidates below.[/warn]",
+                    title="[bold]Top Swing Trade Picks[/bold]",
+                    subtitle=f"[muted]{TOP3_REPORT_PATH}[/muted]",
+                    border_style="yellow",
+                )
             )
-        )
+            _print_strong_watchlist(strong_rows)
+        else:
+            console.print(
+                Panel(
+                    "[warn]No stocks qualify for execution (all HOLD/AVOID/SELL).[/warn]",
+                    title="[bold]Top Swing Trade Picks[/bold]",
+                    subtitle=f"[muted]{TOP3_REPORT_PATH}[/muted]",
+                    border_style="yellow",
+                )
+            )
         return
 
     def _price(value: Any) -> str:
@@ -5500,6 +5608,10 @@ def _print_top3_summary(top_n: list[dict], all_results: list[dict] | None = None
             border_style="green",
         )
     )
+
+    strong_rows = _strong_watchlist_rows(all_results or [])
+    if strong_rows:
+        _print_strong_watchlist(strong_rows)
 
 
 # ---------------------------------------------------------------------------

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from pathlib import Path
 from typing import Annotated
 
@@ -9,7 +8,6 @@ import typer
 from rich.panel import Panel
 
 from app.cli.ui.console import console
-from app.cli.ui.tables import build_verdict_summary_table
 
 
 def _normalize_tickers(tickers: list[str]) -> list[str]:
@@ -18,17 +16,6 @@ def _normalize_tickers(tickers: list[str]) -> list[str]:
         raise typer.BadParameter("Provide at least one ticker.")
     return normalized
 
-
-def _read_debate_results(tickers: list[str], output_dir: Path) -> list[dict]:
-    results = []
-    for ticker in tickers:
-        path = output_dir / ticker / "latest_debate.json"
-        if path.exists():
-            try:
-                results.append(json.loads(path.read_text(encoding="utf-8")))
-            except Exception:
-                pass
-    return results
 
 
 def run_debate_cli(
@@ -52,22 +39,19 @@ def debate_command(
     ctx: typer.Context,
     tickers: Annotated[
         list[str] | None,
-        typer.Argument(help="Ticker symbols to debate, e.g. BBRI BBCA TLKM."),
+        typer.Argument(help="One or more IDX ticker symbols. Example: BBCA BMRI TLKM"),
     ] = None,
     ticker_options: Annotated[
         list[str] | None,
         typer.Option(
             "--tickers",
             "--ticker",
-            help=(
-                "Ticker symbols to debate. Supports "
-                "`--tickers BBRI BBCA` for compatibility."
-            ),
+            help="Ticker symbols via flag. Supports `--tickers BBCA BMRI` for scripting.",
         ),
     ] = None,
     output_dir: Annotated[
         Path,
-        typer.Option("--output-dir", help="Directory for debate reports."),
+        typer.Option("--output-dir", help="Directory for debate JSON output. Default: output/debates"),
     ] = Path("output/debates"),
     verbose: Annotated[
         bool,
@@ -75,10 +59,10 @@ def debate_command(
     ] = False,
     details: Annotated[
         bool,
-        typer.Option("--details/--no-details", help="Show detailed debate panels on console."),
+        typer.Option("--details/--no-details", help="Show full per-agent reasoning in the post-debate table."),
     ] = True,
 ) -> None:
-    """Run the existing AI debate chamber for one or more tickers."""
+    """Run AI multi-agent debate for specific tickers. Example: idx debate BBCA BMRI TLKM"""
     normalized = _normalize_tickers(
         list(ticker_options or []) + list(tickers or []) + list(ctx.args)
     )
@@ -103,10 +87,6 @@ def debate_command(
         verbose=selected_verbose,
         details=details,
     )
-
-    results = _read_debate_results(normalized, output_dir)
-    if results:
-        console.print(build_verdict_summary_table(results))
 
     console.print(
         f"\n[idx.ok]Debate complete.[/idx.ok]  "

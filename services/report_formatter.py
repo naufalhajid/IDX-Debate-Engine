@@ -598,7 +598,7 @@ def _debate_decision_summary(
     reason_lines = _agent_choice_reason_lines(result, packet, per_reason_limit=120)
 
     parts = [
-        f"Final decision {rating}: {_short_text(reasoning, 260)}",
+        f"Final decision {rating}: {_short_text(reasoning, 500)}",
         f"Agent choice distribution: {distribution}.",
     ]
     if reason_lines:
@@ -1026,9 +1026,9 @@ class RichFormatter:
             arg_table.add_column(style="bold", no_wrap=True, width=18)
             arg_table.add_column()
 
-            bull_arg = _key_argument_summary(data, packet, "bull", limit=300)
-            bear_arg = _key_argument_summary(data, packet, "bear", limit=300)
-            decision_summary = _debate_decision_summary(data, packet, limit=520)
+            bull_arg = _key_argument_summary(data, packet, "bull", limit=800)
+            bear_arg = _key_argument_summary(data, packet, "bear", limit=800)
+            decision_summary = _debate_decision_summary(data, packet, limit=1200)
 
             arg_table.add_row(Text("🟢 Bull (Optimistic)", style="green"), Text(bull_arg))
             arg_table.add_row("", "")
@@ -1133,6 +1133,7 @@ class RichFormatter:
             table.add_column("Rating", no_wrap=True)
             table.add_column("Setup Conviction", justify="right", no_wrap=True)
             table.add_column("R/R", justify="right", no_wrap=True)
+            table.add_column("Current Price", justify="right", no_wrap=True)
             table.add_column("Entry Zone")
             table.add_column("Target")
             table.add_column("Risk Gov")
@@ -1142,11 +1143,13 @@ class RichFormatter:
                 rating = "ERROR" if row.get("error") else _rating(row)
                 low, high = _entry_bounds(verdict)
                 risk = _risk(row)
+                current_price = verdict.get("current_price") or risk.get("current_price")
                 table.add_row(
                     _ticker(row),
                     Text(rating, style=self._rating_style(rating)),
                     _pct(_model_confidence(verdict)),
                     _ratio(verdict.get("risk_reward_ratio")),
+                    _money(current_price),
                     f"{_money(low, include_prefix=False)}-{_money(high, include_prefix=False)}",
                     _money(verdict.get("target_price")),
                     self._terminal_risk_governor_line(risk),

@@ -28,11 +28,14 @@ from utils.logger_config import logger
 
 # \u2500\u2500 Constants \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
-_MIN_RECORDS_FOR_ADJUSTMENT: int = 3
+_MIN_RECORDS_FOR_ADJUSTMENT: int = 10
+_HALF_ADJUSTMENT_THRESHOLD: int = 15   # below this: half bonus/penalty applied
 _WIN_RATE_HIGH_THRESHOLD: float = 0.70
 _WIN_RATE_LOW_THRESHOLD: float = 0.30
 _REALIZED_WIN_RATE_HIGH_THRESHOLD: float = 0.60
 _REALIZED_WIN_RATE_LOW_THRESHOLD: float = 0.40
+_EV_HIGH_THRESHOLD: float = 3.0    # avg pnl% above this → bonus
+_EV_LOW_THRESHOLD: float = -2.0    # avg pnl% below this → penalty
 _BONUS: float = 0.05
 _PENALTY: float = -0.05
 _MAX_HISTORY_RECORDS_PER_TICKER: int = 20
@@ -159,25 +162,35 @@ def compute_realized_win_rate(
     return win_rate
 
 
+def _scaled_adjustment(base: float, n: int | None) -> float:
+    """Half the adjustment when n < _HALF_ADJUSTMENT_THRESHOLD."""
+    if n is None or n >= _HALF_ADJUSTMENT_THRESHOLD:
+        return base
+    return base / 2
+
+
 def apply_realized_adjustment(
     conviction_score: float,
     win_rate: float | None,
+    n: int | None = None,
 ) -> float:
     """Adjust conviction score with realized outcome thresholds."""
     if win_rate is None:
         return conviction_score
 
     if win_rate >= _REALIZED_WIN_RATE_HIGH_THRESHOLD:
-        adjusted = conviction_score + _BONUS
+        bonus = _scaled_adjustment(_BONUS, n)
+        adjusted = conviction_score + bonus
         logger.debug(
             f"[HistScorer] Realized win rate {win_rate:.0%} >= "
-            f"{_REALIZED_WIN_RATE_HIGH_THRESHOLD:.0%} -> +{_BONUS} bonus"
+            f"{_REALIZED_WIN_RATE_HIGH_THRESHOLD:.0%} -> +{bonus} bonus (n={n})"
         )
     elif win_rate <= _REALIZED_WIN_RATE_LOW_THRESHOLD:
-        adjusted = conviction_score + _PENALTY
+        penalty = _scaled_adjustment(_PENALTY, n)
+        adjusted = conviction_score + penalty
         logger.debug(
             f"[HistScorer] Realized win rate {win_rate:.0%} <= "
-            f"{_REALIZED_WIN_RATE_LOW_THRESHOLD:.0%} -> {_PENALTY} penalty"
+            f"{_REALIZED_WIN_RATE_LOW_THRESHOLD:.0%} -> {penalty} penalty (n={n})"
         )
     else:
         return conviction_score
@@ -185,35 +198,84 @@ def apply_realized_adjustment(
     return max(0.0, min(adjusted, 1.0))
 
 
-def apply_historical_adjustment(conviction_score: float, win_rate: float | None) -> float:
-    """
-    Adjust conviction score berdasarkan historical win rate.
-
-    Result di-clamp ke [0.0, 1.0] untuk menjaga konsistensi range.
-
-    Args:
-        conviction_score: Raw conviction score dari compute_conviction_score().
-        win_rate: Hasil compute_historical_win_rate(), atau None jika data kurang.
-
-    Returns:
-        Adjusted conviction score in [0.0, 1.0].
-    """
+def apply_historical_adjustment(
+    conviction_score: float,
+    win_rate: float | None,
+    n: int | None = None,
+) -> float:
+    """Adjust conviction score berdasarkan historical win rate."""
     if win_rate is None:
         return conviction_score
 
     if win_rate >= _WIN_RATE_HIGH_THRESHOLD:
-        adjusted = conviction_score + _BONUS
+        bonus = _scaled_adjustment(_BONUS, n)
+        adjusted = conviction_score + bonus
         logger.debug(
             f"[HistScorer] Win rate {win_rate:.0%} >= {_WIN_RATE_HIGH_THRESHOLD:.0%} "
-            f"→ +{_BONUS} bonus"
+            f"-> +{bonus} bonus (n={n})"
         )
     elif win_rate < _WIN_RATE_LOW_THRESHOLD:
-        adjusted = conviction_score + _PENALTY
+        penalty = _scaled_adjustment(_PENALTY, n)
+        adjusted = conviction_score + penalty
         logger.debug(
             f"[HistScorer] Win rate {win_rate:.0%} < {_WIN_RATE_LOW_THRESHOLD:.0%} "
-            f"→ {_PENALTY} penalty"
+            f"-> {penalty} penalty (n={n})"
         )
     else:
-        return conviction_score  # No adjustment in neutral zone
+        return conviction_score
+
+    return max(0.0, min(adjusted, 1.0))
+
+
+def compute_realized_ev(
+    ticker: str,
+    records: Sequence[TradeOutcome],
+) -> float | None:
+    """Average pnl_pct across closed BUY/STRONG_BUY trades for a ticker.
+
+    Returns None if fewer than _MIN_RECORDS_FOR_ADJUSTMENT closed trades with pnl_pct.
+    EV > 0 means the system's signals for this ticker are profitable on average.
+    """
+    ticker_upper = ticker.upper()
+    closed = [
+        r for r in records
+        if r.ticker.upper() == ticker_upper
+        and r.verdict_rating.upper() in {"BUY", "STRONG_BUY"}
+        and r.outcome in {"win", "loss", "breakeven"}
+        and r.pnl_pct is not None
+    ]
+    if len(closed) < _MIN_RECORDS_FOR_ADJUSTMENT:
+        return None
+    ev = sum(r.pnl_pct for r in closed) / len(closed)  # type: ignore[arg-type]
+    logger.debug(
+        f"[HistScorer] {ticker}: realized EV = {ev:.2f}% from {len(closed)} closed trades"
+    )
+    return ev
+
+
+def apply_ev_adjustment(
+    conviction_score: float,
+    ev_pct: float,
+    n: int | None = None,
+) -> float:
+    """Adjust conviction score based on expected value per trade signal.
+
+    EV >= _EV_HIGH_THRESHOLD (3%): system signals profitable → bonus.
+    EV < _EV_LOW_THRESHOLD (-2%): system signals losing money → penalty.
+    """
+    if ev_pct >= _EV_HIGH_THRESHOLD:
+        bonus = _scaled_adjustment(_BONUS, n)
+        adjusted = conviction_score + bonus
+        logger.debug(
+            f"[HistScorer] EV {ev_pct:.2f}% >= {_EV_HIGH_THRESHOLD}% -> +{bonus} bonus (n={n})"
+        )
+    elif ev_pct < _EV_LOW_THRESHOLD:
+        penalty = _scaled_adjustment(_PENALTY, n)
+        adjusted = conviction_score + penalty
+        logger.debug(
+            f"[HistScorer] EV {ev_pct:.2f}% < {_EV_LOW_THRESHOLD}% -> {penalty} penalty (n={n})"
+        )
+    else:
+        return conviction_score
 
     return max(0.0, min(adjusted, 1.0))

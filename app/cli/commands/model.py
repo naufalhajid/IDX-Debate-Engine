@@ -119,16 +119,16 @@ def _get_current_models(provider: str) -> tuple[str, str]:
 def select_model(provider: str, tier: str) -> str:
     choices = MODELS[provider][tier]
     console.print(
-        f"\nPilih model untuk [idx.highlight]{provider.capitalize()} - {tier.capitalize()} Tier[/idx.highlight]:"
+        f"\nSelect model for [idx.highlight]{provider.capitalize()} - {tier.capitalize()} Tier[/idx.highlight]:"
     )
     for i, m in enumerate(choices, 1):
         console.print(f"  [[idx.highlight]{i}[/idx.highlight]] {m}")
-    console.print("  [[idx.highlight]c[/idx.highlight]] Masukkan nama model kustom")
+    console.print("  [[idx.highlight]c[/idx.highlight]] Enter custom model name")
 
-    choice = input(f"Pilihan Anda [1-{len(choices)}/c]: ").strip().lower()
+    choice = input(f"Your choice [1-{len(choices)}/c]: ").strip().lower()
 
     if choice == "c":
-        custom_model = input("Masukkan nama model kustom: ").strip()
+        custom_model = input("Enter custom model name: ").strip()
         return custom_model if custom_model else choices[0]
 
     try:
@@ -138,25 +138,25 @@ def select_model(provider: str, tier: str) -> str:
     except ValueError:
         pass
 
-    console.print("[idx.warn]Pilihan tidak valid, menggunakan default.[/idx.warn]")
+    console.print("[idx.warn]Invalid choice, using default.[/idx.warn]")
     return choices[0]
 
 
 def model_command(
-    provider: str = typer.Argument(None, help="Nama provider (gemini, anthropic, codex)"),
+    provider: str = typer.Argument(None, help="Provider name: gemini, anthropic, or codex."),
 ) -> None:
-    """Pilih Default Model/Provider LLM dan set spesifik model untuk Flash/Pro."""
+    """Switch LLM provider and configure flash/pro model variants."""
     if provider:
         provider = provider.lower()
         if provider not in ["gemini", "anthropic", "codex"]:
             console.print(
-                f"[idx.error]❌ Provider '{provider}' tidak valid.[/idx.error]"
+                f"[idx.error]Provider '{provider}' is not valid. Choose: gemini, anthropic, codex.[/idx.error]"
             )
             raise typer.Exit(1)
 
         update_env_file("DEFAULT_LLM_PROVIDER", provider)
         console.print(
-            f"[idx.ok]✅ Default provider telah diubah ke: [idx.highlight]{provider}[/idx.highlight][/idx.ok]"
+            f"[idx.ok]Default provider changed to: [idx.highlight]{provider}[/idx.highlight][/idx.ok]"
         )
         return
 
@@ -174,20 +174,20 @@ def model_command(
         )
     )
 
-    console.print("\nPilih provider yang ingin digunakan sebagai default:")
+    console.print("\nSelect a provider to use as default:")
     for num, name in PROVIDERS.items():
-        marker = " [idx.ok]← (Aktif)[/idx.ok]" if name == current else ""
+        marker = " [idx.ok]<- (Active)[/idx.ok]" if name == current else ""
         console.print(f"  [[idx.highlight]{num}[/idx.highlight]] {name.capitalize()}{marker}")
-    console.print("  [[idx.highlight]0[/idx.highlight]] Batal / Keluar")
+    console.print("  [[idx.highlight]0[/idx.highlight]] Cancel / Exit")
 
     try:
-        choice = input("\nMasukkan pilihan Anda [0-3]: ").strip()
+        choice = input("\nEnter your choice [0-3]: ").strip()
     except (KeyboardInterrupt, EOFError):
-        console.print("\n[idx.warn]Dibatalkan.[/idx.warn]")
+        console.print("\n[idx.warn]Cancelled.[/idx.warn]")
         raise typer.Exit()
 
     if choice == "0" or not choice:
-        console.print("[idx.warn]Dibatalkan.[/idx.warn]")
+        console.print("[idx.warn]Cancelled.[/idx.warn]")
         raise typer.Exit()
 
     if choice in PROVIDERS:
@@ -213,13 +213,13 @@ def model_command(
                 f"[idx.label]Provider:[/idx.label]     [idx.highlight]{selected_provider.capitalize()}[/idx.highlight]\n"
                 f"[idx.label]Flash:[/idx.label]        [idx.value]{flash_model}[/idx.value]\n"
                 f"[idx.label]Pro:[/idx.label]          [idx.value]{pro_model}[/idx.value]",
-                title="[idx.ok]✅ Configuration Updated[/idx.ok]",
+                title="[idx.ok]Configuration Updated[/idx.ok]",
                 border_style="idx.ok",
                 expand=False,
             )
         )
     else:
         console.print(
-            f"\n[idx.error]❌ Pilihan '{choice}' tidak valid.[/idx.error]"
+            f"\n[idx.error]Choice '{choice}' is not valid.[/idx.error]"
         )
         raise typer.Exit(1)

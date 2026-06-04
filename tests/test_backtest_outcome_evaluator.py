@@ -131,7 +131,8 @@ def test_insufficient_horizon_remains_unscored() -> None:
     assert evaluated is None
 
 
-def test_evaluate_memory_skips_hold_and_missing_artifact(tmp_path: Path) -> None:
+def test_evaluate_memory_skips_records_without_artifact(tmp_path: Path) -> None:
+    # HOLD is now in EVALUATED_RATINGS but both records lack debate artifacts → both skipped
     memory_path = tmp_path / "backtest_memory.jsonl"
     debates_dir = tmp_path / "debates"
     memory = BacktestMemory(memory_path)

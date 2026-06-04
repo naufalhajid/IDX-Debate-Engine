@@ -41,7 +41,7 @@ def filter_command(
     ] = Path("output"),
     ctx: typer.Context = typer.Context,
 ) -> None:
-    """Run the quantitative swing-trade screener."""
+    """Screen top swing-trade candidates from IHSG stocks using quant signals."""
     from core.quant_filter.config import CONFIG
 
     verbose = (ctx.obj or {}).get("verbose", False)

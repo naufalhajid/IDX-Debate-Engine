@@ -49,7 +49,7 @@ def scan_command(
     ] = False,
     ctx: typer.Context = typer.Context,
 ) -> None:
-    """Collect IDX data and build the existing ETL outputs."""
+    """Fetch IDX stock data from providers (ETL). Run before filter if data is stale."""
     if dry_run:
         mode = "full universe" if full else "first IDX page"
         console.print(

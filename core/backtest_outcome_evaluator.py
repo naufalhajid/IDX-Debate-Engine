@@ -17,8 +17,8 @@ from core.settings import settings
 from utils.logger_config import logger
 
 
-DEFAULT_HORIZON_TRADING_DAYS = 63
-EVALUATED_RATINGS = {"BUY", "STRONG_BUY"}
+DEFAULT_HORIZON_TRADING_DAYS = 15
+EVALUATED_RATINGS = {"BUY", "STRONG_BUY", "HOLD"}
 Outcome = Literal["win", "loss"]
 
 

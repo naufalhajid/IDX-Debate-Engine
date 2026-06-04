@@ -94,33 +94,29 @@ def test_win_rate_insufficient_data() -> None:
 
 
 def test_win_rate_all_wins() -> None:
-    """3 records BUY confidence > 0.5 = win rate 1.0."""
-    records = [_make_record("BBCA", "BUY", 0.8)] * 3
+    """10 records BUY confidence > 0.5 = win rate 1.0."""
+    records = [_make_record("BBCA", "BUY", 0.8)] * 10
     result = compute_historical_win_rate("BBCA", records)
     assert result == pytest.approx(1.0)
 
 
 def test_win_rate_all_losses() -> None:
-    """3 records HOLD = win rate 0.0."""
-    records = [_make_record("BBCA", "HOLD", 0.3)] * 3
+    """10 records HOLD = win rate 0.0."""
+    records = [_make_record("BBCA", "HOLD", 0.3)] * 10
     result = compute_historical_win_rate("BBCA", records)
     assert result == pytest.approx(0.0)
 
 
 def test_win_rate_mixed() -> None:
-    """2 BUY + 1 HOLD dari 3 records = 2/3 win rate."""
-    records = [
-        _make_record("BBCA", "BUY", 0.8),
-        _make_record("BBCA", "BUY", 0.7),
-        _make_record("BBCA", "HOLD", 0.3),
-    ]
+    """7 BUY + 3 HOLD dari 10 records = 7/10 win rate."""
+    records = [_make_record("BBCA", "BUY", 0.8)] * 7 + [_make_record("BBCA", "HOLD", 0.3)] * 3
     result = compute_historical_win_rate("BBCA", records)
-    assert result == pytest.approx(2 / 3)
+    assert result == pytest.approx(7 / 10)
 
 
 def test_win_rate_low_confidence_not_counted() -> None:
     """BUY dengan confidence <= 0.5 tidak dihitung sebagai win."""
-    records = [_make_record("BBCA", "BUY", 0.4)] * 3
+    records = [_make_record("BBCA", "BUY", 0.4)] * 10
     result = compute_historical_win_rate("BBCA", records)
     assert result == pytest.approx(0.0)
 
@@ -175,17 +171,17 @@ def test_adjustment_clamps_to_one() -> None:
 
 
 def test_realized_win_rate_uses_evaluated_buy_outcomes_only() -> None:
-    records = [
-        _outcome("BBCA", "win"),
-        _outcome("BBCA", "loss"),
-        _outcome("BBCA", "win"),
-        _outcome("BBCA", "win", rating="HOLD"),
-        _outcome("TLKM", "loss"),
-    ]
+    # 7 BUY wins + 3 BUY losses + 1 HOLD win (excluded) = 7/10 win rate
+    records = (
+        [_outcome("BBCA", "win")] * 7
+        + [_outcome("BBCA", "loss")] * 3
+        + [_outcome("BBCA", "win", rating="HOLD")]
+        + [_outcome("TLKM", "loss")]
+    )
 
     result = compute_realized_win_rate("BBCA", records)
 
-    assert result == pytest.approx(2 / 3)
+    assert result == pytest.approx(7 / 10)
 
 
 def test_realized_win_rate_insufficient_data_returns_none() -> None:

@@ -42,40 +42,37 @@ def pipeline_command(
     ctx: typer.Context,
     dry_run: Annotated[
         bool,
-        typer.Option("--dry-run", help="Use mock debate results; no Gemini calls."),
+        typer.Option("--dry-run", help="Simulate run without writing backtest records or the markdown report."),
     ] = False,
     output_dir: Annotated[
         Path,
-        typer.Option("--output-dir", help="Directory for pipeline artifacts."),
+        typer.Option("--output-dir", help="Directory for pipeline artifacts and reports."),
     ] = Path("output"),
     tickers: Annotated[
         list[str] | None,
         typer.Option(
             "--tickers",
-            help=(
-                "Override candidates with ticker symbols. Accepts "
-                "`--tickers BBRI BBCA` for compatibility."
-            ),
+            help="Override quant filter — debate only these tickers. Example: BBCA BMRI ADMR",
         ),
     ] = None,
     skip_scraping: Annotated[
         bool,
-        typer.Option("--skip-scraping", help="Skip pre-pipeline scraping."),
+        typer.Option("--skip-scraping", help="Skip data fetch and reuse cached JSON from last run (faster)."),
     ] = False,
     no_interactive: Annotated[
         bool,
-        typer.Option("--no-interactive", help="Run without Rich prompts."),
+        typer.Option("--no-interactive", help="Run without interactive prompts, for CI or scripted use."),
     ] = False,
     mode: Annotated[
         str,
-        typer.Option("--mode", help="Orchestrator mode: multi, single, or compare."),
+        typer.Option("--mode", help="Pipeline mode: multi (default, all tickers), single, or compare."),
     ] = "multi",
     verbose: Annotated[
         bool,
         typer.Option("--verbose", help="Enable verbose orchestrator logging."),
     ] = False,
 ) -> None:
-    """Run the end-to-end swing-trade orchestration pipeline."""
+    """Full automated pipeline: quant filter + AI debate + risk gate + TOP_3 report."""
     selected_mode = mode.lower().strip()
     if selected_mode not in {"multi", "single", "compare"}:
         raise typer.BadParameter("mode must be one of: multi, single, compare")
