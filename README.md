@@ -1,96 +1,79 @@
 # IDX Debate Engine
 
-> **A structured multi-agent research pipeline for swing-trade analysis on the Indonesian Stock Exchange (IDX/IHSG).**
+> **A multi-agent AI research pipeline that fights back against information asymmetry in the Indonesian Stock Exchange.**
 
-Built for *decision-support*, not decision-making. This system automates the transition from quantitative screening to structured qualitative review through a **LangGraph-powered debate architecture** — engineered to surface blind spots, apply deterministic financial guardrails, and produce reviewable trade setups.
+Indonesia has over 13 million retail investors — but nearly all of them make decisions without access to the structured, multi-angle analysis that institutional traders take for granted. This engine closes that gap by automating an investment committee workflow: multiple AI agents argue opposite sides of each stock, and a CIO judge makes the final call backed by deterministic financial guardrails.
 
-## Live Demo — Debate Chamber CLI
+**Built for decision-support, not decision-making.**
+
+---
+
+## Live Demo
 
 <p align="center">
-  <img src="docs/assets/debate_terminal_preview.png" alt="IDX Debate Engine — Live terminal output showing a BBRI debate analysis with agent voting, trade plan, risk management, and final verdict" width="100%">
+  <img src="docs/assets/idx_cli_help.png" alt="uv run idx — CLI help showing all available commands" width="100%">
+</p>
+
+<p align="center">
+  <img src="docs/assets/idx_filter.png" alt="uv run idx filter — Top 10 Swing-Trade Candidates table with scores, Graham FV, RSI, and strategy signals" width="100%">
 </p>
 
 <p align="center"><em>
-  Rich terminal dashboard running <code>uv run idx debate BBRI</code> — showing the Trade Plan & Valuation panel, Agent Voting & Integration matrix, Bull vs Bear key arguments, Decision Summary, System & Risk Management flags, and the final Debate Results table. All in real-time.
+  <code>uv run idx filter</code> — quantitative screener ranks all IDX-listed stocks by composite score, showing Graham Fair Value, RSI, upside %, and strategy signal per ticker.
+</em></p>
+
+<p align="center">
+  <img src="docs/assets/idx_debate.png" alt="uv run idx debate KUAS — full debate analysis with agent voting matrix, bull vs bear arguments, risk management, and BUY verdict" width="100%">
+</p>
+
+<p align="center"><em>
+  <code>uv run idx debate KUAS</code> — real-time debate output: Trade Plan & Valuation, Agent Voting matrix (Bull / Bear / Chartist / Scouts), Key Arguments, and final CIO Verdict with Risk Governor.
+</em></p>
+
+<p align="center">
+  <img src="docs/assets/idx_pipeline_verdict.png" alt="Pipeline verdict summary table — all tickers with BUY/HOLD/AVOID ratings, confidence, R/R, entry, target, and stop levels" width="100%">
+</p>
+
+<p align="center"><em>
+  Pipeline final output — Verdict Summary across all debated tickers, with ratings, confidence %, risk/reward ratios, entry zones, targets, and stops.
 </em></p>
 
 ---
 
-## Table of Contents
+## The Problem
 
-- [System Architecture](#system-architecture)
-- [Sample AI Debate Output](#sample-ai-debate-output)
-- [Technical Highlights](#technical-highlights)
-  - [LangGraph Multi-Agent Debate Chamber](#1-langgraph-multi-agent-debate-chamber)
-  - [Quantitative Screener (v3.2)](#2-quantitative-screener-v32)
-  - [Market-Adaptive Regime Detection](#3-market-adaptive-regime-detection)
-  - [Deterministic Risk Governor](#4-deterministic-risk-governor)
-  - [Adaptive Planner & Resilience Engine](#5-adaptive-planner--resilience-engine)
-  - [Evidence Ranker](#6-evidence-ranker)
-- [Project Structure](#project-structure)
-- [Setup & Installation](#setup--installation)
-- [Execution & CLI Reference](#execution--cli-reference)
-- [Testing](#testing)
-- [License](#license)
+Retail investors in Indonesia face a structural disadvantage:
+
+- **No access to structured analysis** — institutional desks have teams of analysts; retail investors have Twitter and gut feeling
+- **Single-perspective LLM analysis is dangerously biased** — asking an AI "should I buy BBRI?" produces a confident-sounding answer with no stress-test
+- **Market manipulation by "bandar"** (large operators) exploits retail traders who don't have the tools to separate signal from noise
+
+This engine builds the counter-system: one AI argues bull, one argues bear, a third stress-tests both, and a CIO judge applies a strict conflict-resolution matrix before a trade is approved.
 
 ---
 
-## System Architecture
+## How the Pipeline Works
 
-The pipeline is **sequential at the batch level** and **parallel at the agent level**. Each ticker traverses the entire graph before the next one begins, ensuring clean state isolation and predictable token budgeting.
-
-```mermaid
-graph TD
-    %% Entry Points & Data Intake
-    EP["orchestrator.py / main.py"] -->|1. Mulai Pipeline| MR["core/regime.py: Regime Detection"]
-    MR -->|2. Klasifikasi Volatilitas| QF["core/quant_filter/pipeline.py: Quant Filter"]
-
-    %% LangGraph Orchestration
-    QF -->|3. Ticker Terpilih| DC["services/debate_chamber.py: DebateChamber"]
-
-    subgraph SUB_DC ["Debate Chamber (LangGraph State Machine)"]
-        DC -->|Flash LLM| FS[Fundamental Scout]
-        DC -->|Flash LLM| CS[Chartist Scout]
-        DC -->|Flash LLM| SS[Sentiment Scout]
-
-        FS --> SYN[Synthesizer Node]
-        CS --> SYN
-        SS --> SYN
-
-        SYN -->|Mulai Ronde| BA[Bullish Analyst]
-        BA -->|Argumen Beli| BR[Bearish Auditor]
-        BR -->|Audit Risiko| CE{Consensus Evaluator}
-
-        CE -->|"Belum Sepakat & R < 3"| SC["State Cleaner: Context Pruning"]
-        SC --> BA
-
-        CE -->|Sepakat / R = 3| DA["Devil's Advocate: Bias Test"]
-        DA -->|Pro LLM| CJ["CIO Judge: Final Decision"]
-    end
-
-    %% Output & Scoring
-    CJ -->|4. CIOVerdict JSON| HS["core/historical_scorer.py: Win-Rate Matcher"]
-    HS -->|5. Skoring Akhir| PSIZ["core/quant_filter/position_sizer.py: Money Management"]
-    PSIZ -->|6. Laporan Markdown| OUT["output/TOP_3_SWING_TRADES.md"]
-    PSIZ -->|7. Database| DB[("db.sqlite3 via SQLAlchemy")]
+```
+Quant Screener → Regime Detection → Debate Chamber → Risk Governor → Report
 ```
 
----
+<p align="center">
+  <img src="docs/assets/idx_pipeline_preflight.png" alt="Pipeline pre-flight checks — LLM API, database, disk, models all green before batch starts" width="100%">
+</p>
 
-## Sample AI Debate Output
+<p align="center"><em>
+  Before every batch run, the pipeline performs pre-flight checks: API connectivity, database, disk space, and live LLM model probes — all must be green before any debate begins.
+</em></p>
 
-What makes this engine unique is how it forces **Bearish Auditors** to challenge **Bullish Analysts** round-by-round, culminating in a structured JSON decision by the **CIO Judge**.
-
-Here is an example snippet of a JSON output when the CIO decides to **HOLD** despite strong technicals, because the Bear exposed a deteriorating margin of safety:
+### A real output — what the CIO decides
 
 ```json
 {
   "ticker": "BBRI",
   "verdict": "HOLD",
   "confidence": 0.65,
-  "reasoning": "The Bullish Analyst correctly identifies the golden cross on MA50 and strong institutional accumulation. However, the Bearish Auditor raises a critical point in Round 2: the margin of safety (Graham Valuation) has shrunk to 3%, and NPL (Non-Performing Loans) data shows a slight uptick in the micro-segment. Given the current HIGH market volatility regime, the risk/reward ratio of 1.2 is insufficient for a fresh entry.",
-  "bull_key_argument": "Strong technical breakout (RSI 62, Price > MA200) supported by record dividend yield.",
-  "bear_key_argument": "Valuation is stretched (PBV 2.8x vs Sector 1.5x); downside risk to SMA20 support is -8%.",
+  "reasoning": "The Bullish Analyst correctly identifies the golden cross on MA50 and strong institutional accumulation. However, the Bearish Auditor raises a critical point in Round 2: the margin of safety (Graham Valuation) has shrunk to 3%, and NPL data shows a slight uptick in the micro-segment. Given the current HIGH volatility regime, the risk/reward ratio of 1.2 is insufficient for a fresh entry.",
   "recommended_action": {
     "entry_price": 4800,
     "target_price": 5200,
@@ -103,61 +86,99 @@ Here is an example snippet of a JSON output when the CIO decides to **HOLD** des
 
 ---
 
+## System Architecture
+
+The pipeline is **sequential at the batch level** and **parallel at the agent level**. Each ticker traverses the entire graph before the next begins, ensuring clean state isolation and predictable token budgeting.
+
+```mermaid
+graph TD
+    EP["orchestrator.py / main.py"] -->|1. Start Pipeline| MR["core/regime.py: Regime Detection"]
+    MR -->|2. Volatility Classification| QF["core/quant_filter/pipeline.py: Quant Filter"]
+    QF -->|3. Selected Tickers| DC["services/debate_chamber.py: DebateChamber"]
+
+    subgraph SUB_DC ["Debate Chamber (LangGraph State Machine)"]
+        DC -->|Flash LLM| FS[Fundamental Scout]
+        DC -->|Flash LLM| CS[Chartist Scout]
+        DC -->|Flash LLM| SS[Sentiment Scout]
+
+        FS --> SYN[Synthesizer Node]
+        CS --> SYN
+        SS --> SYN
+
+        SYN -->|Round Start| BA[Bullish Analyst]
+        BA -->|Buy Argument| BR[Bearish Auditor]
+        BR -->|Risk Audit| CE{Consensus Evaluator}
+
+        CE -->|"No Consensus & R < 3"| SC["State Cleaner: Context Pruning"]
+        SC --> BA
+
+        CE -->|Consensus / R = 3| DA["Devil's Advocate: Bias Test"]
+        DA -->|Pro LLM| CJ["CIO Judge: Final Decision"]
+    end
+
+    CJ -->|4. CIOVerdict JSON| HS["core/historical_scorer.py: Win-Rate Matcher"]
+    HS -->|5. Final Score| PSIZ["core/quant_filter/position_sizer.py: Money Management"]
+    PSIZ -->|6. Markdown Report| OUT["output/TOP_3_SWING_TRADES.md"]
+    PSIZ -->|7. Database| DB[("db.sqlite3 via SQLAlchemy")]
+```
+
+---
+
 ## Technical Highlights
 
 ### 1. LangGraph Multi-Agent Debate Chamber
 
-**File:** [`debate_chamber.py`](services/debate_chamber.py) &nbsp;·&nbsp; **Prompt corpus:** [`debate_prompts/`](services/debate_prompts/)
+**File:** [`services/debate_chamber.py`](services/debate_chamber.py) &nbsp;·&nbsp; **Prompt corpus:** [`services/debate_prompts/`](services/debate_prompts/)
 
-The debate engine models a structured investment committee workflow using a LangGraph `StateGraph` with typed `DebateChamberState`. The architecture is purpose-built to counteract positive-bias common in single-prompt LLM analysis.
+A LangGraph `StateGraph` with typed `DebateChamberState`, purpose-built to counteract the positive bias common in single-prompt LLM analysis.
 
 **Scout Phase** *(parallel, gemini-flash-lite):*
-- **Fundamental Scout**: EPS TTM, ROE, DER, PBV, Graham Number, multi-method fair value.
-- **Chartist**: MA50, MA200, RSI, ATR — pre-computed in Python, not LLM-generated.
-- **Sentiment Scout**: News freshness scoring, Stockbit analyst signals.
+- **Fundamental Scout**: EPS TTM, ROE, DER, PBV, Graham Number, multi-method fair value
+- **Chartist**: MA50, MA200, RSI, ATR — pre-computed in Python, not LLM-generated
+- **Sentiment Scout**: News freshness scoring, Stockbit analyst signals
 
 **Debate Phase** *(up to 3 rounds):*
-- **Anti-groupthink protocol:** Bull (R1 → R2) vs. Bear (R1 → R2). In R2, Bear is programmatically forbidden from repeating any argument from R1 and must challenge the Bull's margin of safety using ATR-based downside.
-- **Devil's Advocate node:** triggered automatically if consensus is detected too early (Round 1). A contrarian agent stress-tests the agreement before it reaches the CIO.
+- **Anti-groupthink protocol:** Bull vs Bear across rounds. In Round 2, the Bear is programmatically forbidden from repeating any argument from Round 1 — it must challenge the Bull's margin of safety using ATR-based downside
+- **Devil's Advocate node:** triggered automatically if consensus appears too early, before it reaches the CIO
 
 **CIO Judge** *(gemini-pro-preview):*
 - Applies a strict **Conflict Resolution Matrix**: `Fundamental ✅ + Technical ✅ → BUY`, `Fundamental ✅ + Technical ❌ → HOLD`, etc.
 
 ### 2. Quantitative Screener (v3.2)
 
-**Files:** [`config.py`](core/quant_filter/config.py) · [`pipeline.py`](core/quant_filter/pipeline.py)
+**Files:** [`core/quant_filter/config.py`](core/quant_filter/config.py) · [`core/quant_filter/pipeline.py`](core/quant_filter/pipeline.py)
 
-A multi-stage screening engine that processes IDX Excel workbooks into a ranked candidate list. All filters are deterministic and configurable.
-- **Stage 1 (Static Gate):** Hard excludes (DER cap, PBV ceiling, ROE floor > 10%, Altman Z-Score > 1.1).
-- **Stage 2 (Technical Gate):** Price > SMA50, RSI < 80, Min ADT Rp 5B.
-- **Stage 3 (Composite Scoring):** 70/30 Technical-Fundamental split optimized for swing trading momentum.
+Multi-stage screening across all IDX-listed stocks:
+- **Stage 1 (Static Gate):** Hard excludes — DER cap, PBV ceiling, ROE floor > 10%, Altman Z-Score > 1.1
+- **Stage 2 (Technical Gate):** Price > SMA50, RSI < 80, Min ADT Rp 5B
+- **Stage 3 (Composite Scoring):** 70/30 Technical-Fundamental split optimised for swing trading momentum
 
 ### 3. Market-Adaptive Regime Detection
 
-**File:** [`regime.py`](core/regime.py)
+**File:** [`core/regime.py`](core/regime.py)
 
-Indonesia's equity market lacks a public volatility index. The system builds its own regime signal by computing the **20-day realized volatility** of `^JKSE` (IHSG) from daily returns via yfinance. Volatility directly controls API concurrency (`rpm_limit`), risk-reward caps, and minimum AI confidence thresholds.
+Indonesia's equity market has no public volatility index. The system builds its own regime signal: **20-day realized volatility** of `^JKSE` (IHSG) computed from daily returns via yfinance. Volatility directly controls API concurrency, risk-reward caps, and minimum AI confidence thresholds.
 
 ### 4. Deterministic Risk Governor
 
-**File:** [`risk_governor.py`](core/risk_governor.py)
+**File:** [`core/risk_governor.py`](core/risk_governor.py)
 
-A fully deterministic, **LLM-free gate** that classifies every CIO verdict before it touches the portfolio optimizer. No randomness, no model calls — purely rule-based Python.
-- Forces all LLM-generated prices to snap to the official IDX tick size (`snap_to_tick`).
-- Rejects trades where the LLM hallucinated a target below the current price.
-- Validates Risk/Reward ratio strictly > 1.5x.
+A fully deterministic, **LLM-free gate** that classifies every CIO verdict before it reaches the portfolio optimizer:
+- Forces all LLM-generated prices to snap to official IDX tick sizes
+- Rejects trades where the LLM hallucinated a target below the current price
+- Validates Risk/Reward ratio strictly > 1.5x
 
 ### 5. Adaptive Planner & Resilience Engine
 
-**Files:** [`adaptive_planner.py`](core/adaptive_planner.py) · [`failure_taxonomy.py`](core/failure_taxonomy.py)
+**Files:** [`core/adaptive_planner.py`](core/adaptive_planner.py)
 
-External dependencies (Stockbit scraper, yfinance, Gemini API) are inherently unreliable. Instead of failing the entire batch on any error, the system uses a structured **failure taxonomy** to make context-aware recovery decisions (`PROCEED_PARTIAL`, `SKIP_TICKER`, `FALLBACK`, `ABORT_BATCH`).
+Structured failure taxonomy for inherently unreliable external dependencies (Stockbit, yfinance, Gemini API). Instead of crashing the batch on any error, the system makes context-aware recovery decisions: `PROCEED_PARTIAL`, `SKIP_TICKER`, `FALLBACK`, `ABORT_BATCH`.
 
 ### 6. Evidence Ranker
 
-**File:** [`evidence_ranker.py`](services/evidence_ranker.py)
+**File:** [`services/evidence_ranker.py`](services/evidence_ranker.py)
 
-A freshness-aware, deterministic evidence selection and ranking layer between the data scouts and the debate context. To prevent prompt overflow and minimize token spend, it filters and scores normalized `ContextPack` chunks by category, query keywords, and per-source freshness.
+A freshness-aware, deterministic selection layer between data scouts and debate context. Filters and scores normalized `ContextPack` chunks by category, query keywords, and per-source freshness — preventing prompt overflow and minimising token spend.
 
 ---
 
@@ -175,7 +196,7 @@ IDX-Debate-Engine/
 │   ├── adaptive_planner.py         # Failure recovery decision engine
 │   └── quant_filter/               # v3.2 quantitative screener
 ├── services/
-│   ├── debate_chamber.py           # LangGraph state machine (117 KB)
+│   ├── debate_chamber.py           # LangGraph state machine
 │   ├── debate_prompts/             # Versioned prompt corpus (manifest.json)
 │   └── fair_value_calculator.py    # Multi-method IDX fair value engine
 ├── providers/
@@ -185,7 +206,7 @@ IDX-Debate-Engine/
 ├── schemas/                        # Pydantic v2 data contracts
 ├── db/                             # SQLAlchemy async models
 ├── tests/                          # 49 test modules
-├── output/                         # Generated JSON/Markdown reports
+├── output/                         # Generated Markdown trade reports
 └── orchestrator.py                 # Batch pipeline entry point
 ```
 
@@ -193,74 +214,58 @@ IDX-Debate-Engine/
 
 ## Setup & Installation
 
-### 🚀 Quick Install (Windows PowerShell)
-
-The fastest way to install the engine, setup the environment, and install dependencies automatically. Open **PowerShell** (not CMD) and run:
-
-```powershell
-irm https://raw.githubusercontent.com/naufalhajid/IDX-Debate-Engine/main/install.ps1 | iex
-```
-
-Avoid piping remote scripts directly into `iex` unless you have reviewed and trusted the exact script content.
-
-### Manual Installation
-
-| Requirement | Version | Notes |
-|---|---|---|
-| Python | 3.14+ | Runtime |
-| [`uv`](https://docs.astral.sh/uv/) | latest | Fast Python package manager |
+**Requirements:** Python 3.12+, [`uv`](https://docs.astral.sh/uv/)
 
 ```bash
 git clone https://github.com/naufalhajid/IDX-Debate-Engine.git
 cd IDX-Debate-Engine
 uv sync
+uv run idx auth        # configure API keys
+uv run idx pipeline    # run full batch
 ```
 
----
-
-## Execution & CLI Reference
-
-All commands are accessed through the unified `idx` CLI, powered by [Typer](https://typer.tiangolo.com/).
-
-### 1. Authentication (Required)
-Before running the engine, you must configure your Gemini API Key and other credentials:
-```bash
-uv run idx auth
-```
-
-### 2. Run Full Batch Pipeline
-Runs the complete pipeline end-to-end: quant filter → regime detection → parallel scouts → debate chamber → CIO verdict → risk governor → portfolio optimization → reports.
-```bash
-uv run idx pipeline
-```
-
-### 3. Individual Commands
+### Individual Commands
 
 ```bash
-# ── Quantitative Screener ────────────────────────
-uv run idx filter --top 10          # Filter and rank candidates
+uv run idx filter --top 10          # Quant screener
 uv run idx scan                     # Quick fundamental sweep
-
-# ── Debate Chamber ───────────────────────────────
-uv run idx debate BBRI BBCA TLKM    # Run debate for specific tickers
-uv run idx debate BBRI --output-dir output/debates
-
-# ── Sector Analysis ──────────────────────────────
-uv run idx sector list              # List sector classifications
+uv run idx debate BBRI BBCA TLKM    # Debate specific tickers
+uv run idx serve                    # Start FastAPI server
 ```
 
 ---
 
 ## Testing
 
-The test suite spans **49 test modules** covering unit tests, integration tests, and pipeline reliability tests.
+49 test modules covering unit, integration, and pipeline reliability tests.
 
 ```bash
 uv run pytest -v
+uv run pytest tests/test_debate_chamber_reliability.py -v
 ```
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Agent orchestration | LangGraph (StateGraph) |
+| LLM providers | Google Gemini Flash / Pro, Anthropic Claude, OpenAI (via Codex adapter) |
+| API framework | FastAPI with SSE streaming |
+| CLI | Typer + Rich |
+| Data | yfinance, Stockbit API |
+| Persistence | SQLAlchemy async + SQLite |
+| Validation | Pydantic v2 |
+
+LLM provider can be switched interactively at runtime — no code changes needed:
+
+<p align="center">
+  <img src="docs/assets/idx_model_switcher.png" alt="uv run idx model — interactive LLM provider switcher showing Gemini, Anthropic, and Codex options" width="80%">
+</p>
 
 ---
 
 ## License
 
-MIT License — see [`pyproject.toml`](pyproject.toml). This software is built for research and decision-support. **It does not constitute financial advice.**
+MIT — This software is built for research and decision-support. **It does not constitute financial advice.**
