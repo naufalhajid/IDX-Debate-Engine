@@ -3610,6 +3610,12 @@ async def _run_single_debate(ticker: str, chamber: Any) -> dict:
                 return _empty_result(ticker, f"JSON decode error: {e}")
 
         logger.info(f"[Debate] OK Selesai: {ticker}")
+        missing_keys = {"ticker", "round_count", "raw_data"} - set(result)
+        if missing_keys:
+            logger.warning(
+                f"[Debate] {ticker}: chamber state missing {sorted(missing_keys)} — "
+                f"using fallbacks instead of failing the ticker."
+            )
         disagreement_type = result.get("disagreement_type")
         if disagreement_type:
             logger.info(f"[Debate] {ticker} disagreement_type={disagreement_type}")
@@ -3626,9 +3632,9 @@ async def _run_single_debate(ticker: str, chamber: Any) -> dict:
         ):
             metadata["market_cap_idr"] = int(market_cap)
         return {
-            "ticker": result["ticker"],
+            "ticker": result.get("ticker", ticker),
             "verdict": verdict_dict,
-            "debate_rounds": result["round_count"],
+            "debate_rounds": result.get("round_count", 0),
             "consensus_reached": result.get("consensus_reached", False),
             "consensus_method": result.get("consensus_method"),
             "dissenting_agents": result.get("dissenting_agents", []),
@@ -3645,7 +3651,7 @@ async def _run_single_debate(ticker: str, chamber: Any) -> dict:
                 }
                 for m in debate_history
             ],
-            "raw_data_summary": result["raw_data"],
+            "raw_data_summary": result.get("raw_data", ""),
             "metadata": metadata,
             "error": None,
             "status": "success",
