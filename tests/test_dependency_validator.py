@@ -86,7 +86,16 @@ def test_maybe_rerun_quant_filter_passes_output_dir(
     assert maybe_rerun_quant_filter(
         script_path=str(script), output_dir=tmp_path / "dry"
     )
-    assert captured["command"][-2:] == ["--output-dir", str(tmp_path / "dry")]
+    cmd = captured["command"]
+    assert "--output-dir" in cmd
+    assert cmd[cmd.index("--output-dir") + 1] == str(tmp_path / "dry")
+    # Defaults to momentum when no mode is given.
+    assert cmd[-2:] == ["--mode", "momentum"]
+
+    assert maybe_rerun_quant_filter(
+        script_path=str(script), output_dir=tmp_path / "dry", mode="mean-reversion"
+    )
+    assert captured["command"][-2:] == ["--mode", "mean_reversion"]
 
 
 def test_codex_api_key_check_resolves_token(monkeypatch: pytest.MonkeyPatch) -> None:

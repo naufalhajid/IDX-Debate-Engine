@@ -2251,6 +2251,9 @@ TICKER_PATTERN = re.compile(r"^[A-Z]{4}(?:\.JK)?$")
 PROMPT_MANIFEST_PATH = "services/debate_prompts/manifest.json"
 CLI_TICKERS_OVERRIDE: list[str] | None = None
 CLI_MODE: str = "multi"
+# Screener strategy used when the orchestrator (re)runs the quant filter:
+# "momentum" (default, trend-following) or "mean_reversion" (oversold pullbacks).
+CLI_SCREENER_MODE: str = "momentum"
 
 
 def _ledger_call(operation: str, func, *args, **kwargs) -> None:
@@ -4960,6 +4963,7 @@ async def main(
     output_dir: Path = OUTPUT_DIR,
     user_config: dict | None = None,
     mode: str | None = None,
+    screener_mode: str | None = None,
     chamber_factory: Callable[[], Any] | None = None,
     tickers: list[str] | None = None,
     raise_on_error: bool = False,
@@ -4984,6 +4988,11 @@ async def main(
     run_mode = mode or CLI_MODE
     if run_mode not in {"multi", "single", "compare"}:
         raise ValueError(f"Unsupported orchestrator mode: {run_mode}")
+    run_screener_mode = (
+        "mean_reversion"
+        if str(screener_mode or CLI_SCREENER_MODE).replace("-", "_") == "mean_reversion"
+        else "momentum"
+    )
     _cli_renderer.render_header(
         mode=run_mode,
         regime="detecting",
@@ -5049,13 +5058,24 @@ async def main(
             "skip quant filter dan top10_candidates.json."
         )
     else:
+        # Mean-reversion requested → the cached top10_candidates.json is
+        # mode-agnostic (may hold momentum picks), so force a fresh screen.
+        force_rerun = run_screener_mode != "momentum"
         validation = check_candidates_file(JSON_PATH, settings.CANDIDATES_MAX_AGE_HOURS)
-        if not validation.is_valid:
-            if settings.CANDIDATES_AUTO_RERUN:
-                logger.info(
-                    f"[Validator] {validation.message} Auto-rerun quant filter."
-                )
-                if not maybe_rerun_quant_filter(output_dir=OUTPUT_DIR):
+        if force_rerun or not validation.is_valid:
+            if force_rerun or settings.CANDIDATES_AUTO_RERUN:
+                if force_rerun:
+                    logger.info(
+                        f"[Validator] screener_mode={run_screener_mode}: "
+                        "force-rerun quant filter (cache is mode-agnostic)."
+                    )
+                else:
+                    logger.info(
+                        f"[Validator] {validation.message} Auto-rerun quant filter."
+                    )
+                if not maybe_rerun_quant_filter(
+                    output_dir=OUTPUT_DIR, mode=run_screener_mode
+                ):
                     logger.warning(f"[Validator] {validation.message}")
                     logger.error("[Validator] Auto-rerun gagal. Pipeline dihentikan.")
                     _cli_renderer.flush_buffered_alerts()
@@ -5907,7 +5927,7 @@ _cli = InteractiveCLI()
 
 def _parse_cli_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse orchestrator CLI options while preserving interactive defaults."""
-    global CLI_MODE, CLI_TICKERS_OVERRIDE
+    global CLI_MODE, CLI_TICKERS_OVERRIDE, CLI_SCREENER_MODE
 
     parser = argparse.ArgumentParser(
         description="Run IDX swing-trade orchestration pipeline.",
@@ -5970,9 +5990,24 @@ def _parse_cli_args(argv: list[str] | None = None) -> argparse.Namespace:
             "compare: run both and generate comparison report"
         ),
     )
+    parser.add_argument(
+        "--screener-mode",
+        choices=["momentum", "mean_reversion", "mean-reversion"],
+        default="momentum",
+        help=(
+            "Quant-filter strategy when the pipeline (re)runs the screener:\n"
+            "momentum (default, trend-following) or mean-reversion "
+            "(oversold pullbacks in an uptrend). Forces a screener rerun."
+        ),
+    )
     args = parser.parse_args(argv)
     CLI_TICKERS_OVERRIDE = None
     CLI_MODE = args.mode
+    CLI_SCREENER_MODE = (
+        "mean_reversion"
+        if str(args.screener_mode).replace("-", "_") == "mean_reversion"
+        else "momentum"
+    )
     if args.tickers:
         try:
             args.tickers = _normalize_cli_tickers(args.tickers)

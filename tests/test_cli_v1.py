@@ -173,9 +173,28 @@ def test_pipeline_preserves_legacy_flags(monkeypatch):
             "skip_scraping": True,
             "no_interactive": True,
             "mode": "compare",
+            "screener_mode": "momentum",
             "verbose": True,
         }
     ]
+
+
+def test_pipeline_screener_mode_threads_mean_reversion(monkeypatch):
+    calls = []
+
+    def fake_run_pipeline_cli(**kwargs):
+        calls.append(kwargs)
+
+    monkeypatch.setattr(
+        "app.cli.commands.pipeline.run_pipeline_cli", fake_run_pipeline_cli
+    )
+
+    result = runner.invoke(
+        app, ["pipeline", "--screener-mode", "mean-reversion", "--dry-run"]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert calls[0]["screener_mode"] == "mean_reversion"
 
 
 def test_pipeline_uses_global_verbose_flag(monkeypatch):
@@ -211,6 +230,7 @@ def test_pipeline_runner_passes_argparse_argv_without_program_name(monkeypatch):
         skip_scraping=True,
         no_interactive=True,
         mode="multi",
+        screener_mode="momentum",
         verbose=True,
     )
 
@@ -220,6 +240,8 @@ def test_pipeline_runner_passes_argparse_argv_without_program_name(monkeypatch):
             str(Path("tmp/out")),
             "--mode",
             "multi",
+            "--screener-mode",
+            "momentum",
             "--dry-run",
             "--skip-scraping",
             "--no-interactive",

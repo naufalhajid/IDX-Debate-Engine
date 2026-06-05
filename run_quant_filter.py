@@ -16,6 +16,7 @@ def build_config(
     output_dir: str | Path | None = None,
     input_file: str | Path | None = None,
     scratch_dir: str | Path | None = None,
+    mode: str | None = None,
 ) -> dict:
     """Build quant-filter config while keeping legacy defaults."""
     cfg = dict(CONFIG)
@@ -25,6 +26,12 @@ def build_config(
         cfg["output_dir"] = str(output_dir)
     if scratch_dir is not None:
         cfg["scratch_dir"] = str(scratch_dir)
+    if mode is not None:
+        cfg["screener_mode"] = (
+            "mean_reversion"
+            if str(mode).replace("-", "_") == "mean_reversion"
+            else "momentum"
+        )
 
     if input_file is not None:
         cfg["input_file"] = str(input_file)
@@ -54,12 +61,19 @@ def main(argv: list[str] | None = None) -> None:
         default=None,
         help="Directory for the markdown scan report.",
     )
+    parser.add_argument(
+        "--mode",
+        default="momentum",
+        choices=["momentum", "mean_reversion", "mean-reversion"],
+        help="Screener strategy: momentum (default) or mean-reversion.",
+    )
     args = parser.parse_args(argv)
     run_pipeline(
         build_config(
             output_dir=args.output_dir,
             input_file=args.input_file,
             scratch_dir=args.scratch_dir,
+            mode=args.mode,
         )
     )
 

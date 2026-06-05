@@ -19,11 +19,19 @@ def run_pipeline_cli(
     skip_scraping: bool,
     no_interactive: bool,
     mode: str,
+    screener_mode: str,
     verbose: bool,
 ) -> None:
     import orchestrator
 
-    argv = ["--output-dir", str(output_dir), "--mode", mode]
+    argv = [
+        "--output-dir",
+        str(output_dir),
+        "--mode",
+        mode,
+        "--screener-mode",
+        screener_mode,
+    ]
     if dry_run:
         argv.append("--dry-run")
     if skip_scraping:
@@ -81,6 +89,14 @@ def pipeline_command(
             help="Pipeline mode: multi (default, all tickers), single, or compare.",
         ),
     ] = "multi",
+    screener_mode: Annotated[
+        str,
+        typer.Option(
+            "--screener-mode",
+            help="Quant-filter strategy: 'momentum' (default) or 'mean-reversion' "
+            "(oversold pullbacks). Mean-reversion forces a fresh screener run.",
+        ),
+    ] = "momentum",
     verbose: Annotated[
         bool,
         typer.Option("--verbose", help="Enable verbose orchestrator logging."),
@@ -90,6 +106,12 @@ def pipeline_command(
     selected_mode = mode.lower().strip()
     if selected_mode not in {"multi", "single", "compare"}:
         raise typer.BadParameter("mode must be one of: multi, single, compare")
+
+    selected_screener_mode = mode_str = screener_mode.lower().strip().replace("-", "_")
+    if mode_str not in {"momentum", "mean_reversion"}:
+        raise typer.BadParameter(
+            "screener-mode must be one of: momentum, mean-reversion"
+        )
 
     root_ctx = ctx.find_root()
     global_verbose = bool(((root_ctx.obj or {}) if root_ctx else {}).get("verbose"))
@@ -134,6 +156,7 @@ def pipeline_command(
         skip_scraping=skip_scraping,
         no_interactive=no_interactive,
         mode=selected_mode,
+        screener_mode=selected_screener_mode,
         verbose=verbose or global_verbose,
     )
 

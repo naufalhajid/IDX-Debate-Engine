@@ -329,6 +329,7 @@ def check_all_dependencies(
 def maybe_rerun_quant_filter(
     script_path: str = "run_quant_filter.py",
     output_dir: Path | str | None = None,
+    mode: str = "momentum",
 ) -> bool:
     """
     Jalankan run_quant_filter.py via subprocess jika CANDIDATES_AUTO_RERUN=True.
@@ -348,6 +349,12 @@ def maybe_rerun_quant_filter(
     command = [sys.executable, str(script)]
     if output_dir is not None:
         command.extend(["--output-dir", str(output_dir)])
+    norm_mode = (
+        "mean_reversion"
+        if str(mode).replace("-", "_") == "mean_reversion"
+        else "momentum"
+    )
+    command.extend(["--mode", norm_mode])
 
     logger.info("[Validator] Auto-rerun: menjalankan " + " ".join(command[1:]) + " ...")
     result = subprocess.run(
