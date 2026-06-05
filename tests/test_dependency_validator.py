@@ -164,6 +164,25 @@ def test_codex_api_key_check_resolves_token(monkeypatch: pytest.MonkeyPatch) -> 
     assert "Token Codex tersedia" in result.message
 
 
+def test_anthropic_api_key_check_resolves_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "core.dependency_validator.settings",
+        SimpleNamespace(DEFAULT_LLM_PROVIDER="anthropic", ANTHROPIC_API_KEY=""),
+    )
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr(
+        "providers.oauth_manager.resolve_anthropic_token",
+        lambda: "anthropic-token",
+    )
+
+    result = check_llm_api_key(required=True)
+
+    assert result.is_valid is True
+    assert "Kredensial Anthropic tersedia" in result.message
+
+
 def test_codex_model_check_requires_live_probe(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[tuple[str, str]] = []
 

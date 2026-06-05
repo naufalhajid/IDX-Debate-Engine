@@ -164,8 +164,30 @@ def check_llm_api_key(required: bool = True) -> DependencyCheck:
         api_key = settings.GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY", "")
         key_name = "GEMINI_API_KEY"
     elif provider == "anthropic":
-        api_key = settings.ANTHROPIC_API_KEY or os.environ.get("ANTHROPIC_API_KEY", "")
         key_name = "ANTHROPIC_API_KEY"
+        if not required:
+            api_key = settings.ANTHROPIC_API_KEY or os.environ.get(
+                "ANTHROPIC_API_KEY", ""
+            )
+        else:
+            try:
+                from providers.oauth_manager import resolve_anthropic_token
+
+                api_key = resolve_anthropic_token()
+            except Exception as exc:
+                return DependencyCheck(
+                    name="llm_api_key",
+                    is_valid=False,
+                    message=(
+                        "Kredensial Anthropic tidak valid atau tidak tersedia: "
+                        f"{exc}"
+                    ),
+                    hint=(
+                        "Isi ANTHROPIC_API_KEY/CLAUDE_CODE_OAUTH_TOKEN atau "
+                        "jalankan `idx auth add anthropic`."
+                    ),
+                    blocking=required,
+                )
     elif provider == "codex":
         if not required:
             return DependencyCheck(
@@ -205,10 +227,13 @@ def check_llm_api_key(required: bool = True) -> DependencyCheck:
         api_key = ""
 
     if api_key.strip():
+        credential_label = (
+            "Kredensial Anthropic" if provider == "anthropic" else key_name
+        )
         return DependencyCheck(
             name="llm_api_key",
             is_valid=True,
-            message=f"{key_name} tersedia untuk provider {provider}.",
+            message=f"{credential_label} tersedia untuk provider {provider}.",
             blocking=False,
         )
 
