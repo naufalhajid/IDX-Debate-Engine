@@ -5,16 +5,9 @@ from typing import Annotated
 
 import typer
 
+from app.cli.mode_utils import normalize_screener_mode
 from app.cli.ui.console import console
 from app.cli.ui.tables import build_filter_results_table
-
-
-def _normalize_mode(mode: str) -> str:
-    """Map user-facing mode spellings to the config value."""
-    m = (mode or "").strip().lower().replace("-", "_")
-    if m in {"mean_reversion", "meanreversion", "mr", "reversion"}:
-        return "mean_reversion"
-    return "momentum"
 
 
 def run_filter(
@@ -30,13 +23,19 @@ def run_filter(
     cfg = dict(CONFIG)
     cfg["top_n"] = top
     cfg["output_dir"] = str(output_dir)
-    cfg["screener_mode"] = _normalize_mode(mode)
+    cfg["screener_mode"] = normalize_screener_mode(mode)
     if input_file is not None:
         cfg["input_file"] = str(input_file)
     return run_pipeline(cfg)
 
 
 def filter_command(
+    mode_arg: Annotated[
+        str | None,
+        typer.Argument(
+            help="Optional strategy alias: momentum, mom, trend, mean-reversion, or mr."
+        ),
+    ] = None,
     top: Annotated[
         int,
         typer.Option("--top", "-n", min=1, help="Number of candidates to keep."),
@@ -50,13 +49,13 @@ def filter_command(
         typer.Option("--output-dir", help="Directory for top10_candidates.json."),
     ] = Path("output"),
     mode: Annotated[
-        str,
+        str | None,
         typer.Option(
             "--mode",
             help="Strategy: 'momentum' (trend-following, default) or "
             "'mean-reversion' (oversold pullbacks in an uptrend).",
         ),
-    ] = "momentum",
+    ] = None,
     ctx: typer.Context = typer.Context,
 ) -> None:
     """Screen top swing-trade candidates from IHSG stocks using quant signals."""
@@ -64,7 +63,16 @@ def filter_command(
 
     verbose = (ctx.obj or {}).get("verbose", False)
     scratch_dir = str(CONFIG.get("scratch_dir", "scratch"))
-    norm_mode = _normalize_mode(mode)
+    option_mode = normalize_screener_mode(mode) if mode is not None else None
+    positional_mode = (
+        normalize_screener_mode(mode_arg) if mode_arg is not None else None
+    )
+    if option_mode is not None and positional_mode is not None:
+        if option_mode != positional_mode:
+            raise typer.BadParameter(
+                "positional mode conflicts with --mode; choose one strategy."
+            )
+    norm_mode = positional_mode or option_mode or "momentum"
 
     if verbose:
         console.print(

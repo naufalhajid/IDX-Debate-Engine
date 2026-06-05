@@ -7,8 +7,137 @@ from typing import Annotated
 import typer
 from rich.panel import Panel
 
+from app.cli.mode_utils import (
+    format_screener_mode,
+    is_pipeline_mode_token,
+    is_screener_mode_token,
+    normalize_pipeline_mode,
+    normalize_screener_mode,
+)
 from app.cli.ui.console import console
 from app.cli.ui.tables import build_verdict_summary_table
+
+
+def _select_from_menu(
+    *,
+    title: str,
+    choices: list[tuple[str, str, str]],
+    default: str,
+) -> str:
+    console.print(f"\n{title}:")
+    for number, value, label in choices:
+        marker = " [idx.ok]<- default[/idx.ok]" if value == default else ""
+        console.print(f"  [[idx.highlight]{number}[/idx.highlight]] {label}{marker}")
+
+    try:
+        choice = input(f"Enter your choice [1-{len(choices)}]: ").strip().lower()
+    except (KeyboardInterrupt, EOFError):
+        console.print("\n[idx.warn]Cancelled.[/idx.warn]")
+        raise typer.Exit()
+
+    if not choice:
+        return default
+    for number, value, _label in choices:
+        if choice == number:
+            return value
+
+    console.print("[idx.warn]Invalid choice, using default.[/idx.warn]")
+    return default
+
+
+def _choose_pipeline_modes() -> tuple[str, str]:
+    console.print(
+        Panel(
+            "Choose how the full pipeline should screen and debate candidates.",
+            title="[idx.header]IDX Pipeline Mode[/idx.header]",
+            border_style="idx.header",
+            expand=False,
+        )
+    )
+    selected_mode = _select_from_menu(
+        title="Pipeline mode",
+        choices=[
+            ("1", "multi", "Multi-agent debate"),
+            ("2", "single", "Single-agent baseline"),
+            ("3", "compare", "Compare multi-agent vs single-agent"),
+        ],
+        default="multi",
+    )
+    selected_screener_mode = _select_from_menu(
+        title="Screener strategy",
+        choices=[
+            ("1", "momentum", "Momentum swing"),
+            ("2", "mean_reversion", "Mean-reversion swing"),
+        ],
+        default="momentum",
+    )
+    return selected_mode, selected_screener_mode
+
+
+def _resolve_pipeline_tokens(
+    *,
+    extra_args: list[str],
+    mode: str | None,
+    screener_mode: str | None,
+    no_interactive: bool,
+) -> tuple[str, str, tuple[str, ...]]:
+    lowered = [token.strip().lower() for token in extra_args]
+    if "choose" in lowered:
+        if no_interactive:
+            raise typer.BadParameter("choose cannot be used with --no-interactive")
+        if len(extra_args) > 1:
+            raise typer.BadParameter(
+                "choose cannot be combined with positional modes or tickers; "
+                "use --tickers for ticker overrides."
+            )
+        if mode is not None or screener_mode is not None:
+            raise typer.BadParameter(
+                "choose cannot be combined with --mode or --screener-mode"
+            )
+        selected_mode, selected_screener_mode = _choose_pipeline_modes()
+        return selected_mode, selected_screener_mode, ()
+
+    selected_mode = normalize_pipeline_mode(mode) if mode is not None else "multi"
+    selected_screener_mode = (
+        normalize_screener_mode(screener_mode)
+        if screener_mode is not None
+        else "momentum"
+    )
+    positional_mode: str | None = None
+    positional_screener_mode: str | None = None
+    positional_tickers: list[str] = []
+
+    for token in extra_args:
+        if is_pipeline_mode_token(token):
+            token_mode = normalize_pipeline_mode(token)
+            if mode is not None and token_mode != selected_mode:
+                raise typer.BadParameter(
+                    "positional pipeline mode conflicts with --mode"
+                )
+            if positional_mode is not None and token_mode != positional_mode:
+                raise typer.BadParameter("multiple pipeline modes were provided")
+            positional_mode = token_mode
+            selected_mode = token_mode
+        elif is_screener_mode_token(token):
+            token_screener_mode = normalize_screener_mode(token)
+            if (
+                screener_mode is not None
+                and token_screener_mode != selected_screener_mode
+            ):
+                raise typer.BadParameter(
+                    "positional screener mode conflicts with --screener-mode"
+                )
+            if (
+                positional_screener_mode is not None
+                and token_screener_mode != positional_screener_mode
+            ):
+                raise typer.BadParameter("multiple screener modes were provided")
+            positional_screener_mode = token_screener_mode
+            selected_screener_mode = token_screener_mode
+        else:
+            positional_tickers.append(token)
+
+    return selected_mode, selected_screener_mode, tuple(positional_tickers)
 
 
 def run_pipeline_cli(
@@ -83,41 +212,40 @@ def pipeline_command(
         ),
     ] = False,
     mode: Annotated[
-        str,
+        str | None,
         typer.Option(
             "--mode",
             help="Pipeline mode: multi (default, all tickers), single, or compare.",
         ),
-    ] = "multi",
+    ] = None,
     screener_mode: Annotated[
-        str,
+        str | None,
         typer.Option(
             "--screener-mode",
             help="Quant-filter strategy: 'momentum' (default) or 'mean-reversion' "
             "(oversold pullbacks). Mean-reversion forces a fresh screener run.",
         ),
-    ] = "momentum",
+    ] = None,
     verbose: Annotated[
         bool,
         typer.Option("--verbose", help="Enable verbose orchestrator logging."),
     ] = False,
 ) -> None:
     """Full automated pipeline: quant filter + AI debate + risk gate + TOP_3 report."""
-    selected_mode = mode.lower().strip()
-    if selected_mode not in {"multi", "single", "compare"}:
-        raise typer.BadParameter("mode must be one of: multi, single, compare")
-
-    selected_screener_mode = mode_str = screener_mode.lower().strip().replace("-", "_")
-    if mode_str not in {"momentum", "mean_reversion"}:
-        raise typer.BadParameter(
-            "screener-mode must be one of: momentum, mean-reversion"
+    selected_mode, selected_screener_mode, positional_tickers = (
+        _resolve_pipeline_tokens(
+            extra_args=list(ctx.args),
+            mode=mode,
+            screener_mode=screener_mode,
+            no_interactive=no_interactive,
         )
+    )
 
     root_ctx = ctx.find_root()
     global_verbose = bool(((root_ctx.obj or {}) if root_ctx else {}).get("verbose"))
     selected_tickers = tuple(
         ticker.strip().upper()
-        for ticker in tuple(tickers or ()) + tuple(ctx.args)
+        for ticker in tuple(tickers or ()) + positional_tickers
         if ticker.strip()
     )
 
@@ -141,8 +269,9 @@ def pipeline_command(
 
     console.print(
         Panel(
-            f"[idx.label]Mode:[/idx.label]     [idx.highlight]{selected_mode}[/idx.highlight]\n"
-            f"[idx.label]Tickers:[/idx.label]  {ticker_label}" + flags_line,
+            f"[idx.label]Pipeline Mode:[/idx.label]  [idx.highlight]{selected_mode}[/idx.highlight]\n"
+            f"[idx.label]Screener:[/idx.label]       [idx.highlight]{format_screener_mode(selected_screener_mode)}[/idx.highlight]\n"
+            f"[idx.label]Tickers:[/idx.label]        {ticker_label}" + flags_line,
             title="[idx.header]IDX Pipeline[/idx.header]",
             border_style="idx.header",
             expand=False,

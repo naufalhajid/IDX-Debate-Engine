@@ -227,10 +227,20 @@ uv run idx pipeline    # run full batch
 ### Individual Commands
 
 ```bash
-uv run idx filter --top 10          # Quant screener
-uv run idx scan                     # Quick fundamental sweep
+uv run idx filter                   # Momentum swing screener
+uv run idx filter mr                # Mean-reversion swing screener
+uv run idx pipeline                 # Full momentum pipeline
+uv run idx pipeline mr              # Full mean-reversion pipeline
+uv run idx pipeline choose          # Interactive mode selector
 uv run idx debate BBRI BBCA TLKM    # Debate specific tickers
-uv run idx serve                    # Start FastAPI server
+uv run idx scan                     # Quick fundamental sweep
+```
+
+For scripts and CI, the explicit flags remain available:
+
+```bash
+uv run idx filter --mode mean-reversion --top 10
+uv run idx pipeline --mode compare --screener-mode mean-reversion
 ```
 
 ---

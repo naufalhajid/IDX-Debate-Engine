@@ -12,6 +12,7 @@ from core.dependency_validator import (
     check_llm_api_key,
     check_llm_models,
     maybe_rerun_quant_filter,
+    _summarize_quant_filter_output,
 )
 
 
@@ -77,9 +78,10 @@ def test_maybe_rerun_quant_filter_passes_output_dir(
     script.write_text("print('ok')", encoding="utf-8")
     captured: dict[str, list[str]] = {}
 
-    def fake_run(command: list[str]) -> SimpleNamespace:
+    def fake_run(command: list[str], **kwargs) -> SimpleNamespace:
         captured["command"] = command
-        return SimpleNamespace(returncode=0)
+        captured["kwargs"] = kwargs
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
 
     monkeypatch.setattr("core.dependency_validator.subprocess.run", fake_run)
 
@@ -89,6 +91,8 @@ def test_maybe_rerun_quant_filter_passes_output_dir(
     cmd = captured["command"]
     assert "--output-dir" in cmd
     assert cmd[cmd.index("--output-dir") + 1] == str(tmp_path / "dry")
+    assert captured["kwargs"]["capture_output"] is True
+    assert captured["kwargs"]["text"] is True
     # Defaults to momentum when no mode is given.
     assert cmd[-2:] == ["--mode", "momentum"]
 
@@ -96,6 +100,31 @@ def test_maybe_rerun_quant_filter_passes_output_dir(
         script_path=str(script), output_dir=tmp_path / "dry", mode="mean-reversion"
     )
     assert captured["command"][-2:] == ["--mode", "mean_reversion"]
+
+
+def test_quant_filter_output_summary_keeps_pipeline_console_clean() -> None:
+    output = """
+2026-06-06 00:12:53,418 [INFO] Total ticker universe: 957
+2026-06-06 00:12:53,450 [INFO] Lolos static filter: 458 ticker
+2026-06-06 00:13:02,885 [INFO] Download berhasil. Shape: (120, 2290)
+2026-06-06 00:13:03,026 [INFO] IHSG return 1 bulan: -17.82%
+2026-06-06 00:13:04,546 [INFO] Top 10 kandidat berhasil disaring.
+2026-06-06 00:13:04,549 [INFO] JSON diekspor -> output\\top10_candidates.json
+2026-06-06 00:12:53,460 [WARNING] [Graham] BMTR: capped.
+2026-06-06 00:13:03,541 [INFO] [BAPA] Excluded: suspek suspended/FCA (volume anomali)
+"""
+
+    summary = _summarize_quant_filter_output(output)
+
+    assert "universe=957" in summary
+    assert "static=458" in summary
+    assert "yf_shape=120, 2290" in summary
+    assert "ihsg_1m=-17.82%" in summary
+    assert "top=10" in summary
+    assert "json=output\\top10_candidates.json" in summary
+    assert "warnings=1" in summary
+    assert "graham_caps=1" in summary
+    assert "suspended_like=1" in summary
 
 
 def test_codex_api_key_check_resolves_token(monkeypatch: pytest.MonkeyPatch) -> None:

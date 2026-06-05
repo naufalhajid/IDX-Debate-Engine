@@ -36,6 +36,9 @@ _DEBATE_EPILOG = (
 _PIPELINE_EPILOG = (
     "Examples:\n\n"
     "  idx pipeline                           # auto-select from quant filter\n"
+    "  idx pipeline mr                        # mean-reversion screener\n"
+    "  idx pipeline single mr BBCA            # single-agent debate for BBCA\n"
+    "  idx pipeline choose                    # interactive mode selector\n"
     "  idx pipeline --tickers BBCA BMRI ADMR  # specific tickers only\n"
     "  idx pipeline --dry-run                 # simulate without writing records\n"
     "  idx pipeline --skip-scraping           # reuse cached data (faster)\n"

@@ -9,6 +9,7 @@ Mengecek umur top10_candidates.json dan menawarkan dua opsi saat stale:
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -51,6 +52,46 @@ class DependencyCheckResult:
     checks: dict[str, DependencyCheck]
     failed_checks: list[str]
     blocking_issues: list[str]
+
+
+def _tail_lines(text: str, max_lines: int = 80) -> str:
+    lines = [line for line in str(text or "").splitlines() if line.strip()]
+    if len(lines) <= max_lines:
+        return "\n".join(lines)
+    omitted = len(lines) - max_lines
+    return f"... ({omitted} earlier line(s) omitted) ...\n" + "\n".join(
+        lines[-max_lines:]
+    )
+
+
+def _summarize_quant_filter_output(output: str) -> str:
+    """Condense verbose run_quant_filter.py logs into one readable status line."""
+    text = str(output or "")
+    patterns = [
+        ("universe", r"Total ticker universe:\s*([0-9]+)"),
+        ("static", r"Lolos static filter:\s*([0-9]+)\s+ticker"),
+        ("yf_shape", r"Download berhasil\.\s*Shape:\s*\(([^)]+)\)"),
+        ("ihsg_1m", r"IHSG return 1 bulan:\s*([+-]?[0-9.]+%)"),
+        ("top", r"Top\s+([0-9]+)\s+kandidat berhasil disaring"),
+        ("json", r"JSON diekspor\s*(?:->|→|.)\s*([^\r\n]+top10_candidates\.json)"),
+    ]
+    parts: list[str] = []
+    for label, pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            parts.append(f"{label}={match.group(1).strip()}")
+
+    warnings = len(re.findall(r"\[WARNING\]", text))
+    graham_caps = len(re.findall(r"\[Graham\]", text))
+    suspended = len(re.findall(r"Excluded: suspek suspended/FCA", text))
+    if warnings:
+        parts.append(f"warnings={warnings}")
+    if graham_caps:
+        parts.append(f"graham_caps={graham_caps}")
+    if suspended:
+        parts.append(f"suspended_like={suspended}")
+
+    return " | ".join(parts) if parts else "completed"
 
 
 def check_candidates_file(path: Path, max_age_hours: float) -> ValidationResult:
@@ -357,18 +398,34 @@ def maybe_rerun_quant_filter(
     command.extend(["--mode", norm_mode])
 
     logger.info("[Validator] Auto-rerun: menjalankan " + " ".join(command[1:]) + " ...")
+    # Capture verbose quant-filter logs so the orchestrator console can show a
+    # compact success summary. Raw output is surfaced only on failure.
     result = subprocess.run(
         command,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
         # Tidak capture output — biarkan mengalir ke terminal
         # supaya user bisa melihat progress scraping secara real-time.
     )
 
+    captured_output = "\n".join(
+        part for part in (result.stdout, result.stderr) if str(part or "").strip()
+    )
+
     if result.returncode == 0:
-        logger.info("[Validator] Auto-rerun selesai.")
+        summary = _summarize_quant_filter_output(captured_output)
+        logger.info(f"[Validator] Auto-rerun selesai: {summary}")
         return True
 
     logger.error(
         f"[Validator] Auto-rerun gagal (returncode={result.returncode}). "
         "Periksa output di atas untuk detail error."
     )
+    if captured_output.strip():
+        logger.error(
+            "[Validator] Auto-rerun output (last lines):\n"
+            + _tail_lines(captured_output)
+        )
     return False

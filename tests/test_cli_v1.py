@@ -92,6 +92,64 @@ def test_filter_applies_safe_overrides(monkeypatch):
     assert calls == [(5, Path("output/sample.xlsx"), Path("tmp/filter"), "momentum")]
 
 
+def test_filter_accepts_positional_mean_reversion_mode(monkeypatch):
+    calls = []
+
+    def fake_run_filter(*, top, input_file, output_dir, mode="momentum"):
+        calls.append((top, input_file, output_dir, mode))
+
+    monkeypatch.setattr("app.cli.commands.filter.run_filter", fake_run_filter)
+
+    result = runner.invoke(app, ["filter", "mr"])
+
+    assert result.exit_code == 0, result.output
+    assert calls == [(10, None, Path("output"), "mean_reversion")]
+
+
+def test_filter_accepts_mode_option_mean_reversion(monkeypatch):
+    calls = []
+
+    def fake_run_filter(*, top, input_file, output_dir, mode="momentum"):
+        calls.append((top, input_file, output_dir, mode))
+
+    monkeypatch.setattr("app.cli.commands.filter.run_filter", fake_run_filter)
+
+    result = runner.invoke(app, ["filter", "--mode", "mean-reversion"])
+
+    assert result.exit_code == 0, result.output
+    assert calls == [(10, None, Path("output"), "mean_reversion")]
+
+
+def test_filter_rejects_invalid_positional_mode(monkeypatch):
+    calls = []
+
+    def fake_run_filter(*, top, input_file, output_dir, mode="momentum"):
+        calls.append((top, input_file, output_dir, mode))
+
+    monkeypatch.setattr("app.cli.commands.filter.run_filter", fake_run_filter)
+
+    result = runner.invoke(app, ["filter", "salah-mode"])
+
+    assert result.exit_code != 0
+    assert calls == []
+    assert "screener mode must be one of" in result.output
+
+
+def test_filter_rejects_conflicting_positional_and_option_modes(monkeypatch):
+    calls = []
+
+    def fake_run_filter(*, top, input_file, output_dir, mode="momentum"):
+        calls.append((top, input_file, output_dir, mode))
+
+    monkeypatch.setattr("app.cli.commands.filter.run_filter", fake_run_filter)
+
+    result = runner.invoke(app, ["filter", "mr", "--mode", "momentum"])
+
+    assert result.exit_code != 0
+    assert calls == []
+    assert "positional mode conflicts with --mode" in result.output
+
+
 def test_debate_normalizes_tickers_and_output_dir(monkeypatch):
     calls = []
 
@@ -195,6 +253,76 @@ def test_pipeline_screener_mode_threads_mean_reversion(monkeypatch):
 
     assert result.exit_code == 0, result.output
     assert calls[0]["screener_mode"] == "mean_reversion"
+
+
+def test_pipeline_accepts_positional_screener_mode(monkeypatch):
+    calls = []
+
+    def fake_run_pipeline_cli(**kwargs):
+        calls.append(kwargs)
+
+    monkeypatch.setattr(
+        "app.cli.commands.pipeline.run_pipeline_cli", fake_run_pipeline_cli
+    )
+
+    result = runner.invoke(app, ["pipeline", "mr", "--dry-run"])
+
+    assert result.exit_code == 0, result.output
+    assert calls[0]["mode"] == "multi"
+    assert calls[0]["screener_mode"] == "mean_reversion"
+    assert calls[0]["tickers"] == ()
+
+
+def test_pipeline_accepts_positional_mode_screener_and_ticker(monkeypatch):
+    calls = []
+
+    def fake_run_pipeline_cli(**kwargs):
+        calls.append(kwargs)
+
+    monkeypatch.setattr(
+        "app.cli.commands.pipeline.run_pipeline_cli", fake_run_pipeline_cli
+    )
+
+    result = runner.invoke(app, ["pipeline", "single", "mr", "BBCA", "--dry-run"])
+
+    assert result.exit_code == 0, result.output
+    assert calls[0]["mode"] == "single"
+    assert calls[0]["screener_mode"] == "mean_reversion"
+    assert calls[0]["tickers"] == ("BBCA",)
+
+
+def test_pipeline_choose_selects_modes_interactively(monkeypatch):
+    calls = []
+
+    def fake_run_pipeline_cli(**kwargs):
+        calls.append(kwargs)
+
+    monkeypatch.setattr(
+        "app.cli.commands.pipeline.run_pipeline_cli", fake_run_pipeline_cli
+    )
+
+    result = runner.invoke(app, ["pipeline", "choose", "--dry-run"], input="2\n2\n")
+
+    assert result.exit_code == 0, result.output
+    assert calls[0]["mode"] == "single"
+    assert calls[0]["screener_mode"] == "mean_reversion"
+
+
+def test_pipeline_choose_rejects_no_interactive(monkeypatch):
+    calls = []
+
+    def fake_run_pipeline_cli(**kwargs):
+        calls.append(kwargs)
+
+    monkeypatch.setattr(
+        "app.cli.commands.pipeline.run_pipeline_cli", fake_run_pipeline_cli
+    )
+
+    result = runner.invoke(app, ["pipeline", "choose", "--no-interactive"])
+
+    assert result.exit_code != 0
+    assert calls == []
+    assert "choose cannot be used with --no-interactive" in result.output
 
 
 def test_pipeline_uses_global_verbose_flag(monkeypatch):

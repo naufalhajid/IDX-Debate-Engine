@@ -49,6 +49,8 @@ htmlcov/
 # Scratch runtime artifacts; keep scratch scripts reviewable if needed.
 scratch/**/*.json
 scratch/**/*.md
+scratch/repro_price_return.py
+scratch/verify_mr_gates.py
 
 # Generated runtime artifacts
 /output/**
