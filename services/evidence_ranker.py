@@ -153,7 +153,9 @@ class EvidenceRanker:
         if pack.price or pack.fair_value is not None:
             append_chunk("fair_value", _fair_value_content(pack))
 
-        fundamentals_text = _compact_json(pack.fundamentals) if pack.fundamentals else ""
+        fundamentals_text = (
+            _compact_json(pack.fundamentals) if pack.fundamentals else ""
+        )
         for part in _split_text(fundamentals_text, max_chars=400):
             append_chunk("fundamental", part)
 
@@ -202,7 +204,9 @@ class EvidenceRanker:
             scored_chunks.append(
                 chunk.model_copy(update={"relevance_score": _clamp_score(score)})
             )
-        return sorted(scored_chunks, key=lambda item: item.relevance_score, reverse=True)
+        return sorted(
+            scored_chunks, key=lambda item: item.relevance_score, reverse=True
+        )
 
     def select_evidence(
         self,
@@ -355,9 +359,7 @@ def guard_evidence_citation_ids(
     citation_map = {citation.chunk_id: citation for citation in citations}
     cited_unique = [chunk_id for chunk_id in dict.fromkeys(cited_chunk_ids) if chunk_id]
     cited_chunks = [
-        citation_map[chunk_id]
-        for chunk_id in cited_unique
-        if chunk_id in citation_map
+        citation_map[chunk_id] for chunk_id in cited_unique if chunk_id in citation_map
     ]
     missing = [chunk_id for chunk_id in cited_unique if chunk_id not in citation_map]
     stale = [citation.chunk_id for citation in cited_chunks if citation.is_stale]
@@ -398,9 +400,7 @@ def _make_bundle(
         total_chunks_selected=len(selected),
         has_stale_data=has_stale_data,
         staleness_warning=(
-            "Some selected evidence is older than 24 hours."
-            if has_stale_data
-            else None
+            "Some selected evidence is older than 24 hours." if has_stale_data else None
         ),
         token_estimate=selected_content_chars // CHARS_PER_TOKEN,
         selected_content_chars=selected_content_chars,
@@ -528,7 +528,9 @@ def _parse_timestamp(value: Any) -> datetime:
     return timestamp.astimezone(timezone.utc)
 
 
-def _freshness_seconds(fetched_at: datetime, reference_time: datetime | None = None) -> int | None:
+def _freshness_seconds(
+    fetched_at: datetime, reference_time: datetime | None = None
+) -> int | None:
     try:
         ref = reference_time or datetime.now(timezone.utc)
         return _market_freshness_seconds(fetched_at, ref)
@@ -549,14 +551,28 @@ def _market_freshness_seconds(fetched_at: datetime, current_time: datetime) -> i
 
     # Indonesian Stock Exchange (IDX) Trading Holidays for 2026
     idx_holidays_2026 = {
-        "2026-01-01", "2026-01-16",
-        "2026-02-16", "2026-02-17",
-        "2026-03-18", "2026-03-19", "2026-03-20", "2026-03-23", "2026-03-24",
+        "2026-01-01",
+        "2026-01-16",
+        "2026-02-16",
+        "2026-02-17",
+        "2026-03-18",
+        "2026-03-19",
+        "2026-03-20",
+        "2026-03-23",
+        "2026-03-24",
         "2026-04-03",
-        "2026-05-01", "2026-05-14", "2026-05-15", "2026-05-27", "2026-05-28",
-        "2026-06-01", "2026-06-16",
-        "2026-08-17", "2026-08-25",
-        "2026-12-24", "2026-12-25", "2026-12-31"
+        "2026-05-01",
+        "2026-05-14",
+        "2026-05-15",
+        "2026-05-27",
+        "2026-05-28",
+        "2026-06-01",
+        "2026-06-16",
+        "2026-08-17",
+        "2026-08-25",
+        "2026-12-24",
+        "2026-12-25",
+        "2026-12-31",
     }
 
     # Parse custom/additional holidays from settings dynamically
@@ -577,6 +593,7 @@ def _market_freshness_seconds(fetched_at: datetime, current_time: datetime) -> i
     all_holidays = idx_holidays_2026 | additional_holidays
 
     import datetime as dt_mod
+
     wib = dt_mod.timezone(dt_mod.timedelta(hours=7))
 
     start_local = fetched_at.astimezone(wib)
@@ -586,7 +603,9 @@ def _market_freshness_seconds(fetched_at: datetime, current_time: datetime) -> i
     end_date = end_local.date()
 
     if start_date == end_date:
-        is_holiday = start_date.weekday() in (5, 6) or start_date.isoformat() in all_holidays
+        is_holiday = (
+            start_date.weekday() in (5, 6) or start_date.isoformat() in all_holidays
+        )
         if is_holiday:
             return 0
         return total_seconds
@@ -608,7 +627,6 @@ def _market_freshness_seconds(fetched_at: datetime, current_time: datetime) -> i
     return max(0, total_seconds - closed_seconds)
 
 
-
 def _fair_value_content(pack: ContextPack) -> str:
     fair_value = (
         f"{pack.fair_value:.0f}" if pack.fair_value is not None else "INSUFFICIENT_DATA"
@@ -616,7 +634,9 @@ def _fair_value_content(pack: ContextPack) -> str:
     upside = "INSUFFICIENT_DATA"
     if pack.price and pack.fair_value is not None:
         upside = f"{((pack.fair_value - pack.price) / pack.price) * 100:.1f}%"
-    return f"Current Price: {pack.price:.0f} | Fair Value: {fair_value} | Upside: {upside}"
+    return (
+        f"Current Price: {pack.price:.0f} | Fair Value: {fair_value} | Upside: {upside}"
+    )
 
 
 def _source_for_category(sources: list[str], category: CategoryName) -> str:
@@ -720,7 +740,9 @@ def _load_debate_payload(ticker: str) -> dict[str, Any]:
 def _build_dummy_pack_from_debate(ticker: str, payload: dict[str, Any]) -> ContextPack:
     raw_summary = str(payload.get("raw_data_summary") or "")
     verdict = payload.get("verdict") if isinstance(payload.get("verdict"), dict) else {}
-    metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+    metadata = (
+        payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+    )
     raw_data = {
         "ticker": ticker,
         "generated_at": metadata.get("generated_at"),
@@ -763,7 +785,9 @@ def _extract_data_sources(raw_summary: str, metadata: dict[str, Any]) -> list[st
     sources: list[str] = []
     match = re.search(r"Data Sources:\s*(.+)", raw_summary)
     if match:
-        sources.extend(part.strip() for part in match.group(1).split(",") if part.strip())
+        sources.extend(
+            part.strip() for part in match.group(1).split(",") if part.strip()
+        )
     for key in ("market_data_source", "fundamental_source", "sentiment_source"):
         value = metadata.get(key)
         if isinstance(value, str) and value.strip():
@@ -779,8 +803,12 @@ def _extract_data_sources(raw_summary: str, metadata: dict[str, Any]) -> list[st
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Build an evidence brief for a ticker.")
-    parser.add_argument("--ticker", required=True, help="Ticker with latest_debate.json output.")
+    parser = argparse.ArgumentParser(
+        description="Build an evidence brief for a ticker."
+    )
+    parser.add_argument(
+        "--ticker", required=True, help="Ticker with latest_debate.json output."
+    )
     args = parser.parse_args()
 
     payload = _load_debate_payload(args.ticker)

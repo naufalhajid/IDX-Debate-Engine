@@ -141,7 +141,9 @@ class ExplainabilityAuditor:
             winner_agent = explicit_winner.get("agent") or (
                 dissenting_agents[0] if dissenting_agents else "confidence_winner"
             )
-            winner_position = explicit_winner.get("position") or self._canonical_position(rating)
+            winner_position = explicit_winner.get(
+                "position"
+            ) or self._canonical_position(rating)
             winner_confidence = explicit_winner.get("confidence") or confidence
             winner_raw_confidence = explicit_winner.get("confidence") or confidence
             winner_effective_confidence = explicit_winner.get("effective_confidence")
@@ -240,10 +242,7 @@ class ExplainabilityAuditor:
 
     def format_report(self, packet: AuditPacket) -> str:
         """Render an audit packet as a human-readable text report."""
-        agent_lines = [
-            self._format_agent_vote(vote)
-            for vote in packet.agent_votes
-        ]
+        agent_lines = [self._format_agent_vote(vote) for vote in packet.agent_votes]
         if not agent_lines:
             agent_lines = ["  none"]
 

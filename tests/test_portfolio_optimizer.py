@@ -21,7 +21,9 @@ def test_basic_selection() -> None:
         _make_entry("TLKM", 0.60, "tech"),
         _make_entry("ADRO", 0.50, "energy"),
     ]
-    result = diversify_portfolio(scorable, top_n=3, max_per_sector=1, min_conviction=0.0)
+    result = diversify_portfolio(
+        scorable, top_n=3, max_per_sector=1, min_conviction=0.0
+    )
     assert len(result) == 3
     tickers = [e["ticker"] for e in result]
     assert "BBCA" in tickers
@@ -36,7 +38,9 @@ def test_sector_cap_enforced() -> None:
         _make_entry("BBRI", 0.85, "bank"),
         _make_entry("KLBF", 0.70, "healthcare"),
     ]
-    result = diversify_portfolio(scorable, top_n=2, max_per_sector=1, min_conviction=0.0)
+    result = diversify_portfolio(
+        scorable, top_n=2, max_per_sector=1, min_conviction=0.0
+    )
     assert len(result) == 2
     tickers = [e["ticker"] for e in result]
     # BBCA masuk (score tertinggi), BBRI ditolak karena sector cap, KLBF masuk
@@ -52,7 +56,9 @@ def test_soft_cap_fallback() -> None:
         _make_entry("BBRI", 0.85, "bank"),
         _make_entry("BMRI", 0.80, "bank"),
     ]
-    result = diversify_portfolio(scorable, top_n=3, max_per_sector=1, min_conviction=0.0)
+    result = diversify_portfolio(
+        scorable, top_n=3, max_per_sector=1, min_conviction=0.0
+    )
     # Soft-cap fallback: semua bank, tapi tetap pilih 3
     assert len(result) == 3
 
@@ -64,7 +70,9 @@ def test_min_conviction_filter() -> None:
         _make_entry("KLBF", 0.25, "healthcare"),  # di bawah threshold
         _make_entry("ICBP", 0.70, "consumer_staples"),
     ]
-    result = diversify_portfolio(scorable, top_n=3, max_per_sector=2, min_conviction=0.30)
+    result = diversify_portfolio(
+        scorable, top_n=3, max_per_sector=2, min_conviction=0.30
+    )
     tickers = [e["ticker"] for e in result]
     assert "KLBF" not in tickers
 
@@ -75,7 +83,9 @@ def test_min_conviction_fallback_when_all_below() -> None:
         _make_entry("BBCA", 0.20, "bank"),
         _make_entry("KLBF", 0.15, "healthcare"),
     ]
-    result = diversify_portfolio(scorable, top_n=2, max_per_sector=2, min_conviction=0.50)
+    result = diversify_portfolio(
+        scorable, top_n=2, max_per_sector=2, min_conviction=0.50
+    )
     # Soft fallback: tetap ada result
     assert len(result) == 2
 
@@ -87,7 +97,9 @@ def test_tie_breaking() -> None:
         _make_entry("KLBF", 0.70, "healthcare"),
         _make_entry("ICBP", 0.70, "consumer_staples"),  # tie dengan KLBF
     ]
-    result = diversify_portfolio(scorable, top_n=2, max_per_sector=2, min_conviction=0.0)
+    result = diversify_portfolio(
+        scorable, top_n=2, max_per_sector=2, min_conviction=0.0
+    )
     # Tie: KLBF dan ICBP sama-sama 0.70, keduanya harus masuk
     assert len(result) >= 2
     tickers = [e["ticker"] for e in result]
@@ -105,5 +117,7 @@ def test_fewer_candidates_than_top_n() -> None:
     scorable = [
         _make_entry("BBCA", 0.80, "bank"),
     ]
-    result = diversify_portfolio(scorable, top_n=3, max_per_sector=1, min_conviction=0.0)
+    result = diversify_portfolio(
+        scorable, top_n=3, max_per_sector=1, min_conviction=0.0
+    )
     assert len(result) == 1

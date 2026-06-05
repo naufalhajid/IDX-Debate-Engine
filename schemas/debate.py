@@ -24,6 +24,7 @@ from utils.trade_math import calculate_rr
 # Base helper
 # ---------------------------------------------------------------------------
 
+
 class BaseDataClass(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -31,6 +32,7 @@ class BaseDataClass(BaseModel):
 # ---------------------------------------------------------------------------
 # Core message type
 # ---------------------------------------------------------------------------
+
 
 class DebateMessage(BaseDataClass):
     """Single argument in the stock debate chamber."""
@@ -53,6 +55,7 @@ class DebateMessage(BaseDataClass):
 # CIO Verdict — Swing Trade edition, Pydantic-validated, Svelte-ready
 # ---------------------------------------------------------------------------
 
+
 class CIOVerdict(BaseDataClass):
     """
     Structured output from the CIO Judge — Swing Trade frame (1-3 months, 3-10% target).
@@ -74,7 +77,9 @@ class CIOVerdict(BaseDataClass):
     rating: Literal["STRONG_BUY", "BUY", "HOLD", "SELL", "AVOID"] = "HOLD"
 
     confidence: float = Field(
-        default=0.0, ge=0.0, le=1.0,
+        default=0.0,
+        ge=0.0,
+        le=1.0,
         description="CIO confidence in the verdict, 0-1.",
     )
 
@@ -177,9 +182,11 @@ class CIOVerdict(BaseDataClass):
         description="Whether the debate agents reached consensus before the CIO formatter.",
     )
 
-    consensus_method: Literal["voting", "confidence_winner", "soft_hold"] | None = Field(
-        default=None,
-        description="Consensus path used by the debate chamber.",
+    consensus_method: Literal["voting", "confidence_winner", "soft_hold"] | None = (
+        Field(
+            default=None,
+            description="Consensus path used by the debate chamber.",
+        )
     )
 
     dissenting_agents: list[str] = Field(
@@ -249,7 +256,11 @@ class CIOVerdict(BaseDataClass):
             self.risk_reward_ratio = None
 
         # 4. Overvaluation flag — Margin of Safety check
-        if self.current_price is not None and self.fair_value is not None and self.fair_value > 0:
+        if (
+            self.current_price is not None
+            and self.fair_value is not None
+            and self.fair_value > 0
+        ):
             self.is_overvalued = self.current_price > self.fair_value
         else:
             self.is_overvalued = None
@@ -269,7 +280,9 @@ class CIOVerdict(BaseDataClass):
         missing_fv = self.fair_value is None or self.fair_value <= 0
         if self.confidence < 0.60 or bad_rr or missing_fv:
             self.wait_and_see = True
-            if missing_fv and not any("fundamental" in s.lower() for s in self.key_risks):
+            if missing_fv and not any(
+                "fundamental" in s.lower() for s in self.key_risks
+            ):
                 self.key_risks = list(self.key_risks) + [
                     "Fair value tidak tersedia — validasi fundamental secara manual sebelum entry."
                 ]
@@ -343,6 +356,7 @@ class CIOVerdict(BaseDataClass):
             parts = re.split(r"\s*[-–]\s*", text, maxsplit=1)
             if len(parts) < 2:
                 return 0.0
+
             # Strip thousand separators (both dot and comma) then parse
             def _to_float(s: str) -> float:
                 s = s.strip()
@@ -351,7 +365,7 @@ class CIOVerdict(BaseDataClass):
                 # Heuristic: if there's exactly one dot and the part after it
                 # is exactly 3 digits, treat it as thousand separator.
                 s = re.sub(r"\.(?=\d{3}(?!\d))", "", s)  # remove thousand dots
-                s = s.replace(",", "")                     # remove thousand commas
+                s = s.replace(",", "")  # remove thousand commas
                 return float(s)
 
             lo = _to_float(parts[0])
@@ -367,25 +381,26 @@ class CIOVerdict(BaseDataClass):
         a leaner payload.
         """
         return {
-            "ticker":             self.ticker,
-            "rating":             self.rating,
-            "buy_at":             self.entry_price_range,
-            "sell_at":            self.target_price,
-            "cut_loss":           self.stop_loss,
-            "fair_value":         self.fair_value,
-            "expected_return":    self.expected_return,
-            "risk_reward":        self.risk_reward_ratio,
-            "is_overvalued":      self.is_overvalued,
-            "wait_and_see":       self.wait_and_see,
-            "confidence":         self.confidence,
-            "summary":            self.summary,
-            "critical_risk":      self.critical_risk_factor,
+            "ticker": self.ticker,
+            "rating": self.rating,
+            "buy_at": self.entry_price_range,
+            "sell_at": self.target_price,
+            "cut_loss": self.stop_loss,
+            "fair_value": self.fair_value,
+            "expected_return": self.expected_return,
+            "risk_reward": self.risk_reward_ratio,
+            "is_overvalued": self.is_overvalued,
+            "wait_and_see": self.wait_and_see,
+            "confidence": self.confidence,
+            "summary": self.summary,
+            "critical_risk": self.critical_risk_factor,
         }
 
 
 # ---------------------------------------------------------------------------
 # Standalone validator (used by Synthesizer node — no LLM call needed)
 # ---------------------------------------------------------------------------
+
 
 def validate_swing_targets(
     current_price: float,
@@ -448,13 +463,16 @@ def validate_swing_targets(
     return {
         "is_valid": len(warnings) == 0,
         "warnings": warnings,
-        "warning_text": "\n".join(warnings) if warnings else "✅ Swing trade parameters within acceptable range.",
+        "warning_text": "\n".join(warnings)
+        if warnings
+        else "✅ Swing trade parameters within acceptable range.",
     }
 
 
 # ---------------------------------------------------------------------------
 # Custom reducer
 # ---------------------------------------------------------------------------
+
 
 def history_updater(
     left: list[DebateMessage] | None,
@@ -516,6 +534,7 @@ def _merge_metadata_lists(left: list[Any], right: list[Any]) -> list[Any]:
 # LangGraph State
 # ---------------------------------------------------------------------------
 
+
 class DebateChamberState(TypedDict):
     """
     Canonical LangGraph state for the IHSG Swing Trade Debate Chamber.
@@ -533,8 +552,8 @@ class DebateChamberState(TypedDict):
 
     # Identity
     ticker: str
-    current_price: float          # ← NEW: last traded price (IDR)
-    market_data: dict             # Cached yfinance data fetched once per ticker
+    current_price: float  # ← NEW: last traded price (IDR)
+    market_data: dict  # Cached yfinance data fetched once per ticker
 
     # Parallel data collection outputs (Phase 1)
     fundamental_data: str
@@ -568,7 +587,7 @@ class DebateChamberState(TypedDict):
     devils_advocate_question: str
 
     # Final output
-    final_verdict: str            # JSON-serialized CIOVerdict
+    final_verdict: str  # JSON-serialized CIOVerdict
     metadata: Annotated[dict, metadata_updater]
 
     # Error propagation

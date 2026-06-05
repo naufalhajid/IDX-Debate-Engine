@@ -34,7 +34,9 @@ class DownTicker:
 
 
 @pytest.mark.asyncio
-async def test_check_all_providers_both_healthy(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_check_all_providers_both_healthy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(provider_health, "StockbitApiClient", HealthyStockbitClient)
     monkeypatch.setattr(
         provider_health,

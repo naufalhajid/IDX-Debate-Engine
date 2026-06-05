@@ -277,7 +277,9 @@ def _valuation_status(fair_value: Any, current_price: Any) -> str:
 
 
 # FIX: ISSUE 1 — Treat rejected fair value as an unverified valuation gap.
-def _valuation_gap_is_unverified(result: dict[str, Any], verdict: dict[str, Any]) -> bool:
+def _valuation_gap_is_unverified(
+    result: dict[str, Any], verdict: dict[str, Any]
+) -> bool:
     metadata = _dict_or_empty(result.get("metadata"))
     return (
         str(verdict.get("valuation_gap") or "").lower() == "unverified"
@@ -291,8 +293,7 @@ def _valuation_gap_is_unverified(result: dict[str, Any], verdict: dict[str, Any]
 def _breaking_news_lines(result: dict[str, Any]) -> list[str]:
     metadata = _dict_or_empty(result.get("metadata"))
     has_breaking = bool(
-        result.get("has_breaking_news")
-        or metadata.get("has_breaking_news")
+        result.get("has_breaking_news") or metadata.get("has_breaking_news")
     )
     if not has_breaking:
         return []
@@ -430,11 +431,7 @@ def _argument_sentences(value: Any) -> list[str]:
     text = _clean_argument_text(value)
     if not text:
         return []
-    return [
-        item.strip()
-        for item in re.split(r"(?<=[.!?])\s+", text)
-        if item.strip()
-    ]
+    return [item.strip() for item in re.split(r"(?<=[.!?])\s+", text) if item.strip()]
 
 
 def _summarize_argument_text(value: Any, limit: int = 220) -> str:
@@ -797,7 +794,9 @@ def _agent_rows(
         effective = _confidence(_vote_value(vote, "effective_confidence"))
         effective_text = "--" if effective is None else f"{effective:.0%}"
         if is_adversarial:
-            rows.append((agent_label, position, confidence_text, effective_text, "N/A", "dim"))
+            rows.append(
+                (agent_label, position, confidence_text, effective_text, "N/A", "dim")
+            )
             continue
         rows.append(
             (
@@ -908,7 +907,7 @@ class RichFormatter:
             table.add_row(
                 Text(label, style=self._argument_style(role)),
                 Text(_key_argument_summary(result, packet, role)),
-        )
+            )
         table.add_row(
             Text("Decision Summary", style="yellow"),
             Text(_debate_decision_summary(result, packet, limit=420)),
@@ -961,14 +960,17 @@ class RichFormatter:
                     ("RATING: ", "bold cyan"),
                     (f"{rating}  ", rating_style),
                     ("TRADE SETUP CONVICTION: ", "bold cyan"),
-                    (confidence_text)
+                    (confidence_text),
                 ),
                 Text.assemble(
                     ("CONSENSUS: ", "bold cyan"),
-                    (_yes_no(consensus) + f" ({_method_indonesian(method)})", "green" if consensus else "yellow"),
+                    (
+                        _yes_no(consensus) + f" ({_method_indonesian(method)})",
+                        "green" if consensus else "yellow",
+                    ),
                     ("   ROUND: ", "bold cyan"),
-                    (str(data.get("debate_rounds") or "N/A"), "magenta")
-                )
+                    (str(data.get("debate_rounds") or "N/A"), "magenta"),
+                ),
             )
 
             # 2. Left Column: Trade Plan & Valuation
@@ -989,8 +991,12 @@ class RichFormatter:
                     style="yellow" if valuation_unverified else value_style,
                 ),
             )
-            left_table.add_row("Entry Zone", f"{_money(entry_low)} – {_money(entry_high)}")
-            left_table.add_row("Target Price", f"{_money(target)}  ({_signed_pct(upside)})")
+            left_table.add_row(
+                "Entry Zone", f"{_money(entry_low)} – {_money(entry_high)}"
+            )
+            left_table.add_row(
+                "Target Price", f"{_money(target)}  ({_signed_pct(upside)})"
+            )
             left_table.add_row(
                 "Stop Loss",
                 f"{_money(stop)}  ({_signed_pct(-downside if downside is not None else None)})",
@@ -1030,11 +1036,17 @@ class RichFormatter:
             bear_arg = _key_argument_summary(data, packet, "bear", limit=800)
             decision_summary = _debate_decision_summary(data, packet, limit=1200)
 
-            arg_table.add_row(Text("🟢 Bull (Optimistic)", style="green"), Text(bull_arg))
+            arg_table.add_row(
+                Text("🟢 Bull (Optimistic)", style="green"), Text(bull_arg)
+            )
             arg_table.add_row("", "")
-            arg_table.add_row(Text("🔴 Bear (Pessimistic)", style="red"), Text(bear_arg))
+            arg_table.add_row(
+                Text("🔴 Bear (Pessimistic)", style="red"), Text(bear_arg)
+            )
             arg_table.add_row("", "")
-            arg_table.add_row(Text("Decision Summary", style="yellow"), Text(decision_summary))
+            arg_table.add_row(
+                Text("Decision Summary", style="yellow"), Text(decision_summary)
+            )
 
             arg_panel = Panel(
                 arg_table,
@@ -1068,7 +1080,9 @@ class RichFormatter:
             if risks:
                 sys_table.add_row("Key Risks", "\n".join(f"• {r}" for r in risks))
             if catalysts:
-                sys_table.add_row("Key Catalysts", "\n".join(f"• {c}" for c in catalysts))
+                sys_table.add_row(
+                    "Key Catalysts", "\n".join(f"• {c}" for c in catalysts)
+                )
 
             sys_panel = Panel(
                 sys_table,
@@ -1086,7 +1100,11 @@ class RichFormatter:
                 arg_panel,
                 *([breaking_panel] if breaking_panel is not None else []),
                 sys_panel,
-                Text(f"Generated: {_generated_at(data, packet)}", style="dim", justify="right")
+                Text(
+                    f"Generated: {_generated_at(data, packet)}",
+                    style="dim",
+                    justify="right",
+                ),
             )
 
             border = {
@@ -1143,7 +1161,9 @@ class RichFormatter:
                 rating = "ERROR" if row.get("error") else _rating(row)
                 low, high = _entry_bounds(verdict)
                 risk = _risk(row)
-                current_price = verdict.get("current_price") or risk.get("current_price")
+                current_price = verdict.get("current_price") or risk.get(
+                    "current_price"
+                )
                 table.add_row(
                     _ticker(row),
                     Text(rating, style=self._rating_style(rating)),
@@ -1296,7 +1316,11 @@ class MarkdownFormatter:
                 f"| **Recommendation** | **{rating}** |",
                 f"| **Trade Setup Conviction** | {confidence_text} |",
                 f"| **Current Price** | {_money(current_price)} |",
-                *([] if valuation_unverified else [f"| **Fair Value** | {_money(fair_value)} |"]),
+                *(
+                    []
+                    if valuation_unverified
+                    else [f"| **Fair Value** | {_money(fair_value)} |"]
+                ),
                 (
                     f"| **Gap** | {value_status} |"
                     if valuation_unverified

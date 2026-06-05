@@ -36,21 +36,23 @@ def test_validate_key_behavior(monkeypatch):
             return "pong"
 
     from providers import gemini
+
     monkeypatch.setattr(gemini, "get_flash_llm", lambda: FakeLLM())
 
     missing = client.get("/api/validate-key")
     empty = client.get("/api/validate-key", headers={"X-Gemini-API-Key": "   "})
-    valid_random = client.get("/api/validate-key", headers={"X-Gemini-API-Key": "some-random-key-123"})
+    valid_random = client.get(
+        "/api/validate-key", headers={"X-Gemini-API-Key": "some-random-key-123"}
+    )
 
     assert missing.status_code == 401
     assert missing.json()["detail"]["code"] == "MISSING_API_KEY"
-    
+
     assert empty.status_code == 401
     assert empty.json()["detail"]["code"] == "MISSING_API_KEY"
 
     assert valid_random.status_code == 200
     assert valid_random.json() == {"valid": True}
-
 
 
 def test_results_missing_file_returns_no_results(monkeypatch, tmp_path):
@@ -104,7 +106,11 @@ def test_results_normalizes_orchestrator_artifact(monkeypatch, tmp_path):
                             "round": 1,
                             "confidence": 0.6,
                         },
-                        {"role": "devils_advocate", "content": "Stress test", "round": 2},
+                        {
+                            "role": "devils_advocate",
+                            "content": "Stress test",
+                            "round": 2,
+                        },
                     ],
                 }
             ]

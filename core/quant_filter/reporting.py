@@ -6,6 +6,7 @@ import pandas as pd
 
 from utils.exdate_scanner import ExDateInfo, format_exdate_block
 
+
 def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
     def _float_or_none(row: pd.Series, key: str) -> float | None:
         value = row.get(key)
@@ -82,7 +83,9 @@ def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
         f"*Engine: {cfg.get('version', 'v3.x')} — Absolute scoring | "
         "Asymmetric RSI | Piotroski integrated | Bank-aware valuation*"
     )
-    lines.append(f"**Filter Version:** {cfg.get('version', 'v3.x')} — Swing Trade Optimized")
+    lines.append(
+        f"**Filter Version:** {cfg.get('version', 'v3.x')} — Swing Trade Optimized"
+    )
     lines.append("")
     lines.append(
         "| Rank | Ticker | Sektor | Harga | Stop Loss | Graham Fair Value "
@@ -104,10 +107,13 @@ def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
         else:
             fv_str = "N/A"
         exdate_icon = " ⚠️" if r["ExDate Risk"] == "WARNING" else ""
-        ex_src = f" [{r.get('ExDate Source','?')}]" if r.get("ExDate Source") else ""
+        ex_src = f" [{r.get('ExDate Source', '?')}]" if r.get("ExDate Source") else ""
         piotroski_icon = (
-            "🟢" if r.get("Piotroski F-Score", 0) >= 7 else
-            "🟡" if r.get("Piotroski F-Score", 0) >= 4 else "🔴"
+            "🟢"
+            if r.get("Piotroski F-Score", 0) >= 7
+            else "🟡"
+            if r.get("Piotroski F-Score", 0) >= 4
+            else "🔴"
         )
         lines.append(
             f"| {i} "
@@ -131,8 +137,12 @@ def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
     if not final_df.empty and v32_cols.issubset(final_df.columns):
         lines.append("## 📊 Momentum Snapshot (Sort: Price Mom 1M)")
         lines.append("")
-        lines.append("| # | Ticker | Price Mom 1M | RS vs IHSG | Vol Surge | EMA20 Signal |")
-        lines.append("|---|--------|-------------|------------|-----------|--------------|")
+        lines.append(
+            "| # | Ticker | Price Mom 1M | RS vs IHSG | Vol Surge | EMA20 Signal |"
+        )
+        lines.append(
+            "|---|--------|-------------|------------|-----------|--------------|"
+        )
         momentum_df = final_df.sort_values("price_return_1m", ascending=False)
         for i, (_, mr) in enumerate(momentum_df.iterrows(), 1):
             lines.append(
@@ -165,7 +175,9 @@ def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
     # Investment thesis untuk rank #1
     if not final_df.empty:
         top1 = final_df.iloc[0]
-        max_dd = ((top1["Current Price"] - top1["Stop Loss Level"]) / top1["Current Price"]) * 100
+        max_dd = (
+            (top1["Current Price"] - top1["Stop Loss Level"]) / top1["Current Price"]
+        ) * 100
         lines.append(f"## 💡 Investment Thesis: {top1['Ticker']} (Rank #1)")
         lines.append("")
         lines.append(
@@ -179,7 +191,7 @@ def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
             f"PBV saat ini {top1['PBV']:.1f}× — **{top1['PBV vs Sektor']}** vs sektor."
         )
         lines.append(
-            f"- **Quality**: Piotroski F-Score **{top1.get('Piotroski F-Score','N/A')}/9** | "
+            f"- **Quality**: Piotroski F-Score **{top1.get('Piotroski F-Score', 'N/A')}/9** | "
             f"Altman Z **{top1.get('Altman Z-Score', 'N/A')}**"
         )
         lines.append(
@@ -193,7 +205,7 @@ def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
             f"RS vs IHSG `{_format_rs_vs_ihsg(top1)}`"
         )
         lines.append(
-            f"- **Profitabilitas**: ROE {top1['ROE (TTM)']*100:.1f}% | "
+            f"- **Profitabilitas**: ROE {top1['ROE (TTM)'] * 100:.1f}% | "
             f"DER {top1['DER (Quarter)']:.2f}×"
         )
         lines.append(

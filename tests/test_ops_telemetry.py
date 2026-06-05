@@ -56,9 +56,7 @@ def test_build_batch_report_success_rate(telemetry_module, tmp_path):
     ops = make_ops(telemetry_module, tmp_path)
     for ticker in ("WIIM", "ADRO", "TLKM"):
         ops.record_ticker(make_metric(telemetry_module, ticker=ticker))
-    ops.record_ticker(
-        make_metric(telemetry_module, ticker="BBCA", status="failed")
-    )
+    ops.record_ticker(make_metric(telemetry_module, ticker="BBCA", status="failed"))
 
     report = ops.build_batch_report("run-1", "2026-05-13T04:42:36+07:00")
 
@@ -72,10 +70,18 @@ def test_build_batch_report_verdict_breakdown_counts_correctly(
     telemetry_module, tmp_path
 ):
     ops = make_ops(telemetry_module, tmp_path)
-    ops.record_ticker(make_metric(telemetry_module, ticker="WIIM", verdict_rating="HOLD"))
-    ops.record_ticker(make_metric(telemetry_module, ticker="TLKM", verdict_rating="HOLD"))
-    ops.record_ticker(make_metric(telemetry_module, ticker="ADRO", verdict_rating="BUY"))
-    ops.record_ticker(make_metric(telemetry_module, ticker="BBCA", verdict_rating="AVOID"))
+    ops.record_ticker(
+        make_metric(telemetry_module, ticker="WIIM", verdict_rating="HOLD")
+    )
+    ops.record_ticker(
+        make_metric(telemetry_module, ticker="TLKM", verdict_rating="HOLD")
+    )
+    ops.record_ticker(
+        make_metric(telemetry_module, ticker="ADRO", verdict_rating="BUY")
+    )
+    ops.record_ticker(
+        make_metric(telemetry_module, ticker="BBCA", verdict_rating="AVOID")
+    )
 
     report = ops.build_batch_report("run-1", "2026-05-13T04:42:36+07:00")
 
@@ -168,15 +174,11 @@ def test_build_batch_report_tickers_with_stale_data_only_true(
     telemetry_module, tmp_path
 ):
     ops = make_ops(telemetry_module, tmp_path)
-    ops.record_ticker(
-        make_metric(telemetry_module, ticker="WIIM", has_stale_data=True)
-    )
+    ops.record_ticker(make_metric(telemetry_module, ticker="WIIM", has_stale_data=True))
     ops.record_ticker(
         make_metric(telemetry_module, ticker="BBCA", has_stale_data=False)
     )
-    ops.record_ticker(
-        make_metric(telemetry_module, ticker="ADRO", has_stale_data=True)
-    )
+    ops.record_ticker(make_metric(telemetry_module, ticker="ADRO", has_stale_data=True))
 
     report = ops.build_batch_report("run-1", "2026-05-13T04:42:36+07:00")
 

@@ -348,7 +348,9 @@ Rules:
                 f"{BASE_URL}/keystats/ratio/v1/{ticker}?year_limit=10"
             )
         except Exception as exc:
-            logger.warning(f"[SingleAgent] Fundamental fetch failed for {ticker}: {exc}")
+            logger.warning(
+                f"[SingleAgent] Fundamental fetch failed for {ticker}: {exc}"
+            )
             return {"brief": f"Fundamental data unavailable: {exc}"}, None
 
         if not raw:
@@ -372,7 +374,9 @@ Rules:
             return "Sentiment data unavailable"
         return json.dumps(raw, ensure_ascii=False, separators=(",", ":"))[:5_000]
 
-    def _build_technical_indicators(self, market_data: dict[str, Any]) -> dict[str, Any]:
+    def _build_technical_indicators(
+        self, market_data: dict[str, Any]
+    ) -> dict[str, Any]:
         history = market_data.get("history")
         if history is None or len(history) == 0:
             return {"current_price": derive_current_price(market_data)}
@@ -408,7 +412,9 @@ Rules:
                 )
             if len(close) >= 14:
                 indicators["rsi14"] = round(float(compute_rsi(close).iloc[-1]), 1)
-                indicators["atr14"] = round(float(compute_atr(high, low, close).iloc[-1]), 0)
+                indicators["atr14"] = round(
+                    float(compute_atr(high, low, close).iloc[-1]), 0
+                )
             return indicators
         except Exception as exc:
             logger.warning(f"[SingleAgent] Technical indicator build failed: {exc}")
@@ -417,6 +423,7 @@ Rules:
     @staticmethod
     def _strip_json_fence(raw: str) -> str:
         from services.debate_chamber import DebateChamber
+
         return DebateChamber._sanitize_json(raw)
 
     @staticmethod

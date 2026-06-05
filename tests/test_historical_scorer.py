@@ -1,4 +1,5 @@
 """Tests untuk core/historical_scorer.py."""
+
 import json
 from pathlib import Path
 
@@ -51,6 +52,7 @@ def _outcome(ticker: str, outcome: str, rating: str = "BUY") -> TradeOutcome:
 
 # ── load_debate_history ────────────────────────────────────────────────────────
 
+
 def test_load_empty_dir(tmp_path: Path) -> None:
     """Dir tanpa debates/ mengembalikan list kosong tanpa error."""
     records = load_debate_history(tmp_path)
@@ -86,6 +88,7 @@ def test_load_skips_corrupt_files(tmp_path: Path) -> None:
 
 # ── compute_historical_win_rate ────────────────────────────────────────────────
 
+
 def test_win_rate_insufficient_data() -> None:
     """Kurang dari MIN_RECORDS_FOR_ADJUSTMENT mengembalikan None."""
     records = [_make_record("BBCA", "BUY", 0.8)]
@@ -109,7 +112,9 @@ def test_win_rate_all_losses() -> None:
 
 def test_win_rate_mixed() -> None:
     """7 BUY + 3 HOLD dari 10 records = 7/10 win rate."""
-    records = [_make_record("BBCA", "BUY", 0.8)] * 7 + [_make_record("BBCA", "HOLD", 0.3)] * 3
+    records = [_make_record("BBCA", "BUY", 0.8)] * 7 + [
+        _make_record("BBCA", "HOLD", 0.3)
+    ] * 3
     result = compute_historical_win_rate("BBCA", records)
     assert result == pytest.approx(7 / 10)
 
@@ -129,6 +134,7 @@ def test_win_rate_different_ticker() -> None:
 
 
 # ── apply_historical_adjustment ────────────────────────────────────────────────
+
 
 def test_adjustment_none_win_rate() -> None:
     """win_rate=None tidak mengubah score."""
@@ -215,8 +221,10 @@ def test_load_realized_outcomes_reads_backtest_memory(tmp_path: Path) -> None:
 
 # ── conviction weights validation ─────────────────────────────────────────────
 
+
 def test_settings_weights_sum_to_one() -> None:
     """CONVICTION_WEIGHT_CONFIDENCE + CONVICTION_WEIGHT_RR_RATIO harus = 1.0."""
     from core.settings import settings
+
     total = settings.CONVICTION_WEIGHT_CONFIDENCE + settings.CONVICTION_WEIGHT_RR_RATIO
     assert abs(total - 1.0) < 1e-6, f"Weights sum = {total}, expected 1.0"

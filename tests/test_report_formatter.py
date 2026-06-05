@@ -236,7 +236,9 @@ def test_vote_table_includes_sentiment_specialist_in_order() -> None:
     assert report.index("Sentiment Specialist") < report.index("Devil's Advocate")
 
 
-def test_markdown_risk_governor_does_not_instantiate_rich_formatter(monkeypatch) -> None:
+def test_markdown_risk_governor_does_not_instantiate_rich_formatter(
+    monkeypatch,
+) -> None:
     def fail_if_called(self, risk):
         raise AssertionError("MarkdownFormatter should not call RichFormatter")
 

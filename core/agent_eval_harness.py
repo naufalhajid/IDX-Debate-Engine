@@ -63,9 +63,13 @@ class AgentEvalHarness:
             failures.append("final_verdict is required but missing")
 
         actual_rating = _normalise_rating(verdict.get("rating")) if verdict else None
-        actual_confidence = _coerce_confidence(verdict.get("confidence")) if verdict else None
+        actual_confidence = (
+            _coerce_confidence(verdict.get("confidence")) if verdict else None
+        )
 
-        allowed_ratings = {_normalise_rating(rating) for rating in expected.allowed_ratings}
+        allowed_ratings = {
+            _normalise_rating(rating) for rating in expected.allowed_ratings
+        }
         if verdict is not None and actual_rating not in allowed_ratings:
             failures.append(
                 f"rating {actual_rating!r} not in allowed ratings {sorted(allowed_ratings)}"
@@ -116,7 +120,9 @@ class AgentEvalHarness:
         }
 
 
-def _parse_final_verdict(raw_verdict: Any, failures: list[str]) -> dict[str, Any] | None:
+def _parse_final_verdict(
+    raw_verdict: Any, failures: list[str]
+) -> dict[str, Any] | None:
     if raw_verdict is None or raw_verdict == "":
         return None
     if isinstance(raw_verdict, dict):

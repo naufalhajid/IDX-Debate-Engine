@@ -66,55 +66,99 @@ logger = logging.getLogger(__name__)
 
 _TICKER_SECTOR: dict[str, str] = {
     # Banking
-    "BBCA": "bank", "BBRI": "bank", "BMRI": "bank", "BBNI": "bank",
-    "BRIS": "bank", "BTPS": "bank", "BNGA": "bank", "BNII": "bank",
-    "PNBN": "bank", "BDMN": "bank", "MEGA": "bank", "AGRO": "bank",
-    "BJTM": "bank", "BJBR": "bank", "NISP": "bank", "BABP": "bank",
+    "BBCA": "bank",
+    "BBRI": "bank",
+    "BMRI": "bank",
+    "BBNI": "bank",
+    "BRIS": "bank",
+    "BTPS": "bank",
+    "BNGA": "bank",
+    "BNII": "bank",
+    "PNBN": "bank",
+    "BDMN": "bank",
+    "MEGA": "bank",
+    "AGRO": "bank",
+    "BJTM": "bank",
+    "BJBR": "bank",
+    "NISP": "bank",
+    "BABP": "bank",
     # Consumer
-    "UNVR": "consumer", "ICBP": "consumer", "MYOR": "consumer",
-    "INDF": "consumer", "SIDO": "consumer", "CPIN": "consumer",
-    "JPFA": "consumer", "KLBF": "consumer", "DVLA": "consumer",
-    "TSPC": "consumer", "ULTJ": "consumer", "GOOD": "consumer",
+    "UNVR": "consumer",
+    "ICBP": "consumer",
+    "MYOR": "consumer",
+    "INDF": "consumer",
+    "SIDO": "consumer",
+    "CPIN": "consumer",
+    "JPFA": "consumer",
+    "KLBF": "consumer",
+    "DVLA": "consumer",
+    "TSPC": "consumer",
+    "ULTJ": "consumer",
+    "GOOD": "consumer",
     # Mining
-    "ADRO": "mining", "BYAN": "mining", "MDKA": "mining",
-    "PTBA": "mining", "ITMG": "mining", "INCO": "mining",
-    "ANTM": "mining", "TINS": "mining", "HRUM": "mining",
-    "DOID": "mining", "ELSA": "mining",
+    "ADRO": "mining",
+    "BYAN": "mining",
+    "MDKA": "mining",
+    "PTBA": "mining",
+    "ITMG": "mining",
+    "INCO": "mining",
+    "ANTM": "mining",
+    "TINS": "mining",
+    "HRUM": "mining",
+    "DOID": "mining",
+    "ELSA": "mining",
     # Property
-    "BSDE": "property", "SMRA": "property", "CTRA": "property",
-    "PWON": "property", "LPKR": "property", "DMAS": "property",
+    "BSDE": "property",
+    "SMRA": "property",
+    "CTRA": "property",
+    "PWON": "property",
+    "LPKR": "property",
+    "DMAS": "property",
     # Telecom
-    "TLKM": "telecom", "EXCL": "telecom", "ISAT": "telecom",
+    "TLKM": "telecom",
+    "EXCL": "telecom",
+    "ISAT": "telecom",
     # Industrial / Automotive
-    "ASII": "industrial", "ASTRA": "industrial", "AUTO": "industrial",
-    "GJTL": "industrial", "SMSM": "industrial",
+    "ASII": "industrial",
+    "ASTRA": "industrial",
+    "AUTO": "industrial",
+    "GJTL": "industrial",
+    "SMSM": "industrial",
     # Energy
-    "PGAS": "energy", "MEDC": "energy", "AKRA": "energy",
-    "LSIP": "energy", "AALI": "energy",
+    "PGAS": "energy",
+    "MEDC": "energy",
+    "AKRA": "energy",
+    "LSIP": "energy",
+    "AALI": "energy",
     # Tech
-    "GOTO": "tech", "BUKA": "tech", "EMTK": "tech",
+    "GOTO": "tech",
+    "BUKA": "tech",
+    "EMTK": "tech",
     # Healthcare
-    "HEAL": "healthcare", "MIKA": "healthcare", "PRDA": "healthcare",
+    "HEAL": "healthcare",
+    "MIKA": "healthcare",
+    "PRDA": "healthcare",
 }
 
 # EV/EBITDA historical multiples per sektor (median 5 tahun IHSG)
 _SECTOR_EV_EBITDA: dict[str, float] = {
-    "bank":       0.0,   # EV/EBITDA tidak relevan untuk bank
-    "consumer":  14.0,
-    "mining":     5.0,
-    "property":  10.0,
-    "telecom":   10.0,
-    "industrial":  8.0,
-    "energy":     6.0,
-    "tech":      20.0,
+    "bank": 0.0,  # EV/EBITDA tidak relevan untuk bank
+    "consumer": 14.0,
+    "mining": 5.0,
+    "property": 10.0,
+    "telecom": 10.0,
+    "industrial": 8.0,
+    "energy": 6.0,
+    "tech": 20.0,
     "healthcare": 15.0,
-    "default":   10.0,
+    "default": 10.0,
 }
 
 
 # ---------------------------------------------------------------------------
 # Main Adapter
 # ---------------------------------------------------------------------------
+
 
 class XlsxDataAdapter:
     """
@@ -130,11 +174,11 @@ class XlsxDataAdapter:
         if not self.path.exists():
             raise FileNotFoundError(f"Xlsx tidak ditemukan: {self.path}")
 
-        self._df_keystats:  pd.DataFrame | None = None
-        self._df_prices:    pd.DataFrame | None = None
-        self._df_analysis:  pd.DataFrame | None = None
+        self._df_keystats: pd.DataFrame | None = None
+        self._df_prices: pd.DataFrame | None = None
+        self._df_analysis: pd.DataFrame | None = None
         self._df_sentiments: pd.DataFrame | None = None
-        self._df_idxstocks:  pd.DataFrame | None = None
+        self._df_idxstocks: pd.DataFrame | None = None
         logger.info(f"[XlsxAdapter] Initialized dengan: {self.path}")
 
     # ── Lazy sheet loaders ──────────────────────────────────────────────────
@@ -142,7 +186,9 @@ class XlsxDataAdapter:
     def _keystats(self) -> pd.DataFrame:
         if self._df_keystats is None:
             self._df_keystats = pd.read_excel(self.path, sheet_name="key-statistics")
-            logger.info(f"[XlsxAdapter] Loaded key-statistics: {len(self._df_keystats)} tickers")
+            logger.info(
+                f"[XlsxAdapter] Loaded key-statistics: {len(self._df_keystats)} tickers"
+            )
         return self._df_keystats
 
     def _prices(self) -> pd.DataFrame:
@@ -217,12 +263,13 @@ class XlsxDataAdapter:
         optimistis. IHSG PE Median (8.83 saat ini) adalah reality-check yang bagus.
         """
         from fair_value_calculator import get_historical_multiples
+
         base = get_historical_multiples(ticker)
 
         ihsg_pe_median = self._f(ks, "IHSG PE Ratio TTM (Median)", default=0.0)
-        current_pe     = self._f(ks, "Current PE Ratio (TTM)", default=0.0)
-        forward_pe     = self._f(ks, "Forward PE Ratio", default=0.0)
-        current_pb     = self._f(ks, "Current Price to Book Value", default=0.0)
+        current_pe = self._f(ks, "Current PE Ratio (TTM)", default=0.0)
+        forward_pe = self._f(ks, "Forward PE Ratio", default=0.0)
+        current_pb = self._f(ks, "Current Price to Book Value", default=0.0)
 
         # Hitung historical PE dari rata-rata 3Y + 5Y price return implied PE
         # Jika tidak ada data historis: fallback ke min(hardcode, current*1.2)
@@ -245,14 +292,16 @@ class XlsxDataAdapter:
             if current_pb < computed_pb * 0.50:
                 # De-rating signifikan — ambil rata-rata current dan historis
                 computed_pb = (current_pb + computed_pb) / 2.0
-                logger.debug(f"[XlsxAdapter] {ticker}: PB de-rating detected, "
-                             f"adjusted from {base['pb']:.1f}x to {computed_pb:.1f}x")
+                logger.debug(
+                    f"[XlsxAdapter] {ticker}: PB de-rating detected, "
+                    f"adjusted from {base['pb']:.1f}x to {computed_pb:.1f}x"
+                )
 
         return {
-            "pe":             round(computed_pe, 1),
-            "pb":             round(computed_pb, 1),
+            "pe": round(computed_pe, 1),
+            "pb": round(computed_pb, 1),
             "cost_of_equity": base["cost_of_equity"],
-            "growth_rate":    base["growth_rate"],
+            "growth_rate": base["growth_rate"],
         }
 
     # ── KeyStats builder ─────────────────────────────────────────────────────
@@ -269,8 +318,10 @@ class XlsxDataAdapter:
 
         ks = self._ks_row(ticker)
         if ks is None:
-            logger.warning(f"[XlsxAdapter] {ticker} tidak ditemukan di xlsx. "
-                           f"Returning empty KeyStats.")
+            logger.warning(
+                f"[XlsxAdapter] {ticker} tidak ditemukan di xlsx. "
+                f"Returning empty KeyStats."
+            )
             return KeyStats(ticker=ticker, current_price=current_price)
 
         f = self._f  # alias pendek
@@ -283,28 +334,26 @@ class XlsxDataAdapter:
 
         stats = KeyStats(
             ticker=ticker,
-
             # ── Income statement ──
             eps_ttm=f(ks, "Current EPS (TTM)"),
             # Forward EPS: pakai jika tersedia (11% ticker), fallback ke TTM
-            eps_forward=f(ks, "Forward PE Ratio") and (
+            eps_forward=f(ks, "Forward PE Ratio")
+            and (
                 current_price / f(ks, "Forward PE Ratio")
-                if f(ks, "Forward PE Ratio") > 0 else f(ks, "Current EPS (TTM)")
-            ) or f(ks, "Current EPS (TTM)"),
+                if f(ks, "Forward PE Ratio") > 0
+                else f(ks, "Current EPS (TTM)")
+            )
+            or f(ks, "Current EPS (TTM)"),
             dps=f(ks, "Dividend (TTM)"),
-
             # ── Balance sheet ──
             book_value_per_share=f(ks, "Current Book Value Per Share"),
-
             # ── Profitability ──
-            roe=f(ks, "Return on Equity (TTM)"),        # sudah dalam desimal (0.17)
+            roe=f(ks, "Return on Equity (TTM)"),  # sudah dalam desimal (0.17)
             net_margin=f(ks, "Net Profit Margin (Quarter)"),  # sudah dalam desimal
-            roa=f(ks, "Return on Assets (TTM)"),        # sudah dalam desimal
-
+            roa=f(ks, "Return on Assets (TTM)"),  # sudah dalam desimal
             # ── Market ──
             current_price=current_price,
             shares_outstanding=f(ks, "Current Share Outstanding"),
-
             # ── Valuation saat ini (untuk display di report) ──
             raw_pe_current=f(ks, "Current PE Ratio (TTM)"),
             raw_pb_current=f(ks, "Current Price to Book Value"),
@@ -314,8 +363,8 @@ class XlsxDataAdapter:
         multiples = self._get_historical_multiples(ticker, ks)
         stats.historical_pe_avg = multiples["pe"]
         stats.historical_pb_avg = multiples["pb"]
-        stats.cost_of_equity    = multiples["cost_of_equity"]
-        stats.growth_rate       = multiples["growth_rate"]
+        stats.cost_of_equity = multiples["cost_of_equity"]
+        stats.growth_rate = multiples["growth_rate"]
 
         # Normalise — xlsx sudah dalam desimal untuk ROE/margin, tapi jaga-jaga
         if stats.roe > 1.0:
@@ -329,7 +378,9 @@ class XlsxDataAdapter:
 
     # ── Metode ke-4: EV/EBITDA ──────────────────────────────────────────────
 
-    def fair_value_ev_ebitda(self, ticker: str, current_price: float = 0.0) -> float | None:
+    def fair_value_ev_ebitda(
+        self, ticker: str, current_price: float = 0.0
+    ) -> float | None:
         """
         Fair value ke-4: EV/EBITDA Band.
 
@@ -353,14 +404,14 @@ class XlsxDataAdapter:
 
         f = self._f
         ebitda_ttm = f(ks, "EBITDA (TTM)")
-        net_debt   = f(ks, "Net Debt (Quarter)")
-        shares     = f(ks, "Current Share Outstanding")
+        net_debt = f(ks, "Net Debt (Quarter)")
+        shares = f(ks, "Current Share Outstanding")
 
         if ebitda_ttm <= 0 or shares <= 0:
             return None
 
         enterprise_value = ebitda_ttm * target_ev_ebitda
-        equity_value     = enterprise_value - net_debt
+        equity_value = enterprise_value - net_debt
         if equity_value <= 0:
             return None
 
@@ -378,11 +429,11 @@ class XlsxDataAdapter:
 
     # Sektor yang tidak ada di FairValueCalculator.SECTOR_WEIGHTS → remap ke default
     _SECTOR_REMAP: dict[str, str] = {
-        "telecom":    "default",
+        "telecom": "default",
         "industrial": "default",
-        "energy":     "mining",   # paling mirip karakteristiknya
-        "healthcare": "consumer", # paling mirip
-        "tech":       "default",
+        "energy": "mining",  # paling mirip karakteristiknya
+        "healthcare": "consumer",  # paling mirip
+        "tech": "default",
     }
 
     def build_fair_value_report(
@@ -408,14 +459,14 @@ class XlsxDataAdapter:
         """
         from fair_value_calculator import FairValueCalculator
 
-        stats  = self.extract_keystats(ticker, current_price)
+        stats = self.extract_keystats(ticker, current_price)
         sektor = _TICKER_SECTOR.get(ticker.upper(), "default")
         calc_sektor = self._SECTOR_REMAP.get(sektor, sektor)
-        calc   = FairValueCalculator(stats, sector=calc_sektor)
+        calc = FairValueCalculator(stats, sector=calc_sektor)
 
         # Hitung 3 metode standar
-        pe_fv  = calc.fair_value_pe()
-        pb_fv  = calc.fair_value_pb()
+        pe_fv = calc.fair_value_pe()
+        pb_fv = calc.fair_value_pb()
         ddm_fv = calc.fair_value_ddm()
 
         # Metode ke-4: EV/EBITDA
@@ -474,10 +525,10 @@ class XlsxDataAdapter:
         )
         EV_SHARE = 0.15
         w4 = {
-            "pe":  base_w["pe"]  * (1 - EV_SHARE),
-            "pb":  base_w["pb"]  * (1 - EV_SHARE),
+            "pe": base_w["pe"] * (1 - EV_SHARE),
+            "pb": base_w["pb"] * (1 - EV_SHARE),
             "ddm": base_w["ddm"] * (1 - EV_SHARE),
-            "ev":  EV_SHARE,
+            "ev": EV_SHARE,
         }
 
         results: dict[str, float] = {}
@@ -527,7 +578,7 @@ class XlsxDataAdapter:
 
         return {
             "fair_value": weighted_fv,
-            "breakdown":  {k: int(v) for k, v in results.items()},
+            "breakdown": {k: int(v) for k, v in results.items()},
             "confidence": confidence,
             "margin_of_safety_pct": mos,
             "valuation_verdict": verdict,
@@ -546,10 +597,10 @@ class XlsxDataAdapter:
         current_price: float,
     ) -> str:
         """Build laporan teks yang diperluas — lebih informatif dari versi API."""
-        fv      = result["fair_value"]
-        bdown   = result["breakdown"]
-        mos     = result["margin_of_safety_pct"]
-        conf    = result["confidence"]
+        fv = result["fair_value"]
+        bdown = result["breakdown"]
+        mos = result["margin_of_safety_pct"]
+        conf = result["confidence"]
         verdict = result["valuation_verdict"]
 
         n_methods = len(bdown)
@@ -597,11 +648,13 @@ class XlsxDataAdapter:
         if ddm_fv:
             lines.append(
                 f"  Metode 3 DDM        : DPS Rp {stats.dps:,.0f} / "
-                f"(ke {stats.cost_of_equity*100:.0f}% − g {stats.growth_rate*100:.0f}%) "
+                f"(ke {stats.cost_of_equity * 100:.0f}% − g {stats.growth_rate * 100:.0f}%) "
                 f"= Rp {int(ddm_fv):,}"
             )
         else:
-            reason = "DPS=0" if stats.dps <= 0 else "spread ke−g terlalu kecil atau outlier"
+            reason = (
+                "DPS=0" if stats.dps <= 0 else "spread ke−g terlalu kecil atau outlier"
+            )
             lines.append(f"  Metode 3 DDM        : TIDAK VALID ({reason})")
 
         # Metode 4: EV/EBITDA
@@ -666,19 +719,23 @@ class XlsxDataAdapter:
             f"  Net Margin      : {stats.net_margin * 100:.1f}%",
             f"  ROA             : {stats.roa * 100:.1f}%",
             f"  P/E saat ini    : {stats.raw_pe_current:.1f}x  "
-                f"(hist avg dipakai: {stats.historical_pe_avg:.1f}x)",
+            f"(hist avg dipakai: {stats.historical_pe_avg:.1f}x)",
             f"  P/B saat ini    : {stats.raw_pb_current:.1f}x  "
-                f"(hist avg dipakai: {stats.historical_pb_avg:.1f}x)",
+            f"(hist avg dipakai: {stats.historical_pb_avg:.1f}x)",
             "",
         ]
 
         # Quality flags
-        pf    = quality.get("piotroski_f_score", "N/A")
+        pf = quality.get("piotroski_f_score", "N/A")
         altman = quality.get("altman_z", "N/A")
         pf_label = (
-            "🟢 STRONG (≥7)" if isinstance(pf, (int, float)) and pf >= 7 else
-            "🟡 MEDIUM (4–6)" if isinstance(pf, (int, float)) and pf >= 4 else
-            "🔴 WEAK (<4)" if isinstance(pf, (int, float)) else "N/A"
+            "🟢 STRONG (≥7)"
+            if isinstance(pf, (int, float)) and pf >= 7
+            else "🟡 MEDIUM (4–6)"
+            if isinstance(pf, (int, float)) and pf >= 4
+            else "🔴 WEAK (<4)"
+            if isinstance(pf, (int, float))
+            else "N/A"
         )
         lines += [
             "── QUALITY FLAGS ───────────────────────────────────────────────",
@@ -713,27 +770,34 @@ class XlsxDataAdapter:
         """
         ks = self._ks_row(ticker)
         if ks is None:
-            return {"piotroski_f_score": None, "altman_z": None,
-                    "is_distressed": False, "is_weak_quality": False, "warning": None}
+            return {
+                "piotroski_f_score": None,
+                "altman_z": None,
+                "is_distressed": False,
+                "is_weak_quality": False,
+                "warning": None,
+            }
 
         f = self._f
-        pf     = f(ks, "Piotroski F-Score")
+        pf = f(ks, "Piotroski F-Score")
         altman = f(ks, "Altman Z-Score (Modified)")
 
         warnings = []
         if pf < 4:
             warnings.append(f"F-Score LEMAH ({int(pf)}/9) — kualitas fundamental buruk")
         if 0 < altman < 1.1:
-            warnings.append(f"Altman Z {altman:.2f} — zona DISTRESS (risiko kebangkrutan)")
+            warnings.append(
+                f"Altman Z {altman:.2f} — zona DISTRESS (risiko kebangkrutan)"
+            )
         elif 1.1 <= altman < 2.6:
             warnings.append(f"Altman Z {altman:.2f} — zona GREY (perlu monitoring)")
 
         return {
             "piotroski_f_score": int(pf) if pf > 0 else 0,
-            "altman_z":          altman,
-            "is_distressed":     0 < altman < 1.1,
-            "is_weak_quality":   pf < 4,
-            "warning":           " | ".join(warnings) if warnings else None,
+            "altman_z": altman,
+            "is_distressed": 0 < altman < 1.1,
+            "is_weak_quality": pf < 4,
+            "warning": " | ".join(warnings) if warnings else None,
         }
 
     # ── Sentiment Text ───────────────────────────────────────────────────────
@@ -745,7 +809,7 @@ class XlsxDataAdapter:
 
         Membersihkan mention-tags [%XxXx%] agar LLM fokus ke konten.
         """
-        df   = self._sentiments()
+        df = self._sentiments()
         rows = df[df["Ticker"] == ticker.upper()].dropna(subset=["Content"])
         rows = rows[rows["Content"].str.strip().str.len() > 5]
 
@@ -761,19 +825,19 @@ class XlsxDataAdapter:
 
         lines = [f"=== SENTIMEN STOCKBIT — {ticker} ({len(rows)} posts) ==="]
         for _, row in rows.iterrows():
-            content  = _clean(str(row.get("Content", "")))
-            posted   = str(row.get("Posted At", ""))[:10]
-            category = str(row.get("Category", "")) if pd.notna(row.get("Category")) else ""
-            cat_tag  = f" [{category}]" if category and category != "nan" else ""
+            content = _clean(str(row.get("Content", "")))
+            posted = str(row.get("Posted At", ""))[:10]
+            category = (
+                str(row.get("Category", "")) if pd.notna(row.get("Category")) else ""
+            )
+            cat_tag = f" [{category}]" if category and category != "nan" else ""
             lines.append(f"[{posted}]{cat_tag} {content}")
 
         return "\n".join(lines)
 
     # ── Ex-Date dari xlsx (tanpa hit yfinance) ───────────────────────────────
 
-    def get_exdate_info(
-        self, ticker: str, current_price: float = 0.0
-    ) -> "ExDateInfo":
+    def get_exdate_info(self, ticker: str, current_price: float = 0.0) -> "ExDateInfo":
         """
         Ambil ex-dividend date langsung dari xlsx — tidak perlu yfinance.
 
@@ -788,13 +852,13 @@ class XlsxDataAdapter:
         """
         _CLEAR: ExDateInfo = {
             "has_upcoming_exdate": False,
-            "ex_date":             None,
-            "days_until_exdate":   None,
-            "div_per_share":       None,
-            "div_yield_pct":       None,
-            "risk_tier":           "CLEAR",
-            "expected_drop_rp":    None,
-            "source":              "xlsx",
+            "ex_date": None,
+            "days_until_exdate": None,
+            "div_per_share": None,
+            "div_yield_pct": None,
+            "risk_tier": "CLEAR",
+            "expected_drop_rp": None,
+            "source": "xlsx",
         }
 
         ks = self._ks_row(ticker)
@@ -818,11 +882,13 @@ class XlsxDataAdapter:
                     continue
 
             if ex_date is None:
-                logger.warning(f"[XlsxAdapter] Tidak bisa parse ex-date '{exdate_str}' untuk {ticker}")
+                logger.warning(
+                    f"[XlsxAdapter] Tidak bisa parse ex-date '{exdate_str}' untuk {ticker}"
+                )
                 return _CLEAR
 
-            today       = datetime.now(timezone.utc).date()
-            days_until  = (ex_date - today).days
+            today = datetime.now(timezone.utc).date()
+            days_until = (ex_date - today).days
 
             if days_until < 0:
                 return {**_CLEAR, "ex_date": str(ex_date), "source": "xlsx"}
@@ -836,6 +902,7 @@ class XlsxDataAdapter:
 
             # Risk tier — sama dengan exdate_scanner.py
             from utils.exdate_scanner import CRITICAL_WINDOW_DAYS, WARNING_WINDOW_DAYS
+
             if days_until <= CRITICAL_WINDOW_DAYS:
                 risk_tier = "CRITICAL"
             elif days_until <= WARNING_WINDOW_DAYS:
@@ -845,13 +912,13 @@ class XlsxDataAdapter:
 
             return {
                 "has_upcoming_exdate": risk_tier != "CLEAR",
-                "ex_date":             str(ex_date),
-                "days_until_exdate":   days_until,
-                "div_per_share":       div_per_share,
-                "div_yield_pct":       div_yield_pct,
-                "risk_tier":           risk_tier,
-                "expected_drop_rp":    div_per_share,
-                "source":              "xlsx",
+                "ex_date": str(ex_date),
+                "days_until_exdate": days_until,
+                "div_per_share": div_per_share,
+                "div_yield_pct": div_yield_pct,
+                "risk_tier": risk_tier,
+                "expected_drop_rp": div_per_share,
+                "source": "xlsx",
             }
 
         except Exception as e:
@@ -897,19 +964,19 @@ class XlsxDataAdapter:
 
         if exclude_special_monitoring:
             df_idx = self._idxstocks()
-            special = set(df_idx[
-                df_idx["Note"].str.contains("PEMANTAUAN", na=False)
-            ]["Ticker"].tolist())
+            special = set(
+                df_idx[df_idx["Note"].str.contains("PEMANTAUAN", na=False)][
+                    "Ticker"
+                ].tolist()
+            )
             mask &= ~df_ks["Ticker"].isin(special)
 
         # Sort by Composite Rank dari analysis sheet
         df_analysis = self._analysis()
-        filtered    = df_ks[mask]["Ticker"].tolist()
+        filtered = df_ks[mask]["Ticker"].tolist()
 
         try:
-            rank_map = dict(zip(
-                df_analysis["Ticker"], df_analysis["Composite Rank"]
-            ))
+            rank_map = dict(zip(df_analysis["Ticker"], df_analysis["Composite Rank"]))
             filtered.sort(key=lambda t: rank_map.get(t, 0), reverse=True)
         except Exception:
             pass

@@ -71,12 +71,18 @@ def _field(obj: Any, key: str, default: Any = None) -> Any:
 
 def _build_scout_metrics(entry: dict[str, Any]) -> dict[str, dict[str, Any]]:
     verdict = entry.get("verdict") if isinstance(entry.get("verdict"), dict) else {}
-    risk = entry.get("risk_governor") if isinstance(entry.get("risk_governor"), dict) else {}
+    risk = (
+        entry.get("risk_governor")
+        if isinstance(entry.get("risk_governor"), dict)
+        else {}
+    )
     raw = str(entry.get("raw_data_summary") or "")
     metadata = entry.get("metadata") if isinstance(entry.get("metadata"), dict) else {}
     return {
         "technical": {
-            "current_price": risk.get("current_price") or verdict.get("current_price") or 0,
+            "current_price": risk.get("current_price")
+            or verdict.get("current_price")
+            or 0,
             "entry": (
                 f"{risk.get('entry_low', 0):,.0f} - {risk.get('entry_high', 0):,.0f}"
                 if risk
@@ -92,9 +98,13 @@ def _build_scout_metrics(entry: dict[str, Any]) -> dict[str, dict[str, Any]]:
             "sector": entry.get("sector_key") or "unknown",
         },
         "sentiment": {
-            "news": entry.get("news_sentiment") or metadata.get("news_overall_sentiment") or "UNKNOWN",
+            "news": entry.get("news_sentiment")
+            or metadata.get("news_overall_sentiment")
+            or "UNKNOWN",
             "adjustment": entry.get("news_confidence_adjustment") or 0,
-            "consensus": entry.get("consensus_method") or verdict.get("consensus_method") or "-",
+            "consensus": entry.get("consensus_method")
+            or verdict.get("consensus_method")
+            or "-",
             "status": entry.get("status") or "-",
         },
     }
@@ -164,11 +174,19 @@ def _resolve_sector(ticker: str, raw_sector: str | None) -> str:
 
 def normalize_result(entry: dict[str, Any]) -> dict[str, Any]:
     verdict = entry.get("verdict") if isinstance(entry.get("verdict"), dict) else {}
-    risk = entry.get("risk_governor") if isinstance(entry.get("risk_governor"), dict) else {}
+    risk = (
+        entry.get("risk_governor")
+        if isinstance(entry.get("risk_governor"), dict)
+        else {}
+    )
     entry_low, entry_high = _parse_entry_range(verdict.get("entry_price_range"))
     entry_low = _as_float(risk.get("entry_low"), entry_low)
     entry_high = _as_float(risk.get("entry_high"), entry_high)
-    history = entry.get("debate_history") if isinstance(entry.get("debate_history"), list) else []
+    history = (
+        entry.get("debate_history")
+        if isinstance(entry.get("debate_history"), list)
+        else []
+    )
     rating = str(verdict.get("rating") or "HOLD").upper()
     if rating == "SELL":
         rating = "AVOID"
@@ -184,7 +202,10 @@ def normalize_result(entry: dict[str, Any]) -> dict[str, Any]:
         from datetime import datetime
         from zoneinfo import ZoneInfo
         from core.settings import settings
-        raw_date = datetime.now(ZoneInfo(settings.DATETIME_TIMEZONE)).strftime("%Y%m%d_%H%M%S")
+
+        raw_date = datetime.now(ZoneInfo(settings.DATETIME_TIMEZONE)).strftime(
+            "%Y%m%d_%H%M%S"
+        )
 
     return {
         "ticker": ticker,
@@ -192,9 +213,15 @@ def normalize_result(entry: dict[str, Any]) -> dict[str, Any]:
         "conviction_score": _as_percent_score(
             entry.get("conviction_score") or verdict.get("confidence")
         ),
-        "rating": rating if rating in {"STRONG_BUY", "BUY", "HOLD", "AVOID"} else "HOLD",
-        "actionable": bool(risk.get("sizing_allowed", not verdict.get("wait_and_see", False))),
-        "target_price": _as_float(risk.get("target_price") or verdict.get("target_price")),
+        "rating": rating
+        if rating in {"STRONG_BUY", "BUY", "HOLD", "AVOID"}
+        else "HOLD",
+        "actionable": bool(
+            risk.get("sizing_allowed", not verdict.get("wait_and_see", False))
+        ),
+        "target_price": _as_float(
+            risk.get("target_price") or verdict.get("target_price")
+        ),
         "stop_loss": _as_float(risk.get("stop_loss") or verdict.get("stop_loss")),
         "entry_low": entry_low,
         "entry_high": entry_high,
@@ -210,10 +237,7 @@ def normalize_result(entry: dict[str, Any]) -> dict[str, Any]:
             or entry.get("error")
             or "No verdict summary available."
         ),
-        "verdict_reasoning": str(
-            verdict.get("weighted_reasoning")
-            or ""
-        ),
+        "verdict_reasoning": str(verdict.get("weighted_reasoning") or ""),
         "last_debated_at": _normalize_date(raw_date),
     }
 

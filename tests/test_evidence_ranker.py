@@ -253,17 +253,18 @@ def test_guard_evidence_citation_ids_works_from_metadata_citations(
 
 def test_market_freshness_seconds_excludes_weekends_and_holidays(monkeypatch):
     from services.evidence_ranker import _market_freshness_seconds
+
     # WIB is UTC+7
     wib = timezone(timedelta(hours=7))
-    
+
     # Friday 2026-05-15 16:00:00 WIB (is a holiday: Cuti Bersama Kenaikan Yesus Kristus)
     # Saturday 2026-05-16 (weekend)
     # Sunday 2026-05-17 (weekend)
     # Monday 2026-05-18 10:00:00 WIB
-    
+
     start = datetime(2026, 5, 15, 16, 0, 0, tzinfo=wib)
     end = datetime(2026, 5, 18, 10, 0, 0, tzinfo=wib)
-    
+
     # Raw elapsed duration is 66 hours (237,600 seconds)
     # Excluded duration:
     # - Friday 15 May (holiday): 8 hours (from 16:00 to 24:00)
@@ -271,7 +272,8 @@ def test_market_freshness_seconds_excludes_weekends_and_holidays(monkeypatch):
     # - Sunday 17 May (weekend): 24 hours
     # Total excluded = 56 hours (201,600 seconds)
     # Market age should be 10 hours (36,000 seconds)
-    
-    age = _market_freshness_seconds(start.astimezone(timezone.utc), end.astimezone(timezone.utc))
-    assert age == 10 * 3600
 
+    age = _market_freshness_seconds(
+        start.astimezone(timezone.utc), end.astimezone(timezone.utc)
+    )
+    assert age == 10 * 3600

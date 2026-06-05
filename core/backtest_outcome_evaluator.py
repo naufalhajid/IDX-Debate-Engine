@@ -187,7 +187,9 @@ def evaluate_memory(
             if entry_date >= evaluation_day:
                 details.append(_detail(record, "skipped", "too_early_to_evaluate"))
                 continue
-            bars = fetcher(record.ticker, entry_date + timedelta(days=1), evaluation_day)
+            bars = fetcher(
+                record.ticker, entry_date + timedelta(days=1), evaluation_day
+            )
         except Exception as exc:
             logger.warning(f"[BacktestEval] {record.ticker}: price fetch failed: {exc}")
             details.append(_detail(record, "skipped", "price_fetch_failed"))

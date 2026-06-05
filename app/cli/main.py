@@ -5,10 +5,14 @@ from __future__ import annotations
 import warnings
 
 _original_showwarning = warnings.showwarning
+
+
 def _custom_showwarning(message, category, filename, lineno, file=None, line=None):
     if "allowed_objects" in str(message) or "LangChain" in category.__name__:
         return
     _original_showwarning(message, category, filename, lineno, file, line)
+
+
 warnings.showwarning = _custom_showwarning
 
 from importlib import metadata
@@ -53,15 +57,25 @@ def _print_workflow_panel() -> None:
     body = Table.grid(padding=(0, 2))
     body.add_column(style="bold cyan", no_wrap=True)
     body.add_column()
-    body.add_row("1. idx filter",    "Screen top IHSG candidates using quant signals")
-    body.add_row("2. idx debate",    "AI multi-agent debate for specific tickers")
-    body.add_row("3. idx pipeline",  "Full automated run — filter + debate + risk gate")
+    body.add_row("1. idx filter", "Screen top IHSG candidates using quant signals")
+    body.add_row("2. idx debate", "AI multi-agent debate for specific tickers")
+    body.add_row("3. idx pipeline", "Full automated run — filter + debate + risk gate")
     body.add_row("", "")
-    body.add_row("[dim]idx auth[/dim]",   "[dim]Authenticate providers (run once before first use)[/dim]")
-    body.add_row("[dim]idx model[/dim]",  "[dim]Switch LLM provider and model variants[/dim]")
-    body.add_row("[dim]idx scan[/dim]",   "[dim]Refresh IDX stock data from providers (ETL)[/dim]")
+    body.add_row(
+        "[dim]idx auth[/dim]",
+        "[dim]Authenticate providers (run once before first use)[/dim]",
+    )
+    body.add_row(
+        "[dim]idx model[/dim]", "[dim]Switch LLM provider and model variants[/dim]"
+    )
+    body.add_row(
+        "[dim]idx scan[/dim]", "[dim]Refresh IDX stock data from providers (ETL)[/dim]"
+    )
     body.add_row("", "")
-    body.add_row("[dim]Tip:[/dim]", "[dim]Run  idx <command> --help  for options and examples[/dim]")
+    body.add_row(
+        "[dim]Tip:[/dim]",
+        "[dim]Run  idx <command> --help  for options and examples[/dim]",
+    )
     console.print(
         Panel(
             body,

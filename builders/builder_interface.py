@@ -21,4 +21,3 @@ class BuilderInterface(ABC):
     @abstractmethod
     async def insert_stock_price(self):
         raise NotImplementedError
-

@@ -194,9 +194,7 @@ def test_build_bundle_breaking_negative_news_penalizes_more() -> None:
 
 
 def test_breaking_negative_corporate_action_gets_negative_adjustment() -> None:
-    patcher, _ = _mock_ticker(
-        [_raw("BBCA rights issue rugi turun below", hours_ago=2)]
-    )
+    patcher, _ = _mock_ticker([_raw("BBCA rights issue rugi turun below", hours_ago=2)])
     try:
         bundle = NewsFetcher().build_bundle("BBCA")
     finally:
@@ -281,7 +279,9 @@ def test_dividend_or_buyback_upcoming_neutralizes_adjustment() -> None:
 
     async def mock_prefetch(ticker: str):
         return {
-            "calendar": {"Ex-Dividend Date": datetime.now(timezone.utc) + timedelta(days=10)},
+            "calendar": {
+                "Ex-Dividend Date": datetime.now(timezone.utc) + timedelta(days=10)
+            },
             "dividends": pd.Series([100.0]),
         }
 
@@ -313,7 +313,9 @@ def test_dividend_or_buyback_past_does_not_neutralize_adjustment() -> None:
     async def mock_prefetch(ticker: str):
         # Ex-date is in the past, so it should be CLEAR
         return {
-            "calendar": {"Ex-Dividend Date": datetime.now(timezone.utc) - timedelta(days=10)},
+            "calendar": {
+                "Ex-Dividend Date": datetime.now(timezone.utc) - timedelta(days=10)
+            },
             "dividends": pd.Series([100.0]),
         }
 
@@ -337,7 +339,6 @@ def test_dividend_or_buyback_past_does_not_neutralize_adjustment() -> None:
     assert "Reason: Positive news sentiment" in prompt
 
 
-
 def test_confidence_reason_matches_configured_constants() -> None:
     patcher, _ = _mock_ticker(
         [_raw("BBCA rugi turun below", hours_ago=BREAKING_NEWS_HOURS + 3)]
@@ -353,10 +354,10 @@ def test_confidence_reason_matches_configured_constants() -> None:
     )
 
 
-def test_bundle_to_prompt_string_includes_event_flags_without_mislabeling_sentiment() -> None:
-    patcher, _ = _mock_ticker(
-        [_raw("BBCA rights issue rugi turun below", hours_ago=2)]
-    )
+def test_bundle_to_prompt_string_includes_event_flags_without_mislabeling_sentiment() -> (
+    None
+):
+    patcher, _ = _mock_ticker([_raw("BBCA rights issue rugi turun below", hours_ago=2)])
     try:
         fetcher = NewsFetcher()
         bundle = fetcher.build_bundle("BBCA")

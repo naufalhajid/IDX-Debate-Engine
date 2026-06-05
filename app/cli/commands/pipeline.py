@@ -42,11 +42,16 @@ def pipeline_command(
     ctx: typer.Context,
     dry_run: Annotated[
         bool,
-        typer.Option("--dry-run", help="Simulate run without writing backtest records or the markdown report."),
+        typer.Option(
+            "--dry-run",
+            help="Simulate run without writing backtest records or the markdown report.",
+        ),
     ] = False,
     output_dir: Annotated[
         Path,
-        typer.Option("--output-dir", help="Directory for pipeline artifacts and reports."),
+        typer.Option(
+            "--output-dir", help="Directory for pipeline artifacts and reports."
+        ),
     ] = Path("output"),
     tickers: Annotated[
         list[str] | None,
@@ -57,15 +62,24 @@ def pipeline_command(
     ] = None,
     skip_scraping: Annotated[
         bool,
-        typer.Option("--skip-scraping", help="Skip data fetch and reuse cached JSON from last run (faster)."),
+        typer.Option(
+            "--skip-scraping",
+            help="Skip data fetch and reuse cached JSON from last run (faster).",
+        ),
     ] = False,
     no_interactive: Annotated[
         bool,
-        typer.Option("--no-interactive", help="Run without interactive prompts, for CI or scripted use."),
+        typer.Option(
+            "--no-interactive",
+            help="Run without interactive prompts, for CI or scripted use.",
+        ),
     ] = False,
     mode: Annotated[
         str,
-        typer.Option("--mode", help="Pipeline mode: multi (default, all tickers), single, or compare."),
+        typer.Option(
+            "--mode",
+            help="Pipeline mode: multi (default, all tickers), single, or compare.",
+        ),
     ] = "multi",
     verbose: Annotated[
         bool,
@@ -94,17 +108,19 @@ def pipeline_command(
     if no_interactive:
         flags.append("no-interactive")
 
-    ticker_label = ", ".join(selected_tickers) if selected_tickers else "(from quant filter)"
+    ticker_label = (
+        ", ".join(selected_tickers) if selected_tickers else "(from quant filter)"
+    )
     flags_line = (
         f"\n[idx.label]Flags:[/idx.label]    [idx.muted]{', '.join(flags)}[/idx.muted]"
-        if flags else ""
+        if flags
+        else ""
     )
 
     console.print(
         Panel(
             f"[idx.label]Mode:[/idx.label]     [idx.highlight]{selected_mode}[/idx.highlight]\n"
-            f"[idx.label]Tickers:[/idx.label]  {ticker_label}"
-            + flags_line,
+            f"[idx.label]Tickers:[/idx.label]  {ticker_label}" + flags_line,
             title="[idx.header]IDX Pipeline[/idx.header]",
             border_style="idx.header",
             expand=False,
@@ -133,8 +149,7 @@ def pipeline_command(
 
     report = output_dir / "TOP_3_SWING_TRADES.md"
     console.print(
-        f"\n[idx.ok]Pipeline complete.[/idx.ok]  "
-        f"[idx.path]{report}[/idx.path]"
+        f"\n[idx.ok]Pipeline complete.[/idx.ok]  [idx.path]{report}[/idx.path]"
     )
 
 

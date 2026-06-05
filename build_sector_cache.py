@@ -27,10 +27,10 @@ import yfinance as yf
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-INPUT_FILE  = "output/IDX Fundamental Analysis 2026-04-24.xlsx"
+INPUT_FILE = "output/IDX Fundamental Analysis 2026-04-24.xlsx"
 OUTPUT_FILE = "output/sector_cache.json"
-BATCH_SIZE  = 50     # Fetch N ticker sekaligus via yfinance bulk info
-SLEEP_SEC   = 2.0    # Jeda antar batch (hindari rate limit)
+BATCH_SIZE = 50  # Fetch N ticker sekaligus via yfinance bulk info
+SLEEP_SEC = 2.0  # Jeda antar batch (hindari rate limit)
 
 # ── yfinance sector → internal key ───────────────────────────────────────────
 #
@@ -40,48 +40,65 @@ SLEEP_SEC   = 2.0    # Jeda antar batch (hindari rate limit)
 
 YF_SECTOR_MAP: dict[str, str] = {
     # Energy
-    "Energy":                       "energy",
+    "Energy": "energy",
     # Materials
-    "Basic Materials":              "basic_materials",
+    "Basic Materials": "basic_materials",
     # Industrials
-    "Industrials":                  "industrials",
+    "Industrials": "industrials",
     # Consumer
-    "Consumer Defensive":           "consumer_staples",
-    "Consumer Staples":             "consumer_staples",
-    "Consumer Cyclical":            "consumer_disc",
-    "Consumer Discretionary":       "consumer_disc",
+    "Consumer Defensive": "consumer_staples",
+    "Consumer Staples": "consumer_staples",
+    "Consumer Cyclical": "consumer_disc",
+    "Consumer Discretionary": "consumer_disc",
     # Healthcare
-    "Healthcare":                   "healthcare",
+    "Healthcare": "healthcare",
     # Financial — default ke finance_nonbank, override ke bank via industry
-    "Financial Services":           "finance_nonbank",
-    "Financials":                   "finance_nonbank",
+    "Financial Services": "finance_nonbank",
+    "Financials": "finance_nonbank",
     # Real Estate
-    "Real Estate":                  "property",
+    "Real Estate": "property",
     # Technology / Communication
-    "Technology":                   "tech",
-    "Communication Services":       "tech",
+    "Technology": "tech",
+    "Communication Services": "tech",
     # Utilities → infrastruktur (listrik, air, gas)
-    "Utilities":                    "infrastructure",
+    "Utilities": "infrastructure",
     # Industrials kadang dipakai untuk kontraktor infrastruktur
     # → sudah di-handle oleh YF_SECTOR_MAP["Industrials"] = industrials
 }
 
 # Industry keywords yang meng-override sektor → bank
 BANK_INDUSTRY_KEYWORDS = [
-    "bank", "banking", "commercial bank", "regional bank",
-    "savings", "sharia bank", "syariah",
+    "bank",
+    "banking",
+    "commercial bank",
+    "regional bank",
+    "savings",
+    "sharia bank",
+    "syariah",
 ]
 
 # Industry keywords → transport
 TRANSPORT_INDUSTRY_KEYWORDS = [
-    "airline", "shipping", "trucking", "logistics", "courier",
-    "transportation", "freight",
+    "airline",
+    "shipping",
+    "trucking",
+    "logistics",
+    "courier",
+    "transportation",
+    "freight",
 ]
 
 # Industry keywords → infrastructure
 INFRA_INDUSTRY_KEYWORDS = [
-    "toll", "airport", "port", "seaport", "electricity",
-    "power", "water", "gas distribution", "pipeline",
+    "toll",
+    "airport",
+    "port",
+    "seaport",
+    "electricity",
+    "power",
+    "water",
+    "gas distribution",
+    "pipeline",
 ]
 
 
@@ -90,7 +107,7 @@ def classify_ticker(sector_yf: str, industry_yf: str) -> str:
     Map yfinance sector + industry string → internal 12-sektor key.
     Industry override lebih spesifik daripada sektor.
     """
-    sector_yf   = (sector_yf or "").strip()
+    sector_yf = (sector_yf or "").strip()
     industry_yf = (industry_yf or "").lower().strip()
 
     # ── Industry-level override (lebih spesifik) ──────────────────────────────
@@ -119,28 +136,28 @@ def fetch_sector_batch(tickers_jk: list[str]) -> dict[str, dict]:
             ticker_code = t_jk.replace(".JK", "")
             try:
                 info = batch.tickers[t_jk].info
-                yf_sector   = info.get("sector", "") or ""
+                yf_sector = info.get("sector", "") or ""
                 yf_industry = info.get("industry", "") or ""
-                internal    = classify_ticker(yf_sector, yf_industry)
+                internal = classify_ticker(yf_sector, yf_industry)
                 result[ticker_code] = {
-                    "sector":       internal,
-                    "yf_sector":    yf_sector,
-                    "yf_industry":  yf_industry,
+                    "sector": internal,
+                    "yf_sector": yf_sector,
+                    "yf_industry": yf_industry,
                 }
             except Exception as e:
                 # Ticker individual gagal → default, jangan blokir batch
                 result[ticker_code] = {
-                    "sector":       "default",
-                    "yf_sector":    "",
-                    "yf_industry":  f"fetch_error: {e}",
+                    "sector": "default",
+                    "yf_sector": "",
+                    "yf_industry": f"fetch_error: {e}",
                 }
     except Exception as e:
         # Seluruh batch gagal
         for t_jk in tickers_jk:
             result[t_jk.replace(".JK", "")] = {
-                "sector":       "default",
-                "yf_sector":    "",
-                "yf_industry":  f"batch_error: {e}",
+                "sector": "default",
+                "yf_sector": "",
+                "yf_industry": f"batch_error: {e}",
             }
     return result
 
@@ -168,7 +185,9 @@ def main():
     if os.path.exists(OUTPUT_FILE):
         with open(OUTPUT_FILE, "r", encoding="utf-8") as f:
             existing_cache = json.load(f)
-        logger.info(f"Cache existing: {len(existing_cache)} ticker ter-load (akan di-skip).")
+        logger.info(
+            f"Cache existing: {len(existing_cache)} ticker ter-load (akan di-skip)."
+        )
 
     # Filter hanya ticker yang belum ada di cache
     remaining = [t for t in all_tickers if t not in existing_cache]
@@ -185,8 +204,8 @@ def main():
 
     for i in range(0, len(remaining), BATCH_SIZE):
         batch_tickers = remaining[i : i + BATCH_SIZE]
-        batch_jk      = [t + ".JK" for t in batch_tickers]
-        batch_num     = (i // BATCH_SIZE) + 1
+        batch_jk = [t + ".JK" for t in batch_tickers]
+        batch_num = (i // BATCH_SIZE) + 1
 
         logger.info(
             f"Batch {batch_num}/{total_batches}: "
@@ -212,6 +231,7 @@ def main():
 def _print_summary(cache: dict, logger: logging.Logger):
     """Tampilkan distribusi sektor dari cache."""
     from collections import Counter
+
     dist = Counter(v["sector"] for v in cache.values())
     logger.info("")
     logger.info("── Distribusi Sektor ──────────────────────────────────")

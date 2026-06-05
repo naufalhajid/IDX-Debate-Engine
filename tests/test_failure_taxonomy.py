@@ -20,7 +20,9 @@ def test_classify_connection_error_as_dns() -> None:
 
 
 def test_classify_timeout_error_as_timeout() -> None:
-    result = classify_exception(TimeoutError("debate timed out"), source="debate_chamber")
+    result = classify_exception(
+        TimeoutError("debate timed out"), source="debate_chamber"
+    )
 
     assert result.code is ErrorCode.TIMEOUT
     assert result.source == "debate_chamber"
@@ -74,7 +76,9 @@ def test_route_failure_skips_retryable_error_after_max_attempts() -> None:
 
 def test_route_failure_aborts_auth_and_budget_exhaustion() -> None:
     auth = classify_exception(PermissionError("401 Unauthorized"), source="stockbit")
-    budget = classify_exception(RuntimeError("Budget exhausted at charge point"), source="orchestrator")
+    budget = classify_exception(
+        RuntimeError("Budget exhausted at charge point"), source="orchestrator"
+    )
 
     assert route_failure(auth).action is FailureAction.ABORT
     assert route_failure(budget).action is FailureAction.ABORT

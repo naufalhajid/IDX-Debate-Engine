@@ -76,7 +76,10 @@ def test_validate_artifacts_missing_file(tmp_path: Path) -> None:
     report = validate_artifacts(batch_path, top3_path, latest_path)
 
     assert report.valid is False
-    assert any("Missing required artifact: TOP_3_SWING_TRADES.md" in error for error in report.errors)
+    assert any(
+        "Missing required artifact: TOP_3_SWING_TRADES.md" in error
+        for error in report.errors
+    )
 
 
 def test_validate_artifacts_markdown_ticker_failed_in_json(tmp_path: Path) -> None:
@@ -93,7 +96,10 @@ def test_validate_artifacts_markdown_ticker_failed_in_json(tmp_path: Path) -> No
     report = validate_artifacts(batch_path, top3_path, latest_path)
 
     assert report.valid is False
-    assert any("Ticker TLKM is listed" in error and "status=failed" in error for error in report.errors)
+    assert any(
+        "Ticker TLKM is listed" in error and "status=failed" in error
+        for error in report.errors
+    )
 
 
 def _write_optional_logs(
@@ -121,9 +127,7 @@ def _write_optional_logs(
         encoding="utf-8",
     )
     rag_path.write_text(
-        json.dumps(
-            {"ticker": ticker, "run_id": run_id, "has_stale_data": stale}
-        )
+        json.dumps({"ticker": ticker, "run_id": run_id, "has_stale_data": stale})
         + "\n",
         encoding="utf-8",
     )
@@ -179,7 +183,8 @@ def test_reconcile_artifacts_preserves_corrupt_audit_jsonl(tmp_path: Path) -> No
     )
     audit_path, telemetry_path, rag_path = _write_optional_logs(tmp_path)
     audit_path.write_text(
-        json.dumps({"ticker": "BBCA", "run_id": "run-1"}) + "\n"
+        json.dumps({"ticker": "BBCA", "run_id": "run-1"})
+        + "\n"
         + '{"ticker":"BBCA","run_id":"run-1","summary":"unterminated\n',
         encoding="utf-8",
     )
@@ -257,10 +262,14 @@ def test_reconcile_artifacts_flags_latest_missing_from_batch(tmp_path: Path) -> 
     )
 
     assert report.valid is False
-    assert any("latest_debate.json ticker TLKM is missing" in error for error in report.errors)
+    assert any(
+        "latest_debate.json ticker TLKM is missing" in error for error in report.errors
+    )
 
 
-def test_reconcile_artifacts_warns_for_stale_or_missing_optional_surfaces(tmp_path: Path) -> None:
+def test_reconcile_artifacts_warns_for_stale_or_missing_optional_surfaces(
+    tmp_path: Path,
+) -> None:
     batch_path, top3_path, latest_path = _write_artifacts(
         tmp_path,
         batch=[
@@ -276,7 +285,8 @@ def test_reconcile_artifacts_warns_for_stale_or_missing_optional_surfaces(tmp_pa
     )
     rag_path = tmp_path / "evidence_log.jsonl"
     rag_path.write_text(
-        json.dumps({"ticker": "BBCA", "run_id": "run-1", "has_stale_data": True}) + "\n",
+        json.dumps({"ticker": "BBCA", "run_id": "run-1", "has_stale_data": True})
+        + "\n",
         encoding="utf-8",
     )
 
@@ -430,4 +440,6 @@ def test_reconcile_artifacts_rejects_telemetry_count_mismatch(tmp_path: Path) ->
     )
 
     assert report.valid is False
-    assert any(issue.code == "telemetry_ticker_count_mismatch" for issue in report.issues)
+    assert any(
+        issue.code == "telemetry_ticker_count_mismatch" for issue in report.issues
+    )

@@ -105,7 +105,9 @@ class OpsTelemetry:
         confidences = [
             metric.confidence for metric in metrics if metric.confidence is not None
         ]
-        longest_metric = max(metrics, key=lambda metric: metric.duration_seconds, default=None)
+        longest_metric = max(
+            metrics, key=lambda metric: metric.duration_seconds, default=None
+        )
         total_flash_calls = sum(metric.flash_calls for metric in metrics)
         total_pro_calls = sum(metric.pro_calls for metric in metrics)
         rag_efficiencies = [
@@ -177,9 +179,7 @@ class OpsTelemetry:
     def format_report(self, report: BatchReport) -> str:
         """Render a human-readable telemetry dashboard."""
         confidence = (
-            f"{report.avg_confidence:.0%}"
-            if report.avg_confidence is not None
-            else "-"
+            f"{report.avg_confidence:.0%}" if report.avg_confidence is not None else "-"
         )
         total_tokens = report.estimated_flash_tokens + report.estimated_pro_tokens
         saving_note = _format_rag_saving_note(
@@ -211,10 +211,7 @@ class OpsTelemetry:
                 f"Avg confidence : {confidence}",
                 f"Avg rounds     : {report.avg_debate_rounds:.1f}",
                 f"Avg duration   : {report.avg_duration_seconds:.0f}s",
-                (
-                    f"Longest run    : {longest_run} "
-                    f"({report.longest_run_seconds:.0f}s)"
-                ),
+                (f"Longest run    : {longest_run} ({report.longest_run_seconds:.0f}s)"),
                 "",
                 "TOKEN SPEND (estimated)",
                 "───────────────────────",
@@ -234,9 +231,7 @@ class OpsTelemetry:
                     f"Avg chunks     : {report.rag_avg_chunks_selected:.1f} selected / "
                     f"{report.rag_avg_chunks_considered:.1f} considered"
                 ),
-                (
-                    f"Avg RAG tokens : ~{report.avg_rag_token_estimate:.0f} tokens"
-                ),
+                (f"Avg RAG tokens : ~{report.avg_rag_token_estimate:.0f} tokens"),
                 f"Context saving : {saving_note}",
                 "",
                 "PROVIDER HEALTH",

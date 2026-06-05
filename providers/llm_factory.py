@@ -83,6 +83,7 @@ def get_llm(
 
     if resolved == "gemini":
         from providers.gemini import get_flash_llm, get_pro_llm
+
         return get_flash_llm() if tier == "flash" else get_pro_llm()
 
     if resolved == "anthropic":
@@ -90,10 +91,12 @@ def get_llm(
             get_anthropic_flash_llm,
             get_anthropic_pro_llm,
         )
+
         return get_anthropic_flash_llm() if tier == "flash" else get_anthropic_pro_llm()
 
     if resolved == "codex":
         from providers.codex_adapter import get_codex_flash_llm, get_codex_pro_llm
+
         return get_codex_flash_llm() if tier == "flash" else get_codex_pro_llm()
 
     raise ValueError(

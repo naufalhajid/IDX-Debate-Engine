@@ -50,7 +50,9 @@ class StockbitTokenFetcher:
             logger.warning(
                 "Could not detect Chrome version, initializing undetected-chromedriver without version pin."
             )
-            self.driver = uc.Chrome(options=options, headless=False, use_subprocess=True)
+            self.driver = uc.Chrome(
+                options=options, headless=False, use_subprocess=True
+            )
 
         tmp_dir = tempfile.gettempdir()
         self.token_path = os.path.join(tmp_dir, "stockbit_token.tmp")

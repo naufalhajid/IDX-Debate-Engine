@@ -90,8 +90,12 @@ def build_context_pack(ticker: str, raw_data: dict) -> ContextPack:
             ("verdict", "fair_value"),
         ),
     )
-    fundamentals = _first_dict(raw_data, "fundamentals", "fundamental_data", "fundamental")
-    technicals = _first_dict(raw_data, "technicals", "technical_indicators", "technical_data")
+    fundamentals = _first_dict(
+        raw_data, "fundamentals", "fundamental_data", "fundamental"
+    )
+    technicals = _first_dict(
+        raw_data, "technicals", "technical_indicators", "technical_data"
+    )
     sentiment_summary = _first_text(
         raw_data,
         "sentiment_summary",
@@ -151,11 +155,17 @@ def pack_to_prompt_string(
     lines = [
         f"Ticker: {pack.ticker}",
         f"As Of: {pack.as_of.isoformat()}",
-        _format_priority_section("Tier1 Core Fields", fields, CONTEXT_FIELD_TIERS["tier1"]),
+        _format_priority_section(
+            "Tier1 Core Fields", fields, CONTEXT_FIELD_TIERS["tier1"]
+        ),
         f"Data Sources: {', '.join(pack.data_sources) if pack.data_sources else 'unknown'}",
         (
             "Source Timestamps: "
-            + (_compact_json(pack.source_timestamps) if pack.source_timestamps else "unknown")
+            + (
+                _compact_json(pack.source_timestamps)
+                if pack.source_timestamps
+                else "unknown"
+            )
         ),
         f"Missing Fields: {', '.join(pack.missing_fields) if pack.missing_fields else 'none'}",
     ]
@@ -169,7 +179,11 @@ def pack_to_prompt_string(
     for field_name in CONTEXT_FIELD_TIERS["tier2"]:
         field_line = _format_priority_field(field_name, fields.get(field_name))
         candidate = candidate_text([*extra_lines, field_line])
-        if len(candidate) <= buffer_limit or not extra_lines and len(candidate) <= limit:
+        if (
+            len(candidate) <= buffer_limit
+            or not extra_lines
+            and len(candidate) <= limit
+        ):
             extra_lines.append(field_line)
         else:
             omitted.append(field_name)
@@ -201,17 +215,25 @@ def _collect_priority_fields(
 ) -> dict[str, Any]:
     """Collect tiered context fields from raw provider and verdict payloads."""
     verdict = _first_dict(raw_data, "verdict", "final_verdict")
-    fundamentals = _first_dict(raw_data, "fundamentals", "fundamental_data", "fundamental")
-    technicals = _first_dict(raw_data, "technicals", "technical_indicators", "technical_data")
+    fundamentals = _first_dict(
+        raw_data, "fundamentals", "fundamental_data", "fundamental"
+    )
+    technicals = _first_dict(
+        raw_data, "technicals", "technical_indicators", "technical_data"
+    )
     metadata = _first_dict(raw_data, "metadata")
     return {
         "rating": _first_present(verdict, raw_data, "rating"),
         "current_price": current_price,
         "fair_value": fair_value,
         "rr": _first_present(verdict, raw_data, "rr", "risk_reward_ratio", "rr_ratio"),
-        "confidence": _first_present(verdict, raw_data, "confidence", "model_confidence"),
+        "confidence": _first_present(
+            verdict, raw_data, "confidence", "model_confidence"
+        ),
         "entry_low": _first_present(verdict, raw_data, "entry_low", "entry_price_low"),
-        "entry_high": _first_present(verdict, raw_data, "entry_high", "entry_price_high"),
+        "entry_high": _first_present(
+            verdict, raw_data, "entry_high", "entry_price_high"
+        ),
         "target": _first_present(verdict, raw_data, "target", "target_price"),
         "stop": _first_present(verdict, raw_data, "stop", "stop_loss"),
         "roe": _first_present(fundamentals, raw_data, "roe", "return_on_equity"),
@@ -229,7 +251,9 @@ def _collect_priority_fields(
             "sentiment_summary",
             "sentiment",
         ),
-        "rag_evidence": _first_present(raw_data, metadata, "rag_evidence", "decision_brief"),
+        "rag_evidence": _first_present(
+            raw_data, metadata, "rag_evidence", "decision_brief"
+        ),
         "analyst_notes": _first_present(
             raw_data,
             fundamentals,
@@ -297,7 +321,11 @@ def _truncation_footer(omitted: list[str]) -> list[str]:
 
 
 def _resolve_as_of(raw_data: dict) -> datetime:
-    value = raw_data.get("as_of") or raw_data.get("timestamp") or raw_data.get("generated_at")
+    value = (
+        raw_data.get("as_of")
+        or raw_data.get("timestamp")
+        or raw_data.get("generated_at")
+    )
     if isinstance(value, datetime):
         return value
     if isinstance(value, str) and value.strip():
@@ -386,7 +414,12 @@ def _collect_data_sources(raw_data: dict) -> list[str]:
         elif isinstance(value, str) and value.strip():
             sources.append(value.strip())
 
-    for key in ("source", "market_data_source", "fundamental_source", "sentiment_source"):
+    for key in (
+        "source",
+        "market_data_source",
+        "fundamental_source",
+        "sentiment_source",
+    ):
         value = raw_data.get(key)
         if isinstance(value, str) and value.strip():
             sources.append(value.strip())

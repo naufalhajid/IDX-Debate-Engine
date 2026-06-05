@@ -49,9 +49,11 @@ def file_lock(lock_path: str, *, timeout: float = 30.0) -> Iterator[None]:
             try:
                 if sys.platform == "win32":
                     import msvcrt
+
                     msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
                 else:
                     import fcntl
+
                     fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                 break
             except (OSError, IOError):
@@ -68,12 +70,14 @@ def file_lock(lock_path: str, *, timeout: float = 30.0) -> Iterator[None]:
             try:
                 if sys.platform == "win32":
                     import msvcrt
+
                     try:
                         msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
                     except OSError:
                         pass
                 else:
                     import fcntl
+
                     fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
             finally:
                 lock_file.close()
@@ -89,6 +93,7 @@ def _token_storage_dir() -> Path:
     p = Path(settings.TOKEN_STORAGE_DIR)
     if not p.is_absolute():
         from core.settings import ROOT_PATH
+
         p = ROOT_PATH / p
     p.mkdir(parents=True, exist_ok=True)
     return p
@@ -202,7 +207,9 @@ def detect_claude_code_version() -> str:
         try:
             result = subprocess.run(
                 [cmd, "--version"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             if result.returncode == 0 and result.stdout.strip():
                 version = result.stdout.strip().split()[0]
@@ -227,10 +234,16 @@ def _read_claude_code_credentials_from_keychain() -> dict[str, Any] | None:
 
     try:
         result = subprocess.run(
-            ["security", "find-generic-password",
-             "-s", "Claude Code-credentials",
-             "-w"],
-            capture_output=True, text=True, timeout=5,
+            [
+                "security",
+                "find-generic-password",
+                "-s",
+                "Claude Code-credentials",
+                "-w",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -304,18 +317,22 @@ def refresh_anthropic_oauth_pure(
 
     client_id = settings.ANTHROPIC_OAUTH_CLIENT_ID
     if use_json:
-        data = json.dumps({
-            "grant_type": "refresh_token",
-            "refresh_token": refresh_token,
-            "client_id": client_id,
-        }).encode()
+        data = json.dumps(
+            {
+                "grant_type": "refresh_token",
+                "refresh_token": refresh_token,
+                "client_id": client_id,
+            }
+        ).encode()
         content_type = "application/json"
     else:
-        data = urllib.parse.urlencode({
-            "grant_type": "refresh_token",
-            "refresh_token": refresh_token,
-            "client_id": client_id,
-        }).encode()
+        data = urllib.parse.urlencode(
+            {
+                "grant_type": "refresh_token",
+                "refresh_token": refresh_token,
+                "client_id": client_id,
+            }
+        ).encode()
         content_type = "application/x-www-form-urlencoded"
 
     token_endpoints = [
@@ -380,11 +397,13 @@ def resolve_codex_token() -> str:
             refresh_token = codex.get("refresh_token", "")
             if refresh_token:
                 try:
-                    data = urllib.parse.urlencode({
-                        "grant_type": "refresh_token",
-                        "refresh_token": refresh_token,
-                        "client_id": settings.CODEX_OAUTH_CLIENT_ID,
-                    }).encode()
+                    data = urllib.parse.urlencode(
+                        {
+                            "grant_type": "refresh_token",
+                            "refresh_token": refresh_token,
+                            "client_id": settings.CODEX_OAUTH_CLIENT_ID,
+                        }
+                    ).encode()
                     req = urllib.request.Request(
                         "https://auth.openai.com/oauth/token",
                         data=data,
@@ -396,9 +415,12 @@ def resolve_codex_token() -> str:
                     new_token = result.get("access_token", "")
                     if new_token:
                         codex["access_token"] = new_token
-                        codex["refresh_token"] = result.get("refresh_token", refresh_token)
+                        codex["refresh_token"] = result.get(
+                            "refresh_token", refresh_token
+                        )
                         codex["expires_at_ms"] = (
-                            int(time.time() * 1000) + result.get("expires_in", 3600) * 1000
+                            int(time.time() * 1000)
+                            + result.get("expires_in", 3600) * 1000
                         )
                         store["codex"] = codex
                         _write_auth_store(store)
@@ -475,7 +497,9 @@ def resolve_anthropic_token() -> str:
     with file_lock(_lock_path()):
         store = _read_auth_store()
         anthro = store.get("anthropic", {})
-        if anthro.get("access_token") and is_token_valid(anthro.get("expires_at_ms", 0)):
+        if anthro.get("access_token") and is_token_valid(
+            anthro.get("expires_at_ms", 0)
+        ):
             return anthro["access_token"]
 
     raise ValueError(

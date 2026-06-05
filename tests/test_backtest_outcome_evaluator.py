@@ -170,7 +170,9 @@ def test_evaluate_memory_updates_buy_with_matching_artifact(tmp_path: Path) -> N
 
     stored = memory.all_records()
     assert summary.updated_records == 1
-    assert summary.backup_path == str(memory_path.with_name("backtest_memory.jsonl.bak"))
+    assert summary.backup_path == str(
+        memory_path.with_name("backtest_memory.jsonl.bak")
+    )
     assert stored[0].outcome == "win"
     assert stored[0].evaluation_method == "hybrid_target_stop_horizon"
 

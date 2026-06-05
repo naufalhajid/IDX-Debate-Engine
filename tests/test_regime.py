@@ -51,12 +51,22 @@ def test_get_regime_params_normal() -> None:
 def test_regime_params_have_required_keys_high() -> None:
     """HIGH params harus punya semua kunci yang dibutuhkan orchestrator."""
     params = get_regime_params("HIGH")
-    for key in ("top_n_selection", "rpm_limit", "rr_normalization_cap", "min_conviction_override"):
+    for key in (
+        "top_n_selection",
+        "rpm_limit",
+        "rr_normalization_cap",
+        "min_conviction_override",
+    ):
         assert key in params, f"Key '{key}' missing from HIGH regime params"
 
 
 def test_regime_params_have_required_keys_low() -> None:
     """LOW params harus punya semua kunci yang dibutuhkan orchestrator."""
     params = get_regime_params("LOW")
-    for key in ("top_n_selection", "rpm_limit", "rr_normalization_cap", "min_conviction_override"):
+    for key in (
+        "top_n_selection",
+        "rpm_limit",
+        "rr_normalization_cap",
+        "min_conviction_override",
+    ):
         assert key in params, f"Key '{key}' missing from LOW regime params"

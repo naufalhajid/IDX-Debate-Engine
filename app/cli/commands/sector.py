@@ -8,7 +8,10 @@ from typing import Annotated, Any
 import typer
 
 from app.cli.ui.console import console
-from app.cli.ui.tables import build_sector_distribution_table, build_sector_members_table
+from app.cli.ui.tables import (
+    build_sector_distribution_table,
+    build_sector_members_table,
+)
 
 SECTOR_ALIASES = {
     "banking": "bank",
@@ -41,7 +44,9 @@ def build_command(ctx: typer.Context = typer.Context) -> None:
         console.print("[idx.header]Building sector cache[/idx.header]")
         run_sector_build()
     else:
-        with console.status("[idx.header]Fetching sector data from yfinance...[/idx.header]"):
+        with console.status(
+            "[idx.header]Fetching sector data from yfinance...[/idx.header]"
+        ):
             run_sector_build()
     console.print("[idx.ok]Sector cache built.[/idx.ok]")
 

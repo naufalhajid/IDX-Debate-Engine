@@ -36,7 +36,9 @@ def _load_manifest() -> dict:
     try:
         return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise ValueError(f"Invalid debate prompt manifest JSON: {MANIFEST_PATH}") from exc
+        raise ValueError(
+            f"Invalid debate prompt manifest JSON: {MANIFEST_PATH}"
+        ) from exc
 
 
 def load_prompt_registry() -> PromptRegistry:
@@ -63,7 +65,9 @@ def load_prompt_registry() -> PromptRegistry:
         prompts[key] = content
 
     if missing:
-        raise FileNotFoundError("Missing required debate prompt files: " + ", ".join(missing))
+        raise FileNotFoundError(
+            "Missing required debate prompt files: " + ", ".join(missing)
+        )
     if empty:
         raise ValueError("Empty required debate prompt files: " + ", ".join(empty))
 

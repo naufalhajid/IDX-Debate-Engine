@@ -71,11 +71,15 @@ async def fetch_ihsg_volatility(lookback_days: int = 20) -> float | None:
 
         returns = close.pct_change().dropna()
         vol = float(returns.std())
-        logger.info(f"[Regime] IHSG realized vol ({lookback_days}d): {vol:.4f} ({vol*100:.2f}%)")
+        logger.info(
+            f"[Regime] IHSG realized vol ({lookback_days}d): {vol:.4f} ({vol * 100:.2f}%)"
+        )
         return vol
 
     except Exception as e:
-        logger.warning(f"[Regime] Gagal fetch IHSG volatility: {e} — fallback ke NORMAL.")
+        logger.warning(
+            f"[Regime] Gagal fetch IHSG volatility: {e} — fallback ke NORMAL."
+        )
         return None
 
 
@@ -91,18 +95,24 @@ def classify_regime(
     sebagai safe default agar pipeline tidak terganggu.
     """
     if vol is None:
-        logger.warning("[Regime] Volatility tidak tersedia — fallback ke NORMAL regime.")
+        logger.warning(
+            "[Regime] Volatility tidak tersedia — fallback ke NORMAL regime."
+        )
         return "NORMAL"
 
     if vol >= high_threshold:
-        logger.info(f"[Regime] HIGH volatility ({vol*100:.2f}% >= {high_threshold*100:.0f}%)")
+        logger.info(
+            f"[Regime] HIGH volatility ({vol * 100:.2f}% >= {high_threshold * 100:.0f}%)"
+        )
         return "HIGH"
 
     if vol < low_threshold:
-        logger.info(f"[Regime] LOW volatility ({vol*100:.2f}% < {low_threshold*100:.0f}%)")
+        logger.info(
+            f"[Regime] LOW volatility ({vol * 100:.2f}% < {low_threshold * 100:.0f}%)"
+        )
         return "LOW"
 
-    logger.info(f"[Regime] NORMAL volatility ({vol*100:.2f}%)")
+    logger.info(f"[Regime] NORMAL volatility ({vol * 100:.2f}%)")
     return "NORMAL"
 
 
@@ -118,17 +128,17 @@ def get_regime_params(regime: RegimeType) -> dict:
     """
     if regime == "HIGH":
         return {
-            "top_n_selection": 2,           # kurangi exposure di pasar volatile
-            "rpm_limit": 5,                 # hemat budget API
-            "rr_normalization_cap": 4.0,    # tighten cap (R/R > 4x lebih mencurigakan)
+            "top_n_selection": 2,  # kurangi exposure di pasar volatile
+            "rpm_limit": 5,  # hemat budget API
+            "rr_normalization_cap": 4.0,  # tighten cap (R/R > 4x lebih mencurigakan)
             "min_conviction_override": 0.45,  # standar lebih ketat
         }
 
     if regime == "LOW":
         return {
-            "top_n_selection": 5,           # opportunity lebih banyak di pasar tenang
+            "top_n_selection": 5,  # opportunity lebih banyak di pasar tenang
             "rpm_limit": 15,
-            "rr_normalization_cap": 6.0,    # lebih toleran ke R/R tinggi
+            "rr_normalization_cap": 6.0,  # lebih toleran ke R/R tinggi
             "min_conviction_override": 0.20,
         }
 

@@ -10,7 +10,9 @@ import yaml
 from utils.logger_config import logger
 
 
-RR_TIERS_CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "rr_tiers.yaml"
+RR_TIERS_CONFIG_PATH = (
+    Path(__file__).resolve().parent.parent / "config" / "rr_tiers.yaml"
+)
 DEFAULT_RR_TIER_NAME = "default"
 LARGE_CAP_TIER_NAME = "large_cap"
 
@@ -44,7 +46,9 @@ def calculate_rr(entry_high: float, target: float, stop: float) -> float:
     return round(reward / risk, 2)
 
 
-def _get_market_cap_idr(ticker: str, yf_info: dict[str, Any] | None = None) -> int | None:
+def _get_market_cap_idr(
+    ticker: str, yf_info: dict[str, Any] | None = None
+) -> int | None:
     """
     Return market cap in IDR from a yfinance info dict.
 
@@ -92,9 +96,7 @@ def _load_largecap_fallback() -> set[str]:
         if not isinstance(tickers, list):
             raise ValueError("large_cap_fallback must be a list.")
         return {
-            str(ticker).upper().strip()
-            for ticker in tickers
-            if str(ticker).strip()
+            str(ticker).upper().strip() for ticker in tickers if str(ticker).strip()
         }
     except FileNotFoundError:
         logger.warning(

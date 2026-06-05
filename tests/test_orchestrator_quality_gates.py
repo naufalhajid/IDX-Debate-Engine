@@ -66,19 +66,43 @@ def test_minimum_confidence_gate_skips_setup_generation() -> None:
     ("kwargs", "message"),
     [
         (
-            {"current_price": 100, "entry_low": 95, "entry_high": 100, "target": 100, "stop": 90},
+            {
+                "current_price": 100,
+                "entry_low": 95,
+                "entry_high": 100,
+                "target": 100,
+                "stop": 90,
+            },
             "target (100) does not exceed top of entry range (100)",
         ),
         (
-            {"current_price": 100, "entry_low": 95, "entry_high": 100, "target": 120, "stop": 95},
+            {
+                "current_price": 100,
+                "entry_low": 95,
+                "entry_high": 100,
+                "target": 120,
+                "stop": 95,
+            },
             "stop (95) is not below bottom of entry range (95)",
         ),
         (
-            {"current_price": 112, "entry_low": 95, "entry_high": 100, "target": 120, "stop": 90},
+            {
+                "current_price": 112,
+                "entry_low": 95,
+                "entry_high": 100,
+                "target": 120,
+                "stop": 90,
+            },
             "current price (112) is more than 10% above entry range top (100)",
         ),
         (
-            {"current_price": 100, "entry_low": 95, "entry_high": 100, "target": 112, "stop": 90},
+            {
+                "current_price": 100,
+                "entry_low": 95,
+                "entry_high": 100,
+                "target": 112,
+                "stop": 90,
+            },
             "R/R (1.20x) below minimum threshold of 1.5x (default tier)",
         ),
     ],
@@ -111,7 +135,9 @@ def test_apply_setup_coherence_gate_removes_gula_like_setup() -> None:
     assert result["verdict"]["target_price"] is None
     assert result["verdict"]["stop_loss"] is None
     assert result["risk_governor"]["status"] == "reject"
-    assert any("more than 10% above entry range" in reason for reason in result["reasons"])
+    assert any(
+        "more than 10% above entry range" in reason for reason in result["reasons"]
+    )
 
 
 def test_coherence_uses_large_cap_threshold_for_bmri() -> None:

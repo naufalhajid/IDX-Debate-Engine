@@ -38,8 +38,12 @@ def get_codex_flash_llm() -> "ChatCodexResponses":
             "api_key": SecretStr(access_token),
             "request_timeout": 60,
         }
-        
-        if model_name.startswith("o1") or model_name.startswith("o3") or model_name.startswith("o4"):
+
+        if (
+            model_name.startswith("o1")
+            or model_name.startswith("o3")
+            or model_name.startswith("o4")
+        ):
             kwargs["max_completion_tokens"] = 4000
         else:
             kwargs["temperature"] = 0.1
@@ -70,10 +74,14 @@ def get_codex_pro_llm() -> "ChatCodexResponses":
             "api_key": SecretStr(access_token),
             "request_timeout": 90,
         }
-        
-        # OpenAI reasoning models (o1, o3, o4) do not support temperature 
+
+        # OpenAI reasoning models (o1, o3, o4) do not support temperature
         # and prefer max_completion_tokens over max_tokens
-        if model_name.startswith("o1") or model_name.startswith("o3") or model_name.startswith("o4"):
+        if (
+            model_name.startswith("o1")
+            or model_name.startswith("o3")
+            or model_name.startswith("o4")
+        ):
             kwargs["max_completion_tokens"] = 10000
         else:
             kwargs["temperature"] = 0.3

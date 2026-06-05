@@ -182,8 +182,12 @@ def reconcile_artifacts(
         latest_path,
         [],
     )
-    latest_ticker = _extract_ticker(latest_payload) if isinstance(latest_payload, dict) else None
-    latest_run_id = _extract_run_id(latest_payload) if isinstance(latest_payload, dict) else None
+    latest_ticker = (
+        _extract_ticker(latest_payload) if isinstance(latest_payload, dict) else None
+    )
+    latest_run_id = (
+        _extract_run_id(latest_payload) if isinstance(latest_payload, dict) else None
+    )
 
     batch_payload = _load_json(
         _read_required_text(batch_path, "full_batch_results.json", []),
@@ -234,7 +238,9 @@ def reconcile_artifacts(
         )
         _reconcile_rag_log(rag_path, latest_ticker, latest_run_id, issues, warnings)
     else:
-        message = "latest_debate.json has no ticker; optional log surfaces cannot be linked."
+        message = (
+            "latest_debate.json has no ticker; optional log surfaces cannot be linked."
+        )
         warnings.append(message)
         issues.append(
             ReconciliationIssue(
@@ -295,7 +301,9 @@ def _load_jsonl(
         warnings.append(f"Missing optional artifact surface: {label} at {path}")
         return []
     records: list[dict[str, Any]] = []
-    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    for line_number, line in enumerate(
+        path.read_text(encoding="utf-8").splitlines(), 1
+    ):
         if not line.strip():
             continue
         try:
@@ -412,9 +420,7 @@ def _validate_batch_risk_governor(
                 "risk_governor.sizing_allowed=False."
             )
         reason_codes = {
-            str(code)
-            for code in risk.get("reason_codes", [])
-            if code is not None
+            str(code) for code in risk.get("reason_codes", []) if code is not None
         }
         if "upside_exhausted" in reason_codes:
             warnings.append(
@@ -437,7 +443,9 @@ def _validate_basic_run_scope(
         )
     batch_timestamp = _extract_batch_timestamp(batch_entries)
     markdown_timestamp = _extract_markdown_field(markdown_text, "Batch Timestamp")
-    latest_timestamp = _extract_batch_timestamp([latest_result] if latest_result else [])
+    latest_timestamp = _extract_batch_timestamp(
+        [latest_result] if latest_result else []
+    )
 
     _compare_optional_value(
         "batch_timestamp",
@@ -495,7 +503,9 @@ def _reconcile_run_scope(
     batch_run_id = _extract_shared_run_id(batch_entries)
     markdown_timestamp = _extract_markdown_field(markdown_text, "Batch Timestamp")
     markdown_run_id = _extract_markdown_field(markdown_text, "Run ID")
-    latest_timestamp = _extract_batch_timestamp([latest_payload] if latest_payload else [])
+    latest_timestamp = _extract_batch_timestamp(
+        [latest_payload] if latest_payload else []
+    )
     latest_run_id = _extract_run_id(latest_payload) if latest_payload else None
 
     _append_run_scope_mismatch(
@@ -608,8 +618,7 @@ def _reconcile_run_scope(
             source="run_scope",
             code="telemetry_ticker_set_mismatch",
             message=(
-                "telemetry_log.jsonl ticker set does not match "
-                "full_batch_results.json."
+                "telemetry_log.jsonl ticker set does not match full_batch_results.json."
             ),
         )
 
@@ -685,9 +694,7 @@ def _extract_batch_timestamp(entries: list[dict[str, Any]]) -> str | None:
 
 def _extract_shared_run_id(entries: list[dict[str, Any]]) -> str | None:
     run_ids = {
-        run_id
-        for entry in entries
-        if (run_id := _extract_run_id(entry)) is not None
+        run_id for entry in entries if (run_id := _extract_run_id(entry)) is not None
     }
     if len(run_ids) == 1:
         return next(iter(run_ids))
@@ -884,7 +891,11 @@ def _reconcile_telemetry_log(
             continue
         metrics = record.get("ticker_metrics")
         if isinstance(metrics, list):
-            if any(_clean_ticker(metric.get("ticker")) == ticker for metric in metrics if isinstance(metric, dict)):
+            if any(
+                _clean_ticker(metric.get("ticker")) == ticker
+                for metric in metrics
+                if isinstance(metric, dict)
+            ):
                 return
     _append_warning_issue(
         issues,
@@ -950,10 +961,14 @@ def _extract_markdown_tickers(markdown_text: str) -> list[str]:
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Validate debate output artifacts.")
-    parser.add_argument("--batch", required=True, help="Path to full_batch_results.json")
+    parser.add_argument(
+        "--batch", required=True, help="Path to full_batch_results.json"
+    )
     parser.add_argument("--top3", required=True, help="Path to TOP_3_SWING_TRADES.md")
     parser.add_argument("--latest", required=True, help="Path to latest_debate.json")
-    parser.add_argument("--reconcile", action="store_true", help="Run full artifact reconciliation.")
+    parser.add_argument(
+        "--reconcile", action="store_true", help="Run full artifact reconciliation."
+    )
     parser.add_argument("--audit-log", help="Path to audit_log.jsonl")
     parser.add_argument("--telemetry-log", help="Path to telemetry_log.jsonl")
     parser.add_argument("--rag-log", help="Path to evidence_log.jsonl")

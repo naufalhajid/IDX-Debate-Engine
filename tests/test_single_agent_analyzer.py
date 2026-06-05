@@ -38,7 +38,11 @@ def _valid_response(rating: str = "BUY") -> str:
             "stop_loss": 8300.0,
             "risk_reward_ratio": 2.1,
             "reasoning": "Momentum remains constructive while valuation support is adequate.",
-            "key_risks": ["Breakdown below support", "Weak sector flow", "Earnings miss"],
+            "key_risks": [
+                "Breakdown below support",
+                "Weak sector flow",
+                "Earnings miss",
+            ],
             "key_catalysts": ["Volume expansion", "Banking sector rotation"],
             "timeframe": "1-3 Months",
         }
@@ -107,7 +111,9 @@ def test_parse_response_invalid_json_returns_failed() -> None:
 
 
 @pytest.mark.asyncio
-async def test_analyze_llm_timeout_returns_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_analyze_llm_timeout_returns_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     analyzer = SingleAgentAnalyzer(timeout_seconds=0.01)
     monkeypatch.setattr(analyzer, "_fetch_market_data", lambda ticker: _context(ticker))
 
@@ -124,7 +130,9 @@ async def test_analyze_llm_timeout_returns_timeout(monkeypatch: pytest.MonkeyPat
 
 
 @pytest.mark.asyncio
-async def test_analyze_llm_exception_returns_failed(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_analyze_llm_exception_returns_failed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     analyzer = SingleAgentAnalyzer()
     monkeypatch.setattr(analyzer, "_fetch_market_data", lambda ticker: _context(ticker))
 
@@ -140,7 +148,9 @@ async def test_analyze_llm_exception_returns_failed(monkeypatch: pytest.MonkeyPa
 
 
 @pytest.mark.asyncio
-async def test_analyze_valid_response_returns_success(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_analyze_valid_response_returns_success(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     analyzer = SingleAgentAnalyzer()
     monkeypatch.setattr(analyzer, "_fetch_market_data", lambda ticker: _context(ticker))
 
@@ -156,7 +166,9 @@ async def test_analyze_valid_response_returns_success(monkeypatch: pytest.Monkey
 
 
 @pytest.mark.asyncio
-async def test_analyze_verdict_rating_is_allowed(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_analyze_verdict_rating_is_allowed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     analyzer = SingleAgentAnalyzer()
     monkeypatch.setattr(analyzer, "_fetch_market_data", lambda ticker: _context(ticker))
 
@@ -172,7 +184,9 @@ async def test_analyze_verdict_rating_is_allowed(monkeypatch: pytest.MonkeyPatch
 
 
 @pytest.mark.asyncio
-async def test_analyze_verdict_mode_is_single_agent(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_analyze_verdict_mode_is_single_agent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     analyzer = SingleAgentAnalyzer()
     monkeypatch.setattr(analyzer, "_fetch_market_data", lambda ticker: _context(ticker))
 

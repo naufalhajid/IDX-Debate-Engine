@@ -67,13 +67,15 @@ class StockbitApiClient:
         retry = 0
         last_status_code = None
         session = self._get_session()
-        
+
         while retry <= 3:
             try:
                 if method == "GET":
                     response = session.get(url, headers=self.headers, timeout=15)
                 elif method == "POST":
-                    response = session.post(url, headers=self.headers, json=payload, timeout=15)
+                    response = session.post(
+                        url, headers=self.headers, json=payload, timeout=15
+                    )
                 else:
                     raise ValueError("Unsupported HTTP method")
 
@@ -140,14 +142,16 @@ class StockbitApiClient:
         with self._auth_lock:
             # Double-checked locking: skip jika thread lain baru saja refresh < 10 detik lalu
             if time.time() - self._last_auth_time < 10:
-                logger.info("Authentication recently performed by another thread. Skipping.")
+                logger.info(
+                    "Authentication recently performed by another thread. Skipping."
+                )
                 return
 
             if self.is_authorise and not self._is_refresh_token_empty():
                 self._refresh_token()
             else:
                 self._login()
-            
+
             self._last_auth_time = time.time()
 
     def reauthenticate(self):
@@ -179,9 +183,7 @@ class StockbitApiClient:
                 try:
                     fetcher.close()
                 except Exception as exc:
-                    logger.error(
-                        f"[{__name__}] Unexpected error: {exc}", exc_info=True
-                    )
+                    logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
 
         if token:
             logger.info("Logged in successfully via StockbitTokenFetcher!")
@@ -232,7 +234,9 @@ class StockbitApiClient:
 
             except requests.exceptions.RequestException as e:
                 failure = classify_exception(e, source="stockbit")
-                logger.error(f"Stockbit refresh failure classified: {failure.model_dump()}")
+                logger.error(
+                    f"Stockbit refresh failure classified: {failure.model_dump()}"
+                )
                 logger.error(f"Request failed: {e}")
 
     def _write_token(self, token, refresh_token, user_agent=None):
@@ -318,5 +322,7 @@ class StockbitApiClient:
 
         except requests.exceptions.RequestException as e:
             failure = classify_exception(e, source="stockbit")
-            logger.error(f"Stockbit challenge failure classified: {failure.model_dump()}")
+            logger.error(
+                f"Stockbit challenge failure classified: {failure.model_dump()}"
+            )
             logger.error(f"Request failed: {e}")

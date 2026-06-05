@@ -116,14 +116,16 @@ def _build_sector_map(
 
     logger.info(
         f"[Sector] Resolve selesai: "
-        f"cache={len(tickers)-len(miss_l1)}, "
-        f"hardcode={len(miss_l1)-len(miss_l2)}, "
-        f"keyword={len(miss_l2)-len(miss_l3)}, "
+        f"cache={len(tickers) - len(miss_l1)}, "
+        f"hardcode={len(miss_l1) - len(miss_l2)}, "
+        f"keyword={len(miss_l2) - len(miss_l3)}, "
         f"default={len(miss_l4)}"
     )
     if miss_l4:
-        logger.debug(f"[Sector] Ticker 'default': {miss_l4[:20]}"
-                     + ("..." if len(miss_l4) > 20 else ""))
+        logger.debug(
+            f"[Sector] Ticker 'default': {miss_l4[:20]}"
+            + ("..." if len(miss_l4) > 20 else "")
+        )
 
     return result
 
@@ -131,6 +133,7 @@ def _build_sector_map(
 # ══════════════════════════════════════════════════════════════════════════════
 # ── EXDATE RESOLVER — xlsx primary, yfinance fallback ────────────────────────
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _resolve_exdate(
     ticker: str,
@@ -171,7 +174,7 @@ def _resolve_exdate(
 
         if parsed_date is not None:
             today = datetime.now(timezone.utc).date()
-            days  = (parsed_date - today).days
+            days = (parsed_date - today).days
             if days >= 0:
                 # Ex-date masih ke depan — hitung risk tier
                 if days <= CRITICAL_WINDOW_DAYS:
@@ -183,13 +186,15 @@ def _resolve_exdate(
                 div = float(row.get("Dividend (TTM)", 0) or 0)
                 return {
                     "has_upcoming_exdate": tier != "CLEAR",
-                    "ex_date":             str(parsed_date),
-                    "days_until_exdate":   days,
-                    "div_per_share":       div or None,
-                    "div_yield_pct":       round(div / current_px * 100, 2) if div and current_px > 0 else None,
-                    "risk_tier":           tier,
-                    "expected_drop_rp":    div or None,
-                    "source":              "xlsx_direct",
+                    "ex_date": str(parsed_date),
+                    "days_until_exdate": days,
+                    "div_per_share": div or None,
+                    "div_yield_pct": round(div / current_px * 100, 2)
+                    if div and current_px > 0
+                    else None,
+                    "risk_tier": tier,
+                    "expected_drop_rp": div or None,
+                    "source": "xlsx_direct",
                 }
             # days < 0 → ex-date sudah lewat → fall through ke lapis 3
 
@@ -201,9 +206,12 @@ def _resolve_exdate(
 # ── HELPERS ───────────────────────────────────────────────────────────────────
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def setup_logging(log_dir: str) -> logging.Logger:
     os.makedirs(log_dir, exist_ok=True)
-    log_file = os.path.join(log_dir, f"scan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+    log_file = os.path.join(
+        log_dir, f"scan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+    )
     logger = logging.getLogger("quant_filter")
     logger.setLevel(logging.INFO)
     if not logger.handlers:
@@ -227,7 +235,9 @@ def download_yf_with_retry(
     """Download yfinance OHLCV dengan retry + paksa MultiIndex untuk single ticker."""
     for attempt in range(1, retries + 1):
         try:
-            logger.info(f"yfinance download attempt {attempt}/{retries} ({len(tickers)} ticker)...")
+            logger.info(
+                f"yfinance download attempt {attempt}/{retries} ({len(tickers)} ticker)..."
+            )
             data = _get_yfinance().download(
                 tickers,
                 period=period,
@@ -261,6 +271,7 @@ def download_yf_with_retry(
 # ── TICKER ANALYZER ───────────────────────────────────────────────────────────
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _analyze_ticker(
     row: pd.Series,
     df_t: pd.DataFrame,
@@ -276,16 +287,15 @@ def _analyze_ticker(
     t = row["Ticker"]
 
     close = df_t["Close"].squeeze()
-    vol   = df_t["Volume"].squeeze()
-    high  = df_t["High"].squeeze()
-    low   = df_t["Low"].squeeze()
+    vol = df_t["Volume"].squeeze()
+    high = df_t["High"].squeeze()
+    low = df_t["Low"].squeeze()
 
     # ── Suspended / FCA Board Exclusion ──────────────────────────────────────
-    recent_vol  = vol.tail(5).sum()
+    recent_vol = vol.tail(5).sum()
     avg_vol_20d = vol.tail(20).mean()
-    if (
-        (vol.tail(20) == 0).sum() > cfg["max_zero_vol_days"] or
-        (avg_vol_20d > 0 and (recent_vol / avg_vol_20d) < 0.10)
+    if (vol.tail(20) == 0).sum() > cfg["max_zero_vol_days"] or (
+        avg_vol_20d > 0 and (recent_vol / avg_vol_20d) < 0.10
     ):
         logger.info(f"[{t}] Excluded: suspek suspended/FCA (volume anomali)")
         return None
@@ -300,7 +310,9 @@ def _analyze_ticker(
     except (TypeError, ValueError):
         der = None
     if der is not None and der > max_der:
-        logger.debug(f"[{t}] DER {der:.2f} > sector cap {max_der:.2f} ({sector_key}), skip")
+        logger.debug(
+            f"[{t}] DER {der:.2f} > sector cap {max_der:.2f} ({sector_key}), skip"
+        )
         return None
 
     price_mom_period = int(cfg.get("price_mom_period_days", 22))
@@ -324,12 +336,18 @@ def _analyze_ticker(
         ma200_context = "BELOW"
     else:
         prev5 = close.iloc[-6:-1]
-        if len(prev5) == 5 and float(prev5.mean()) < ma200_value and current_px > ma200_value:
+        if (
+            len(prev5) == 5
+            and float(prev5.mean()) < ma200_value
+            and current_px > ma200_value
+        ):
             ma200_context = "CROSSOVER_RECENT"
         else:
             ma200_context = "ABOVE" if current_px >= ma200_value else "BELOW"
 
-    min_price_vs_ema20 = cfg.get("min_price_vs_ema20", cfg.get("min_price_vs_sma50", 1.0))
+    min_price_vs_ema20 = cfg.get(
+        "min_price_vs_ema20", cfg.get("min_price_vs_sma50", 1.0)
+    )
     if current_px < ema20_latest * min_price_vs_ema20:
         logger.debug(f"[{t}] Price below EMA20 trend filter, skip")
         return None
@@ -337,7 +355,9 @@ def _analyze_ticker(
     # Relative Strength vs IHSG: reject candidates underperforming the index.
     if len(close) <= price_mom_period:
         return None
-    price_return_1m: float = float((current_px / float(close.iloc[-price_mom_period - 1])) - 1)
+    price_return_1m: float = float(
+        (current_px / float(close.iloc[-price_mom_period - 1])) - 1
+    )
     rs_vs_ihsg: float = price_return_1m - ihsg_return_1m
     if rs_vs_ihsg < cfg["min_rs_vs_ihsg_1m"]:
         logger.debug(f"[{t}] RS vs IHSG {rs_vs_ihsg:.2%} < threshold, skip")
@@ -361,7 +381,9 @@ def _analyze_ticker(
     rsi_latest: float = float(rsi_series.iloc[-1])
 
     if rsi_latest > cfg["rsi_hard_reject"]:
-        logger.debug(f"[{t}] RSI {rsi_latest:.1f} > {cfg['rsi_hard_reject']}, hard reject")
+        logger.debug(
+            f"[{t}] RSI {rsi_latest:.1f} > {cfg['rsi_hard_reject']}, hard reject"
+        )
         return None
 
     # ── SMA 20 — Uptrend Confirmation ────────────────────────────────────────
@@ -369,7 +391,6 @@ def _analyze_ticker(
     if pd.isna(sma20.iloc[-1]):
         return None
     sma20_latest: float = float(sma20.iloc[-1])
-
 
     # ── ATR (14) ──────────────────────────────────────────────────────────────
     atr_series = compute_atr(high, low, close)
@@ -389,7 +410,7 @@ def _analyze_ticker(
     vol_surge_ratio: float = curr_vol / vol_20d_avg if vol_20d_avg > 0 else 0.0
 
     # ── Momentum Score ────────────────────────────────────────────────────────
-    mom_note:  list[str] = []
+    mom_note: list[str] = []
 
     # [v3.1 FIX] RSI scoring asimetris — swing-trade aware.
     # Oversold (<45) lebih menarik dari overbought (>70) untuk entry swing,
@@ -434,24 +455,24 @@ def _analyze_ticker(
     else:
         price_mom_score = 0.00
     price_momentum_score: float = price_mom_score * cfg["weight_price_momentum"]
-    mom_note.append(f"Price Mom {price_return_1m*100:.1f}%")
+    mom_note.append(f"Price Mom {price_return_1m * 100:.1f}%")
 
     # ── Composite Score + SMA20 Distance Adjustments ─────────────────────────
     total_score: float = (
-        row["Val_Score"] +
-        row["Prof_Score"] +
-        momentum_rsi_score +
-        momentum_vol_score +
-        price_momentum_score
+        row["Val_Score"]
+        + row["Prof_Score"]
+        + momentum_rsi_score
+        + momentum_vol_score
+        + price_momentum_score
     )
     dist_to_sma20_pct: float = (current_px - sma20_latest) / sma20_latest
 
     if dist_to_sma20_pct > 0.10:
         total_score += cfg["over_extended_penalty"]
-        mom_note.append(f"Over-Extended (+{dist_to_sma20_pct*100:.1f}% SMA20)")
+        mom_note.append(f"Over-Extended (+{dist_to_sma20_pct * 100:.1f}% SMA20)")
     elif 0.01 <= dist_to_sma20_pct <= 0.05:
         total_score += cfg["fresh_breakout_bonus"]
-        mom_note.append(f"Fresh Breakout (+{dist_to_sma20_pct*100:.1f}% SMA20)")
+        mom_note.append(f"Fresh Breakout (+{dist_to_sma20_pct * 100:.1f}% SMA20)")
 
     if ma200_context == "CROSSOVER_RECENT":
         total_score += 7
@@ -467,24 +488,32 @@ def _analyze_ticker(
         mom_note.append(f"F-Score Kuat ({piotroski}/9)")
     elif piotroski < cfg["min_piotroski"]:
         total_score += cfg.get("penalty_piotroski_fail", -15)
-        mom_note.append(f"Penalty: F-Score Buruk ({piotroski}/9) ({cfg.get('penalty_piotroski_fail', -15)})")
+        mom_note.append(
+            f"Penalty: F-Score Buruk ({piotroski}/9) ({cfg.get('penalty_piotroski_fail', -15)})"
+        )
     elif piotroski <= cfg["piotroski_weak_max"]:
         total_score += cfg["piotroski_weak_penalty"]
         mom_note.append(f"F-Score Lemah ({piotroski}/9)")
 
     # [v3.2 FIX] Altman Z-Score Turnaround Penalty
     altman_z_raw = row.get("Altman Z-Score (Modified)", 0)
-    altman_z_val = float(altman_z_raw) if not pd.isna(altman_z_raw) and altman_z_raw else 0.0
+    altman_z_val = (
+        float(altman_z_raw) if not pd.isna(altman_z_raw) and altman_z_raw else 0.0
+    )
     if 0 < altman_z_val < cfg["min_altman_z"]:
         total_score += cfg.get("penalty_altman_z_fail", -20)
-        mom_note.append(f"Penalty: Altman-Z Distress ({altman_z_val:.2f}) ({cfg.get('penalty_altman_z_fail', -20)})")
+        mom_note.append(
+            f"Penalty: Altman-Z Distress ({altman_z_val:.2f}) ({cfg.get('penalty_altman_z_fail', -20)})"
+        )
 
     # [v3.2 FIX] ROE Turnaround Penalty
     roe_raw = row.get("Return on Equity (TTM)", 0)
     roe_val = float(roe_raw) if not pd.isna(roe_raw) and roe_raw else 0.0
     if roe_val < cfg["min_roe"]:
         total_score += cfg.get("penalty_roe_fail", -15)
-        mom_note.append(f"Penalty: ROE Buruk ({roe_val*100:.1f}%) ({cfg.get('penalty_roe_fail', -15)})")
+        mom_note.append(
+            f"Penalty: ROE Buruk ({roe_val * 100:.1f}%) ({cfg.get('penalty_roe_fail', -15)})"
+        )
 
     # Penalti jika tidak ada margin of safety (Valuation gap == 0)
     try:
@@ -500,7 +529,7 @@ def _analyze_ticker(
 
     # ── Stop Loss (ATR-based + BEI tick size) ─────────────────────────────────
     stop_candidate_1 = sma20_latest - (cfg["stop_atr_from_sma20"] * atr_14)
-    stop_candidate_2 = current_px   - (cfg["stop_atr_from_price"] * atr_14)
+    stop_candidate_2 = current_px - (cfg["stop_atr_from_price"] * atr_14)
     stop_loss: float = max(stop_candidate_1, stop_candidate_2)
     stop_loss = max(stop_loss, current_px * cfg["stop_hard_floor_pct"])
     stop_loss = snap_to_tick(stop_loss)
@@ -509,9 +538,11 @@ def _analyze_ticker(
     sector_bench = SECTOR_PBV_BENCHMARK.get(sector_key, SECTOR_PBV_BENCHMARK["default"])
     pbv_current: float = float(row.get("Current Price to Book Value", 0))
     pbv_label = (
-        "Murah" if pbv_current < sector_bench["fair_lo"] else
-        "Wajar" if pbv_current <= sector_bench["fair_hi"] else
-        "Mahal"
+        "Murah"
+        if pbv_current < sector_bench["fair_lo"]
+        else "Wajar"
+        if pbv_current <= sector_bench["fair_hi"]
+        else "Mahal"
     )
 
     # ── Quality Flags dari xlsx ───────────────────────────────────────────────
@@ -519,48 +550,49 @@ def _analyze_ticker(
     altman_z = row.get("Altman Z-Score (Modified)", 0)
 
     return {
-        "Ticker":                    t,
-        "Sektor":                    row["Sector_Label"],
-        "Sektor Key":                sector_key,
-        "Current Price":             current_px,
-        "Stop Loss Level":           round(stop_loss, 0),
-        "Est. Fair Value (Graham)":  row["Graham_Number"],
-        "Graham_Bear":               row["Graham_Bear"],
-        "Graham_Bull":               row["Graham_Bull"],
-        "graham_fv_capped":          bool(row.get("graham_fv_capped", False)),
-        "Valuation Gap (%)":         row["Valuation_Gap_Pct"],
+        "Ticker": t,
+        "Sektor": row["Sector_Label"],
+        "Sektor Key": sector_key,
+        "Current Price": current_px,
+        "Stop Loss Level": round(stop_loss, 0),
+        "Est. Fair Value (Graham)": row["Graham_Number"],
+        "Graham_Bear": row["Graham_Bear"],
+        "Graham_Bull": row["Graham_Bull"],
+        "graham_fv_capped": bool(row.get("graham_fv_capped", False)),
+        "Valuation Gap (%)": row["Valuation_Gap_Pct"],
         "Price to Equity Discount": row.get("Price to Equity Discount (%)", 0),
-        "RSI (14)":                  rsi_latest,
-        "SMA 20":                    sma20_latest,
-        "ema20":                     round(ema20_latest, 2),
-        "ma200":                     round(ma200_value, 2) if ma200_value else None,
-        "ma200_context":             ma200_context,
-        "ATR (14)":                  atr_14,
-        "ROE (TTM)":                 row["Return on Equity (TTM)"],
-        "DER (Quarter)":             row["Debt to Equity Ratio (Quarter)"],
-        "max_der_allowed":           max_der,
-        "PBV":                       pbv_current,
-        "PBV vs Sektor":             pbv_label,
-        "PBV Sektor Percentile":     round(row["PBV_Sector_Pctile"] * 100, 1),
-        "ADT 20d (Rp)":              adt_20,
-        "Composite Score":           total_score,
-        "price_return_1m":           round(price_return_1m * 100, 2),
-        "rs_vs_ihsg_1m":             round(rs_vs_ihsg * 100, 2),
-        "vol_surge_ratio":           round(vol_surge_ratio, 2),
-        "price_momentum_score":      round(price_momentum_score, 2),
-        "Entry Strategy":            " | ".join(mom_note),
-        "Piotroski F-Score":         int(piotroski) if piotroski else 0,
-        "Altman Z-Score":            float(altman_z) if altman_z else 0.0,
-        "ExDate Risk":               exdate_info["risk_tier"],
-        "ExDate Date":               exdate_info.get("ex_date"),
-        "ExDate Source":             exdate_info.get("source", "unknown"),
-        "_exdate_info":              exdate_info,
+        "RSI (14)": rsi_latest,
+        "SMA 20": sma20_latest,
+        "ema20": round(ema20_latest, 2),
+        "ma200": round(ma200_value, 2) if ma200_value else None,
+        "ma200_context": ma200_context,
+        "ATR (14)": atr_14,
+        "ROE (TTM)": row["Return on Equity (TTM)"],
+        "DER (Quarter)": row["Debt to Equity Ratio (Quarter)"],
+        "max_der_allowed": max_der,
+        "PBV": pbv_current,
+        "PBV vs Sektor": pbv_label,
+        "PBV Sektor Percentile": round(row["PBV_Sector_Pctile"] * 100, 1),
+        "ADT 20d (Rp)": adt_20,
+        "Composite Score": total_score,
+        "price_return_1m": round(price_return_1m * 100, 2),
+        "rs_vs_ihsg_1m": round(rs_vs_ihsg * 100, 2),
+        "vol_surge_ratio": round(vol_surge_ratio, 2),
+        "price_momentum_score": round(price_momentum_score, 2),
+        "Entry Strategy": " | ".join(mom_note),
+        "Piotroski F-Score": int(piotroski) if piotroski else 0,
+        "Altman Z-Score": float(altman_z) if altman_z else 0.0,
+        "ExDate Risk": exdate_info["risk_tier"],
+        "ExDate Date": exdate_info.get("ex_date"),
+        "ExDate Source": exdate_info.get("source", "unknown"),
+        "_exdate_info": exdate_info,
     }
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ── MAIN PIPELINE ─────────────────────────────────────────────────────────────
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def run_pipeline(cfg: dict) -> pd.DataFrame:
     cfg = dict(cfg)
@@ -593,29 +625,40 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
     # ── 1. DATA INGESTION — semua dari xlsx ───────────────────────────────────
     logger.info(f"Membaca: {cfg['input_file']}")
 
-    df_ks     = pd.read_excel(cfg["input_file"], sheet_name="key-statistics")
+    df_ks = pd.read_excel(cfg["input_file"], sheet_name="key-statistics")
     df_prices = pd.read_excel(cfg["input_file"], sheet_name="stock-prices")
-    df_anal   = pd.read_excel(cfg["input_file"], sheet_name="analysis")
-    df_idx    = pd.read_excel(cfg["input_file"], sheet_name="idx-stocks")
+    df_anal = pd.read_excel(cfg["input_file"], sheet_name="analysis")
+    df_idx = pd.read_excel(cfg["input_file"], sheet_name="idx-stocks")
 
     # Merge semua sheet
-    df = df_ks.merge(
-        df_prices[["Ticker", "Close Price", "Volume", "High Price", "Low Price"]],
-        on="Ticker", how="left",
-    ).merge(
-        df_anal[["Ticker", "Price to Equity Discount (%)", "Composite Rank"]],
-        on="Ticker", how="left",
-    ).merge(
-        df_idx[["Ticker", "Name", "Note"]],
-        on="Ticker", how="left",
+    df = (
+        df_ks.merge(
+            df_prices[["Ticker", "Close Price", "Volume", "High Price", "Low Price"]],
+            on="Ticker",
+            how="left",
+        )
+        .merge(
+            df_anal[["Ticker", "Price to Equity Discount (%)", "Composite Rank"]],
+            on="Ticker",
+            how="left",
+        )
+        .merge(
+            df_idx[["Ticker", "Name", "Note"]],
+            on="Ticker",
+            how="left",
+        )
     )
 
     # Numeric coerce
     for col in [
-        "Close Price", "Debt to Equity Ratio (Quarter)",
-        "Current Price to Book Value", "Return on Equity (TTM)",
-        "Current EPS (TTM)", "Piotroski F-Score",
-        "Altman Z-Score (Modified)", "Price to Equity Discount (%)",
+        "Close Price",
+        "Debt to Equity Ratio (Quarter)",
+        "Current Price to Book Value",
+        "Return on Equity (TTM)",
+        "Current EPS (TTM)",
+        "Piotroski F-Score",
+        "Altman Z-Score (Modified)",
+        "Price to Equity Discount (%)",
         "Current Book Value Per Share",
     ]:
         if col in df.columns:
@@ -643,22 +686,24 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
     df["PBV_Sector_Pctile"] = df.groupby("Sector")["Current Price to Book Value"].rank(
         pct=True, ascending=True
     )
-    df["Sector_Label"] = df["Sector"].map(
-        {k: v["label"] for k, v in SECTOR_PBV_BENCHMARK.items()}
-    ).fillna("Lain-lain")
+    df["Sector_Label"] = (
+        df["Sector"]
+        .map({k: v["label"] for k, v in SECTOR_PBV_BENCHMARK.items()})
+        .fillna("Lain-lain")
+    )
     max_der_map = cfg["max_der_by_sector"]
     df["Max_DER_Allowed"] = df["Sector"].map(max_der_map).fillna(max_der_map["default"])
 
     # ── 3. STATIC FILTERING ───────────────────────────────────────────────────
     # [v3.2 FIX] Turnaround-friendly filtering
     # Menghapus filter absolut untuk ROE, Piotroski, dan Altman Z.
-    # Saham dengan fundamental buruk dibiarkan lolos ke scoring, 
+    # Saham dengan fundamental buruk dibiarkan lolos ke scoring,
     # di mana mereka akan mendapatkan PENALTI BERAT.
     filtered = df[
-        (df["Close Price"] > cfg["min_close_price"]) &
-        (df["Debt to Equity Ratio (Quarter)"] <= df["Max_DER_Allowed"]) &
-        (df["PBV_Sector_Pctile"] < cfg["pbv_sector_pctile"]) &
-        (df["Current Price to Book Value"] < cfg["max_pbv_hard"])
+        (df["Close Price"] > cfg["min_close_price"])
+        & (df["Debt to Equity Ratio (Quarter)"] <= df["Max_DER_Allowed"])
+        & (df["PBV_Sector_Pctile"] < cfg["pbv_sector_pctile"])
+        & (df["Current Price to Book Value"] < cfg["max_pbv_hard"])
     ].copy()
 
     logger.info(f"Lolos static filter: {len(filtered)} ticker")
@@ -669,13 +714,23 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
 
     # ── 4. VALUATION SCORING — Graham Number (IHSG-calibrated) ───────────────
     bvps = filtered["Current Book Value Per Share"]
-    eps  = filtered["Current EPS (TTM)"]
-    k    = cfg["graham_k"]
+    eps = filtered["Current EPS (TTM)"]
+    k = cfg["graham_k"]
 
     valid_graham = (eps > 0) & (bvps > 0)
-    filtered["Graham_Number"] = np.where(valid_graham, np.sqrt(np.clip(k * eps * bvps, 0, None)), 0)
-    filtered["Graham_Bear"]   = np.where(valid_graham, np.sqrt(np.clip(k * eps * cfg["graham_bear_eps"] * bvps, 0, None)), 0)
-    filtered["Graham_Bull"]   = np.where(valid_graham, np.sqrt(np.clip(k * eps * cfg["graham_bull_eps"] * bvps, 0, None)), 0)
+    filtered["Graham_Number"] = np.where(
+        valid_graham, np.sqrt(np.clip(k * eps * bvps, 0, None)), 0
+    )
+    filtered["Graham_Bear"] = np.where(
+        valid_graham,
+        np.sqrt(np.clip(k * eps * cfg["graham_bear_eps"] * bvps, 0, None)),
+        0,
+    )
+    filtered["Graham_Bull"] = np.where(
+        valid_graham,
+        np.sqrt(np.clip(k * eps * cfg["graham_bull_eps"] * bvps, 0, None)),
+        0,
+    )
 
     # Graham FV Sanity Cap: prevent extreme EPS/BVPS outliers from dominating ranking.
     fv_cap = filtered["Close Price"] * cfg["graham_fv_cap_multiplier"]
@@ -693,14 +748,20 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         filtered["graham_fv_capped"], fv_cap, filtered["Graham_Number"]
     )
     filtered["Graham_Bear"] = np.where(
-        filtered["graham_fv_capped"], fv_cap * cfg["graham_bear_eps"], filtered["Graham_Bear"]
+        filtered["graham_fv_capped"],
+        fv_cap * cfg["graham_bear_eps"],
+        filtered["Graham_Bear"],
     )
     filtered["Graham_Bull"] = np.where(
-        filtered["graham_fv_capped"], fv_cap * cfg["graham_bull_eps"], filtered["Graham_Bull"]
+        filtered["graham_fv_capped"],
+        fv_cap * cfg["graham_bull_eps"],
+        filtered["Graham_Bull"],
     )
 
     filtered["Valuation_Gap_Pct"] = (
-        (filtered["Graham_Number"] - filtered["Close Price"]) / filtered["Close Price"] * 100
+        (filtered["Graham_Number"] - filtered["Close Price"])
+        / filtered["Close Price"]
+        * 100
     ).clip(lower=0)
 
     # [v3.1 FIX] Absolute threshold-based Val_Score — tidak lagi rank(pct=True).
@@ -721,13 +782,13 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
             fair_lo = bench["fair_lo"]
             if pbv <= 0:
                 return w * 0.10
-            if pbv < fair_lo * 0.70:          # sangat murah vs benchmark sektor
+            if pbv < fair_lo * 0.70:  # sangat murah vs benchmark sektor
                 return w * 1.00
             if pbv < fair_lo * 0.90:
                 return w * 0.70
             if pbv <= fair_lo:
                 return w * 0.40
-            return w * 0.10                   # di atas fair_lo = tidak menarik
+            return w * 0.10  # di atas fair_lo = tidak menarik
 
         # Non-finansial: Graham-based gap
         gap = float(row.get("Valuation_Gap_Pct", 0) or 0)
@@ -759,7 +820,7 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
 
     # ── 6. DYNAMIC TECHNICALS VIA YFINANCE ───────────────────────────────────
     valid_tickers = filtered["Ticker"].tolist()
-    tickers_yf    = [t + ".JK" for t in valid_tickers]
+    tickers_yf = [t + ".JK" for t in valid_tickers]
 
     data = download_yf_with_retry(
         tickers_yf,
@@ -797,7 +858,8 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
             raise ValueError("Data IHSG tidak cukup untuk return 1 bulan.")
 
         ihsg_return_1m = float(
-            (float(ihsg_close.iloc[-1]) / float(ihsg_close.iloc[-price_mom_period - 1])) - 1
+            (float(ihsg_close.iloc[-1]) / float(ihsg_close.iloc[-price_mom_period - 1]))
+            - 1
         )
         logger.info(f"IHSG return 1 bulan: {ihsg_return_1m:.2%}")
     except Exception as e:
@@ -832,7 +894,9 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
     if final_df.empty:
         logger.warning("Tidak ada ticker yang lolos semua filter.")
     else:
-        final_df = final_df.sort_values("Composite Score", ascending=False).head(cfg["top_n"])
+        final_df = final_df.sort_values("Composite Score", ascending=False).head(
+            cfg["top_n"]
+        )
         logger.info(f"Top {len(final_df)} kandidat berhasil disaring.")
 
     # Export JSON (untuk orchestrator.py)

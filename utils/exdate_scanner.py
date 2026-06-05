@@ -1,13 +1,13 @@
 """
 utils/exdate_scanner.py — Dividend Ex-Date Scanner untuk IHSG Swing Trade.
 
-Mencegah "Dividend Trap": membeli saham yang akan ex-dividend dalam 
-window swing trade, menyebabkan price drop sebesar dividend yield 
+Mencegah "Dividend Trap": membeli saham yang akan ex-dividend dalam
+window swing trade, menyebabkan price drop sebesar dividend yield
 tepat di ex-date (umum di IHSG, terutama Mar-Jun).
 
 Pipeline integration:
   - run_quant_filter.py : hard exclude CRITICAL, soft flag WARNING
-  - debate_chamber.py   : injeksi ExDateInfo ke synthesizer sebagai 
+  - debate_chamber.py   : injeksi ExDateInfo ke synthesizer sebagai
                           FACTUAL BLOCK untuk CIO consideration
 """
 
@@ -26,24 +26,27 @@ def _get_yfinance():
 
     return yf
 
-CRITICAL_WINDOW_DAYS = 7    # Hard exclude — terlalu dekat untuk swing entry
-WARNING_WINDOW_DAYS  = 30   # Soft flag — masuk debate dengan metadata
+
+CRITICAL_WINDOW_DAYS = 7  # Hard exclude — terlalu dekat untuk swing entry
+WARNING_WINDOW_DAYS = 30  # Soft flag — masuk debate dengan metadata
 
 
 # ── Output Schema ────────────────────────────────────────────────────────────
 
+
 class ExDateInfo(TypedDict):
-    has_upcoming_exdate : bool
-    ex_date             : str | None
-    days_until_exdate   : int | None
-    div_per_share       : float | None
-    div_yield_pct       : float | None
-    risk_tier           : str           # "CRITICAL" | "WARNING" | "CLEAR"
-    expected_drop_rp    : float | None
-    source              : str
+    has_upcoming_exdate: bool
+    ex_date: str | None
+    days_until_exdate: int | None
+    div_per_share: float | None
+    div_yield_pct: float | None
+    risk_tier: str  # "CRITICAL" | "WARNING" | "CLEAR"
+    expected_drop_rp: float | None
+    source: str
 
 
 # ── Core Scanner ─────────────────────────────────────────────────────────────
+
 
 def scan_exdate(ticker: str, current_price: float = 0.0) -> ExDateInfo:
     """
@@ -59,14 +62,14 @@ def scan_exdate(ticker: str, current_price: float = 0.0) -> ExDateInfo:
         on any fetch failure so pipeline is never blocked.
     """
     _CLEAR: ExDateInfo = {
-        "has_upcoming_exdate" : False,
-        "ex_date"             : None,
-        "days_until_exdate"   : None,
-        "div_per_share"       : None,
-        "div_yield_pct"       : None,
-        "risk_tier"           : "CLEAR",
-        "expected_drop_rp"    : None,
-        "source"              : "unavailable",
+        "has_upcoming_exdate": False,
+        "ex_date": None,
+        "days_until_exdate": None,
+        "div_per_share": None,
+        "div_yield_pct": None,
+        "risk_tier": "CLEAR",
+        "expected_drop_rp": None,
+        "source": "unavailable",
     }
 
     try:
@@ -99,7 +102,9 @@ def scan_exdate(ticker: str, current_price: float = 0.0) -> ExDateInfo:
 
         # ── 2. Only flag if ex-date is upcoming (not past) ──────────────────
         if days_until < 0:
-            logger.info(f"[ExDate] {ticker}: ex-date {ex_date} is in the past ({days_until}d ago)")
+            logger.info(
+                f"[ExDate] {ticker}: ex-date {ex_date} is in the past ({days_until}d ago)"
+            )
             return {**_CLEAR, "source": "yfinance"}
 
         # ── 3. Get dividend amount from dividends history ────────────────────
@@ -126,16 +131,16 @@ def scan_exdate(ticker: str, current_price: float = 0.0) -> ExDateInfo:
             risk_tier = "CLEAR"
 
         result: ExDateInfo = {
-            "has_upcoming_exdate" : risk_tier != "CLEAR",
+            "has_upcoming_exdate": risk_tier != "CLEAR",
             # M2 fix: jangan tampilkan tanggal ex-date jika sudah lewat atau CLEAR
             # — trader bisa salah baca tanggal 2025 sebagai upcoming
-            "ex_date"             : str(ex_date) if risk_tier != "CLEAR" else None,
-            "days_until_exdate"   : days_until if risk_tier != "CLEAR" else None,
-            "div_per_share"       : div_per_share,
-            "div_yield_pct"       : div_yield_pct,
-            "risk_tier"           : risk_tier,
-            "expected_drop_rp"    : div_per_share if risk_tier != "CLEAR" else None,
-            "source"              : "yfinance",
+            "ex_date": str(ex_date) if risk_tier != "CLEAR" else None,
+            "days_until_exdate": days_until if risk_tier != "CLEAR" else None,
+            "div_per_share": div_per_share,
+            "div_yield_pct": div_yield_pct,
+            "risk_tier": risk_tier,
+            "expected_drop_rp": div_per_share if risk_tier != "CLEAR" else None,
+            "source": "yfinance",
         }
 
         logger.info(
@@ -159,12 +164,14 @@ def format_exdate_block(ticker: str, info: ExDateInfo) -> str:
 
     tier_label = {
         "CRITICAL": "🔴 CRITICAL — Ex-date dalam 7 hari",
-        "WARNING":  "🟠 WARNING  — Ex-date dalam 30 hari",
+        "WARNING": "🟠 WARNING  — Ex-date dalam 30 hari",
     }.get(info["risk_tier"], "CLEAR")
 
     div_str = f"Rp {info['div_per_share']:,.0f}" if info["div_per_share"] else "N/A"
     yield_str = f"{info['div_yield_pct']:.2f}%" if info["div_yield_pct"] else "N/A"
-    drop_str = f"~Rp {info['expected_drop_rp']:,.0f}" if info["expected_drop_rp"] else "N/A"
+    drop_str = (
+        f"~Rp {info['expected_drop_rp']:,.0f}" if info["expected_drop_rp"] else "N/A"
+    )
 
     return (
         f"=== DIVIDEND EX-DATE SCAN: {ticker} ===\n"

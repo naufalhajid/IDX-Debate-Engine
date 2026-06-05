@@ -10,4 +10,5 @@ def __getattr__(name: str):
         return run_pipeline
     raise AttributeError(name)
 
+
 __all__ = ["CONFIG", "run_pipeline"]

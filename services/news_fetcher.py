@@ -122,10 +122,7 @@ async def fetch_news_rss(
     normalized_ticker = _normalize_ticker(ticker)
     query_name = company_name.strip() or normalized_ticker
     query = quote(f"{query_name} saham")
-    google_url = (
-        "https://news.google.com/rss/search?"
-        f"q={query}&hl=id&gl=ID&ceid=ID:id"
-    )
+    google_url = f"https://news.google.com/rss/search?q={query}&hl=id&gl=ID&ceid=ID:id"
 
     google_items = await _fetch_rss_items(
         google_url,
@@ -183,7 +180,9 @@ async def _fetch_rss_items(
         return []
 
     try:
-        return _parse_rss_items(xml_text, default_source=default_item_source, ticker=ticker)
+        return _parse_rss_items(
+            xml_text, default_source=default_item_source, ticker=ticker
+        )
     except Exception as exc:
         logger.warning("[News] %s %s parse failed: %s", ticker, source, exc)
         return []
@@ -218,7 +217,9 @@ async def _fetch_text(
     try:
         import httpx
     except ImportError as exc:
-        raise RuntimeError("Neither aiohttp nor httpx is available for RSS fetch") from exc
+        raise RuntimeError(
+            "Neither aiohttp nor httpx is available for RSS fetch"
+        ) from exc
 
     try:
         async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
@@ -234,27 +235,32 @@ async def _fetch_text(
     return response.text
 
 
-def _parse_rss_items(xml_text: str, default_source: str | None = None, ticker: str | None = None) -> list[dict]:
+def _parse_rss_items(
+    xml_text: str, default_source: str | None = None, ticker: str | None = None
+) -> list[dict]:
     root = ET.fromstring(xml_text)
     parsed_items: list[dict] = []
-    
+
     ticker_pattern = None
     if ticker:
-        ticker_pattern = re.compile(rf'\b{re.escape(ticker.upper())}\b')
-        
+        ticker_pattern = re.compile(rf"\b{re.escape(ticker.upper())}\b")
+
     for item in root.findall(".//item"):
         title = _child_text(item, "title")
         link = _child_text(item, "link")
         published_dt = _parse_rss_pub_date(_child_text(item, "pubDate"))
         if not title or not link or published_dt is None:
             continue
-            
+
         summary = _strip_html(_child_text(item, "description"))
-        
+
         if ticker_pattern:
             title_upper = title.upper()
             summary_upper = summary.upper()
-            if not (ticker_pattern.search(title_upper) or ticker_pattern.search(summary_upper)):
+            if not (
+                ticker_pattern.search(title_upper)
+                or ticker_pattern.search(summary_upper)
+            ):
                 continue
 
         source = _rss_item_source(item, title, default_source=default_source)
@@ -330,13 +336,18 @@ def _recent_rss_items(
             if key in deduped
             else None
         )
-        if key not in deduped or existing_published is None or published > existing_published:
+        if (
+            key not in deduped
+            or existing_published is None
+            or published > existing_published
+        ):
             deduped[key] = item
 
     return sorted(
         deduped.values(),
-        key=lambda raw: _parse_publish_time(raw.get("published")) or datetime.min.replace(
-            tzinfo=timezone.utc
+        key=lambda raw: (
+            _parse_publish_time(raw.get("published"))
+            or datetime.min.replace(tzinfo=timezone.utc)
         ),
         reverse=True,
     )[:limit]
@@ -489,7 +500,9 @@ class NewsFetcher:
         negative_hits = _keyword_hits(text, NEGATIVE_KEYWORDS)
         positive_hits = _keyword_hits(text, POSITIVE_KEYWORDS)
         hit_count = positive_hits + negative_hits
-        net_score = 0.0 if hit_count == 0 else (positive_hits - negative_hits) / hit_count
+        net_score = (
+            0.0 if hit_count == 0 else (positive_hits - negative_hits) / hit_count
+        )
         net_score = _clamp(net_score, -1.0, 1.0)
 
         if net_score > 0.2:
@@ -556,10 +569,7 @@ class NewsFetcher:
 
         raw_items = await self.fetch_news_async(normalized_ticker)
         cutoff = now - timedelta(days=NEWS_LOOKBACK_DAYS)
-        classified = [
-            self.classify_item(raw, normalized_ticker)
-            for raw in raw_items
-        ]
+        classified = [self.classify_item(raw, normalized_ticker) for raw in raw_items]
         recent_items = [
             item
             for item in classified
@@ -576,12 +586,22 @@ class NewsFetcher:
         has_upcoming_exdate = False
         if any(item.is_corporate_action for item in selected):
             try:
-                from utils.market_data_cache import DEFAULT_MARKET_DATA_CACHE, scan_exdate_from_market_data
-                market_data = await DEFAULT_MARKET_DATA_CACHE.prefetch(normalized_ticker)
-                exdate_info = scan_exdate_from_market_data(normalized_ticker, market_data)
+                from utils.market_data_cache import (
+                    DEFAULT_MARKET_DATA_CACHE,
+                    scan_exdate_from_market_data,
+                )
+
+                market_data = await DEFAULT_MARKET_DATA_CACHE.prefetch(
+                    normalized_ticker
+                )
+                exdate_info = scan_exdate_from_market_data(
+                    normalized_ticker, market_data
+                )
                 has_upcoming_exdate = exdate_info.get("has_upcoming_exdate", False)
             except Exception as exc:
-                logger.warning(f"[News] Failed to check upcoming ex-date for {normalized_ticker}: {exc}")
+                logger.warning(
+                    f"[News] Failed to check upcoming ex-date for {normalized_ticker}: {exc}"
+                )
                 # Fallback: assume it is upcoming for safety if there are corporate action news items
                 has_upcoming_exdate = True
 
@@ -618,10 +638,7 @@ class NewsFetcher:
         if bundle.confidence_adjustment != 0 or bundle.confidence_adjustment_reason:
             lines.extend(
                 [
-                    (
-                        "Confidence adjustment: "
-                        f"{bundle.confidence_adjustment:+.2f}"
-                    ),
+                    (f"Confidence adjustment: {bundle.confidence_adjustment:+.2f}"),
                     f"Reason: {bundle.confidence_adjustment_reason}",
                 ]
             )
@@ -858,7 +875,9 @@ def _ticker_in_text(text: str, ticker: str) -> bool:
     normalized = _normalize_ticker(ticker)
     if not _is_valid_idx_ticker(normalized):
         return False
-    pattern = re.compile(rf"(?<![A-Z0-9]){re.escape(normalized)}(?:\.JK)?(?![A-Z0-9])", re.IGNORECASE)
+    pattern = re.compile(
+        rf"(?<![A-Z0-9]){re.escape(normalized)}(?:\.JK)?(?![A-Z0-9])", re.IGNORECASE
+    )
     return bool(pattern.search(text))
 
 
@@ -977,15 +996,16 @@ def _confidence_adjustment(
         return 0.0, "No news data available - sentiment unverified"
 
     has_breaking_negative_news = any(
-        item.is_breaking and item.sentiment_score < -0.2
-        for item in items
+        item.is_breaking and item.sentiment_score < -0.2 for item in items
     )
     has_negative_corporate_action = any(
-        item.is_corporate_action and item.sentiment_score < -0.2
-        for item in items
+        item.is_corporate_action and item.sentiment_score < -0.2 for item in items
     )
     if has_breaking_negative_news:
-        return -0.20, f"Breaking negative news in last {BREAKING_NEWS_HOURS}h - significant risk detected"
+        return (
+            -0.20,
+            f"Breaking negative news in last {BREAKING_NEWS_HOURS}h - significant risk detected",
+        )
     if has_negative_corporate_action:
         return (
             -0.15,
@@ -1029,7 +1049,9 @@ DEFAULT_FETCHER = NewsFetcher()
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Build a recent-news brief for a ticker.")
+    parser = argparse.ArgumentParser(
+        description="Build a recent-news brief for a ticker."
+    )
     parser.add_argument("--ticker", required=True, help="IDX ticker, e.g. BBCA")
     args = parser.parse_args()
 

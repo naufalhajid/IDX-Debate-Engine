@@ -149,9 +149,7 @@ class AdaptivePlanner:
                     PlanAction.PROCEED_PARTIAL,
                     "Sentiment fetch failed, proceeding without sentiment data",
                     confidence_penalty=PARTIAL_DATA_CONFIDENCE_PENALTY,
-                    context_note=(
-                        "Sentiment data unavailable - confidence penalized"
-                    ),
+                    context_note=("Sentiment data unavailable - confidence penalized"),
                 )
 
             retry_decision = _route_for_retry(failure, ctx.attempt)
@@ -167,10 +165,10 @@ class AdaptivePlanner:
                     retry_delay_seconds=RETRY_DELAY_SECONDS,
                 )
 
-            if (
-                ctx.stage is PipelineStage.FUNDAMENTAL_FETCH
-                and failure_code in {ErrorCode.AUTH, ErrorCode.QUOTA}
-            ):
+            if ctx.stage is PipelineStage.FUNDAMENTAL_FETCH and failure_code in {
+                ErrorCode.AUTH,
+                ErrorCode.QUOTA,
+            }:
                 return self._decision(
                     ctx,
                     PlanAction.SKIP_TICKER,
@@ -187,8 +185,7 @@ class AdaptivePlanner:
                     "Technical fetch failed, proceeding without technical data",
                     confidence_penalty=PARTIAL_DATA_CONFIDENCE_PENALTY,
                     context_note=(
-                        "Technical data unavailable - using fundamental "
-                        "analysis only"
+                        "Technical data unavailable - using fundamental analysis only"
                     ),
                 )
 
@@ -410,7 +407,9 @@ DEFAULT_PLANNER = AdaptivePlanner()
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Summarize adaptive planner decisions.")
+    parser = argparse.ArgumentParser(
+        description="Summarize adaptive planner decisions."
+    )
     parser.add_argument("--run-id", help="Run ID to summarize")
     parser.add_argument(
         "--path",

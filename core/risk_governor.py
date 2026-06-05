@@ -101,16 +101,16 @@ def evaluate_risk(candidate: dict[str, Any]) -> RiskDecision:
     if reason_codes:
         return _log_decision(
             RiskDecision(
-            ticker=ticker,
-            status="reject",
-            sizing_allowed=False,
-            reason_codes=reason_codes,
-            message="Setup ditolak karena data harga kunci belum valid.",
-            current_price=current_price,
-            entry_low=entry_low,
-            entry_high=entry_high,
-            target_price=target_price,
-            stop_loss=stop_loss,
+                ticker=ticker,
+                status="reject",
+                sizing_allowed=False,
+                reason_codes=reason_codes,
+                message="Setup ditolak karena data harga kunci belum valid.",
+                current_price=current_price,
+                entry_low=entry_low,
+                entry_high=entry_high,
+                target_price=target_price,
+                stop_loss=stop_loss,
             )
         )
 
@@ -125,48 +125,48 @@ def evaluate_risk(candidate: dict[str, Any]) -> RiskDecision:
     if hard_rejects:
         return _log_decision(
             RiskDecision(
-            ticker=ticker,
-            status="reject",
-            sizing_allowed=False,
-            reason_codes=verdict_reason_codes,
-            message=_reject_message(verdict_reason_codes),
-            current_price=current_price,
-            entry_low=entry_low,
-            entry_high=entry_high,
-            target_price=target_price,
-            stop_loss=stop_loss,
+                ticker=ticker,
+                status="reject",
+                sizing_allowed=False,
+                reason_codes=verdict_reason_codes,
+                message=_reject_message(verdict_reason_codes),
+                current_price=current_price,
+                entry_low=entry_low,
+                entry_high=entry_high,
+                target_price=target_price,
+                stop_loss=stop_loss,
             )
         )
 
     if target_price <= current_price:
         return _log_decision(
             RiskDecision(
-            ticker=ticker,
-            status="reject",
-            sizing_allowed=False,
-            reason_codes=[*verdict_reason_codes, "upside_exhausted"],
-            message="Target sudah tidak memberi upside dari harga sekarang.",
-            current_price=current_price,
-            entry_low=entry_low,
-            entry_high=entry_high,
-            target_price=target_price,
-            stop_loss=stop_loss,
+                ticker=ticker,
+                status="reject",
+                sizing_allowed=False,
+                reason_codes=[*verdict_reason_codes, "upside_exhausted"],
+                message="Target sudah tidak memberi upside dari harga sekarang.",
+                current_price=current_price,
+                entry_low=entry_low,
+                entry_high=entry_high,
+                target_price=target_price,
+                stop_loss=stop_loss,
             )
         )
 
     if stop_loss >= current_price:
         return _log_decision(
             RiskDecision(
-            ticker=ticker,
-            status="reject",
-            sizing_allowed=False,
-            reason_codes=[*verdict_reason_codes, "invalid_stop_loss"],
-            message="Stop-loss tidak berada di bawah harga sekarang.",
-            current_price=current_price,
-            entry_low=entry_low,
-            entry_high=entry_high,
-            target_price=target_price,
-            stop_loss=stop_loss,
+                ticker=ticker,
+                status="reject",
+                sizing_allowed=False,
+                reason_codes=[*verdict_reason_codes, "invalid_stop_loss"],
+                message="Stop-loss tidak berada di bawah harga sekarang.",
+                current_price=current_price,
+                entry_low=entry_low,
+                entry_high=entry_high,
+                target_price=target_price,
+                stop_loss=stop_loss,
             )
         )
 
@@ -175,65 +175,65 @@ def evaluate_risk(candidate: dict[str, Any]) -> RiskDecision:
         if conditional:
             return _log_decision(
                 RiskDecision(
+                    ticker=ticker,
+                    status="conditional_deployable",
+                    sizing_allowed=False,
+                    reason_codes=[*verdict_reason_codes, "price_inside_entry_range"],
+                    message=(
+                        "Setup hanya conditional/watchlist; rating atau confidence belum "
+                        "cukup untuk sizing normal. Wajib konfirmasi breakout/volume "
+                        "dan gunakan sizing terbatas."
+                    ),
+                    current_price=current_price,
+                    entry_low=entry_low,
+                    entry_high=entry_high,
+                    target_price=target_price,
+                    stop_loss=stop_loss,
+                )
+            )
+        return _log_decision(
+            RiskDecision(
                 ticker=ticker,
-                status="conditional_deployable",
-                sizing_allowed=False,
-                reason_codes=[*verdict_reason_codes, "price_inside_entry_range"],
-                message=(
-                    "Setup hanya conditional/watchlist; rating atau confidence belum "
-                    "cukup untuk sizing normal. Wajib konfirmasi breakout/volume "
-                    "dan gunakan sizing terbatas."
-                ),
+                status="deployable",
+                sizing_allowed=True,
+                reason_codes=["price_inside_entry_range"],
+                message="Harga sekarang berada di zona entry; kandidat boleh masuk sizing.",
                 current_price=current_price,
                 entry_low=entry_low,
                 entry_high=entry_high,
                 target_price=target_price,
                 stop_loss=stop_loss,
-                )
-            )
-        return _log_decision(
-            RiskDecision(
-            ticker=ticker,
-            status="deployable",
-            sizing_allowed=True,
-            reason_codes=["price_inside_entry_range"],
-            message="Harga sekarang berada di zona entry; kandidat boleh masuk sizing.",
-            current_price=current_price,
-            entry_low=entry_low,
-            entry_high=entry_high,
-            target_price=target_price,
-            stop_loss=stop_loss,
             )
         )
 
     if current_price > entry_high:
         return _log_decision(
             RiskDecision(
-            ticker=ticker,
-            status="wait_for_pullback",
-            sizing_allowed=False,
-            reason_codes=[*verdict_reason_codes, "price_above_entry_range"],
-            message="Setup valid sebagai watchlist, tetapi tunggu pullback ke buy range.",
-            current_price=current_price,
-            entry_low=entry_low,
-            entry_high=entry_high,
-            target_price=target_price,
-            stop_loss=stop_loss,
+                ticker=ticker,
+                status="wait_for_pullback",
+                sizing_allowed=False,
+                reason_codes=[*verdict_reason_codes, "price_above_entry_range"],
+                message="Setup valid sebagai watchlist, tetapi tunggu pullback ke buy range.",
+                current_price=current_price,
+                entry_low=entry_low,
+                entry_high=entry_high,
+                target_price=target_price,
+                stop_loss=stop_loss,
             )
         )
 
     return _log_decision(
         RiskDecision(
-        ticker=ticker,
-        status="watchlist_only",
-        sizing_allowed=False,
-        reason_codes=[*verdict_reason_codes, "price_below_entry_range"],
-        message="Harga belum berada di zona entry; pantau sampai setup terkonfirmasi.",
-        current_price=current_price,
-        entry_low=entry_low,
-        entry_high=entry_high,
-        target_price=target_price,
-        stop_loss=stop_loss,
+            ticker=ticker,
+            status="watchlist_only",
+            sizing_allowed=False,
+            reason_codes=[*verdict_reason_codes, "price_below_entry_range"],
+            message="Harga belum berada di zona entry; pantau sampai setup terkonfirmasi.",
+            current_price=current_price,
+            entry_low=entry_low,
+            entry_high=entry_high,
+            target_price=target_price,
+            stop_loss=stop_loss,
         )
     )
 
@@ -516,7 +516,9 @@ def _is_conditional_setup(reason_codes: list[str], verdict: dict[str, Any]) -> b
     # When the only soft flags are counter_trend + rating_hold and R/R >= 3.5x, the
     # valuation margin is wide enough to deploy without waiting for MA crossover.
     if "counter_trend_setup" in reason_codes and rating in SOFT_BUYABLE_RATINGS:
-        soft_only = [c for c in reason_codes if c not in {"counter_trend_setup", "rating_hold"}]
+        soft_only = [
+            c for c in reason_codes if c not in {"counter_trend_setup", "rating_hold"}
+        ]
         rr = float(verdict.get("risk_reward_ratio") or 0)
         if not soft_only and rr >= 3.5:
             return False

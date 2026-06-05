@@ -194,9 +194,7 @@ class ExecutionLedger:
                 stage=None,
                 event_type=EventType.TICKER_END,
                 severity=(
-                    EventSeverity.INFO
-                    if status == "success"
-                    else EventSeverity.WARNING
+                    EventSeverity.INFO if status == "success" else EventSeverity.WARNING
                 ),
                 message=f"Ticker {ticker} ended with {status}",
                 detail={

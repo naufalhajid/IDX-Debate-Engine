@@ -17,7 +17,6 @@ def _normalize_tickers(tickers: list[str]) -> list[str]:
     return normalized
 
 
-
 def run_debate_cli(
     *,
     tickers: list[str],
@@ -51,15 +50,23 @@ def debate_command(
     ] = None,
     output_dir: Annotated[
         Path,
-        typer.Option("--output-dir", help="Directory for debate JSON output. Default: output/debates"),
+        typer.Option(
+            "--output-dir",
+            help="Directory for debate JSON output. Default: output/debates",
+        ),
     ] = Path("output/debates"),
     verbose: Annotated[
         bool,
-        typer.Option("--verbose", help="Show raw Loguru logs in addition to Rich output."),
+        typer.Option(
+            "--verbose", help="Show raw Loguru logs in addition to Rich output."
+        ),
     ] = False,
     details: Annotated[
         bool,
-        typer.Option("--details/--no-details", help="Show full per-agent reasoning in the post-debate table."),
+        typer.Option(
+            "--details/--no-details",
+            help="Show full per-agent reasoning in the post-debate table.",
+        ),
     ] = True,
 ) -> None:
     """Run AI multi-agent debate for specific tickers. Example: idx debate BBCA BMRI TLKM"""

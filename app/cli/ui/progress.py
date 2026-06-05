@@ -52,8 +52,10 @@ def quiet_filter_pipeline(
         # 2nd+ call in this process: logger already configured — silence StreamHandlers only.
         original = list(qf.handlers)
         qf.handlers = [
-            h for h in qf.handlers
-            if not isinstance(h, logging.StreamHandler) or isinstance(h, logging.FileHandler)
+            h
+            for h in qf.handlers
+            if not isinstance(h, logging.StreamHandler)
+            or isinstance(h, logging.FileHandler)
         ]
         quiet_h = ProgressConsoleHandler(progress_callback)
         qf.addHandler(quiet_h)

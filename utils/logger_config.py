@@ -14,6 +14,7 @@ warnings.filterwarnings("ignore", message=".*allowed_objects.*")
 
 load_dotenv()
 
+
 def _normalize_log_level(value: str | None, default: str = "INFO") -> str:
     candidate = str(value or "").strip().upper()
     if not candidate:

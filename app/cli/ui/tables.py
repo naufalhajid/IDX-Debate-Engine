@@ -217,7 +217,9 @@ def build_verdict_summary_table(results: list[dict]) -> Table:
 
         # Target / Stop
         try:
-            target_str = f"Rp{float(target_raw):,.0f}" if target_raw is not None else "-"
+            target_str = (
+                f"Rp{float(target_raw):,.0f}" if target_raw is not None else "-"
+            )
         except (TypeError, ValueError):
             target_str = "-"
         try:

@@ -100,7 +100,9 @@ def test_debate_normalizes_tickers_and_output_dir(monkeypatch):
 
     monkeypatch.setattr("app.cli.commands.debate.run_debate_cli", fake_run_debate_cli)
 
-    result = runner.invoke(app, ["debate", "bbri", "BBCA", "--output-dir", "tmp/debates"])
+    result = runner.invoke(
+        app, ["debate", "bbri", "BBCA", "--output-dir", "tmp/debates"]
+    )
 
     assert result.exit_code == 0, result.output
     assert calls == [(["BBRI", "BBCA"], Path("tmp/debates"), False, True)]
@@ -140,7 +142,9 @@ def test_pipeline_preserves_legacy_flags(monkeypatch):
     def fake_run_pipeline_cli(**kwargs):
         calls.append(kwargs)
 
-    monkeypatch.setattr("app.cli.commands.pipeline.run_pipeline_cli", fake_run_pipeline_cli)
+    monkeypatch.setattr(
+        "app.cli.commands.pipeline.run_pipeline_cli", fake_run_pipeline_cli
+    )
 
     result = runner.invoke(
         app,
@@ -180,7 +184,9 @@ def test_pipeline_uses_global_verbose_flag(monkeypatch):
     def fake_run_pipeline_cli(**kwargs):
         calls.append(kwargs)
 
-    monkeypatch.setattr("app.cli.commands.pipeline.run_pipeline_cli", fake_run_pipeline_cli)
+    monkeypatch.setattr(
+        "app.cli.commands.pipeline.run_pipeline_cli", fake_run_pipeline_cli
+    )
 
     result = runner.invoke(app, ["--verbose", "pipeline", "--dry-run"])
 
@@ -194,7 +200,9 @@ def test_pipeline_runner_passes_argparse_argv_without_program_name(monkeypatch):
     def fake_run_cli(argv):
         calls.append(argv)
 
-    monkeypatch.setitem(sys.modules, "orchestrator", SimpleNamespace(_run_cli=fake_run_cli))
+    monkeypatch.setitem(
+        sys.modules, "orchestrator", SimpleNamespace(_run_cli=fake_run_cli)
+    )
 
     run_pipeline_cli(
         dry_run=True,

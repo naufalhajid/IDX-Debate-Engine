@@ -94,8 +94,7 @@ def test_check_consistency_flags_failed_ticker_promoted(
 
     assert report.consistent is False
     assert any(
-        item.type == InconsistencyType.FAILED_TICKER_PROMOTED
-        and item.ticker == "WIIM"
+        item.type == InconsistencyType.FAILED_TICKER_PROMOTED and item.ticker == "WIIM"
         for item in report.inconsistencies
     )
 
@@ -120,8 +119,7 @@ def test_check_consistency_flags_avoid_rating_presented_positively(
 
     assert report.consistent is False
     assert any(
-        item.type == InconsistencyType.RATING_MISMATCH
-        and item.ticker == "BBRI"
+        item.type == InconsistencyType.RATING_MISMATCH and item.ticker == "BBRI"
         for item in report.inconsistencies
     )
 
@@ -234,8 +232,7 @@ def test_check_consistency_flags_sized_non_deployable(
 
     assert report.consistent is False
     assert any(
-        item.type == InconsistencyType.SIZED_NON_DEPLOYABLE
-        and item.severity == "error"
+        item.type == InconsistencyType.SIZED_NON_DEPLOYABLE and item.severity == "error"
         for item in report.inconsistencies
     )
 
@@ -264,7 +261,6 @@ def test_check_consistency_flags_upside_exhausted_promoted(
 
     assert report.consistent is False
     assert any(
-        item.type == InconsistencyType.UPSIDE_EXHAUSTED
-        and item.severity == "error"
+        item.type == InconsistencyType.UPSIDE_EXHAUSTED and item.severity == "error"
         for item in report.inconsistencies
     )

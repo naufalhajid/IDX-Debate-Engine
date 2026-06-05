@@ -68,9 +68,9 @@ def debate_fixture() -> dict:
             "Fair Value Estimate: Rp 10,474\n"
             "Data Sources: stockbit, gemini, yfinance\n"
             "Missing Fields: none\n"
-            "Technical Indicators: {\"rsi14\":43.7}\n\n"
-            "Fundamental Brief: {\"brief\":\"solid bank metrics\"}\n\n"
-            "Sentiment Brief: ```json {\"sentiment\":\"NEUTRAL\"} ```"
+            'Technical Indicators: {"rsi14":43.7}\n\n'
+            'Fundamental Brief: {"brief":"solid bank metrics"}\n\n'
+            'Sentiment Brief: ```json {"sentiment":"NEUTRAL"} ```'
         ),
         "metadata": {
             "run_id": "20260513_044236",

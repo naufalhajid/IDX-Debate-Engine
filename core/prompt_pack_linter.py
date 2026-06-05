@@ -171,7 +171,9 @@ def _lint_prompt_file(
     try:
         content = path.read_text(encoding="utf-8")
     except UnicodeDecodeError as exc:
-        errors.append(f"Prompt file is not valid UTF-8 for {prompt_name}: {path}: {exc}")
+        errors.append(
+            f"Prompt file is not valid UTF-8 for {prompt_name}: {path}: {exc}"
+        )
         return
 
     if not content.strip():
@@ -179,7 +181,9 @@ def _lint_prompt_file(
         return
     if prompt_name not in EXEMPT_PROMPTS:
         if "Position:" not in content:
-            errors.append(f"Prompt file for {prompt_name} is missing required marker: Position:")
+            errors.append(
+                f"Prompt file for {prompt_name} is missing required marker: Position:"
+            )
         if "Agent Confidence:" not in content:
             errors.append(
                 f"Prompt file for {prompt_name} is missing required marker: Agent Confidence:"

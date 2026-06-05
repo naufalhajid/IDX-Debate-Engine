@@ -35,9 +35,11 @@ from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponen
 
 try:
     import pytz
+
     _TZ_WIB = pytz.timezone("Asia/Jakarta")
 except Exception:
     from datetime import timezone, timedelta
+
     _TZ_WIB = timezone(timedelta(hours=7))
 
 from core.budget import (
@@ -113,7 +115,7 @@ _TRANSIENT_ERROR_PATTERNS = (
     "connection aborted",
     "connection dropped",  # wraps asyncio.CancelledError from network timeout
     "timeout",
-    "empty response",      # Gemini safety filter / token budget returns empty content
+    "empty response",  # Gemini safety filter / token budget returns empty content
 )
 
 
@@ -135,6 +137,7 @@ def _is_transient_error(exc: BaseException) -> bool:
 
 def _as_debate_message(m):
     from schemas.debate import DebateMessage
+
     if isinstance(m, dict):
         return DebateMessage(**m)
     return m
@@ -328,7 +331,9 @@ def _breaking_news_headlines(news_bundle: Any, limit: int = 3) -> list[dict[str,
     return headlines
 
 
-def _news_adjustment_from_sentiment(sentiment: str, has_breaking: bool) -> tuple[float, str]:
+def _news_adjustment_from_sentiment(
+    sentiment: str, has_breaking: bool
+) -> tuple[float, str]:
     """Map an LLM-judged news sentiment to a CIO confidence adjustment.
 
     Single source of truth so the displayed news sentiment and the numeric
@@ -589,12 +594,15 @@ def _increment_planner_attempt(
 # Internal schemas
 # ---------------------------------------------------------------------------
 
+
 class ConsensusSchema(BaseModel):
     consensus_reached: bool = Field(
         description="True only if BOTH agents overwhelmingly agree on the same direction "
-                    "with no major unresolved fundamental objections."
+        "with no major unresolved fundamental objections."
     )
-    disagreement_type: Literal["direction", "timing", "valuation", "catalyst"] | None = Field(
+    disagreement_type: (
+        Literal["direction", "timing", "valuation", "catalyst"] | None
+    ) = Field(
         default=None,
         description="Primary disagreement type when consensus_reached is false.",
     )
@@ -638,6 +646,7 @@ CIO_SYSTEM_PROMPT = PROMPT_REGISTRY.prompts["CIO_SYSTEM_PROMPT"]
 # ---------------------------------------------------------------------------
 # Router
 # ---------------------------------------------------------------------------
+
 
 def post_evaluator_router(
     state: DebateChamberState,
@@ -708,9 +717,7 @@ def load_agent_calibration_weights(
 
     raw_agents = config.get("agents") if isinstance(config, dict) else None
     raw_flat = (
-        config.get("agent_calibration_weights")
-        if isinstance(config, dict)
-        else None
+        config.get("agent_calibration_weights") if isinstance(config, dict) else None
     )
     configured = False
     for agent in weights:
@@ -734,6 +741,7 @@ def load_agent_calibration_weights(
             "Agent calibration weights not configured — defaulting to 1.0 for all agents."
         )
     return weights
+
 
 AGENT_SIGNAL_PROMPT = PROMPT_REGISTRY.prompts["AGENT_SIGNAL_PROMPT"]
 
@@ -774,6 +782,7 @@ def _bundle_evidence_age_hours(bundle: Any) -> float | None:
     if not freshness_values:
         return None
     return max(freshness_values)
+
 
 SENTIMENT_SIGNAL_WEIGHTING_INSTRUCTION = """
 SIGNAL WEIGHTING: Posts with "_verified_weight": 1.5 are from verified Stockbit users (analysts, institutional accounts). Weight their sentiment signals more heavily in your analysis. Posts with "_verified_weight": 1.0 are from regular retail users and still count - do not ignore them.
@@ -872,10 +881,7 @@ class DebateChamber:
                 return cls._llm_content_to_text(content.get("content"))
             return json.dumps(content, ensure_ascii=False)
         if isinstance(content, list | tuple):
-            parts = [
-                cls._llm_content_to_text(item).strip()
-                for item in content
-            ]
+            parts = [cls._llm_content_to_text(item).strip() for item in content]
             return "\n".join(part for part in parts if part)
         for attr in ("text", "content"):
             value = getattr(content, attr, None)
@@ -1003,8 +1009,7 @@ class DebateChamber:
         max_chars: int = 10_000,
     ) -> tuple[str, int]:
         compacted_posts = [
-            DebateChamber._compact_stockbit_post_for_llm(post)
-            for post in posts
+            DebateChamber._compact_stockbit_post_for_llm(post) for post in posts
         ]
         protected_count = min(max(protected_count, 0), len(compacted_posts))
         serialized = json.dumps(compacted_posts, ensure_ascii=False)
@@ -1054,13 +1059,21 @@ class DebateChamber:
             serialized = dumps_with_note(compact_posts)
             if len(serialized) <= max_chars:
                 return serialized, original_count - len(compact_posts)
-            content_limit = content_limit // 2 if content_limit > 20 else content_limit - 1
+            content_limit = (
+                content_limit // 2 if content_limit > 20 else content_limit - 1
+            )
 
         minimal_posts: list[dict[str, Any]] = []
         for post in kept_posts:
             minimal_post = {
                 key: post[key]
-                for key in ("stream_id", "id", "post_id", "created_at", "_verified_weight")
+                for key in (
+                    "stream_id",
+                    "id",
+                    "post_id",
+                    "created_at",
+                    "_verified_weight",
+                )
                 if key in post
             }
             minimal_post["content"] = "..."
@@ -1087,7 +1100,9 @@ class DebateChamber:
         }
 
     @classmethod
-    def _sentiment_payload_from_response(cls, ticker: str, content: Any) -> dict[str, Any]:
+    def _sentiment_payload_from_response(
+        cls, ticker: str, content: Any
+    ) -> dict[str, Any]:
         raw_text = cls._llm_content_to_text(content).strip()
         try:
             payload = json.loads(cls._sanitize_json(raw_text))
@@ -1097,8 +1112,7 @@ class DebateChamber:
         except (json.JSONDecodeError, ValueError) as exc:
             raw_preview = raw_text[:500].replace("\n", "\\n")
             logger.warning(
-                f"[Sentiment] JSON parse failed for {ticker}: {exc}; "
-                f"raw={raw_preview}"
+                f"[Sentiment] JSON parse failed for {ticker}: {exc}; raw={raw_preview}"
             )
             return {
                 "position": "HOLD",
@@ -1164,7 +1178,9 @@ class DebateChamber:
         )
 
     @classmethod
-    def _extract_confidence(cls, content: str, default: float | None = None) -> float | None:
+    def _extract_confidence(
+        cls, content: str, default: float | None = None
+    ) -> float | None:
         text = str(content or "")
         for match in cls._CONFIDENCE_RE.finditer(text):
             try:
@@ -1179,7 +1195,11 @@ class DebateChamber:
     @classmethod
     def _infer_position_from_text(cls, content: str, role: str) -> str:
         text = str(content or "")
-        if not text.strip() or "data unavailable" in text.lower() or "missing" == text.lower().strip():
+        if (
+            not text.strip()
+            or "data unavailable" in text.lower()
+            or "missing" == text.lower().strip()
+        ):
             return "UNKNOWN"
 
         explicit = cls._POSITION_RE.search(text)
@@ -1245,14 +1265,18 @@ class DebateChamber:
     def _extract_agent_signal(self, content: str, role: str) -> dict[str, object]:
         position = self._infer_position_from_text(content, role)
         unavailable = position == "UNKNOWN"
-        default_confidence = None if unavailable else (0.60 if role in {"bull", "bear"} else 0.55)
+        default_confidence = (
+            None if unavailable else (0.60 if role in {"bull", "bear"} else 0.55)
+        )
         confidence = self._extract_confidence(content, default=default_confidence)
         return {
             "position": position,
             "confidence": None if confidence is None else round(confidence, 2),
         }
 
-    def _ensure_signal_footer(self, content: Any, role: str) -> tuple[str, dict[str, object]]:
+    def _ensure_signal_footer(
+        self, content: Any, role: str
+    ) -> tuple[str, dict[str, object]]:
         text = self._llm_content_to_text(content).strip()
         signal = self._extract_agent_signal(text, role)
         confidence = signal.get("confidence")
@@ -1296,8 +1320,12 @@ class DebateChamber:
                     run_id=run_id,
                     ticker=ticker,
                     agent=agent,
-                    position=str(signal.get("position", "UNKNOWN")) if signal else "NEUTRAL",
-                    confidence=confidence if isinstance(confidence, (int, float)) else None,
+                    position=str(signal.get("position", "UNKNOWN"))
+                    if signal
+                    else "NEUTRAL",
+                    confidence=confidence
+                    if isinstance(confidence, (int, float))
+                    else None,
                     summary=summary,
                     round_num=int(state.get("round_count", 0) or 0),
                     prompt_version=str(metadata.get("prompt_version", "unknown")),
@@ -1320,11 +1348,23 @@ class DebateChamber:
                 messages.append(message)
         return messages[-1] if messages else None
 
-    def _collect_agent_votes(self, state: DebateChamberState) -> list[dict[str, object]]:
+    def _collect_agent_votes(
+        self, state: DebateChamberState
+    ) -> list[dict[str, object]]:
         specs = [
-            ("fundamental_scout", state.get("fundamental_data", ""), "fundamental_scout", 0),
+            (
+                "fundamental_scout",
+                state.get("fundamental_data", ""),
+                "fundamental_scout",
+                0,
+            ),
             ("chartist", state.get("technical_data", ""), "chartist", 0),
-            ("sentiment_specialist", state.get("sentiment_data", ""), "sentiment_specialist", 0),
+            (
+                "sentiment_specialist",
+                state.get("sentiment_data", ""),
+                "sentiment_specialist",
+                0,
+            ),
         ]
         for role in ("bull", "bear"):
             msg = self._latest_message(state, role)
@@ -1348,18 +1388,22 @@ class DebateChamber:
                 0.0,
                 min(raw_confidence * calibration_weight, 1.0),
             )
-            votes.append({
-                "agent": agent,
-                "position": signal.get("position", "UNKNOWN"),
-                "confidence": raw_confidence,
-                "calibration_weight": calibration_weight,
-                "effective_confidence": effective_confidence,
-                "round": round_num,
-            })
+            votes.append(
+                {
+                    "agent": agent,
+                    "position": signal.get("position", "UNKNOWN"),
+                    "confidence": raw_confidence,
+                    "calibration_weight": calibration_weight,
+                    "effective_confidence": effective_confidence,
+                    "round": round_num,
+                }
+            )
         return votes
 
     @staticmethod
-    def _dissenters(votes: list[dict[str, object]], consensus_position: str) -> list[str]:
+    def _dissenters(
+        votes: list[dict[str, object]], consensus_position: str
+    ) -> list[str]:
         return [
             str(v["agent"])
             for v in votes
@@ -1368,7 +1412,9 @@ class DebateChamber:
 
     @staticmethod
     def _infer_disagreement_type(votes: list[dict[str, object]]) -> str:
-        positions = {str(v.get("position")) for v in votes if v.get("position") != "UNKNOWN"}
+        positions = {
+            str(v.get("position")) for v in votes if v.get("position") != "UNKNOWN"
+        }
         if "BUY" in positions and "AVOID" in positions:
             return "direction"
         if "HOLD" in positions and len(positions) > 1:
@@ -1392,13 +1438,13 @@ class DebateChamber:
         if counts:
             position, count = counts.most_common(1)[0]
             threshold = (
-                ROUND1_CONSENSUS_THRESHOLD
-                if round_count <= 1
-                else CONSENSUS_THRESHOLD
+                ROUND1_CONSENSUS_THRESHOLD if round_count <= 1 else CONSENSUS_THRESHOLD
             )
             if count / CONSENSUS_AGENT_COUNT >= threshold:
                 majority_votes = [v for v in votes if v.get("position") == position]
-                winner = max(majority_votes, key=lambda v: float(v.get("confidence", 0.0) or 0.0))
+                winner = max(
+                    majority_votes, key=lambda v: float(v.get("confidence", 0.0) or 0.0)
+                )
                 return {
                     "consensus_reached": True,
                     "consensus_method": "voting",
@@ -1443,7 +1489,9 @@ class DebateChamber:
                 }
 
         if round_count >= MAX_DEBATE_ROUNDS:
-            known_votes = [v for v in votes if v.get("position") in {"BUY", "HOLD", "AVOID"}]
+            known_votes = [
+                v for v in votes if v.get("position") in {"BUY", "HOLD", "AVOID"}
+            ]
             winner = max(
                 known_votes or votes,
                 key=lambda v: float(
@@ -1486,14 +1534,19 @@ class DebateChamber:
             bound = getattr(llm, "bound", getattr(llm, "first", None))
             model_name = getattr(bound, "model", getattr(bound, "model_name", None))
         if model_name is None:
-            raise RuntimeError("Unable to classify LLM tier for budget accounting (model_name missing)")
+            raise RuntimeError(
+                "Unable to classify LLM tier for budget accounting (model_name missing)"
+            )
 
         m = str(model_name).lower()
         if any(x in m for x in ["flash", "haiku", "mini", "gpt-3.5"]):
             return "flash"
-        if any(x in m for x in ["pro", "sonnet", "opus", "o1", "o3", "gpt-4", "gpt-5", "exp-"]):
+        if any(
+            x in m
+            for x in ["pro", "sonnet", "opus", "o1", "o3", "gpt-4", "gpt-5", "exp-"]
+        ):
             return "pro"
-            
+
         raise RuntimeError(f"Unable to classify LLM tier for budget accounting: {m}")
 
     def _reset_llm_counters(self, state: DebateChamberState) -> None:
@@ -1502,7 +1555,10 @@ class DebateChamber:
             metadata["flash_calls"] = 0
             metadata["pro_calls"] = 0
             state["metadata"] = metadata
-            key = (str(metadata.get("run_id", "unknown")), str(state.get("ticker", "unknown")))
+            key = (
+                str(metadata.get("run_id", "unknown")),
+                str(state.get("ticker", "unknown")),
+            )
             self._llm_call_counts[key] = {"flash_calls": 0, "pro_calls": 0}
         except Exception as exc:
             logger.warning(f"[Telemetry] Failed to initialize LLM counters: {exc}")
@@ -1515,7 +1571,10 @@ class DebateChamber:
             metadata = state.get("metadata") or {}
             metadata[counter_key] = int(metadata.get(counter_key, 0) or 0) + 1
             state["metadata"] = metadata
-            key = (str(metadata.get("run_id", "unknown")), str(state.get("ticker", "unknown")))
+            key = (
+                str(metadata.get("run_id", "unknown")),
+                str(state.get("ticker", "unknown")),
+            )
             counts = self._llm_call_counts.setdefault(
                 key,
                 {"flash_calls": 0, "pro_calls": 0},
@@ -1649,10 +1708,11 @@ class DebateChamber:
         structured output (CIO & Consensus) tidak berbenturan instruksi.
         """
         msgs = list(messages)
-        
+
         # FIX: Hanya suntikkan global rules jika inject_rules = True
         if inject_rules:
             from datetime import datetime
+
             current_date = datetime.now(_TZ_WIB).strftime("%Y-%m-%d")
             global_rules = f"""
 GLOBAL RELIABILITY RULES (MANDATORY)
@@ -1860,14 +1920,20 @@ Current Date (Asia/Jakarta): {current_date}
             report_str, fv_price = build_fair_value_report(raw, ticker, current_price)
             logger.info(f"[Fundamental] Fair value for {ticker}: {fv_price}")
             if fv_price is None:
-                logger.warning(f"[Fundamental] Raw API response for {ticker}: {json.dumps(raw)[:2000]}")
+                logger.warning(
+                    f"[Fundamental] Raw API response for {ticker}: {json.dumps(raw)[:2000]}"
+                )
 
             messages = [
                 SystemMessage(content=FUNDAMENTAL_SCOUT_PROMPT + AGENT_SIGNAL_PROMPT),
-                HumanMessage(content=f"{report_str}\n\n=== RAW API JSON ===\n{json.dumps(raw)[:10_000]}"),
+                HumanMessage(
+                    content=f"{report_str}\n\n=== RAW API JSON ===\n{json.dumps(raw)[:10_000]}"
+                ),
             ]
             resp = await self._invoke_llm_for_state(state, self.flash_llm, messages)
-            content, signal = self._ensure_signal_footer(resp.content, "fundamental_scout")
+            content, signal = self._ensure_signal_footer(
+                resp.content, "fundamental_scout"
+            )
             self._record_observation(state, "fundamental_scout", content, signal)
             _ledger_stage_success(
                 state,
@@ -1942,15 +2008,17 @@ Current Date (Asia/Jakarta): {current_date}
                 if isinstance(df_yf.columns, pd.MultiIndex):
                     df_yf.columns = df_yf.columns.get_level_values(0)
 
-                close = df_yf['Close'].squeeze()
-                high = df_yf['High'].squeeze()
-                low = df_yf['Low'].squeeze()
-                volume = df_yf['Volume'].squeeze()
+                close = df_yf["Close"].squeeze()
+                high = df_yf["High"].squeeze()
+                low = df_yf["Low"].squeeze()
+                volume = df_yf["Volume"].squeeze()
 
                 # Pre-compute all technicals in Python (ground truth)
                 sma20_val = float(close.rolling(20).mean().iloc[-1])
                 ema20_val = float(close.ewm(span=20, adjust=False).mean().iloc[-1])
-                ma50_raw = close.rolling(50).mean().iloc[-1] if len(close) >= 50 else None
+                ma50_raw = (
+                    close.rolling(50).mean().iloc[-1] if len(close) >= 50 else None
+                )
                 ma200_series = close.rolling(window=200, min_periods=50).mean()
                 ma200_raw = ma200_series.iloc[-1] if len(close) >= 50 else None
                 rsi_val = float(compute_rsi(close).iloc[-1])
@@ -1960,8 +2028,12 @@ Current Date (Asia/Jakarta): {current_date}
                     atr_val = float((high - low).tail(14).mean())
                 current_price = float(close.iloc[-1])
 
-                high_20d = float(high.tail(20).max()) if len(high) >= 20 else float(high.max())
-                high_50d = float(high.tail(50).max()) if len(high) >= 50 else float(high.max())
+                high_20d = (
+                    float(high.tail(20).max()) if len(high) >= 20 else float(high.max())
+                )
+                high_50d = (
+                    float(high.tail(50).max()) if len(high) >= 50 else float(high.max())
+                )
 
                 # Momentum / volume-breakout signals — feed the asymmetry watchlist gate
                 # in _apply_consensus_override. A recent volume-confirmed up-move is what
@@ -1969,13 +2041,14 @@ Current Date (Asia/Jakarta): {current_date}
                 # is merely below its MAs; MA-based trend signals miss the single-day surge.
                 last_volume = float(volume.iloc[-1]) if len(volume) else 0.0
                 avg_volume_20d = float(volume.tail(20).mean()) if len(volume) else 0.0
-                volume_surge_ratio = (last_volume / avg_volume_20d) if avg_volume_20d > 0 else 0.0
+                volume_surge_ratio = (
+                    (last_volume / avg_volume_20d) if avg_volume_20d > 0 else 0.0
+                )
                 return_5d_pct = (
                     (current_price / float(close.iloc[-6]) - 1.0) * 100.0
                     if len(close) >= 6 and float(close.iloc[-6]) > 0
                     else 0.0
                 )
-
 
                 if ma200_raw is None or pd.isna(ma200_raw):
                     ma200_context = "INSUFFICIENT_DATA"
@@ -1994,14 +2067,20 @@ Current Date (Asia/Jakarta): {current_date}
                         ):
                             ma200_context = "CROSSOVER_RECENT"
                         else:
-                            ma200_context = "ABOVE" if current_price >= ma200_value else "BELOW"
+                            ma200_context = (
+                                "ABOVE" if current_price >= ma200_value else "BELOW"
+                            )
 
                 tech_indicators = {
                     "current_price": round(current_price, 0),
                     "sma20": round(sma20_val, 0),
                     "ema20": round(ema20_val, 0),
-                    "ma50": round(float(ma50_raw), 0) if ma50_raw is not None and not pd.isna(ma50_raw) else None,
-                    "ma200": round(float(ma200_raw), 0) if ma200_raw is not None and not pd.isna(ma200_raw) else None,
+                    "ma50": round(float(ma50_raw), 0)
+                    if ma50_raw is not None and not pd.isna(ma50_raw)
+                    else None,
+                    "ma200": round(float(ma200_raw), 0)
+                    if ma200_raw is not None and not pd.isna(ma200_raw)
+                    else None,
                     "ma200_context": ma200_context,
                     "rsi14": round(rsi_val, 1),
                     "atr14": round(atr_val, 0) if not pd.isna(atr_val) else None,
@@ -2013,7 +2092,9 @@ Current Date (Asia/Jakarta): {current_date}
                     "volume_surge_ratio": round(volume_surge_ratio, 2),
                     "return_5d_pct": round(return_5d_pct, 1),
                 }
-                logger.info(f"[Chartist] Technicals computed: MA50={tech_indicators.get('ma50')}, RSI={tech_indicators.get('rsi14')}")
+                logger.info(
+                    f"[Chartist] Technicals computed: MA50={tech_indicators.get('ma50')}, RSI={tech_indicators.get('rsi14')}"
+                )
         except Exception as e:
             logger.warning(f"[Chartist] yfinance download failed for {ticker}: {e}")
             failure_record = classify_exception(e, "yfinance").model_dump(mode="json")
@@ -2047,9 +2128,12 @@ Current Date (Asia/Jakarta): {current_date}
         # ── 2. Also fetch orderbook for near-term level context ──────────────
         orderbook_data: dict = {}
         try:
-            orderbook_data = await self._fetch_url(
-                f"{BASE_URL}/company-price-feed/v2/orderbook/companies/{ticker}"
-            ) or {}
+            orderbook_data = (
+                await self._fetch_url(
+                    f"{BASE_URL}/company-price-feed/v2/orderbook/companies/{ticker}"
+                )
+                or {}
+            )
         except Exception as e:
             logger.warning(f"[Chartist] Orderbook fetch failed: {e}")
             failure_record = classify_exception(e, "stockbit").model_dump(mode="json")
@@ -2081,14 +2165,18 @@ Current Date (Asia/Jakarta): {current_date}
                 state["metadata"] = _metadata_with_planner_note(state, decision)
 
         # ── 3. Build message with ground-truth technicals ────────────────────
-        tech_summary = json.dumps(tech_indicators, indent=2) if tech_indicators else "{}"
+        tech_summary = (
+            json.dumps(tech_indicators, indent=2) if tech_indicators else "{}"
+        )
         messages = [
             SystemMessage(content=CHARTIST_PROMPT + AGENT_SIGNAL_PROMPT),
-            HumanMessage(content=(
-                f"=== PRE-COMPUTED TECHNICALS (Python — Ground Truth, do NOT recalculate) ===\n"
-                f"{tech_summary}\n\n"
-                f"=== ORDERBOOK ===\n{json.dumps(orderbook_data)[:5_000]}"
-            )),
+            HumanMessage(
+                content=(
+                    f"=== PRE-COMPUTED TECHNICALS (Python — Ground Truth, do NOT recalculate) ===\n"
+                    f"{tech_summary}\n\n"
+                    f"=== ORDERBOOK ===\n{json.dumps(orderbook_data)[:5_000]}"
+                )
+            ),
         ]
         resp = await self._invoke_llm_for_state(state, self.pro_llm, messages)
         content, signal = self._ensure_signal_footer(resp.content, "chartist")
@@ -2114,27 +2202,31 @@ Current Date (Asia/Jakarta): {current_date}
             stage="SENTIMENT_FETCH",
             attempt_key="sentiment_attempt",
         )
-        await asyncio.sleep(1.0)   # stagger to avoid burst rate-limit
+        await asyncio.sleep(1.0)  # stagger to avoid burst rate-limit
         try:
             pinned_raw, ideas_posts, news_posts = await asyncio.gather(
-                asyncio.shield(self._fetch_sentiment_endpoint(
-                    ticker,
-                    "pinned",
-                    f"{BASE_URL}/stream/v3/symbol/{ticker}/pinned",
-                )),
-                asyncio.shield(self._fetch_sentiment_stream_posts(
-                    ticker,
-                    "STREAM_CATEGORY_IDEAS",
-                )),
-                asyncio.shield(self._fetch_sentiment_stream_posts(
-                    ticker,
-                    "STREAM_CATEGORY_NEWS",
-                )),
+                asyncio.shield(
+                    self._fetch_sentiment_endpoint(
+                        ticker,
+                        "pinned",
+                        f"{BASE_URL}/stream/v3/symbol/{ticker}/pinned",
+                    )
+                ),
+                asyncio.shield(
+                    self._fetch_sentiment_stream_posts(
+                        ticker,
+                        "STREAM_CATEGORY_IDEAS",
+                    )
+                ),
+                asyncio.shield(
+                    self._fetch_sentiment_stream_posts(
+                        ticker,
+                        "STREAM_CATEGORY_NEWS",
+                    )
+                ),
             )
             pinned_posts = self._extract_stockbit_posts(pinned_raw)
-            total_before_dedup = (
-                len(pinned_posts) + len(ideas_posts) + len(news_posts)
-            )
+            total_before_dedup = len(pinned_posts) + len(ideas_posts) + len(news_posts)
             combined_posts = self._merge_stockbit_posts(
                 pinned_posts,
                 ideas_posts,
@@ -2324,7 +2416,7 @@ Current Date (Asia/Jakarta): {current_date}
             validation = validate_swing_targets(
                 current_price=current_price,
                 fair_value=fair_value_estimate,
-                target_price=0.0,     # not known yet — only overvaluation checked here
+                target_price=0.0,  # not known yet — only overvaluation checked here
                 entry_price_range="0 - 0",
                 stop_loss=0.0,
             )
@@ -2336,7 +2428,9 @@ Current Date (Asia/Jakarta): {current_date}
                     f"Estimated Fair Value: Rp {fair_value_estimate:,.0f}\n"
                     f"{'─' * 60}\n\n" + raw
                 )
-                logger.warning(f"[Synthesizer] Overvaluation detected: {current_price} > {fair_value_estimate}")
+                logger.warning(
+                    f"[Synthesizer] Overvaluation detected: {current_price} > {fair_value_estimate}"
+                )
 
         if "Unavailable" in raw or "Missing" in raw:
             raw = (
@@ -2425,8 +2519,7 @@ Current Date (Asia/Jakarta): {current_date}
                 logger.warning(f"[RAG] Failed to store telemetry metrics: {exc}")
             if bundle.has_stale_data:
                 logger.warning(
-                    f"[RAG] {ticker} has stale evidence: "
-                    f"{bundle.staleness_warning}"
+                    f"[RAG] {ticker} has stale evidence: {bundle.staleness_warning}"
                 )
                 if "evidence_age_hours" in metadata:
                     stale_reason = (
@@ -2448,7 +2541,9 @@ Current Date (Asia/Jakarta): {current_date}
                 f"[RAG] {ticker} evidence selection failed; "
                 f"falling back to ContextPack brief: {exc}"
             )
-            failure_record = classify_exception(exc, "context_build").model_dump(mode="json")
+            failure_record = classify_exception(exc, "context_build").model_dump(
+                mode="json"
+            )
             decision = _planner_decision_for_state(
                 state,
                 stage=PipelineStage.CONTEXT_BUILD,
@@ -2500,7 +2595,10 @@ Current Date (Asia/Jakarta): {current_date}
                         attempt_key="context_build_attempt",
                     )
                     metadata = _metadata_with_planner_note(state, decision)
-                    if decision is not None and decision.action is PlanAction.PROCEED_PARTIAL:
+                    if (
+                        decision is not None
+                        and decision.action is PlanAction.PROCEED_PARTIAL
+                    ):
                         _ledger_stage_partial(
                             state,
                             stage="CONTEXT_BUILD",
@@ -2509,11 +2607,13 @@ Current Date (Asia/Jakarta): {current_date}
                         )
                     decision_brief = raw
                     state["metadata"] = metadata
-        fair_value_estimate, verified_metadata = _reject_unverified_fair_value_if_needed(
-            ticker=ticker,
-            run_id=run_id,
-            fair_value=fair_value_estimate,
-            metadata=dict(state.get("metadata") or {}),
+        fair_value_estimate, verified_metadata = (
+            _reject_unverified_fair_value_if_needed(
+                ticker=ticker,
+                run_id=run_id,
+                fair_value=fair_value_estimate,
+                metadata=dict(state.get("metadata") or {}),
+            )
         )
         state["fair_value_estimate"] = fair_value_estimate
         state["metadata"] = verified_metadata
@@ -2548,14 +2648,13 @@ Current Date (Asia/Jakarta): {current_date}
 
         prompt = BULL_SYSTEM_PROMPT_R1 if rc == 0 else BULL_SYSTEM_PROMPT_R2
 
-        content_parts = [f"Ticker: {ticker}\n\nSynthesized Market Data:\n{state['raw_data']}"]
+        content_parts = [
+            f"Ticker: {ticker}\n\nSynthesized Market Data:\n{state['raw_data']}"
+        ]
 
         if rc > 0:
             # Send pruned history — prevents state bloat
-            debate_history = [
-                _as_debate_message(m)
-                for m in state["debate_history"]
-            ]
+            debate_history = [_as_debate_message(m) for m in state["debate_history"]]
             hist = "\n".join(
                 f"[{m.role.upper()} R{m.round_num}]: {m.content}"
                 for m in debate_history
@@ -2570,7 +2669,7 @@ Current Date (Asia/Jakarta): {current_date}
         content, signal = self._ensure_signal_footer(resp.content, "bull")
         if len(content) < 50:
             logger.warning(
-                f"[Bull] Suspiciously short response for {ticker} R{rc+1} "
+                f"[Bull] Suspiciously short response for {ticker} R{rc + 1} "
                 f"({len(content)} chars) — may indicate a safety filter hit"
             )
         msg = DebateMessage(
@@ -2591,10 +2690,7 @@ Current Date (Asia/Jakarta): {current_date}
         prompt = BEAR_SYSTEM_PROMPT_R1 if rc == 0 else BEAR_SYSTEM_PROMPT_R2
 
         # Always surface the latest Bull argument for the Bear to attack
-        debate_history = [
-            _as_debate_message(m)
-            for m in state["debate_history"]
-        ]
+        debate_history = [_as_debate_message(m) for m in state["debate_history"]]
         bull_args = [m.content for m in debate_history if m.role == "bull"]
         last_bull = bull_args[-1] if bull_args else "(no bull argument yet)"
 
@@ -2614,7 +2710,9 @@ Current Date (Asia/Jakarta): {current_date}
             SystemMessage(content=prompt + AGENT_SIGNAL_PROMPT),
             HumanMessage(content="\n".join(content_parts)),
         ]
-        resp = await self._invoke_llm_for_state(state, self.flash_llm, messages)  # Use Flash for Bear opening/rebuttal rounds
+        resp = await self._invoke_llm_for_state(
+            state, self.flash_llm, messages
+        )  # Use Flash for Bear opening/rebuttal rounds
         new_rc = rc + 1
         content, signal = self._ensure_signal_footer(resp.content, "bear")
         if len(content) < 50:
@@ -2715,7 +2813,9 @@ Current Date (Asia/Jakarta): {current_date}
             # Tail-truncate — conclusions tend to live at the end of the
             # message, which is exactly what the next round needs.
             content = m.content
-            truncated = content if len(content) <= TAIL_CHARS else "…" + content[-TAIL_CHARS:]
+            truncated = (
+                content if len(content) <= TAIL_CHARS else "…" + content[-TAIL_CHARS:]
+            )
             compressed_msgs.append(
                 DebateMessage(
                     role=m.role,
@@ -2732,7 +2832,9 @@ Current Date (Asia/Jakarta): {current_date}
             if preserved_prices
             else "PRICES CITED IN ROUND 1: (none detected)"
         )
-        evidence_msg = DebateMessage(role="system", content=evidence_content, round_num=0)
+        evidence_msg = DebateMessage(
+            role="system", content=evidence_content, round_num=0
+        )
 
         sentinel = DebateMessage(role="system", content="__REPLACE__", round_num=-1)
         return {"debate_history": [sentinel, evidence_msg, *compressed_msgs]}
@@ -2743,18 +2845,16 @@ Current Date (Asia/Jakarta): {current_date}
         Keeps the CIO from rubber-stamping the winning side.
         """
         logger.info("[Devil's Advocate] Injecting adversarial scenario")
-        debate_history = [
-            _as_debate_message(m)
-            for m in state["debate_history"]
-        ]
+        debate_history = [_as_debate_message(m) for m in state["debate_history"]]
         hist = "\n".join(
-            f"[{m.role.upper()} R{m.round_num}]: {m.content}"
-            for m in debate_history
+            f"[{m.role.upper()} R{m.round_num}]: {m.content}" for m in debate_history
         )
         decision_context = state.get("decision_brief") or state.get("raw_data", "")
         messages = [
             SystemMessage(content=DEVILS_ADVOCATE_PROMPT),
-            HumanMessage(content=f"Decision Brief:\n{decision_context}\n\nDebate:\n{hist}"),
+            HumanMessage(
+                content=f"Decision Brief:\n{decision_context}\n\nDebate:\n{hist}"
+            ),
         ]
         resp = await self._invoke_llm_for_state(state, self.flash_llm, messages)
         content, signal = self._ensure_signal_footer(resp.content, "devils_advocate")
@@ -2782,9 +2882,9 @@ Current Date (Asia/Jakarta): {current_date}
     #:   - MA50 × (1 − MA_LOW_TOL)  ≤ price ≤ MA50 × MA_HIGH_TOL    → ✅
     #:   - MA50 × MA_HIGH_TOL       < price ≤ MA50 × MA_OVEREXT     → ✅ but flagged
     #:   - price > MA50 × MA_OVEREXT                                → ❌ (too extended)
-    MA_LOW_TOL = 0.02        # 2% below MA50 still counts as support test
-    MA_HIGH_TOL = 1.08       # 8% above MA50 is the "overextended soft boundary"
-    MA_OVEREXT = 1.10        # 10% above MA50 is a hard reject
+    MA_LOW_TOL = 0.02  # 2% below MA50 still counts as support test
+    MA_HIGH_TOL = 1.08  # 8% above MA50 is the "overextended soft boundary"
+    MA_OVEREXT = 1.10  # 10% above MA50 is a hard reject
 
     def _classify_signals(
         self,
@@ -2955,7 +3055,7 @@ Current Date (Asia/Jakarta): {current_date}
             stop_candidate_1 = sma20 - atr14
             stop_candidate_2 = current_price - (2.0 * atr14)
             stop = max(stop_candidate_1, stop_candidate_2)
-            
+
             # Hard floor: stop tidak boleh lebih dari 8% dari current price
             hard_floor = current_price * 0.92
             stop = snap_to_tick(max(stop, hard_floor))
@@ -2972,17 +3072,17 @@ Current Date (Asia/Jakarta): {current_date}
         # that conservative R/R evaluated from entry_high is >= 2.0x)
         risk_from_entry_high = entry_high - stop
         rr_target = entry_high + (risk_from_entry_high * 2.0)
-        
+
         # Floor: minimal 4% from entry for worthwhile swing
         min_target = entry_mid * 1.04
-        
+
         high_20d = tech.get("high_20d", 0)
         high_50d = tech.get("high_50d", 0)
         high_52w = tech.get("52w_high", 0)
-        
+
         target_basis = "Minimum R/R"
         target_candidate = max(rr_target, min_target)
-        
+
         if high_20d >= target_candidate:
             target_candidate = high_20d
             target_basis = "Resistance 20-Day"
@@ -3016,7 +3116,11 @@ Current Date (Asia/Jakarta): {current_date}
 
         # Compute display percentages from entry_mid, but canonical R/R from entry_high.
         gain_pct = ((target - entry_mid) / entry_mid) * 100 if entry_mid > 0 else 0
-        loss_pct = ((entry_mid - stop) / entry_mid) * 100 if entry_mid > 0 and entry_mid > stop else 0
+        loss_pct = (
+            ((entry_mid - stop) / entry_mid) * 100
+            if entry_mid > 0 and entry_mid > stop
+            else 0
+        )
         rr_ratio = calculate_rr(entry_high, target, stop)
 
         return {
@@ -3127,22 +3231,24 @@ Current Date (Asia/Jakarta): {current_date}
                     elif ch in ("}", "]"):
                         if brackets:
                             last = brackets[-1]
-                            if (ch == "}" and last == "{") or (ch == "]" and last == "["):
+                            if (ch == "}" and last == "{") or (
+                                ch == "]" and last == "["
+                            ):
                                 brackets.pop()
                         repaired_chars.append(ch)
                     else:
                         repaired_chars.append(ch)
-            
+
             if in_double_str or in_single_str:
                 repaired_chars.append('"')
-            
+
             while brackets:
                 b = brackets.pop()
                 if b == "{":
                     repaired_chars.append("}")
                 elif b == "[":
                     repaired_chars.append("]")
-                    
+
             repaired_text = "".join(repaired_chars).strip()
             repaired_text = re.sub(r",\s*([\]}])", r"\1", repaired_text)
             return repaired_text
@@ -3178,7 +3284,9 @@ Current Date (Asia/Jakarta): {current_date}
     VOL_SURGE_THRESHOLD = 1.5
     MOMENTUM_RETURN_THRESHOLD = 5.0
 
-    def _apply_consensus_override(self, parsed: dict, state: DebateChamberState) -> dict:
+    def _apply_consensus_override(
+        self, parsed: dict, state: DebateChamberState
+    ) -> dict:
         p = dict(parsed) if isinstance(parsed, dict) else {}
         method = state.get("consensus_method")
         winner = state.get("consensus_winner") or {}
@@ -3202,7 +3310,9 @@ Current Date (Asia/Jakarta): {current_date}
             return p
 
         if method == "confidence_winner":
-            winner_position = self._normalise_position(str(winner.get("position", "HOLD")))
+            winner_position = self._normalise_position(
+                str(winner.get("position", "HOLD"))
+            )
             if winner_position == "UNKNOWN":
                 winner_position = "HOLD"
 
@@ -3242,7 +3352,7 @@ Current Date (Asia/Jakarta): {current_date}
                     # sentiment agent surfaces here as "AVOID". Escalate only when the
                     # sentiment specialist is non-bearish (anything other than AVOID).
                     sentiment_position = "UNKNOWN"
-                    for vote in (state.get("agent_votes") or []):
+                    for vote in state.get("agent_votes") or []:
                         if str(vote.get("agent", "")).lower() == "sentiment_specialist":
                             sentiment_position = self._normalise_position(
                                 str(vote.get("position", "UNKNOWN"))
@@ -3269,9 +3379,17 @@ Current Date (Asia/Jakarta): {current_date}
                 p["confidence"] = 0.55
             else:
                 try:
-                    p["confidence"] = max(0.0, min(float(winner.get("confidence", p.get("confidence", 0.0))), 1.0))
+                    p["confidence"] = max(
+                        0.0,
+                        min(
+                            float(winner.get("confidence", p.get("confidence", 0.0))),
+                            1.0,
+                        ),
+                    )
                 except (TypeError, ValueError):
-                    p["confidence"] = max(0.0, min(float(p.get("confidence") or 0.0), 1.0))
+                    p["confidence"] = max(
+                        0.0, min(float(p.get("confidence") or 0.0), 1.0)
+                    )
             p["weighted_reasoning"] = self._append_reason(
                 p.get("weighted_reasoning"),
                 (
@@ -3307,7 +3425,9 @@ Current Date (Asia/Jakarta): {current_date}
             if state_metadata.get("fair_value_rejected")
             else state.get("fair_value_estimate", 0.0)
         )
-        logger.info(f"[CIO] Deliberating on {ticker} (current price: {current_price:,.0f})")
+        logger.info(
+            f"[CIO] Deliberating on {ticker} (current price: {current_price:,.0f})"
+        )
         started_at = perf_counter()
         _ledger_stage_start(
             state,
@@ -3316,7 +3436,9 @@ Current Date (Asia/Jakarta): {current_date}
         )
 
         if current_price <= 0:
-            logger.warning(f"[CIO] Invalid current price for {ticker}; returning HOLD fallback")
+            logger.warning(
+                f"[CIO] Invalid current price for {ticker}; returning HOLD fallback"
+            )
             fallback_verdict = CIOVerdict(
                 ticker=ticker,
                 rating="HOLD",
@@ -3391,10 +3513,7 @@ Current Date (Asia/Jakarta): {current_date}
 
         # ── Build CIO prompt ─────────────────────────────────────────────────
         consensus_directive = self._format_consensus_directive(state)
-        debate_history = [
-            _as_debate_message(m)
-            for m in state["debate_history"]
-        ]
+        debate_history = [_as_debate_message(m) for m in state["debate_history"]]
         hist = "\n".join(
             f"[{m.role.upper()} R{m.round_num}]: {self._redact_debate_prices(m.content)}"
             for m in debate_history
@@ -3480,25 +3599,43 @@ Start your response with '{' and end with '}'. Nothing else."""
             p = dict(parsed) if isinstance(parsed, dict) else {}
             p.setdefault("ticker", ticker)
             try:
-                p["current_price"] = float(p.get("current_price") or current_price or 0.0)
+                p["current_price"] = float(
+                    p.get("current_price") or current_price or 0.0
+                )
             except Exception:
                 p["current_price"] = float(current_price or 0.0)
             try:
-                entry_low = int(envelope.get("entry_low") or envelope.get("entry_mid") or 0)
-                entry_high = int(envelope.get("entry_high") or envelope.get("entry_mid") or 0)
+                entry_low = int(
+                    envelope.get("entry_low") or envelope.get("entry_mid") or 0
+                )
+                entry_high = int(
+                    envelope.get("entry_high") or envelope.get("entry_mid") or 0
+                )
                 p["entry_price_range"] = f"{entry_low} - {entry_high}"
             except Exception:
                 p["entry_price_range"] = p.get("entry_price_range") or ""
             try:
-                p["target_price"] = int(envelope.get("target_price")) if envelope.get("target_price") is not None else p.get("target_price")
+                p["target_price"] = (
+                    int(envelope.get("target_price"))
+                    if envelope.get("target_price") is not None
+                    else p.get("target_price")
+                )
             except Exception:
                 p["target_price"] = p.get("target_price")
             try:
-                p["target_basis"] = envelope.get("target_basis") if envelope.get("target_basis") is not None else p.get("target_basis")
+                p["target_basis"] = (
+                    envelope.get("target_basis")
+                    if envelope.get("target_basis") is not None
+                    else p.get("target_basis")
+                )
             except Exception:
                 p["target_basis"] = p.get("target_basis")
             try:
-                p["stop_loss"] = int(envelope.get("stop_loss")) if envelope.get("stop_loss") is not None else p.get("stop_loss")
+                p["stop_loss"] = (
+                    int(envelope.get("stop_loss"))
+                    if envelope.get("stop_loss") is not None
+                    else p.get("stop_loss")
+                )
             except Exception:
                 p["stop_loss"] = p.get("stop_loss")
             # Canonical Python R/R — overrides any LLM-echoed value so downstream
@@ -3593,9 +3730,7 @@ Start your response with '{' and end with '}'. Nothing else."""
             if report.valid:
                 return parsed
 
-            logger.warning(
-                f"[RAG] {ticker} CIO citation guard failed: {report.errors}"
-            )
+            logger.warning(f"[RAG] {ticker} CIO citation guard failed: {report.errors}")
             p = dict(parsed)
             p["weighted_reasoning"] = self._append_reason(
                 p.get("weighted_reasoning"),
@@ -3621,7 +3756,9 @@ Start your response with '{' and end with '}'. Nothing else."""
             verdict_json = CIOVerdict(**parsed).model_dump_json()
             logger.info(f"[CIO] JSON parsed successfully for {ticker}")
         except Exception as e:
-            logger.warning(f"[CIO] Primary JSON parse failed ({e}); using safe fallback verdict")
+            logger.warning(
+                f"[CIO] Primary JSON parse failed ({e}); using safe fallback verdict"
+            )
             verdict_json = CIOVerdict(
                 ticker=ticker,
                 rating="HOLD",
@@ -3666,16 +3803,16 @@ Start your response with '{' and end with '}'. Nothing else."""
         graph = StateGraph(DebateChamberState)
 
         # Register nodes
-        graph.add_node("fundamental",         self._fundamental_node)
-        graph.add_node("chartist",            self._chartist_node)
-        graph.add_node("sentiment",           self._sentiment_node)
-        graph.add_node("synthesizer",         self._synthesizer_node)
-        graph.add_node("bullish_analyst",     self._bullish_node)
-        graph.add_node("bearish_auditor",     self._bearish_node)
+        graph.add_node("fundamental", self._fundamental_node)
+        graph.add_node("chartist", self._chartist_node)
+        graph.add_node("sentiment", self._sentiment_node)
+        graph.add_node("synthesizer", self._synthesizer_node)
+        graph.add_node("bullish_analyst", self._bullish_node)
+        graph.add_node("bearish_auditor", self._bearish_node)
         graph.add_node("consensus_evaluator", self._consensus_evaluator_node)
-        graph.add_node("state_cleaner",       self._state_cleaner_node)
-        graph.add_node("devils_advocate",     self._devils_advocate_node)
-        graph.add_node("cio_judge",           self._cio_judge_node)
+        graph.add_node("state_cleaner", self._state_cleaner_node)
+        graph.add_node("devils_advocate", self._devils_advocate_node)
+        graph.add_node("cio_judge", self._cio_judge_node)
 
         # Phase 1: Parallel fan-out from START
         graph.add_edge(START, "fundamental")
@@ -3684,21 +3821,21 @@ Start your response with '{' and end with '}'. Nothing else."""
 
         # Phase 1: Fan-in to synthesizer
         graph.add_edge("fundamental", "synthesizer")
-        graph.add_edge("chartist",    "synthesizer")
-        graph.add_edge("sentiment",   "synthesizer")
+        graph.add_edge("chartist", "synthesizer")
+        graph.add_edge("sentiment", "synthesizer")
 
         # Phase 2: Debate cycle
-        graph.add_edge("synthesizer",     "bullish_analyst")
+        graph.add_edge("synthesizer", "bullish_analyst")
         graph.add_edge("bullish_analyst", "bearish_auditor")
         graph.add_edge("bearish_auditor", "consensus_evaluator")
 
         # Phase 3: Adaptive routing
         graph.add_conditional_edges("consensus_evaluator", post_evaluator_router)
-        graph.add_edge("state_cleaner", "bullish_analyst")   # loops back for R2
+        graph.add_edge("state_cleaner", "bullish_analyst")  # loops back for R2
 
         # Phase 4: Conclusion path
         graph.add_edge("devils_advocate", "cio_judge")
-        graph.add_edge("cio_judge",       END)
+        graph.add_edge("cio_judge", END)
 
         return graph.compile()
 
@@ -3897,9 +4034,9 @@ Start your response with '{' and end with '}'. Nothing else."""
                 await self._devils_advocate_node(state),
             )
             yield {
-                "type": "devil_advocate", 
+                "type": "devil_advocate",
                 "ticker": ticker,
-                "question": state.get("devils_advocate_question", "")
+                "question": state.get("devils_advocate_question", ""),
             }
             await asyncio.sleep(0)
 
@@ -3984,7 +4121,9 @@ Start your response with '{' and end with '}'. Nothing else."""
             "error": None,
         }
         self._reset_llm_counters(initial_state)
-        logger.info(f"[DebateChamber] ▶ Starting swing-trade pipeline for {ticker} @ Rp {current_price:,.0f}")
+        logger.info(
+            f"[DebateChamber] ▶ Starting swing-trade pipeline for {ticker} @ Rp {current_price:,.0f}"
+        )
         guarded = await run_with_guard(
             ticker=ticker,
             coro=self.app.ainvoke(initial_state),

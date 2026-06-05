@@ -15,6 +15,7 @@ from utils.trade_math import calculate_rr
 # Data container — diisi dari response API Stockbit keystats
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class KeyStats:
     """
@@ -25,30 +26,32 @@ class KeyStats:
     ticker: str = ""
 
     # Income statement
-    eps_ttm: float = 0.0          # Earnings Per Share (Trailing Twelve Months)
-    eps_forward: float = 0.0      # EPS proyeksi tahun depan (jika tersedia)
-    dps: float | None = None      # Dividend Per Share (TTM); None = missing, 0.0 = explicit zero
+    eps_ttm: float = 0.0  # Earnings Per Share (Trailing Twelve Months)
+    eps_forward: float = 0.0  # EPS proyeksi tahun depan (jika tersedia)
+    dps: float | None = (
+        None  # Dividend Per Share (TTM); None = missing, 0.0 = explicit zero
+    )
 
     # Balance sheet
-    book_value_per_share: float = 0.0   # Ekuitas / jumlah saham beredar
+    book_value_per_share: float = 0.0  # Ekuitas / jumlah saham beredar
 
     # Profitability
-    roe: float = 0.0              # Return on Equity (desimal: 0.22 = 22%)
-    net_margin: float = 0.0       # Net Profit Margin (desimal)
+    roe: float = 0.0  # Return on Equity (desimal: 0.22 = 22%)
+    net_margin: float = 0.0  # Net Profit Margin (desimal)
     roa: float = 0.0
 
     # Market
     current_price: float = 0.0
-    shares_outstanding: float = 0.0    # lembar saham beredar (dalam unit, bukan miliar)
+    shares_outstanding: float = 0.0  # lembar saham beredar (dalam unit, bukan miliar)
 
     # Historical P/E dan P/B (rata-rata 3-5 tahun, hardcode per sektor atau ambil dari API)
     # Default ini adalah nilai historis konservatif untuk sektor perbankan IHSG
-    historical_pe_avg: float = 18.0    # rata-rata P/E historis 5 tahun
-    historical_pb_avg: float = 3.5     # rata-rata P/B historis 5 tahun
+    historical_pe_avg: float = 18.0  # rata-rata P/E historis 5 tahun
+    historical_pb_avg: float = 3.5  # rata-rata P/B historis 5 tahun
 
     # Cost of equity untuk DDM/Gordon Growth (dalam desimal)
-    cost_of_equity: float = 0.10       # 10% — default untuk IHSG large cap
-    growth_rate: float = 0.07          # 7% — proyeksi pertumbuhan laba jangka panjang
+    cost_of_equity: float = 0.10  # 10% — default untuk IHSG large cap
+    growth_rate: float = 0.07  # 7% — proyeksi pertumbuhan laba jangka panjang
 
     # Sumber data mentah (untuk debugging)
     raw_pe_current: float = 0.0
@@ -58,6 +61,7 @@ class KeyStats:
 # ---------------------------------------------------------------------------
 # Extractor — parse response JSON dari Stockbit keystats API
 # ---------------------------------------------------------------------------
+
 
 def _parse_stockbit_flat(api_response: dict) -> dict[str, str]:
     """
@@ -75,14 +79,11 @@ def _parse_stockbit_flat(api_response: dict) -> dict[str, str]:
     """
     flat: dict[str, str] = {}
     try:
-        groups = (
-            api_response.get("data", {})
-                        .get("closure_fin_items_results", [])
-        )
+        groups = api_response.get("data", {}).get("closure_fin_items_results", [])
         for group in groups:
             for item in group.get("fin_name_results", []):
                 fitem = item.get("fitem", {})
-                name  = fitem.get("name", "").strip()
+                name = fitem.get("name", "").strip()
                 value = fitem.get("value", "")
                 if name and value not in (None, "", "-", "N/A"):
                     flat[name] = str(value)
@@ -190,60 +191,115 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
 
     if flat:
         # ── Per-share data ───────────────────────────────────────────────────
-        stats.eps_ttm = _lookup([
-            "Current EPS (TTM)", "EPS (TTM)", "EPS TTM",
-            "Earnings Per Share (TTM)",
-        ])
+        stats.eps_ttm = _lookup(
+            [
+                "Current EPS (TTM)",
+                "EPS (TTM)",
+                "EPS TTM",
+                "Earnings Per Share (TTM)",
+            ]
+        )
 
         # If EPS is missing but PE and price are available, back-calculate:
         #   EPS = price / PE
         if stats.eps_ttm == 0.0:
-            pe_ttm = _lookup(["Current PE Ratio (TTM)", "PE Ratio (TTM)", "Current PE Ratio (Annualised)"])
+            pe_ttm = _lookup(
+                [
+                    "Current PE Ratio (TTM)",
+                    "PE Ratio (TTM)",
+                    "Current PE Ratio (Annualised)",
+                ]
+            )
             if pe_ttm > 0:
                 # EPS back-calc dilakukan di build_fair_value_report setelah current_price tersedia
                 stats.raw_pe_current = pe_ttm
 
-        stats.eps_forward = _lookup([
-            "Forward EPS", "EPS (Forward)", "Estimated EPS",
-        ]) or stats.eps_ttm  # fallback to TTM
+        stats.eps_forward = (
+            _lookup(
+                [
+                    "Forward EPS",
+                    "EPS (Forward)",
+                    "Estimated EPS",
+                ]
+            )
+            or stats.eps_ttm
+        )  # fallback to TTM
 
-        stats.book_value_per_share = _lookup([
-            "Book Value Per Share", "BVPS", "Book Value/Share",
-            "Current Book Value Per Share",
-        ])
+        stats.book_value_per_share = _lookup(
+            [
+                "Book Value Per Share",
+                "BVPS",
+                "Book Value/Share",
+                "Current Book Value Per Share",
+            ]
+        )
 
-        stats.dps = _lookup_optional([
-            "Dividend Per Share (TTM)", "DPS (TTM)", "Dividend Per Share",
-            "DPS", "Annual Dividend Per Share", "Cash Dividend Per Share",
-            "Total Dividend Per Share", "Dividen Per Saham",
-        ])
+        stats.dps = _lookup_optional(
+            [
+                "Dividend Per Share (TTM)",
+                "DPS (TTM)",
+                "Dividend Per Share",
+                "DPS",
+                "Annual Dividend Per Share",
+                "Cash Dividend Per Share",
+                "Total Dividend Per Share",
+                "Dividen Per Saham",
+            ]
+        )
 
         # ── Profitability ratios ─────────────────────────────────────────────
-        stats.roe = _lookup([
-            "Return On Equity (TTM)", "ROE (TTM)", "ROE", "Return on Equity",
-            "Return On Equity", "Return on Equity (TTM)",
-            "Imbal Hasil Ekuitas",  # Bahasa Indonesia variant
-        ], pct=True)
+        stats.roe = _lookup(
+            [
+                "Return On Equity (TTM)",
+                "ROE (TTM)",
+                "ROE",
+                "Return on Equity",
+                "Return On Equity",
+                "Return on Equity (TTM)",
+                "Imbal Hasil Ekuitas",  # Bahasa Indonesia variant
+            ],
+            pct=True,
+        )
 
-        stats.net_margin = _lookup([
-            "Net Profit Margin (TTM)", "Net Margin (TTM)", "Net Margin",
-            "Net Profit Margin", "Profit Margin",
-        ], pct=True)
+        stats.net_margin = _lookup(
+            [
+                "Net Profit Margin (TTM)",
+                "Net Margin (TTM)",
+                "Net Margin",
+                "Net Profit Margin",
+                "Profit Margin",
+            ],
+            pct=True,
+        )
 
-        stats.roa = _lookup([
-            "Return On Assets (TTM)", "ROA (TTM)", "ROA", "Return on Assets",
-        ], pct=True)
+        stats.roa = _lookup(
+            [
+                "Return On Assets (TTM)",
+                "ROA (TTM)",
+                "ROA",
+                "Return on Assets",
+            ],
+            pct=True,
+        )
 
         # ── Valuation multiples ──────────────────────────────────────────────
-        stats.raw_pe_current = stats.raw_pe_current or _lookup([
-            "Current PE Ratio (TTM)", "PE Ratio (TTM)",
-            "Current PE Ratio (Annualised)", "P/E Ratio",
-        ])
+        stats.raw_pe_current = stats.raw_pe_current or _lookup(
+            [
+                "Current PE Ratio (TTM)",
+                "PE Ratio (TTM)",
+                "Current PE Ratio (Annualised)",
+                "P/E Ratio",
+            ]
+        )
 
-        stats.raw_pb_current = _lookup([
-            "Current Price to Book Value", "Price to Book Value",
-            "P/B Ratio", "Price/Book",
-        ])
+        stats.raw_pb_current = _lookup(
+            [
+                "Current Price to Book Value",
+                "Price to Book Value",
+                "P/B Ratio",
+                "Price/Book",
+            ]
+        )
 
     # ── Strategy B: legacy flat key-value fallback ────────────────────────────
     # Only runs if Strategy A found nothing useful (flat dict empty or all zeros)
@@ -252,7 +308,10 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
         and stats.book_value_per_share == 0
         and stats.dps in (None, 0)
     ):
-        logger.info("[FairValue] {}: closure_fin_items structure empty, trying legacy key-value", ticker)
+        logger.info(
+            "[FairValue] {}: closure_fin_items structure empty, trying legacy key-value",
+            ticker,
+        )
 
         def _get_legacy_optional(keys: list[str]) -> float | None:
             """Return a legacy numeric field while preserving missing values."""
@@ -283,16 +342,28 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
             parsed = _get_legacy_optional(keys)
             return default if parsed is None else parsed
 
-        stats.eps_ttm            = _get_legacy(["eps", "eps_ttm", "earningPerShare", "data.Current.EPS", "EPS"])
-        stats.book_value_per_share = _get_legacy(["bookValuePerShare", "bvps", "data.Current.BVPS", "BVPS"])
-        legacy_dps = _get_legacy_optional(["dps", "dividendPerShare", "data.Current.DPS", "DPS"])
+        stats.eps_ttm = _get_legacy(
+            ["eps", "eps_ttm", "earningPerShare", "data.Current.EPS", "EPS"]
+        )
+        stats.book_value_per_share = _get_legacy(
+            ["bookValuePerShare", "bvps", "data.Current.BVPS", "BVPS"]
+        )
+        legacy_dps = _get_legacy_optional(
+            ["dps", "dividendPerShare", "data.Current.DPS", "DPS"]
+        )
         if legacy_dps is not None:
             stats.dps = legacy_dps
-        stats.roe                = _get_legacy(["roe", "returnOnEquity", "data.Current.ROE", "ROE"])
-        stats.net_margin         = _get_legacy(["netMargin", "net_margin", "data.Current.NetProfitMargin"])
-        stats.roa                = _get_legacy(["roa", "returnOnAssets", "data.Current.ROA"])
-        stats.raw_pe_current     = _get_legacy(["pe", "priceEarnings", "data.Current.PE", "PE"])
-        stats.raw_pb_current     = _get_legacy(["pb", "priceBook", "data.Current.PBV", "PBV"])
+        stats.roe = _get_legacy(["roe", "returnOnEquity", "data.Current.ROE", "ROE"])
+        stats.net_margin = _get_legacy(
+            ["netMargin", "net_margin", "data.Current.NetProfitMargin"]
+        )
+        stats.roa = _get_legacy(["roa", "returnOnAssets", "data.Current.ROA"])
+        stats.raw_pe_current = _get_legacy(
+            ["pe", "priceEarnings", "data.Current.PE", "PE"]
+        )
+        stats.raw_pb_current = _get_legacy(
+            ["pb", "priceBook", "data.Current.PBV", "PBV"]
+        )
 
         if stats.roe > 1.0:
             stats.roe = stats.roe / 100.0
@@ -305,19 +376,26 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
     # BBCA dan bank besar lain kadang tidak expose DPS langsung di keystats
     # tapi selalu expose Dividend Yield (%). DPS = yield × current_price / 100
     if stats.dps is None and flat:
-        div_yield_pct = _lookup([
-            "Dividend Yield (TTM)", "Dividend Yield", "Yield",
-            "Trailing Dividend Yield", "Dividend Yield (Annual)",
-        ])
+        div_yield_pct = _lookup(
+            [
+                "Dividend Yield (TTM)",
+                "Dividend Yield",
+                "Yield",
+                "Trailing Dividend Yield",
+                "Dividend Yield (Annual)",
+            ]
+        )
         if div_yield_pct > 0:
-            price_for_dps = stats.current_price or _lookup([
-                "Last Price", "Current Price", "Close Price"
-            ])
+            price_for_dps = stats.current_price or _lookup(
+                ["Last Price", "Current Price", "Close Price"]
+            )
             if price_for_dps > 0:
                 # yield dari Stockbit dalam % (e.g. "5.62") → bagi 100
-                stats.dps = round((div_yield_pct / 100.0) * price_for_dps, 2) \
-                    if div_yield_pct > 1.0 \
+                stats.dps = (
+                    round((div_yield_pct / 100.0) * price_for_dps, 2)
+                    if div_yield_pct > 1.0
                     else round(div_yield_pct * price_for_dps, 2)
+                )
                 logger.info(
                     "[FairValue] {}: DPS derived from yield "
                     "({:.2f}%) × price ({:,.0f}) "
@@ -331,11 +409,11 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
     # ── Debug summary ─────────────────────────────────────────────────────────
     parsed = {
         "eps_ttm": stats.eps_ttm,
-        "bvps":    stats.book_value_per_share,
-        "dps":     stats.dps,
-        "roe":     f"{stats.roe * 100:.1f}%",
-        "pe":      stats.raw_pe_current,
-        "pb":      stats.raw_pb_current,
+        "bvps": stats.book_value_per_share,
+        "dps": stats.dps,
+        "roe": f"{stats.roe * 100:.1f}%",
+        "pe": stats.raw_pe_current,
+        "pb": stats.raw_pb_current,
     }
     missing = [k for k, v in parsed.items() if v is None]
     zeros = [k for k, v in parsed.items() if str(v) in ("0", "0.0", "0.0%")]
@@ -358,6 +436,7 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
 # Main calculator
 # ---------------------------------------------------------------------------
 
+
 class FairValueCalculator:
     """
     Menghitung fair value saham IHSG menggunakan 3 metode:
@@ -371,21 +450,31 @@ class FairValueCalculator:
     # Bobot default per metode (harus jumlah = 1.0)
     # Untuk bank (BBCA, BBRI, BMRI): P/B lebih relevan karena aset berbasis ekuitas
     SECTOR_WEIGHTS = {
-        "bank":        {"pe": 0.35, "pb": 0.45, "ddm": 0.20},
-        "consumer":    {"pe": 0.50, "pb": 0.30, "ddm": 0.20},
-        "mining":      {"pe": 0.60, "pb": 0.30, "ddm": 0.10},
-        "property":    {"pe": 0.30, "pb": 0.55, "ddm": 0.15},
-        "default":     {"pe": 0.45, "pb": 0.35, "ddm": 0.20},
+        "bank": {"pe": 0.35, "pb": 0.45, "ddm": 0.20},
+        "consumer": {"pe": 0.50, "pb": 0.30, "ddm": 0.20},
+        "mining": {"pe": 0.60, "pb": 0.30, "ddm": 0.10},
+        "property": {"pe": 0.30, "pb": 0.55, "ddm": 0.15},
+        "default": {"pe": 0.45, "pb": 0.35, "ddm": 0.20},
     }
 
     # Ticker → sektor mapping untuk emiten populer IHSG
     TICKER_SECTOR = {
-        "BBCA": "bank", "BBRI": "bank", "BMRI": "bank",
-        "BBNI": "bank", "BRIS": "bank", "BTPS": "bank",
-        "TLKM": "default", "ASII": "default",
-        "UNVR": "consumer", "ICBP": "consumer", "MYOR": "consumer",
-        "ADRO": "mining", "BYAN": "mining", "MDKA": "mining",
-        "BSDE": "property", "SMRA": "property",
+        "BBCA": "bank",
+        "BBRI": "bank",
+        "BMRI": "bank",
+        "BBNI": "bank",
+        "BRIS": "bank",
+        "BTPS": "bank",
+        "TLKM": "default",
+        "ASII": "default",
+        "UNVR": "consumer",
+        "ICBP": "consumer",
+        "MYOR": "consumer",
+        "ADRO": "mining",
+        "BYAN": "mining",
+        "MDKA": "mining",
+        "BSDE": "property",
+        "SMRA": "property",
     }
 
     def __init__(self, stats: KeyStats, sector: str | None = None):
@@ -452,8 +541,8 @@ class FairValueCalculator:
     # ── Weighted Average ─────────────────────────────────────────────────────
 
     def fair_value_weighted(self) -> dict:
-        pe_fv  = self.fair_value_pe()
-        pb_fv  = self.fair_value_pb()
+        pe_fv = self.fair_value_pe()
+        pb_fv = self.fair_value_pb()
         ddm_fv = self.fair_value_ddm()
 
         results = {}
@@ -465,18 +554,19 @@ class FairValueCalculator:
             results["ddm"] = ddm_fv
 
         if not results:
-            return self._cache_weighted_result({
-                "fair_value": None,
-                "breakdown": {},
-                "confidence": "INSUFFICIENT_DATA",
-                "margin_of_safety_pct": None,
-                "valuation_verdict": "DATA_UNAVAILABLE",
-            })
+            return self._cache_weighted_result(
+                {
+                    "fair_value": None,
+                    "breakdown": {},
+                    "confidence": "INSUFFICIENT_DATA",
+                    "margin_of_safety_pct": None,
+                    "valuation_verdict": "DATA_UNAVAILABLE",
+                }
+            )
 
         total_weight = sum(self.weights[m] for m in results)
         weighted_fv = sum(
-            results[m] * (self.weights[m] / total_weight)
-            for m in results
+            results[m] * (self.weights[m] / total_weight) for m in results
         )
         weighted_fv = round(weighted_fv, 0)
 
@@ -487,8 +577,9 @@ class FairValueCalculator:
         verdict = "DATA_UNAVAILABLE"
         if self.stats.current_price > 0 and weighted_fv > 0:
             mos = round(
-                ((weighted_fv - self.stats.current_price) / self.stats.current_price) * 100,
-                1
+                ((weighted_fv - self.stats.current_price) / self.stats.current_price)
+                * 100,
+                1,
             )
             if mos >= 20:
                 verdict = "UNDERVALUED"
@@ -501,13 +592,15 @@ class FairValueCalculator:
             else:
                 verdict = "OVERVALUED"
 
-        return self._cache_weighted_result({
-            "fair_value": weighted_fv,
-            "breakdown": {k: int(v) for k, v in results.items()},
-            "confidence": confidence,
-            "margin_of_safety_pct": mos,
-            "valuation_verdict": verdict,
-        })
+        return self._cache_weighted_result(
+            {
+                "fair_value": weighted_fv,
+                "breakdown": {k: int(v) for k, v in results.items()},
+                "confidence": confidence,
+                "margin_of_safety_pct": mos,
+                "valuation_verdict": verdict,
+            }
+        )
 
     # ── Target & Stop Calculator ─────────────────────────────────────────────
 
@@ -518,18 +611,18 @@ class FairValueCalculator:
         target_gain_pct: float = 7.0,
         stop_loss_pct: float = 4.0,
     ) -> dict:
-        entry_mid    = (entry_low + entry_high) / 2
+        entry_mid = (entry_low + entry_high) / 2
         target_price = round(entry_mid * (1 + target_gain_pct / 100), -1)
-        stop_loss    = round(entry_mid * (1 - stop_loss_pct / 100), -1)
+        stop_loss = round(entry_mid * (1 - stop_loss_pct / 100), -1)
 
         rr = calculate_rr(entry_high, target_price, stop_loss)
 
         return {
-            "entry_mid":          round(entry_mid, 0),
-            "target_price":       target_price,
-            "stop_loss":          stop_loss,
+            "entry_mid": round(entry_mid, 0),
+            "target_price": target_price,
+            "stop_loss": stop_loss,
             "expected_return_pct": f"+{target_gain_pct:.1f}%",
-            "risk_reward_ratio":  rr,
+            "risk_reward_ratio": rr,
         }
 
     # ── Build Report String (untuk diinjeksi ke raw_data) ───────────────────
@@ -537,20 +630,16 @@ class FairValueCalculator:
     def build_report(self, current_price: float | None = None) -> str:
         if current_price is not None and current_price != self.stats.current_price:
             self._weighted_result_cache = None
-        if current_price is not None:   # ← fix: `if current_price:` is False for 0.0
+        if current_price is not None:  # ← fix: `if current_price:` is False for 0.0
             self.stats.current_price = current_price
 
         result = self._weighted_result_cache or self.fair_value_weighted()
-        fv     = result["fair_value"]
-        bdown  = result["breakdown"]
-        mos    = result["margin_of_safety_pct"]
-        conf   = result["confidence"]
+        fv = result["fair_value"]
+        bdown = result["breakdown"]
+        mos = result["margin_of_safety_pct"]
+        conf = result["confidence"]
         verdict = result["valuation_verdict"]
-        dps_text = (
-            f"Rp {self.stats.dps:,.0f}"
-            if self.stats.dps is not None
-            else "N/A"
-        )
+        dps_text = f"Rp {self.stats.dps:,.0f}" if self.stats.dps is not None else "N/A"
 
         lines = [
             "╔══════════════════════════════════════════════════════════════╗",
@@ -571,7 +660,9 @@ class FairValueCalculator:
                 f"= Rp {bdown['pe']:,}"
             )
         else:
-            lines.append("  Metode P/E Band : TIDAK VALID (EPS = 0 atau data tidak tersedia)")
+            lines.append(
+                "  Metode P/E Band : TIDAK VALID (EPS = 0 atau data tidak tersedia)"
+            )
 
         if "pb" in bdown:
             lines.append(
@@ -580,18 +671,24 @@ class FairValueCalculator:
                 f"= Rp {bdown['pb']:,}"
             )
         else:
-            lines.append("  Metode P/B Band : TIDAK VALID (BVPS = 0 atau data tidak tersedia)")
+            lines.append(
+                "  Metode P/B Band : TIDAK VALID (BVPS = 0 atau data tidak tersedia)"
+            )
 
         if "ddm" in bdown:
             lines.append(
                 f"  Metode DDM      : DPS {dps_text} / "
-                f"(ke {self.stats.cost_of_equity*100:.0f}% - g {self.stats.growth_rate*100:.0f}%) "
+                f"(ke {self.stats.cost_of_equity * 100:.0f}% - g {self.stats.growth_rate * 100:.0f}%) "
                 f"= Rp {bdown['ddm']:,}"
             )
         else:
             lines.append("  Metode DDM      : TIDAK VALID")
 
-        fv_str = f"Rp {fv:,.0f}" if fv is not None else "Tidak dapat dikalkulasi (Data Kosong / None)"
+        fv_str = (
+            f"Rp {fv:,.0f}"
+            if fv is not None
+            else "Tidak dapat dikalkulasi (Data Kosong / None)"
+        )
         lines += [
             "",
             "── HASIL AKHIR ─────────────────────────────────────────────────",
@@ -639,9 +736,9 @@ class FairValueCalculator:
             f"  ROE             : {self.stats.roe * 100:.1f}%",
             f"  Net Margin      : {self.stats.net_margin * 100:.1f}%",
             f"  P/E saat ini    : {self.stats.raw_pe_current:.1f}x "
-                f"(hist avg: {self.stats.historical_pe_avg:.1f}x)",
+            f"(hist avg: {self.stats.historical_pe_avg:.1f}x)",
             f"  P/B saat ini    : {self.stats.raw_pb_current:.1f}x "
-                f"(hist avg: {self.stats.historical_pb_avg:.1f}x)",
+            f"(hist avg: {self.stats.historical_pb_avg:.1f}x)",
             "",
             "CATATAN: Semua angka di atas dihitung Python dari data API.",
             "         LLM DILARANG menimpa atau menghitung ulang FAIR VALUE.",
@@ -664,17 +761,18 @@ HISTORICAL_MULTIPLES: dict[str, dict] = {
     "ASII": {"pe": 14.0, "pb": 1.8, "cost_of_equity": 0.10, "growth_rate": 0.06},
     "UNVR": {"pe": 35.0, "pb": 20.0, "cost_of_equity": 0.09, "growth_rate": 0.05},
     "ICBP": {"pe": 20.0, "pb": 3.5, "cost_of_equity": 0.09, "growth_rate": 0.07},
-    "GOTO": {"pe":  0.0, "pb": 3.0, "cost_of_equity": 0.12, "growth_rate": 0.15},  
-    "ADRO": {"pe": 8.0,  "pb": 1.5, "cost_of_equity": 0.12, "growth_rate": 0.03},
-    "BYAN": {"pe": 7.0,  "pb": 3.5, "cost_of_equity": 0.12, "growth_rate": 0.02},
+    "GOTO": {"pe": 0.0, "pb": 3.0, "cost_of_equity": 0.12, "growth_rate": 0.15},
+    "ADRO": {"pe": 8.0, "pb": 1.5, "cost_of_equity": 0.12, "growth_rate": 0.03},
+    "BYAN": {"pe": 7.0, "pb": 3.5, "cost_of_equity": 0.12, "growth_rate": 0.02},
     "BSDE": {"pe": 10.0, "pb": 0.7, "cost_of_equity": 0.11, "growth_rate": 0.05},
 }
 
 
 def get_historical_multiples(ticker: str) -> dict:
-    return HISTORICAL_MULTIPLES.get(ticker.upper(), {
-        "pe": 15.0, "pb": 2.0, "cost_of_equity": 0.10, "growth_rate": 0.06
-    })
+    return HISTORICAL_MULTIPLES.get(
+        ticker.upper(),
+        {"pe": 15.0, "pb": 2.0, "cost_of_equity": 0.10, "growth_rate": 0.06},
+    )
 
 
 def extract_historical_multiples(api_response: dict, ticker: str) -> dict:
@@ -753,6 +851,7 @@ def extract_historical_multiples(api_response: dict, ticker: str) -> dict:
 # Convenience factory — satu baris dari API response ke report string
 # ---------------------------------------------------------------------------
 
+
 def build_fair_value_report(
     api_response: dict,
     ticker: str,
@@ -779,15 +878,14 @@ def build_fair_value_report(
     if stats.eps_ttm == 0.0 and stats.raw_pe_current > 0 and current_price > 0:
         stats.eps_ttm = round(current_price / stats.raw_pe_current, 2)
         logger.info(
-            "[FairValue] {}: EPS back-calculated from PE "
-            "({} / {} = {})",
+            "[FairValue] {}: EPS back-calculated from PE ({} / {} = {})",
             ticker,
             current_price,
             stats.raw_pe_current,
             stats.eps_ttm,
         )
 
-    calc   = FairValueCalculator(stats)
+    calc = FairValueCalculator(stats)
     result = calc.fair_value_weighted()
     report = calc.build_report(current_price=current_price)
 

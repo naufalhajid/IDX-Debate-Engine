@@ -91,10 +91,16 @@ def _recompute_position(position: dict, total_capital: float) -> None:
 
     position["shares"] = shares
     position["position_value"] = position_value
-    position["allocation_pct"] = position_value / total_capital if total_capital > 0 else 0.0
+    position["allocation_pct"] = (
+        position_value / total_capital if total_capital > 0 else 0.0
+    )
     position["max_loss_rp"] = shares * risk_per_share
-    position["max_drawdown_pct"] = position["max_loss_rp"] / total_capital if total_capital > 0 else 0.0
-    position["expected_return_rp"] = position_value * (position.get("expected_return_pct", 0.0) / 100)
+    position["max_drawdown_pct"] = (
+        position["max_loss_rp"] / total_capital if total_capital > 0 else 0.0
+    )
+    position["expected_return_rp"] = position_value * (
+        position.get("expected_return_pct", 0.0) / 100
+    )
     position["total_cost_est"] = buy_cost + sell_cost_est
 
 
@@ -123,7 +129,10 @@ def _weighted_average_expected_return(positions: list[dict]) -> float:
         ]
         return sum(values) / len(values) if values else 0.0
     return (
-        sum(p.get("position_value", 0.0) * p.get("expected_return_pct", 0.0) for p in positions)
+        sum(
+            p.get("position_value", 0.0) * p.get("expected_return_pct", 0.0)
+            for p in positions
+        )
         / total_value
     )
 
@@ -132,7 +141,9 @@ def _market_condition_score(positions: list[dict], max_positions: int) -> float:
     if not positions:
         return 0.0
     avg_confidence = sum(p.get("confidence", 0.0) for p in positions) / len(positions)
-    avg_rr_score = sum(min(max(p.get("rr_ratio", 0.0) / 2.5, 0.0), 1.0) for p in positions) / len(positions)
+    avg_rr_score = sum(
+        min(max(p.get("rr_ratio", 0.0) / 2.5, 0.0), 1.0) for p in positions
+    ) / len(positions)
     breadth_score = min(len(positions) / max(max_positions, 1), 1.0)
     score = (0.45 * avg_confidence) + (0.35 * avg_rr_score) + (0.20 * breadth_score)
     return round(max(0.0, min(score, 1.0)), 2)
@@ -152,7 +163,9 @@ def _deployment_scenario_comparison(
         "deploy_60_now": {
             "deployment_pct": 60.0,
             "expected_return_on_deployed_pct": round(avg_trade_return_pct, 2),
-            "expected_return_portfolio_pct": round(deploy_pct * avg_trade_return_pct, 2),
+            "expected_return_portfolio_pct": round(
+                deploy_pct * avg_trade_return_pct, 2
+            ),
             "expected_return_rp": round(expected_return_rp, 0),
             "max_drawdown_portfolio_pct": round(deploy_pct * max_loss_pct * 100, 2),
             "max_drawdown_rp": round(max_drawdown_rp, 0),
@@ -304,22 +317,26 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
             * max(confidence, 0.10)
             * max(min(rr_ratio, 3.0), 0.50)
         )
-        eligible.append({
-            "ticker": ticker,
-            "rating": rating,
-            "confidence": confidence,
-            "current_price": current_price,
-            "stop_loss": stop_loss,
-            "rr_ratio": rr_ratio,
-            "risk_per_share": risk_per_share,
-            "expected_return_pct": expected_return_pct,
-            "weight": weight,
-        })
+        eligible.append(
+            {
+                "ticker": ticker,
+                "rating": rating,
+                "confidence": confidence,
+                "current_price": current_price,
+                "stop_loss": stop_loss,
+                "rr_ratio": rr_ratio,
+                "risk_per_share": risk_per_share,
+                "expected_return_pct": expected_return_pct,
+                "weight": weight,
+            }
+        )
 
     total_weight = sum(item["weight"] for item in eligible) or 1.0
 
     for item in eligible:
-        allocation_pct = min(target_deployment_pct * (item["weight"] / total_weight), allocation_cap)
+        allocation_pct = min(
+            target_deployment_pct * (item["weight"] / total_weight), allocation_cap
+        )
         capital_allocated = total_capital * allocation_pct
         lot_from_risk = floor(max_loss_budget / (item["risk_per_share"] * LOT_SIZE))
         lot_from_alloc = floor(capital_allocated / (item["current_price"] * LOT_SIZE))
@@ -375,7 +392,9 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
             break
 
     while sum(p["position_value"] for p in positions) > max_deployed and positions:
-        lowest_priority = max(range(len(positions)), key=lambda i: _position_sort_key(positions[i]))
+        lowest_priority = max(
+            range(len(positions)), key=lambda i: _position_sort_key(positions[i])
+        )
         positions[lowest_priority]["lot"] -= 1
         if positions[lowest_priority]["lot"] < 1:
             positions.pop(lowest_priority)
@@ -402,7 +421,9 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
             f"> total_capital {user_config['total_capital']:,.0f}. "
             f"Portfolio guard gagal."
         )
-        raise ValueError("Position sizing menghasilkan deployed > capital. Cek lot calculation.")
+        raise ValueError(
+            "Position sizing menghasilkan deployed > capital. Cek lot calculation."
+        )
 
     return {
         "positions": positions,

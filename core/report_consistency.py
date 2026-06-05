@@ -124,9 +124,8 @@ def check_consistency(
             )
 
         rating = _extract_rating(batch_entry)
-        if (
-            rating in {"AVOID", "SELL"}
-            and _markdown_presents_positive(markdown_context)
+        if rating in {"AVOID", "SELL"} and _markdown_presents_positive(
+            markdown_context
         ):
             inconsistencies.append(
                 Inconsistency(
@@ -288,9 +287,7 @@ def _append_actionability_inconsistencies(
 
     sizing_allowed = risk.get("sizing_allowed")
     reason_codes = {
-        str(code)
-        for code in risk.get("reason_codes", [])
-        if code is not None
+        str(code) for code in risk.get("reason_codes", []) if code is not None
     }
     status = str(risk.get("status") or "")
 
@@ -431,7 +428,9 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Check TOP_3 markdown against full batch JSON."
     )
-    parser.add_argument("--batch", required=True, help="Path to full_batch_results.json")
+    parser.add_argument(
+        "--batch", required=True, help="Path to full_batch_results.json"
+    )
     parser.add_argument("--top3", required=True, help="Path to TOP_3_SWING_TRADES.md")
     return parser.parse_args(argv)
 

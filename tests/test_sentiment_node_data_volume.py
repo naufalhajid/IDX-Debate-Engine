@@ -33,7 +33,9 @@ def _large_post(stream_id: str) -> dict:
     post = _post(stream_id, content=("ramai dibahas bullish " * 80))
     post.update(
         {
-            "attachments": [{"url": f"https://example.test/{stream_id}/{i}"} for i in range(20)],
+            "attachments": [
+                {"url": f"https://example.test/{stream_id}/{i}"} for i in range(20)
+            ],
             "comments": [{"content": "nested comment " * 30} for _ in range(20)],
             "raw_html": "<div>" + ("oversized " * 300) + "</div>",
         }
@@ -86,7 +88,9 @@ def chamber(monkeypatch) -> DebateChamber:
     async def no_sleep(delay: float) -> None:
         return None
 
-    async def no_news(state: dict, ticker: str, llm_news_sentiment: str | None = None) -> dict:
+    async def no_news(
+        state: dict, ticker: str, llm_news_sentiment: str | None = None
+    ) -> dict:
         return {}
 
     async def no_headlines(ticker: str, limit: int = 6) -> str:
@@ -108,13 +112,16 @@ class TestSentimentNodeDataVolume:
         self,
         chamber: DebateChamber,
     ) -> None:
-        assert chamber._stockbit_post_id(
-            {
-                "stream_id": "stream-id",
-                "id": "stockbit-id",
-                "post_id": "fallback-post-id",
-            }
-        ) == "stream-id"
+        assert (
+            chamber._stockbit_post_id(
+                {
+                    "stream_id": "stream-id",
+                    "id": "stockbit-id",
+                    "post_id": "fallback-post-id",
+                }
+            )
+            == "stream-id"
+        )
         assert chamber._stockbit_post_id({"id": "stockbit-id"}) == "stockbit-id"
         assert chamber._stockbit_post_id({"post_id": "fallback-post-id"}) == (
             "fallback-post-id"
@@ -291,7 +298,9 @@ class TestSentimentNodeDataVolume:
 
         asyncio.run(chamber._sentiment_node(_state()))
 
-        weights = {post["stream_id"]: post["_verified_weight"] for post in captured["posts"]}
+        weights = {
+            post["stream_id"]: post["_verified_weight"] for post in captured["posts"]
+        }
         assert weights == {
             "pinned-verified": 1.5,
             "idea-retail": 1.0,
@@ -364,12 +373,10 @@ class TestSentimentNodeDataVolume:
             _paged_stream_response(
                 {
                     "STREAM_CATEGORY_IDEAS": [
-                        _post(f"s{i}", content=large_text)
-                        for i in range(1, 31)
+                        _post(f"s{i}", content=large_text) for i in range(1, 31)
                     ],
                     "STREAM_CATEGORY_NEWS": [
-                        _post(f"n{i}", content=large_text)
-                        for i in range(1, 20)
+                        _post(f"n{i}", content=large_text) for i in range(1, 20)
                     ],
                 }
             ),
@@ -416,7 +423,9 @@ class TestSentimentNodeDataVolume:
             raise AssertionError(f"unexpected url: {url}")
 
         async def malformed_response(state, llm, messages):
-            return SimpleNamespace(content="BUY karena ramai dibahas, confidence tinggi")
+            return SimpleNamespace(
+                content="BUY karena ramai dibahas, confidence tinggi"
+            )
 
         monkeypatch.setattr(chamber, "_fetch_url", fake_fetch_url)
         monkeypatch.setattr(

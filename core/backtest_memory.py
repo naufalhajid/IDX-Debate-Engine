@@ -126,9 +126,7 @@ class BacktestMemory:
             if record.outcome in {"win", "loss", "breakeven"}
         ]
         pnl_values = [
-            record.pnl_pct
-            for record in records
-            if record.pnl_pct is not None
+            record.pnl_pct for record in records if record.pnl_pct is not None
         ]
         confidence_values = [
             record.confidence_at_entry
@@ -136,11 +134,7 @@ class BacktestMemory:
             if record.confidence_at_entry is not None
         ]
         win_rate = wins / len(closed) if closed else 0.0
-        avg_pnl_pct = (
-            sum(pnl_values) / len(pnl_values)
-            if pnl_values
-            else None
-        )
+        avg_pnl_pct = sum(pnl_values) / len(pnl_values) if pnl_values else None
         avg_confidence = (
             sum(confidence_values) / len(confidence_values)
             if confidence_values

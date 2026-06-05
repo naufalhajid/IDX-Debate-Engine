@@ -99,7 +99,9 @@ def validate_handoff(
 ) -> HandoffValidationReport:
     """Hydrate and validate a handoff envelope for a consumer boundary."""
     try:
-        envelope = data if isinstance(data, HandoffEnvelope) else envelope_from_dict(data)
+        envelope = (
+            data if isinstance(data, HandoffEnvelope) else envelope_from_dict(data)
+        )
     except Exception as exc:
         return HandoffValidationReport(
             valid=False,

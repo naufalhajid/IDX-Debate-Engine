@@ -67,7 +67,9 @@ class ComparisonReporter:
 
             single_rating = single_verdict.rating if single_verdict else None
             single_confidence = single_verdict.confidence if single_verdict else None
-            single_rr_ratio = single_verdict.risk_reward_ratio if single_verdict else None
+            single_rr_ratio = (
+                single_verdict.risk_reward_ratio if single_verdict else None
+            )
             multi_rating = self._string_or_none(multi.get("rating"))
             multi_confidence = self._to_float(multi.get("confidence"))
             multi_rr_ratio = self._to_float(multi.get("risk_reward_ratio"))
@@ -102,7 +104,9 @@ class ComparisonReporter:
 
         total = len(rows)
         agreement_count = sum(1 for row in rows if row.ratings_agree)
-        deltas = [row.confidence_delta for row in rows if row.confidence_delta is not None]
+        deltas = [
+            row.confidence_delta for row in rows if row.confidence_delta is not None
+        ]
         avg_delta = round(sum(deltas) / len(deltas), 4) if deltas else 0.0
         multi_higher = sum(1 for delta in deltas if delta > 0)
         single_higher = sum(1 for delta in deltas if delta < 0)

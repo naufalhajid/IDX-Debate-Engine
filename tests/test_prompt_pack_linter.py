@@ -43,7 +43,9 @@ def test_lint_prompt_pack_missing_file_error(tmp_path: Path) -> None:
 
     assert report.valid is False
     assert report.total_prompts == 1
-    assert any("Prompt file missing for BULL_PROMPT" in error for error in report.errors)
+    assert any(
+        "Prompt file missing for BULL_PROMPT" in error for error in report.errors
+    )
 
 
 def test_lint_prompt_pack_missing_position_marker_error(tmp_path: Path) -> None:
@@ -79,7 +81,10 @@ def test_lint_prompt_pack_duplicate_prompt_name_error(tmp_path: Path) -> None:
     report = lint_prompt_pack(str(manifest_path))
 
     assert report.valid is False
-    assert any("Duplicate prompt name in manifest: BULL_PROMPT" in error for error in report.errors)
+    assert any(
+        "Duplicate prompt name in manifest: BULL_PROMPT" in error
+        for error in report.errors
+    )
 
 
 def _write_required_prompt_pack(
@@ -127,7 +132,10 @@ def test_guard_prompt_pack_missing_required_prompt_error(tmp_path: Path) -> None
     )
 
     assert report.valid is False
-    assert any("Manifest missing required prompt: BULL_SYSTEM_PROMPT_R1" in error for error in report.errors)
+    assert any(
+        "Manifest missing required prompt: BULL_SYSTEM_PROMPT_R1" in error
+        for error in report.errors
+    )
 
 
 def test_guard_prompt_pack_missing_prompt_version_error(tmp_path: Path) -> None:

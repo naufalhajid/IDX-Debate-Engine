@@ -1,4 +1,5 @@
 """Tests untuk core/dependency_validator.py."""
+
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -40,6 +41,7 @@ def test_file_stale(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # Backdate mtime ke 48 jam yang lalu
     old_mtime = time.time() - (48 * 3600)
     import os
+
     os.utime(f, (old_mtime, old_mtime))
 
     result = check_candidates_file(f, max_age_hours=24.0)
@@ -81,7 +83,9 @@ def test_maybe_rerun_quant_filter_passes_output_dir(
 
     monkeypatch.setattr("core.dependency_validator.subprocess.run", fake_run)
 
-    assert maybe_rerun_quant_filter(script_path=str(script), output_dir=tmp_path / "dry")
+    assert maybe_rerun_quant_filter(
+        script_path=str(script), output_dir=tmp_path / "dry"
+    )
     assert captured["command"][-2:] == ["--output-dir", str(tmp_path / "dry")]
 
 

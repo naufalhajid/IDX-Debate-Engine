@@ -110,7 +110,11 @@ def route_failure(
     max_attempts: int = 3,
 ) -> FailureDecision:
     """Choose a consistent retry/skip/abort/fail action for a failure."""
-    record = failure if isinstance(failure, FailureRecord) else classify_exception(failure, source)
+    record = (
+        failure
+        if isinstance(failure, FailureRecord)
+        else classify_exception(failure, source)
+    )
     safe_attempt = max(1, attempt)
     safe_max_attempts = max(1, max_attempts)
 
@@ -121,14 +125,21 @@ def route_failure(
     if record.code is ErrorCode.AUTH:
         action = FailureAction.ABORT
         reason = "authentication failures require operator intervention"
-    elif record.code is ErrorCode.QUOTA and _is_budget_exhaustion(record.message.lower()):
+    elif record.code is ErrorCode.QUOTA and _is_budget_exhaustion(
+        record.message.lower()
+    ):
         action = FailureAction.ABORT
         reason = "budget exhaustion should stop remaining agent work"
     elif record.retryable and safe_attempt < safe_max_attempts:
         action = FailureAction.RETRY
         retry_after_seconds = _retry_delay_seconds(record.code, safe_attempt)
         reason = f"{record.code.value} is retryable and attempts remain"
-    elif record.code in {ErrorCode.DNS, ErrorCode.TIMEOUT, ErrorCode.EMPTY_LLM, ErrorCode.QUOTA}:
+    elif record.code in {
+        ErrorCode.DNS,
+        ErrorCode.TIMEOUT,
+        ErrorCode.EMPTY_LLM,
+        ErrorCode.QUOTA,
+    }:
         action = FailureAction.SKIP
         reason = f"{record.code.value} exhausted retries; skip this unit of work"
     elif record.code is ErrorCode.NO_PRICE:
@@ -155,7 +166,9 @@ def _retry_delay_seconds(code: ErrorCode, attempt: int) -> float:
 
 
 def _is_budget_exhaustion(lower_message: str) -> bool:
-    return "budget exhausted" in lower_message or "daily pro-call budget" in lower_message
+    return (
+        "budget exhausted" in lower_message or "daily pro-call budget" in lower_message
+    )
 
 
 def _extract_ticker(e: Exception) -> str:
@@ -180,7 +193,8 @@ def _is_auth(e: Exception, lower_message: str) -> bool:
         or "unauthorized" in lower_message
         or "forbidden" in lower_message
         or "token expired" in lower_message
-        or "oauth" in lower_message and "invalid" in lower_message
+        or "oauth" in lower_message
+        and "invalid" in lower_message
         or "invalid_grant" in lower_message
     )
 

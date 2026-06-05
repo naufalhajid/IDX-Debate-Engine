@@ -26,6 +26,7 @@ from utils.logger_config import logger
 @dataclass
 class ValidationResult:
     """Hasil validasi staleness file kandidat."""
+
     is_valid: bool
     age_hours: float
     message: str
@@ -34,6 +35,7 @@ class ValidationResult:
 @dataclass
 class DependencyCheck:
     """Single pre-flight dependency check result."""
+
     name: str
     is_valid: bool
     message: str
@@ -44,6 +46,7 @@ class DependencyCheck:
 @dataclass
 class DependencyCheckResult:
     """Aggregate pre-flight dependency status for the orchestrator."""
+
     is_valid: bool
     checks: dict[str, DependencyCheck]
     failed_checks: list[str]
@@ -96,7 +99,7 @@ def check_candidates_file(path: Path, max_age_hours: float) -> ValidationResult:
 def check_llm_api_key(required: bool = True) -> DependencyCheck:
     """Verify that the API key for the active provider is available."""
     provider = settings.DEFAULT_LLM_PROVIDER.lower()
-    
+
     if provider == "gemini":
         api_key = settings.GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY", "")
         key_name = "GEMINI_API_KEY"
@@ -204,7 +207,7 @@ def check_disk_space(path: Path, required_gb: float = 5.0) -> DependencyCheck:
     """Ensure enough free disk space exists for batch output and logs."""
     target = path if path.exists() else path.parent
     target.mkdir(parents=True, exist_ok=True)
-    free_gb = shutil.disk_usage(target).free / (1024 ** 3)
+    free_gb = shutil.disk_usage(target).free / (1024**3)
     if free_gb >= required_gb:
         return DependencyCheck(
             name="disk_space",
@@ -224,7 +227,7 @@ def check_disk_space(path: Path, required_gb: float = 5.0) -> DependencyCheck:
 def check_llm_models(required: bool = True) -> DependencyCheck:
     """Validate configured model names are present for the active provider."""
     provider = settings.DEFAULT_LLM_PROVIDER.lower()
-    
+
     if provider == "gemini":
         flash = settings.GEMINI_FLASH_MODEL
         pro = settings.GEMINI_PRO_MODEL
@@ -243,7 +246,7 @@ def check_llm_models(required: bool = True) -> DependencyCheck:
         missing.append("FLASH_MODEL")
     if not str(pro or "").strip():
         missing.append("PRO_MODEL")
-        
+
     if not missing:
         if provider == "codex" and not required:
             return DependencyCheck(
@@ -257,6 +260,7 @@ def check_llm_models(required: bool = True) -> DependencyCheck:
             )
         if provider == "codex" and required:
             import concurrent.futures
+
             try:
                 with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
                     f1 = executor.submit(_invoke_llm_probe, provider, "flash")
@@ -277,10 +281,7 @@ def check_llm_models(required: bool = True) -> DependencyCheck:
             return DependencyCheck(
                 name="llm_models",
                 is_valid=True,
-                message=(
-                    f"Model {provider} live probe OK: "
-                    f"flash={flash}, pro={pro}."
-                ),
+                message=(f"Model {provider} live probe OK: flash={flash}, pro={pro}."),
                 blocking=False,
             )
         return DependencyCheck(
@@ -348,11 +349,7 @@ def maybe_rerun_quant_filter(
     if output_dir is not None:
         command.extend(["--output-dir", str(output_dir)])
 
-    logger.info(
-        "[Validator] Auto-rerun: menjalankan "
-        + " ".join(command[1:])
-        + " ..."
-    )
+    logger.info("[Validator] Auto-rerun: menjalankan " + " ".join(command[1:]) + " ...")
     result = subprocess.run(
         command,
         # Tidak capture output — biarkan mengalir ke terminal

@@ -104,8 +104,8 @@ class Settings(BaseSettings):
     CANDIDATES_AUTO_RERUN: bool = True
 
     # ── Market Regime (IHSG ^JKSE realized volatility proxy) ─────────────────
-    REGIME_VOLATILITY_HIGH_THRESHOLD: float = 0.02   # daily std >= 2% → HIGH
-    REGIME_VOLATILITY_LOW_THRESHOLD: float = 0.01    # daily std < 1%  → LOW
+    REGIME_VOLATILITY_HIGH_THRESHOLD: float = 0.02  # daily std >= 2% → HIGH
+    REGIME_VOLATILITY_LOW_THRESHOLD: float = 0.01  # daily std < 1%  → LOW
     REGIME_VOLATILITY_LOOKBACK_DAYS: int = 20
 
     # ── Portfolio Diversification ────────────────────────────────────────────

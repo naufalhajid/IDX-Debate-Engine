@@ -14,10 +14,10 @@ async def get_gemini_api_key(
                 ),
             },
         )
-    
+
     # Strip whitespace and quotes from copy-paste
     clean_key = x_gemini_api_key.strip().strip("'").strip('"')
-    
+
     if not clean_key:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -29,4 +29,3 @@ async def get_gemini_api_key(
             },
         )
     return clean_key
-

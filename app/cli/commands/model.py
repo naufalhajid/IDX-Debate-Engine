@@ -143,7 +143,9 @@ def select_model(provider: str, tier: str) -> str:
 
 
 def model_command(
-    provider: str = typer.Argument(None, help="Provider name: gemini, anthropic, or codex."),
+    provider: str = typer.Argument(
+        None, help="Provider name: gemini, anthropic, or codex."
+    ),
 ) -> None:
     """Switch LLM provider and configure flash/pro model variants."""
     if provider:
@@ -177,7 +179,9 @@ def model_command(
     console.print("\nSelect a provider to use as default:")
     for num, name in PROVIDERS.items():
         marker = " [idx.ok]<- (Active)[/idx.ok]" if name == current else ""
-        console.print(f"  [[idx.highlight]{num}[/idx.highlight]] {name.capitalize()}{marker}")
+        console.print(
+            f"  [[idx.highlight]{num}[/idx.highlight]] {name.capitalize()}{marker}"
+        )
     console.print("  [[idx.highlight]0[/idx.highlight]] Cancel / Exit")
 
     try:
@@ -219,7 +223,5 @@ def model_command(
             )
         )
     else:
-        console.print(
-            f"\n[idx.error]Choice '{choice}' is not valid.[/idx.error]"
-        )
+        console.print(f"\n[idx.error]Choice '{choice}' is not valid.[/idx.error]")
         raise typer.Exit(1)

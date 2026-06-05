@@ -81,13 +81,21 @@ async def _load_results() -> dict[str, dict[str, Any]]:  # QW-FIX-PF1
     current_mtime = _results_signature()
 
     now = time.monotonic()
-    if _cache and (now - _cache_timestamp) < _CACHE_TTL_SECONDS and current_mtime == _cache_file_mtime:
+    if (
+        _cache
+        and (now - _cache_timestamp) < _CACHE_TTL_SECONDS
+        and current_mtime == _cache_file_mtime
+    ):
         return _cache
 
     async with _cache_lock:
         now = time.monotonic()
         current_mtime = _results_signature()
-        if _cache and (now - _cache_timestamp) < _CACHE_TTL_SECONDS and current_mtime == _cache_file_mtime:
+        if (
+            _cache
+            and (now - _cache_timestamp) < _CACHE_TTL_SECONDS
+            and current_mtime == _cache_file_mtime
+        ):
             return _cache
 
         raw_data = []
@@ -122,11 +130,14 @@ async def _load_results() -> dict[str, dict[str, Any]]:  # QW-FIX-PF1
                         data = json.loads(file_content)
                         if isinstance(data, dict) and "ticker" in data:
                             ticker_key = data["ticker"]
-                            if results_path == RESULTS_PATH or ticker_key not in compiled_results:
+                            if (
+                                results_path == RESULTS_PATH
+                                or ticker_key not in compiled_results
+                            ):
                                 compiled_results[ticker_key] = data
                 except Exception as e:
                     logger.warning(f"[_load_results] Failed to read fallback {f}: {e}")
-        
+
         if not compiled_results:
             raise _error(
                 "NO_RESULTS",
@@ -161,55 +172,61 @@ def invalidate_results_cache() -> None:
 @router.get("/health")
 async def health_check() -> dict[str, Any]:
     from datetime import datetime, timedelta
-    
+
     debates_dir = RESULTS_PATH.parent / "debates"
     latest_time = None
     results = []
-    
+
     if debates_dir.exists():
         for f in debates_dir.glob("*.json"):
             try:
                 mtime = f.stat().st_mtime
                 if latest_time is None or mtime > latest_time:
                     latest_time = mtime
-                    
+
                 content = f.read_text(encoding="utf-8")
                 if not content.strip():
                     continue
                 data = json.loads(content)
-                
+
                 verdict = data.get("verdict") or {}
                 rating = verdict.get("rating", "UNKNOWN")
                 confidence = verdict.get("confidence", 0.0)
                 conviction_score = data.get("conviction_score", 0.0)
                 rounds = data.get("debate_rounds", 0)
                 consensus = data.get("consensus_reached", False)
-                
+
                 metadata = data.get("metadata") or {}
-                batch_ts = metadata.get("batch_timestamp") or metadata.get("run_timestamp")
+                batch_ts = metadata.get("batch_timestamp") or metadata.get(
+                    "run_timestamp"
+                )
                 debate_date = datetime.fromtimestamp(mtime)
                 if batch_ts:
                     try:
                         debate_date = datetime.strptime(batch_ts, "%Y%m%d_%H%M%S")
                     except ValueError:
                         try:
-                            debate_date = datetime.strptime(batch_ts.split("_")[0], "%Y%m%d")
+                            debate_date = datetime.strptime(
+                                batch_ts.split("_")[0], "%Y%m%d"
+                            )
                         except Exception:
                             pass
-                
-                results.append({
-                    "rating": rating,
-                    "confidence": confidence,
-                    "conviction_score": conviction_score,
-                    "rounds": rounds,
-                    "consensus": consensus,
-                    "date": debate_date
-                })
+
+                results.append(
+                    {
+                        "rating": rating,
+                        "confidence": confidence,
+                        "conviction_score": conviction_score,
+                        "rounds": rounds,
+                        "consensus": consensus,
+                        "date": debate_date,
+                    }
+                )
             except Exception:
                 pass
-                
+
     total_debates = len(results)
-    
+
     # Calculate stats
     ratings_dist = {"STRONG_BUY": 0, "BUY": 0, "HOLD": 0, "AVOID": 0}
     total_conviction = 0.0
@@ -217,18 +234,18 @@ async def health_check() -> dict[str, Any]:
     consensus_count = 0
     fresh_count = 0
     stale_count = 0
-    
+
     # 1 month threshold (30 days) from now
     now = datetime.now()
     one_month_ago = now - timedelta(days=30)
-    
+
     for r in results:
         rating = r["rating"]
         if rating in ratings_dist:
             ratings_dist[rating] += 1
         else:
             ratings_dist[rating] = 1
-            
+
         total_conviction += r["conviction_score"]
         total_confidence += r["confidence"]
         if r["consensus"]:
@@ -237,27 +254,35 @@ async def health_check() -> dict[str, Any]:
             fresh_count += 1
         else:
             stale_count += 1
-            
+
     latest_date_str = None
     if latest_time is not None:
         latest_date_str = datetime.fromtimestamp(latest_time).isoformat()
-        
+
     debate_stats = {
         "total_debates": total_debates,
-        "avg_conviction": round(total_conviction / total_debates, 3) if total_debates > 0 else 0.0,
-        "avg_confidence": round(total_confidence / total_debates, 3) if total_debates > 0 else 0.0,
-        "consensus_rate": round((consensus_count / total_debates) * 100, 2) if total_debates > 0 else 0.0,
+        "avg_conviction": round(total_conviction / total_debates, 3)
+        if total_debates > 0
+        else 0.0,
+        "avg_confidence": round(total_confidence / total_debates, 3)
+        if total_debates > 0
+        else 0.0,
+        "consensus_rate": round((consensus_count / total_debates) * 100, 2)
+        if total_debates > 0
+        else 0.0,
         "ratings_distribution": ratings_dist,
         "fresh_count": fresh_count,
         "stale_count": stale_count,
-        "latest_debate_date": latest_date_str
+        "latest_debate_date": latest_date_str,
     }
 
     return {
-        "status": "ok", 
-        "results_exist": RESULTS_PATH.exists() or _merged_results_path().exists() or bool(results),
+        "status": "ok",
+        "results_exist": RESULTS_PATH.exists()
+        or _merged_results_path().exists()
+        or bool(results),
         "latest_debate_date": latest_date_str,
-        "debate_stats": debate_stats
+        "debate_stats": debate_stats,
     }
 
 
@@ -265,10 +290,10 @@ async def health_check() -> dict[str, Any]:
 async def validate_key(api_key: str = Depends(get_gemini_api_key)) -> dict[str, bool]:
     if not api_key:
         return {"valid": False}
-    
+
     from providers.gemini import get_flash_llm, gemini_api_key_override
     import asyncio
-    
+
     try:
         with gemini_api_key_override(api_key):
             llm = get_flash_llm()
@@ -364,7 +389,10 @@ async def stream_debate(
                     elif event.get("type") == "error":
                         if not final_result:
                             from core.orchestrator.legacy import _empty_result
-                            final_result = _empty_result(ticker, event.get("message", "Unknown error"))
+
+                            final_result = _empty_result(
+                                ticker, event.get("message", "Unknown error")
+                            )
                 return final_result
 
         def chamber_factory():
@@ -372,11 +400,25 @@ async def stream_debate(
 
         # Phase 1: Pre-flight checks progress
         for ticker in payload.tickers:
-            yield sse({"type": "progress", "ticker": ticker, "phase": "Pre-flight Checks", "pct": 5})
+            yield sse(
+                {
+                    "type": "progress",
+                    "ticker": ticker,
+                    "phase": "Pre-flight Checks",
+                    "pct": 5,
+                }
+            )
 
         # Phase 2: Market Regime Detection progress
         for ticker in payload.tickers:
-            yield sse({"type": "progress", "ticker": ticker, "phase": "Market Regime", "pct": 10})
+            yield sse(
+                {
+                    "type": "progress",
+                    "ticker": ticker,
+                    "phase": "Market Regime",
+                    "pct": 10,
+                }
+            )
 
         user_config = {
             "total_capital": float(payload.total_capital),
@@ -416,23 +458,38 @@ async def stream_debate(
                 exc = orchestrator_task.exception()
                 logger.error(f"Orchestrator pipeline failed: {exc}", exc_info=exc)
                 for ticker in payload.tickers:
-                    yield sse({"type": "error", "ticker": ticker, "message": f"Orchestrator pipeline failed: {exc}"})
+                    yield sse(
+                        {
+                            "type": "error",
+                            "ticker": ticker,
+                            "message": f"Orchestrator pipeline failed: {exc}",
+                        }
+                    )
             else:
                 # Yield 95% progress for scoring and sizing
                 for ticker in payload.tickers:
-                    yield sse({"type": "progress", "ticker": ticker, "phase": "Scoring & Sizing", "pct": 95})
+                    yield sse(
+                        {
+                            "type": "progress",
+                            "ticker": ticker,
+                            "phase": "Scoring & Sizing",
+                            "pct": 95,
+                        }
+                    )
 
                 # Invalidate cache and yield the final scored verdicts
                 invalidate_results_cache()
                 final_results = await _load_results()
                 for ticker in payload.tickers:
                     if ticker in final_results:
-                        yield sse({
-                            "type": "verdict",
-                            "ticker": ticker,
-                            "stage": "final",
-                            "result": final_results[ticker]
-                        })
+                        yield sse(
+                            {
+                                "type": "verdict",
+                                "ticker": ticker,
+                                "stage": "final",
+                                "result": final_results[ticker],
+                            }
+                        )
                     yield sse({"type": "done", "ticker": ticker})
 
         except asyncio.CancelledError:

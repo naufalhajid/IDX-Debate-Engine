@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import warnings
+
 _original_showwarning = warnings.showwarning
+
+
 def _custom_showwarning(message, category, filename, lineno, file=None, line=None):
     if "allowed_objects" in str(message) or "LangChain" in category.__name__:
         return
     _original_showwarning(message, category, filename, lineno, file, line)
+
+
 warnings.showwarning = _custom_showwarning
 
 # ruff: noqa: E402

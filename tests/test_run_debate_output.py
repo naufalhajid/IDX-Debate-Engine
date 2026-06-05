@@ -10,7 +10,9 @@ class FakeDebateChamber:
     async def run(self, ticker: str) -> dict:
         return {
             "ticker": ticker,
-            "final_verdict": json.dumps({"ticker": ticker, "rating": "BUY", "confidence": 0.72}),
+            "final_verdict": json.dumps(
+                {"ticker": ticker, "rating": "BUY", "confidence": 0.72}
+            ),
             "round_count": 1,
             "debate_history": [
                 SimpleNamespace(

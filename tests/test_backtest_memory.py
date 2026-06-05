@@ -96,7 +96,9 @@ def test_summary_stats_on_empty_store_returns_zeros(tmp_path: Path) -> None:
     }
 
 
-def test_old_jsonl_records_without_evaluation_metadata_still_load(tmp_path: Path) -> None:
+def test_old_jsonl_records_without_evaluation_metadata_still_load(
+    tmp_path: Path,
+) -> None:
     path = tmp_path / "backtest_memory.jsonl"
     old_record = {
         "run_id": "run-1",

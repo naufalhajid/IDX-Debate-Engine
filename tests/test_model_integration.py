@@ -30,20 +30,24 @@ class TestTokenValidity:
 
     def test_no_expiry_is_valid(self):
         from providers.oauth_manager import is_token_valid
+
         assert is_token_valid(0) is True
 
     def test_future_expiry_is_valid(self):
         from providers.oauth_manager import is_token_valid
+
         future_ms = int(time.time() * 1000) + 3600_000  # +1 hour
         assert is_token_valid(future_ms) is True
 
     def test_past_expiry_is_invalid(self):
         from providers.oauth_manager import is_token_valid
+
         past_ms = int(time.time() * 1000) - 60_000  # -1 minute
         assert is_token_valid(past_ms) is False
 
     def test_within_buffer_is_invalid(self):
         from providers.oauth_manager import is_token_valid
+
         # 30 seconds from now — inside the 60s buffer
         near_ms = int(time.time() * 1000) + 30_000
         assert is_token_valid(near_ms) is False
@@ -209,26 +213,32 @@ class TestOAuthTokenDetection:
 
     def test_regular_api_key_is_not_oauth(self):
         from providers.anthropic_adapter import _is_oauth_token
+
         assert _is_oauth_token("sk-ant-api03-abc123") is False
 
     def test_setup_token_is_oauth(self):
         from providers.anthropic_adapter import _is_oauth_token
+
         assert _is_oauth_token("sk-ant-oat-abc123") is True
 
     def test_jwt_is_oauth(self):
         from providers.anthropic_adapter import _is_oauth_token
+
         assert _is_oauth_token("eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9") is True
 
     def test_cc_prefix_is_oauth(self):
         from providers.anthropic_adapter import _is_oauth_token
+
         assert _is_oauth_token("cc-abc123def456") is True
 
     def test_empty_is_not_oauth(self):
         from providers.anthropic_adapter import _is_oauth_token
+
         assert _is_oauth_token("") is False
 
     def test_random_key_is_not_oauth(self):
         from providers.anthropic_adapter import _is_oauth_token
+
         assert _is_oauth_token("random-api-key-123") is False
 
 
@@ -242,6 +252,7 @@ class TestFailureTaxonomy:
 
     def test_oauth_expired_is_auth(self):
         from core.failure_taxonomy import classify_exception
+
         exc = Exception("Token expired: 401 Unauthorized")
         record = classify_exception(exc, source="anthropic")
         assert record.code.value == "AUTH"
@@ -249,6 +260,7 @@ class TestFailureTaxonomy:
 
     def test_rate_limit_is_quota(self):
         from core.failure_taxonomy import classify_exception
+
         exc = Exception("rate_limit_exceeded: too many requests (429)")
         record = classify_exception(exc, source="codex")
         assert record.code.value == "QUOTA"
@@ -256,6 +268,7 @@ class TestFailureTaxonomy:
 
     def test_overloaded_is_quota(self):
         from core.failure_taxonomy import classify_exception
+
         exc = Exception("overloaded: API is temporarily overloaded")
         record = classify_exception(exc, source="anthropic")
         assert record.code.value == "QUOTA"
@@ -263,6 +276,7 @@ class TestFailureTaxonomy:
 
     def test_invalid_grant_is_auth(self):
         from core.failure_taxonomy import classify_exception
+
         exc = Exception("invalid_grant: refresh token expired")
         record = classify_exception(exc, source="codex")
         assert record.code.value == "AUTH"

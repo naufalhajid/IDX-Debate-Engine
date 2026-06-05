@@ -84,7 +84,7 @@ class StockBit:
         """
         settings = get_settings()
         max_workers = getattr(settings, "STOCKBIT_MAX_WORKERS", 10)
-        
+
         processed_count = 0
         processed_lock = threading.Lock()
 
@@ -94,7 +94,7 @@ class StockBit:
                 key_statistic = self._safe_fetch_key_statistic(stock)
                 if key_statistic:
                     stock.fundamental = self._fundamental(stock, key_statistic)
-                
+
                 with processed_lock:
                     processed_count += 1
                     logger.info(
@@ -459,7 +459,7 @@ class StockBit:
         """
         settings = get_settings()
         max_workers = getattr(settings, "STOCKBIT_MAX_WORKERS", 10)
-        
+
         processed_count = 0
         processed_lock = threading.Lock()
 
@@ -652,7 +652,7 @@ class StockBit:
         """
         settings = get_settings()
         max_workers = getattr(settings, "STOCKBIT_MAX_WORKERS", 10)
-        
+
         processed_count = 0
         processed_lock = threading.Lock()
 
@@ -687,12 +687,16 @@ class StockBit:
         """
         return asyncio.run(self._safe_fetch_stream_data_async(stock))
 
-    async def _fetch_stream_source(self, stock: Stock, operation: str, category: str | None = None) -> dict:
+    async def _fetch_stream_source(
+        self, stock: Stock, operation: str, category: str | None = None
+    ) -> dict:
         ticker = self._ticker(stock)
         try:
             if operation == "pinned":
                 return await asyncio.to_thread(self.stream_pinned_by_stock, stock)
-            return await asyncio.to_thread(self.stream_by_stock, stock, category=category)
+            return await asyncio.to_thread(
+                self.stream_by_stock, stock, category=category
+            )
         except Exception as exc:
             if "401" in str(exc):
                 logger.warning(
@@ -702,7 +706,9 @@ class StockBit:
                 try:
                     await asyncio.to_thread(self.stockbit_api_client.reauthenticate)
                     if operation == "pinned":
-                        return await asyncio.to_thread(self.stream_pinned_by_stock, stock)
+                        return await asyncio.to_thread(
+                            self.stream_pinned_by_stock, stock
+                        )
                     return await asyncio.to_thread(
                         self.stream_by_stock,
                         stock,

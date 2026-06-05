@@ -29,19 +29,20 @@ from utils.logger_config import logger
 # \u2500\u2500 Constants \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 _MIN_RECORDS_FOR_ADJUSTMENT: int = 10
-_HALF_ADJUSTMENT_THRESHOLD: int = 15   # below this: half bonus/penalty applied
+_HALF_ADJUSTMENT_THRESHOLD: int = 15  # below this: half bonus/penalty applied
 _WIN_RATE_HIGH_THRESHOLD: float = 0.70
 _WIN_RATE_LOW_THRESHOLD: float = 0.30
 _REALIZED_WIN_RATE_HIGH_THRESHOLD: float = 0.60
 _REALIZED_WIN_RATE_LOW_THRESHOLD: float = 0.40
-_EV_HIGH_THRESHOLD: float = 3.0    # avg pnl% above this → bonus
-_EV_LOW_THRESHOLD: float = -2.0    # avg pnl% below this → penalty
+_EV_HIGH_THRESHOLD: float = 3.0  # avg pnl% above this → bonus
+_EV_LOW_THRESHOLD: float = -2.0  # avg pnl% below this → penalty
 _BONUS: float = 0.05
 _PENALTY: float = -0.05
 _MAX_HISTORY_RECORDS_PER_TICKER: int = 20
 
 
 # \u2500\u2500 Public API \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+
 
 def load_debate_history(output_dir: Path) -> list[dict]:
     """
@@ -54,7 +55,9 @@ def load_debate_history(output_dir: Path) -> list[dict]:
     records: list[dict] = []
 
     if not debates_dir.exists():
-        logger.debug(f"[HistScorer] Direktori {debates_dir} tidak ada — tidak ada history.")
+        logger.debug(
+            f"[HistScorer] Direktori {debates_dir} tidak ada — tidak ada history."
+        )
         return records
 
     versioned_by_ticker: dict[str, list[Path]] = {}
@@ -238,7 +241,8 @@ def compute_realized_ev(
     """
     ticker_upper = ticker.upper()
     closed = [
-        r for r in records
+        r
+        for r in records
         if r.ticker.upper() == ticker_upper
         and r.verdict_rating.upper() in {"BUY", "STRONG_BUY"}
         and r.outcome in {"win", "loss", "breakeven"}

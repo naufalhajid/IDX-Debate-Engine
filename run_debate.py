@@ -34,7 +34,9 @@ from services.explainability_auditor import DEFAULT_AUDITOR
 from services.report_formatter import DEFAULT_MD, RichFormatter
 from utils.logger_config import logger
 
-PROMPT_MANIFEST_PATH = Path(__file__).resolve().parent / "services" / "debate_prompts" / "manifest.json"
+PROMPT_MANIFEST_PATH = (
+    Path(__file__).resolve().parent / "services" / "debate_prompts" / "manifest.json"
+)
 _batch_failed_count: int = 0
 _DEBATE_LOGGING_CONFIGURED = False
 
@@ -278,6 +280,7 @@ def _get_run_time() -> datetime:
 
 def _as_debate_message(m):
     from schemas.debate import DebateMessage
+
     if isinstance(m, dict):
         return DebateMessage(**m)
     return m
@@ -332,7 +335,9 @@ def _record_open_trade_outcome(
                 pnl_pct=None,
                 hit_target=None,
                 hit_stop=None,
-                confidence_at_entry=float(confidence) if confidence is not None else None,
+                confidence_at_entry=float(confidence)
+                if confidence is not None
+                else None,
                 notes="auto-recorded at debate completion",
             )
         )
@@ -467,7 +472,9 @@ def _write_formatter_report(
     render_details: bool = True,
 ) -> None:
     payload = dict(result)
-    metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+    metadata = (
+        payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+    )
     if str(metadata.get("run_id") or "").lower() in {"", "unknown"}:
         metadata = {**metadata, "run_id": run_timestamp}
         payload["metadata"] = metadata
@@ -507,8 +514,12 @@ def _record_ticker_telemetry(
 ) -> None:
     try:
         report = report or {}
-        verdict = report.get("verdict") if isinstance(report.get("verdict"), dict) else {}
-        metadata = report.get("metadata") if isinstance(report.get("metadata"), dict) else {}
+        verdict = (
+            report.get("verdict") if isinstance(report.get("verdict"), dict) else {}
+        )
+        metadata = (
+            report.get("metadata") if isinstance(report.get("metadata"), dict) else {}
+        )
 
         if status == "success":
             metric = TickerMetric(
@@ -522,7 +533,9 @@ def _record_ticker_telemetry(
                 flash_calls=int(metadata.get("flash_calls", 0) or 0),
                 pro_calls=int(metadata.get("pro_calls", 0) or 0),
                 rag_chunks_selected=int(metadata.get("rag_chunks_selected", 0) or 0),
-                rag_chunks_considered=int(metadata.get("rag_chunks_considered", 0) or 0),
+                rag_chunks_considered=int(
+                    metadata.get("rag_chunks_considered", 0) or 0
+                ),
                 rag_token_estimate=int(metadata.get("rag_token_estimate", 0) or 0),
                 provider_errors=[],
                 has_stale_data=False,
@@ -548,16 +561,16 @@ def _record_ticker_telemetry(
             )
         DEFAULT_TELEMETRY.record_ticker(metric)
     except Exception as exc:
-        logger.warning(f"[Telemetry] Failed to record ticker metric for {ticker}: {exc}")
+        logger.warning(
+            f"[Telemetry] Failed to record ticker metric for {ticker}: {exc}"
+        )
 
 
 def _print_report(report_text: str) -> None:
     try:
         logger.info(str(report_text))
     except UnicodeEncodeError:
-        logger.info(
-            str(report_text.encode("ascii", errors="replace").decode("ascii"))
-        )
+        logger.info(str(report_text.encode("ascii", errors="replace").decode("ascii")))
 
 
 def _write_batch_telemetry_report(
@@ -590,7 +603,9 @@ def _write_batch_telemetry_report(
         logger.warning(f"[Telemetry] Failed to build batch report for {run_id}: {exc}")
 
 
-def _load_batch_debate_rows(output_dir: Path, tickers: list[str]) -> list[dict[str, Any]]:
+def _load_batch_debate_rows(
+    output_dir: Path, tickers: list[str]
+) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for ticker in tickers:
         latest_path = output_dir / ticker / "latest_debate.json"
@@ -803,7 +818,9 @@ async def _run_chamber_with_planner(
             return result, attempt
 
         metadata = result.get("metadata")
-        guard_status = metadata.get("guard_status") if isinstance(metadata, dict) else None
+        guard_status = (
+            metadata.get("guard_status") if isinstance(metadata, dict) else None
+        )
         status = str(guard_status or _status_from_error(str(error)))
         _ledger_call(
             "debate stage failure",
@@ -913,7 +930,9 @@ def _attach_risk_governor(
         metadata = _dict_or_empty(result.get("metadata"))
         raw_data = _dict_or_empty(result.get("raw_data"))
         technicals = _dict_or_empty(result.get("technical_indicators"))
-        atr14 = raw_data.get("atr14") or metadata.get("atr14") or technicals.get("atr14")
+        atr14 = (
+            raw_data.get("atr14") or metadata.get("atr14") or technicals.get("atr14")
+        )
         avg_volume = (
             raw_data.get("avg_volume_20d")
             or metadata.get("avg_volume_20d")
@@ -1007,8 +1026,7 @@ async def _debate_one(
             return False
 
         debate_history = [
-            _as_debate_message(m)
-            for m in result.get("debate_history", [])
+            _as_debate_message(m) for m in result.get("debate_history", [])
         ]
         verdict_payload = _parse_final_verdict_with_planner(
             ticker=ticker,
@@ -1136,7 +1154,9 @@ async def _debate_one(
             run_id=run_timestamp,
             ticker=ticker,
             status="success",
-            verdict=str(verdict_payload.get("rating")) if verdict_payload.get("rating") else None,
+            verdict=str(verdict_payload.get("rating"))
+            if verdict_payload.get("rating")
+            else None,
             started_at=started_at,
         )
         return True

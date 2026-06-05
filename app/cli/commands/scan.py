@@ -45,7 +45,9 @@ def scan_command(
     ] = ExportFormat.spreadsheet,
     dry_run: Annotated[
         bool,
-        typer.Option("--dry-run", help="Show the planned ETL run without executing it."),
+        typer.Option(
+            "--dry-run", help="Show the planned ETL run without executing it."
+        ),
     ] = False,
     ctx: typer.Context = typer.Context,
 ) -> None:

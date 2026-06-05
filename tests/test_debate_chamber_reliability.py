@@ -173,7 +173,9 @@ async def test_consensus_round_one_two_of_five_is_not_enough(monkeypatch):
             "round_count": 1,
             "debate_history": [
                 DebateMessage(role="bull", content="Hold", round_num=1),
-                DebateMessage(role="bear", content="Hold, but risks remain", round_num=1),
+                DebateMessage(
+                    role="bear", content="Hold, but risks remain", round_num=1
+                ),
             ],
         }
     )
@@ -198,8 +200,16 @@ async def test_consensus_round_one_three_of_five_waits_for_more_debate(monkeypat
             "technical_data": "Position: BUY\nAgent Confidence: 0.66",
             "sentiment_data": "Position: HOLD\nAgent Confidence: 0.52",
             "debate_history": [
-                DebateMessage(role="bull", content="Position: BUY\nAgent Confidence: 0.72", round_num=1),
-                DebateMessage(role="bear", content="Position: AVOID\nAgent Confidence: 0.40", round_num=1),
+                DebateMessage(
+                    role="bull",
+                    content="Position: BUY\nAgent Confidence: 0.72",
+                    round_num=1,
+                ),
+                DebateMessage(
+                    role="bear",
+                    content="Position: AVOID\nAgent Confidence: 0.40",
+                    round_num=1,
+                ),
             ],
         }
     )
@@ -225,8 +235,16 @@ async def test_consensus_round_one_requires_four_of_five_votes(monkeypatch):
             "technical_data": "Position: BUY\nAgent Confidence: 0.66",
             "sentiment_data": "Position: BUY\nAgent Confidence: 0.52",
             "debate_history": [
-                DebateMessage(role="bull", content="Position: BUY\nAgent Confidence: 0.72", round_num=1),
-                DebateMessage(role="bear", content="Position: AVOID\nAgent Confidence: 0.40", round_num=1),
+                DebateMessage(
+                    role="bull",
+                    content="Position: BUY\nAgent Confidence: 0.72",
+                    round_num=1,
+                ),
+                DebateMessage(
+                    role="bear",
+                    content="Position: AVOID\nAgent Confidence: 0.40",
+                    round_num=1,
+                ),
             ],
         }
     )
@@ -252,8 +270,16 @@ async def test_consensus_round_two_allows_three_of_five_votes(monkeypatch):
             "technical_data": "Position: BUY\nAgent Confidence: 0.66",
             "sentiment_data": "Position: HOLD\nAgent Confidence: 0.52",
             "debate_history": [
-                DebateMessage(role="bull", content="Position: BUY\nAgent Confidence: 0.72", round_num=2),
-                DebateMessage(role="bear", content="Position: AVOID\nAgent Confidence: 0.40", round_num=2),
+                DebateMessage(
+                    role="bull",
+                    content="Position: BUY\nAgent Confidence: 0.72",
+                    round_num=2,
+                ),
+                DebateMessage(
+                    role="bear",
+                    content="Position: AVOID\nAgent Confidence: 0.40",
+                    round_num=2,
+                ),
             ],
         }
     )
@@ -279,8 +305,16 @@ async def test_consensus_round_two_majority_beats_soft_hold(monkeypatch):
             "technical_data": "Position: BUY\nAgent Confidence: 0.85",
             "sentiment_data": "Position: HOLD\nAgent Confidence: 0.00",
             "debate_history": [
-                DebateMessage(role="bull", content="Position: BUY\nAgent Confidence: 0.85", round_num=2),
-                DebateMessage(role="bear", content="Position: AVOID\nAgent Confidence: 0.85", round_num=2),
+                DebateMessage(
+                    role="bull",
+                    content="Position: BUY\nAgent Confidence: 0.85",
+                    round_num=2,
+                ),
+                DebateMessage(
+                    role="bear",
+                    content="Position: AVOID\nAgent Confidence: 0.85",
+                    round_num=2,
+                ),
             ],
         }
     )
@@ -307,10 +341,18 @@ async def test_consensus_round_three_uses_confidence_winner(monkeypatch):
             "technical_data": "Position: AVOID\nAgent Confidence: 0.62",
             "sentiment_data": "Position: HOLD\nAgent Confidence: 0.63",
             "debate_history": [
-                DebateMessage(role="bull", content="Position: BUY\nAgent Confidence: 0.64", round_num=3),
+                DebateMessage(
+                    role="bull",
+                    content="Position: BUY\nAgent Confidence: 0.64",
+                    round_num=3,
+                ),
                 # 0.93 keeps |bull-bear| = 0.29 > SOFT_HOLD_CONFIDENCE_DELTA (0.27)
                 # so soft_hold does not claim this case — confidence_winner fires
-                DebateMessage(role="bear", content="Position: AVOID\nAgent Confidence: 0.93", round_num=3),
+                DebateMessage(
+                    role="bear",
+                    content="Position: AVOID\nAgent Confidence: 0.93",
+                    round_num=3,
+                ),
             ],
         }
     )
@@ -341,8 +383,16 @@ async def test_confidence_winner_uses_effective_calibrated_confidence(monkeypatc
             "technical_data": "Position: BUY\nAgent Confidence: 0.11",
             "sentiment_data": "Position: HOLD\nAgent Confidence: 0.12",
             "debate_history": [
-                DebateMessage(role="bull", content="Position: BUY\nAgent Confidence: 0.64", round_num=3),
-                DebateMessage(role="bear", content="Position: AVOID\nAgent Confidence: 0.93", round_num=3),
+                DebateMessage(
+                    role="bull",
+                    content="Position: BUY\nAgent Confidence: 0.64",
+                    round_num=3,
+                ),
+                DebateMessage(
+                    role="bear",
+                    content="Position: AVOID\nAgent Confidence: 0.93",
+                    round_num=3,
+                ),
             ],
         }
     )
@@ -435,7 +485,12 @@ def test_momentum_override_blocked_when_not_overvalued():
 
     # Undervalued (price < fair value) → AVOID is not value-driven → no escalation,
     # even with a volume-confirmed breakout and non-bearish sentiment.
-    parsed = {"rating": "AVOID", "confidence": 0.0, "current_price": 615.0, "fair_value": 900.0}
+    parsed = {
+        "rating": "AVOID",
+        "confidence": 0.0,
+        "current_price": 615.0,
+        "fair_value": 900.0,
+    }
     result = chamber._apply_consensus_override(parsed, _confidence_winner_state("HOLD"))
 
     assert result["rating"] == "AVOID"
@@ -649,7 +704,8 @@ async def test_cio_parse_fallback_survives_low_fair_value_blend(monkeypatch):
     )
     verdict = json.loads(result["final_verdict"])
     entry_low, entry_high = [
-        float(part.strip()) for part in verdict["entry_price_range"].split("-", maxsplit=1)
+        float(part.strip())
+        for part in verdict["entry_price_range"].split("-", maxsplit=1)
     ]
 
     assert verdict["rating"] == "HOLD"
@@ -691,7 +747,9 @@ async def test_market_data_cache_prefetches_one_yfinance_bundle(monkeypatch):
         def dividends(self):
             return pd.Series(dtype=float)
 
-    monkeypatch.setattr(mdc, "_get_yfinance", lambda: SimpleNamespace(Ticker=FakeTicker))
+    monkeypatch.setattr(
+        mdc, "_get_yfinance", lambda: SimpleNamespace(Ticker=FakeTicker)
+    )
     cache = mdc.TickerDataCache()
 
     data = await cache.prefetch("BBRI")
@@ -780,7 +838,9 @@ async def test_cio_uses_decision_brief_and_redacts_debate_prices(monkeypatch):
             "technical_indicators": {"ma50": 980, "atr14": 30},
             "fair_value_estimate": 1200.0,
             "debate_history": [
-                DebateMessage(role="bull", content="Buy at Rp 999 target Rp 1200", round_num=1)
+                DebateMessage(
+                    role="bull", content="Buy at Rp 999 target Rp 1200", round_num=1
+                )
             ],
             "raw_data": "SHOULD_NOT_LEAK_RAW_DATA",
             "decision_brief": "COMPACT_DECISION_BRIEF",
@@ -922,7 +982,9 @@ def test_llm_content_to_text_extracts_text_parts():
 
 
 @pytest.mark.asyncio
-async def test_cio_parses_list_content_response_and_keeps_consensus_override(monkeypatch):
+async def test_cio_parses_list_content_response_and_keeps_consensus_override(
+    monkeypatch,
+):
     chamber = _chamber()
     chamber.pro_llm = FakeLLM(model="gemini-2.5-pro")
 
@@ -1020,7 +1082,7 @@ def test_trade_envelope_guarantees_sufficient_rr_from_entry_high():
         fair_value=423.0,
         tech={"ma50": 140.0, "sma20": 133.0, "atr14": 5.0},
     )
-    
+
     # R/R must be calculated conservatively from entry_high
     assert envelope["risk_reward_ratio"] >= 2.0
 
@@ -1074,4 +1136,3 @@ def test_sanitize_json_handles_single_quoted_json():
     parsed = json.loads(sanitized)
     assert parsed["position"] == "BUY"
     assert parsed["confidence"] == 0.85
-
