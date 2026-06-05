@@ -229,3 +229,21 @@ def test_build_sector_map_resolves_cache_hardcode_keyword_and_default(monkeypatc
 def test_snap_to_tick_uses_ihsg_price_fraction_ranges(price, expected):
     """Verifies IHSG tick snapping across supported price bands and invalid values."""
     assert snap_to_tick(price) == expected
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("mean_reversion", "mean_reversion"),
+        ("mean-reversion", "mean_reversion"),
+        ("momentum", "momentum"),
+        ("", "momentum"),
+        (None, "momentum"),
+        ("garbage", "momentum"),
+    ],
+)
+def test_canonical_screener_mode(value, expected):
+    """Canonicalizes screener mode to momentum/mean_reversion; unknowns -> momentum."""
+    from core.quant_filter.config import canonical_screener_mode
+
+    assert canonical_screener_mode(value) == expected

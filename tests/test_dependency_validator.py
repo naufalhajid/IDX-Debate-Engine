@@ -1,5 +1,6 @@
 """Tests untuk core/dependency_validator.py."""
 
+import json
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -12,6 +13,7 @@ from core.dependency_validator import (
     check_llm_api_key,
     check_llm_models,
     maybe_rerun_quant_filter,
+    read_candidates_screener_mode,
     _summarize_quant_filter_output,
 )
 
@@ -100,6 +102,24 @@ def test_maybe_rerun_quant_filter_passes_output_dir(
         script_path=str(script), output_dir=tmp_path / "dry", mode="mean-reversion"
     )
     assert captured["command"][-2:] == ["--mode", "mean_reversion"]
+
+
+def test_read_candidates_screener_mode(tmp_path: Path) -> None:
+    p = tmp_path / "top10_candidates.json"
+    # Missing file -> momentum (legacy default).
+    assert read_candidates_screener_mode(p) == "momentum"
+    # Tagged mean_reversion.
+    p.write_text(
+        json.dumps([{"Ticker": "INDF", "screener_mode": "mean_reversion"}]),
+        encoding="utf-8",
+    )
+    assert read_candidates_screener_mode(p) == "mean_reversion"
+    # Untagged record -> momentum.
+    p.write_text(json.dumps([{"Ticker": "BBCA"}]), encoding="utf-8")
+    assert read_candidates_screener_mode(p) == "momentum"
+    # Malformed content -> momentum.
+    p.write_text("not json", encoding="utf-8")
+    assert read_candidates_screener_mode(p) == "momentum"
 
 
 def test_quant_filter_output_summary_keeps_pipeline_console_clean() -> None:

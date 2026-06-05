@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from core.quant_filter.config import CONFIG, _find_latest_xlsx
+from core.quant_filter.config import CONFIG, _find_latest_xlsx, canonical_screener_mode
 from core.quant_filter.pipeline import run_pipeline
 
 __all__ = ["CONFIG", "build_config", "main", "run_pipeline"]
@@ -27,11 +27,7 @@ def build_config(
     if scratch_dir is not None:
         cfg["scratch_dir"] = str(scratch_dir)
     if mode is not None:
-        cfg["screener_mode"] = (
-            "mean_reversion"
-            if str(mode).replace("-", "_") == "mean_reversion"
-            else "momentum"
-        )
+        cfg["screener_mode"] = canonical_screener_mode(mode)
 
     if input_file is not None:
         cfg["input_file"] = str(input_file)

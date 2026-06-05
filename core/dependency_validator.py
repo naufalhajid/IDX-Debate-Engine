@@ -8,6 +8,7 @@ Mengecek umur top10_candidates.json dan menawarkan dua opsi saat stale:
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -19,6 +20,7 @@ from pathlib import Path
 
 from sqlalchemy import text
 
+from core.quant_filter.config import canonical_screener_mode
 from core.settings import settings
 from db import database, db_path
 from utils.logger_config import logger
@@ -137,6 +139,21 @@ def check_candidates_file(path: Path, max_age_hours: float) -> ValidationResult:
         age_hours=round(age_hours, 2),
         message=f"File valid: {path.name} berumur {age_hours:.1f} jam.",
     )
+
+
+def read_candidates_screener_mode(path: Path) -> str:
+    """Return the screener_mode a candidates file was produced under.
+
+    Untagged/missing/unreadable files are treated as 'momentum' (the legacy
+    default), so pre-existing momentum caches keep being reused.
+    """
+    try:
+        records = json.loads(Path(path).read_text(encoding="utf-8"))
+        if isinstance(records, list) and records and isinstance(records[0], dict):
+            return canonical_screener_mode(records[0].get("screener_mode"))
+    except Exception:
+        pass
+    return "momentum"
 
 
 def check_llm_api_key(required: bool = True) -> DependencyCheck:
@@ -392,11 +409,7 @@ def maybe_rerun_quant_filter(
     command = [sys.executable, str(script)]
     if output_dir is not None:
         command.extend(["--output-dir", str(output_dir)])
-    norm_mode = (
-        "mean_reversion"
-        if str(mode).replace("-", "_") == "mean_reversion"
-        else "momentum"
-    )
+    norm_mode = canonical_screener_mode(mode)
     command.extend(["--mode", norm_mode])
 
     logger.info("[Validator] Auto-rerun: menjalankan " + " ".join(command[1:]) + " ...")

@@ -15,6 +15,7 @@ from core.quant_filter.config import (
     SECTOR_PBV_BENCHMARK,
     TICKER_SECTOR_HARDCODE,
     _find_latest_xlsx,
+    canonical_screener_mode,
 )
 from core.quant_filter.reporting import _build_markdown_report
 from utils.exdate_scanner import (
@@ -956,6 +957,9 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
     if not final_df.empty:
         json_path = os.path.join(cfg["output_dir"], "top10_candidates.json")
         export_df = final_df.drop(columns=["_exdate_info"], errors="ignore")
+        # Tag each record with the screener mode so the orchestrator can reuse a
+        # fresh same-mode cache instead of always re-screening.
+        export_df["screener_mode"] = canonical_screener_mode(cfg.get("screener_mode"))
         export_df.to_json(json_path, orient="records", indent=2, force_ascii=False)
         logger.info(f"JSON diekspor -> {json_path}")
 

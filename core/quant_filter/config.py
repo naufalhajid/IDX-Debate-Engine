@@ -177,6 +177,20 @@ CONFIG = {
 }
 
 
+def canonical_screener_mode(value: str | None) -> str:
+    """Canonicalize a screener-mode value to 'momentum' or 'mean_reversion'.
+
+    Accepts 'mean_reversion' or 'mean-reversion'; anything else (None or unknown)
+    falls back to 'momentum'. Never raises — for non-CLI code paths. CLI input
+    validation and aliases (mom/trend/mr/...) live in app/cli/mode_utils.py.
+    """
+    return (
+        "mean_reversion"
+        if str(value or "").replace("-", "_") == "mean_reversion"
+        else "momentum"
+    )
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # ── SECTOR MAP — IDX Industry Classification (IDXIC) ─────────────────────────
 # ══════════════════════════════════════════════════════════════════════════════
@@ -428,4 +442,5 @@ __all__ = [
     "NAME_SECTOR_KEYWORDS",
     "SECTOR_PBV_BENCHMARK",
     "TICKER_SECTOR_HARDCODE",
+    "canonical_screener_mode",
 ]

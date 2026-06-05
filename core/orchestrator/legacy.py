@@ -90,6 +90,7 @@ from core.dependency_validator import (
     check_all_dependencies,
     check_candidates_file,
     maybe_rerun_quant_filter,
+    read_candidates_screener_mode,
 )
 from core.execution_ledger import DEFAULT_LEDGER, EventSeverity, EventType, LedgerEvent
 from core.historical_scorer import (
@@ -103,6 +104,7 @@ from core.historical_scorer import (
     load_realized_outcomes,
 )
 from core.ops_telemetry import DEFAULT_TELEMETRY, TickerMetric
+from core.quant_filter.config import canonical_screener_mode
 from core.quant_filter.position_sizer import calculate_positions
 from core.quant_filter.reporting import _build_position_summary
 from core.portfolio_optimizer import diversify_portfolio
@@ -4988,11 +4990,7 @@ async def main(
     run_mode = mode or CLI_MODE
     if run_mode not in {"multi", "single", "compare"}:
         raise ValueError(f"Unsupported orchestrator mode: {run_mode}")
-    run_screener_mode = (
-        "mean_reversion"
-        if str(screener_mode or CLI_SCREENER_MODE).replace("-", "_") == "mean_reversion"
-        else "momentum"
-    )
+    run_screener_mode = canonical_screener_mode(screener_mode or CLI_SCREENER_MODE)
     _cli_renderer.render_header(
         mode=run_mode,
         regime="detecting",
@@ -5058,16 +5056,17 @@ async def main(
             "skip quant filter dan top10_candidates.json."
         )
     else:
-        # Mean-reversion requested → the cached top10_candidates.json is
-        # mode-agnostic (may hold momentum picks), so force a fresh screen.
-        force_rerun = run_screener_mode != "momentum"
+        # Force a fresh screen when the cached candidates were produced under a
+        # different screener mode; a fresh same-mode cache is reused as before.
+        cached_mode = read_candidates_screener_mode(JSON_PATH)
+        force_rerun = cached_mode != run_screener_mode
         validation = check_candidates_file(JSON_PATH, settings.CANDIDATES_MAX_AGE_HOURS)
         if force_rerun or not validation.is_valid:
             if force_rerun or settings.CANDIDATES_AUTO_RERUN:
                 if force_rerun:
                     logger.info(
-                        f"[Validator] screener_mode={run_screener_mode}: "
-                        "force-rerun quant filter (cache is mode-agnostic)."
+                        f"[Validator] cached screener_mode={cached_mode} != "
+                        f"requested {run_screener_mode}: rerun quant filter."
                     )
                 else:
                     logger.info(
@@ -6003,11 +6002,7 @@ def _parse_cli_args(argv: list[str] | None = None) -> argparse.Namespace:
     args = parser.parse_args(argv)
     CLI_TICKERS_OVERRIDE = None
     CLI_MODE = args.mode
-    CLI_SCREENER_MODE = (
-        "mean_reversion"
-        if str(args.screener_mode).replace("-", "_") == "mean_reversion"
-        else "momentum"
-    )
+    CLI_SCREENER_MODE = canonical_screener_mode(args.screener_mode)
     if args.tickers:
         try:
             args.tickers = _normalize_cli_tickers(args.tickers)
