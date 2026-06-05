@@ -70,7 +70,7 @@ def filter_command(
     console.print(build_filter_results_table(df, top_n=top))
     json_path = output_dir / "top10_candidates.json"
     console.print(
-        f"\n[idx.ok]Top {len(df)} candidates[/idx.ok]  →  "
+        f"\n[idx.ok]Top {len(df)} candidates[/idx.ok]  ->  "
         f"[idx.path]{json_path}[/idx.path]  "
         f"[idx.muted]| report: {scratch_dir}/report.md[/idx.muted]"
     )
