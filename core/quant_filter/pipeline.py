@@ -356,24 +356,9 @@ def _analyze_ticker(
     # Relative Strength vs IHSG: reject candidates underperforming the index.
     if len(close) <= price_mom_period:
         return None
-    lookback_px = float(close.iloc[-price_mom_period - 1])
-    # Guard against corrupt yfinance bars at the lookback index. A single bad
-    # bar (observed: MAPI lookback ~88 vs a real ~1290) inflates the 1-month
-    # return, which both mis-scores momentum and lets the stock trivially clear
-    # the RS-vs-IHSG gate below. Validate the lookback price against the recent
-    # median and skip the ticker when it is an extreme outlier (bad data).
-    recent_median = float(close.tail(price_mom_period * 2).median())
-    if (
-        lookback_px <= 0
-        or recent_median <= 0
-        or not (0.25 * recent_median <= lookback_px <= 4.0 * recent_median)
-    ):
-        logger.warning(
-            f"[{t}] Implausible lookback price {lookback_px:.0f} vs recent median "
-            f"{recent_median:.0f} — suspected bad yfinance bar, skip."
-        )
-        return None
-    price_return_1m: float = float((current_px / lookback_px) - 1)
+    price_return_1m: float = float(
+        (current_px / float(close.iloc[-price_mom_period - 1])) - 1
+    )
     rs_vs_ihsg: float = price_return_1m - ihsg_return_1m
     if rs_vs_ihsg < cfg["min_rs_vs_ihsg_1m"]:
         logger.debug(f"[{t}] RS vs IHSG {rs_vs_ihsg:.2%} < threshold, skip")
