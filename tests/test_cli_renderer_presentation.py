@@ -111,17 +111,17 @@ def test_final_results_table_explains_price_validation_context() -> None:
     assert "Target" in output
     assert "Stop" in output
     assert "R/R" in output
-    assert "Risk Gov" in output
-    assert "Sizing" in output
-    assert "Reason" in output
+    assert "Evidence Age" in output
+    assert "Status" in output
+    assert "Context" in output
     assert "Current Price" not in output
     assert "Entry Return" not in output
     assert "Final Target" not in output
     assert "Validator Reason" not in output
     assert "Rp 810" in output
     assert "+10.2% above entry" in output
-    assert "target -1.2%" in output
-    assert "upside_exhausted" in output
+    assert "tgt -1.2%" in output
+    assert "upside exhausted" in output
 
 
 def test_live_batch_progress_uses_compact_headers_and_summary_note() -> None:

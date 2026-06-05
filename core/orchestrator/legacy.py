@@ -1,5 +1,5 @@
 """
-orchestrator.py â€” Automated Pipeline: Quant Scouting â†’ Multi-Agent Debate â†’ Top 3 Swing Trades.
+orchestrator.py â€" Automated Pipeline: Quant Scouting â†' Multi-Agent Debate â†' Top 3 Swing Trades.
 
 Execution Pipeline:
   Step 1: Parse top10_candidates.json from run_quant_filter.py, extract tickers,
@@ -16,8 +16,8 @@ Changelog (refactoring dari review sesi):
     agar sliding window tidak terpengaruh NTP sync atau DST jump.
   - [FIX-3] asyncio.Event abort flag: begitu budget habis, semua task yang belum
     mulai langsung dikembalikan tanpa memproses apapun.
-  - [FIX-4] Urutan eksekusi: abort_check â†’ rate_limit â†’ semaphore â†’ abort_check
-    â†’ budget_charge â†’ eksekusi. Budget hanya terpotong tepat sebelum API call.
+  - [FIX-4] Urutan eksekusi: abort_check â†' rate_limit â†' semaphore â†' abort_check
+    â†' budget_charge â†' eksekusi. Budget hanya terpotong tepat sebelum API call.
   - [FIX-5] budget_charged flag lokal per-coroutine: refund hanya terjadi jika
     budget benar-benar sudah di-charge untuk task ini, mencegah over-refund.
   - [FIX-6] CancelledError di-swallow secara eksplisit (intentional deviation dari
@@ -58,7 +58,7 @@ try:
 except ImportError:
     from backports.zoneinfo import ZoneInfo  # type: ignore
 
-# â”€â”€ Rich CLI imports â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â"€â"€ Rich CLI imports â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 # Rich digunakan untuk menghasilkan tampilan terminal yang lebih modern:
 # Panel (bordered boxes), Spinner (live feedback), dan styled markup.
 from pydantic import ValidationError
@@ -145,7 +145,7 @@ def _as_debate_message(m):
 _CLI_THEME = IDX_THEME
 console = Console(theme=_CLI_THEME, highlight=False)
 
-# Peta rating CIO â†’ warna Rich. Digunakan oleh live table dan result summary.
+# Peta rating CIO â†' warna Rich. Digunakan oleh live table dan result summary.
 _RATING_STYLE: dict[str, str] = {
     "STRONG_BUY": "bold green",
     "BUY": "cyan",
@@ -179,16 +179,16 @@ def _clean_cli_text(value: Any) -> str:
     """Repair common mojibake sequences that leaked into older CLI strings."""
     text = str(value)
     replacements = {
-        "â€”": "–",
-        "â€“": "–",
-        "â†’": "->",
-        "Ã—": "x",
-        "âœ…": "OK",
-        "âš ï¸": "WARNING",
-        "ðŸ›‘": "STOP",
-        "ðŸš¨": "ERROR",
-        "â•": "=",
-        "â”€": "-",
+        "\u00e2\u20ac\u201c": "\u2013",
+        "\u00e2\u20ac\u201d": "\u2013",
+        "\u00e2\u2020\u2018": "->",
+        "\u00c3\u2014": "x",
+        "\u00e2\u0153\u2026": "OK",
+        "\u00e2\u0161\u00a0\u00ef\u00b8\u008f": "WARNING",
+        "\u00f0\u0178\u203a\u2018": "STOP",
+        "\u00f0\u0178\u0161\u00a8": "ERROR",
+        "\u00e2\u2022\u0090": "=",
+        "\u00e2\u201d\u20ac": "-",
     }
     for bad, good in replacements.items():
         text = text.replace(bad, good)
@@ -634,7 +634,9 @@ class CliRenderer:
             seen.add(key)
             level = "ERROR" if kind == "error" else "WARNING"
             has_error = has_error or kind == "error"
-            table.add_row(Text(level, style="danger" if kind == "error" else "warn"), cleaned)
+            table.add_row(
+                Text(level, style="danger" if kind == "error" else "warn"), cleaned
+            )
         if not seen:
             return
         self.con.print(
@@ -811,9 +813,7 @@ class CliRenderer:
                         f"threshold (>= {float(threshold):.0%})"
                     )
                 except Exception as exc:
-                    logger.error(
-                        f"[{__name__}] Unexpected error: {exc}", exc_info=True
-                    )
+                    logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
                     self.portfolio_threshold_note = (
                         "Catatan: Tidak ada kandidat memenuhi conviction threshold"
                     )
@@ -1010,12 +1010,16 @@ class CliRenderer:
         self.set_pipeline_status(
             "Stockbit",
             "OK" if stockbit_ok else "FAIL",
-            "OK" if stockbit_ok else _short_err(_provider_failure(failures, "stockbit")),
+            "OK"
+            if stockbit_ok
+            else _short_err(_provider_failure(failures, "stockbit")),
         )
         self.set_pipeline_status(
             "yfinance",
             "OK" if yfinance_ok else "FAIL",
-            "OK" if yfinance_ok else _short_err(_provider_failure(failures, "yfinance")),
+            "OK"
+            if yfinance_ok
+            else _short_err(_provider_failure(failures, "yfinance")),
         )
         if not self.verbose:
             return
@@ -1284,7 +1288,9 @@ class CliRenderer:
                 table.add_column(no_wrap=True, overflow="ellipsis")
                 table.add_row("Rating", rating)
                 table.add_row("Confidence", confidence)
-                table.add_row("Audit", "\n".join(audit_by_ticker.get(ticker, [])) or "-")
+                table.add_row(
+                    "Audit", "\n".join(audit_by_ticker.get(ticker, [])) or "-"
+                )
                 table.add_row(
                     "News",
                     (
@@ -1429,7 +1435,7 @@ class CliRenderer:
         validation_table.add_column("Status", no_wrap=True, max_width=14)
         validation_table.add_column("Action", no_wrap=True, max_width=14)
         validation_table.add_column("Codes", overflow="fold", max_width=28)
-        validation_table.add_column("Context", no_wrap=True, max_width=22)
+        validation_table.add_column("Context", no_wrap=True, max_width=40)
 
         for result in results:
             ticker = str(result.get("ticker") or "-").upper()
@@ -1475,7 +1481,11 @@ class CliRenderer:
                 _risk_status_text(str(risk.get("status") or "")),
                 sizing_text,
                 Text(_validation_reason_codes(risk)),
-                Text(_validation_price_context(result, verdict, risk, current_price, target_price)),
+                Text(
+                    _validation_price_context(
+                        result, verdict, risk, current_price, target_price
+                    )
+                ),
                 style=row_style,
             )
         self.con.print(setup_table)
@@ -1560,11 +1570,8 @@ class CliRenderer:
             if self.portfolio_threshold_note:
                 return self.portfolio_threshold_note
             for _status, source, message in self.rank_events:
-                if (
-                    source == "Portfolio"
-                    and str(message).startswith(
-                        "Tidak ada kandidat dengan conviction >="
-                    )
+                if source == "Portfolio" and str(message).startswith(
+                    "Tidak ada kandidat dengan conviction >="
                 ):
                     threshold = ORCHESTRATOR_CONFIG.get("min_conviction_override")
                     if threshold is None:
@@ -1603,14 +1610,14 @@ class CliRenderer:
         portfolio_note = self._portfolio_threshold_note(sizing_result)
 
         if self.verbose:
-            table = Table(
-                box=box.SIMPLE, expand=False, show_edge=False, pad_edge=False
-            )
+            table = Table(box=box.SIMPLE, expand=False, show_edge=False, pad_edge=False)
             table.add_column("Metric", style="bold")
             table.add_column("Value")
             table.add_row("Pipeline status", "Completed")
             table.add_row("Runtime", f"{elapsed:.1f}s")
-            table.add_row("Token budget used", f"~{estimated_tokens:,} estimated tokens")
+            table.add_row(
+                "Token budget used", f"~{estimated_tokens:,} estimated tokens"
+            )
             table.add_row("Pro usage", f"{pro_calls}/{pro_budget}")
             table.add_row("Flash usage", f"{flash_calls}/{flash_budget}")
             table.add_row("Regime", regime)
@@ -1884,7 +1891,9 @@ def _exclusion_reason(result: dict[str, Any]) -> str:
     return "not selected after ranking"
 
 
-def _result_current_price(verdict: dict[str, Any], risk: dict[str, Any]) -> float | None:
+def _result_current_price(
+    verdict: dict[str, Any], risk: dict[str, Any]
+) -> float | None:
     price = _parse_price_value(verdict.get("current_price"))
     if price is not None:
         return price
@@ -1999,18 +2008,20 @@ def _validator_reason_full(risk: dict[str, Any]) -> str:
 
 
 _STATUS_DISPLAY: dict[str, tuple[str, str]] = {
-    "deployable":             ("Ready",       "idx.bull"),
+    "deployable": ("Ready", "idx.bull"),
     "conditional_deployable": ("Conditional", "cyan"),
-    "wait_for_pullback":      ("Wait",        "amber"),
-    "watchlist_only":         ("Watchlist",   "amber"),
-    "reject":                 ("Reject",      "idx.bear"),
+    "wait_for_pullback": ("Wait", "amber"),
+    "watchlist_only": ("Watchlist", "amber"),
+    "reject": ("Reject", "idx.bear"),
 }
 
-_PRICE_POSITION_CODES = frozenset({
-    "price_above_entry_range",
-    "price_inside_entry_range",
-    "price_below_entry_range",
-})
+_PRICE_POSITION_CODES = frozenset(
+    {
+        "price_above_entry_range",
+        "price_inside_entry_range",
+        "price_below_entry_range",
+    }
+)
 
 
 def _risk_status_text(status: str) -> Text:
@@ -2090,7 +2101,9 @@ def _final_selection_label(result: dict[str, Any], *, selected: bool) -> Text:
     try:
         if result.get("error"):
             return Text("Analysis Error", style="danger")
-        verdict = result.get("verdict") if isinstance(result.get("verdict"), dict) else {}
+        verdict = (
+            result.get("verdict") if isinstance(result.get("verdict"), dict) else {}
+        )
         rating = str(verdict.get("rating") or "").upper()
         risk = (
             result.get("risk_governor")
@@ -2226,7 +2239,7 @@ FULL_RESULTS_PATH = OUTPUT_DIR / "full_batch_results.json"
 MERGED_RESULTS_PATH = OUTPUT_DIR / "merged_batch_results.json"
 TOP3_REPORT_PATH = OUTPUT_DIR / "TOP_3_SWING_TRADES.md"
 
-# Shorthand aliases â€” baca dari ORCHESTRATOR_CONFIG agar konsisten dengan
+# Shorthand aliases â€" baca dari ORCHESTRATOR_CONFIG agar konsisten dengan
 # regime override yang dilakukan di main() sebelum pipeline jalan.
 EXCLUDED_RATINGS: set[str] = ORCHESTRATOR_CONFIG["excluded_ratings"]
 # TOP_N_SELECTION dan MAX_CONCURRENT_DEBATES dibaca dinamis dari ORCHESTRATOR_CONFIG
@@ -2378,7 +2391,12 @@ def _plan_orchestrator_decision(
 
 def configure_output_dir(output_dir: Path) -> None:
     """Update module-level output paths from CLI/env configuration."""
-    global OUTPUT_DIR, JSON_PATH, FULL_RESULTS_PATH, MERGED_RESULTS_PATH, TOP3_REPORT_PATH
+    global \
+        OUTPUT_DIR, \
+        JSON_PATH, \
+        FULL_RESULTS_PATH, \
+        MERGED_RESULTS_PATH, \
+        TOP3_REPORT_PATH
     OUTPUT_DIR = output_dir
     JSON_PATH = OUTPUT_DIR / "top10_candidates.json"
     FULL_RESULTS_PATH = OUTPUT_DIR / "full_batch_results.json"
@@ -2445,7 +2463,7 @@ def _prompt_user_config() -> dict:
 
 
 # ---------------------------------------------------------------------------
-# [FIX-1, FIX-2] SafeRateLimiter â€” sliding window, lock-safe
+# [FIX-1, FIX-2] SafeRateLimiter â€" sliding window, lock-safe
 # ---------------------------------------------------------------------------
 
 
@@ -2483,7 +2501,7 @@ class SafeRateLimiter:
 
                 if len(self._tokens) < self.rate_limit:
                     self._tokens.append(now)
-                    return  # Slot tersedia â€” keluar, lock dilepas oleh context manager
+                    return  # Slot tersedia â€" keluar, lock dilepas oleh context manager
 
                 # Hitung berapa lama sampai token tertua kadaluarsa.
                 # _tokens terurut secara implisit karena selalu di-append dengan
@@ -2491,7 +2509,7 @@ class SafeRateLimiter:
                 wait_time = self._tokens[0] + self.period - now
 
             # [FIX-1] Lock sudah dilepas oleh `async with` di atas.
-            # Sleep di luar lock â€” CancelledError di sini tidak menyentuh lock.
+            # Sleep di luar lock â€" CancelledError di sini tidak menyentuh lock.
             if wait_time > 0:
                 logger.debug(f"[RateLimiter] Slot penuh, menunggu {wait_time:.2f}s")
                 await asyncio.sleep(wait_time)
@@ -2639,7 +2657,7 @@ def _candidate_ma200_context(candidate: dict) -> str:
 
 def _apply_pre_cio_filters(candidates: list[dict], regime: str) -> list[dict]:
     """
-    Hard filter sebelum masuk CIO â€” buang kandidat yang tidak layak
+    Hard filter sebelum masuk CIO â€" buang kandidat yang tidak layak
     tanpa membuang LLM token untuk mereka.
     """
     filtered = []
@@ -2654,8 +2672,8 @@ def _apply_pre_cio_filters(candidates: list[dict], regime: str) -> list[dict]:
             logger.info(f"[PreCIO] {ticker} SKIP – ExDate {exdate_days}d")
             continue
 
-        # Counter-trend di HIGH regime â†’ skip langsung
-        # Di NORMAL/LOW regime â†’ biarkan masuk tapi CIO beri penalty
+        # Counter-trend di HIGH regime â†' skip langsung
+        # Di NORMAL/LOW regime â†' biarkan masuk tapi CIO beri penalty
         if regime == "HIGH" and _candidate_ma200_context(c) == "BELOW":
             logger.info(f"[PreCIO] {ticker} SKIP – counter-trend di HIGH regime")
             continue
@@ -2682,7 +2700,7 @@ def parse_report(
     tickers: list[str] = []
     seen: set[str] = set()
 
-    # [FIX-9] `for row in data` â€” syntax error di versi sebelumnya diperbaiki.
+    # [FIX-9] `for row in data` â€" syntax error di versi sebelumnya diperbaiki.
     for row in data:
         raw = row.get("Ticker") or row.get("ticker") or ""
         ticker = raw.strip().upper() if raw else ""
@@ -2718,7 +2736,7 @@ def parse_sector_map(
 
     Mengembalikan dict {ticker: sector_key} untuk portfolio_optimizer.
     Field "Sektor Key" adalah output dari run_quant_filter.py.
-    Tidak raise â€” file hilang/corrupt hanya menghasilkan dict kosong.
+    Tidak raise â€" file hilang/corrupt hanya menghasilkan dict kosong.
     """
     if candidates is None and not json_path.exists():
         logger.warning(
@@ -2770,7 +2788,7 @@ def _empty_result(ticker: str, error: str, sector_key: str = "unknown") -> dict:
     """
     Bentuk seragam untuk debate yang gagal atau di-abort.
 
-    [FIX-10] Status selalu FAILED â€” fungsi ini tidak pernah dipanggil
+    [FIX-10] Status selalu FAILED â€" fungsi ini tidak pernah dipanggil
     untuk kondisi sukses, jadi tidak ada dead code `else "SUCCESS"`.
     """
     return {
@@ -2991,7 +3009,9 @@ def _annotate_rr_tier(
     yf_info = yf_info if yf_info is not None else _extract_rr_yf_info(result)
     resolution = get_rr_resolution(ticker, yf_info=yf_info)
     verdict = result.get("verdict") if isinstance(result.get("verdict"), dict) else {}
-    metadata = result.get("metadata") if isinstance(result.get("metadata"), dict) else {}
+    metadata = (
+        result.get("metadata") if isinstance(result.get("metadata"), dict) else {}
+    )
     tier_payload = {
         "rr_tier": resolution.tier_name,
         "rr_minimum": resolution.rr_minimum,
@@ -3145,7 +3165,9 @@ def sync_metric_aliases(entry: dict[str, Any]) -> None:
 
 def _merge_metadata_reasons(result: dict[str, Any]) -> None:
     """Copy reason metadata from debate nodes into the output reason list."""
-    metadata = result.get("metadata") if isinstance(result.get("metadata"), dict) else {}
+    metadata = (
+        result.get("metadata") if isinstance(result.get("metadata"), dict) else {}
+    )
     for reason in metadata.get("reasons") or []:
         _append_result_reason(result, str(reason))
     if "evidence_age_h" in metadata:
@@ -3177,7 +3199,9 @@ def _valuation_gap_unverified(entry: dict[str, Any]) -> bool:
 
 
 # FIX: ISSUE 3 — Extract breaking-news headlines for report display.
-def _breaking_news_headlines_from_bundle(news_bundle: Any, limit: int = 3) -> list[dict[str, str]]:
+def _breaking_news_headlines_from_bundle(
+    news_bundle: Any, limit: int = 3
+) -> list[dict[str, str]]:
     headlines: list[dict[str, str]] = []
     for item in list(getattr(news_bundle, "items", []) or []):
         if not bool(getattr(item, "is_breaking", False)):
@@ -3487,7 +3511,9 @@ def _write_batch_telemetry_report(
         report_text = DEFAULT_TELEMETRY.format_report(report)
         telemetry_dir = output_dir / "telemetry"
         telemetry_dir.mkdir(parents=True, exist_ok=True)
-        with (telemetry_dir / "telemetry_log.jsonl").open("a", encoding="utf-8") as file:
+        with (telemetry_dir / "telemetry_log.jsonl").open(
+            "a", encoding="utf-8"
+        ) as file:
             file.write(report.model_dump_json())
             file.write("\n")
         (telemetry_dir / "latest_batch_report.txt").write_text(
@@ -3512,9 +3538,7 @@ def _write_formatter_reports(
 ) -> None:
     for result in results:
         verdict = _dict_or_empty(result.get("verdict"))
-        ticker = str(
-            result.get("ticker") or verdict.get("ticker") or "UNKNOWN"
-        ).upper()
+        ticker = str(result.get("ticker") or verdict.get("ticker") or "UNKNOWN").upper()
         try:
             payload = dict(result)
             metadata = _dict_or_empty(payload.get("metadata"))
@@ -3559,7 +3583,7 @@ def _check_report_consistency(
 
 async def _run_single_debate(ticker: str, chamber: Any) -> dict:
     """
-    Jalankan debate untuk satu ticker: chamber.run() owns market-data prefetch â†’ validasi schema.
+    Jalankan debate untuk satu ticker: chamber.run() owns market-data prefetch â†' validasi schema.
 
     Retry ada di dalam DebateChamber._invoke_llm (tenacity). Tidak ada retry
     tambahan di sini untuk menghindari efek perkalian (9Ã— worst case).
@@ -3861,7 +3885,7 @@ async def run_batch_debates(
             #
             # Trade-off: task.cancelled() akan mengembalikan False untuk task ini.
             # Diterima karena Orchestrator tidak menggunakan task.cancelled()
-            # untuk logika apapun â€” abort dideteksi via abort_event.is_set().
+            # untuk logika apapun â€" abort dideteksi via abort_event.is_set().
             #
             # [FIX-5] Refund hanya jika budget_charged=True untuk task INI.
             # Mencegah over-refund saat banyak task di-cancel bersamaan.
@@ -3907,6 +3931,7 @@ async def run_batch_debates(
             chamber = chamber_factory()
         else:
             from services.debate_chamber import DebateChamber
+
             chamber = DebateChamber()
         if run_id:
             # FIX: ISSUE 1 — Propagate the batch run_id before RAG evidence IDs are built.
@@ -3993,10 +4018,11 @@ def compute_conviction_score(
         ev = compute_realized_ev(ticker, realized_outcomes)
         if ev is not None:
             n_real = sum(
-                1 for r in realized_outcomes
+                1
+                for r in realized_outcomes
                 if r.ticker.upper() == ticker.upper()
-                and r.verdict_rating.upper() in {“BUY”, “STRONG_BUY”}
-                and r.outcome in {“win”, “loss”, “breakeven”}
+                and r.verdict_rating.upper() in {"BUY", "STRONG_BUY"}
+                and r.outcome in {"win", "loss", "breakeven"}
                 and r.pnl_pct is not None
             )
             base_score = apply_ev_adjustment(base_score, ev, n=n_real)
@@ -4005,17 +4031,20 @@ def compute_conviction_score(
         realized_win_rate = compute_realized_win_rate(ticker, realized_outcomes)
         if realized_win_rate is not None:
             n_wr = sum(
-                1 for r in realized_outcomes
+                1
+                for r in realized_outcomes
                 if r.ticker.upper() == ticker.upper()
-                and r.verdict_rating.upper() in {“BUY”, “STRONG_BUY”}
-                and r.outcome in {“win”, “loss”}
+                and r.verdict_rating.upper() in {"BUY", "STRONG_BUY"}
+                and r.outcome in {"win", "loss"}
             )
-            base_score = apply_realized_adjustment(base_score, realized_win_rate, n=n_wr)
+            base_score = apply_realized_adjustment(
+                base_score, realized_win_rate, n=n_wr
+            )
             return base_score, warning
 
     if ticker and debate_records is not None:
         win_rate = compute_historical_win_rate(ticker, debate_records)
-        n_hist = sum(1 for r in debate_records if r.get(“ticker”) == ticker)
+        n_hist = sum(1 for r in debate_records if r.get("ticker") == ticker)
         base_score = apply_historical_adjustment(base_score, win_rate, n=n_hist)
 
     return base_score, warning
@@ -4088,7 +4117,7 @@ def select_top_n(
     return top_n
 
 
-# Backward-compatibility alias â€” deprecate secara bertahap
+# Backward-compatibility alias â€" deprecate secara bertahap
 select_top3 = select_top_n
 
 
@@ -4145,7 +4174,9 @@ def save_merged_results(
             data_dict[r["ticker"]] = r
 
     merged_results = list(data_dict.values())
-    path.write_text(json.dumps(merged_results, indent=2, ensure_ascii=False), encoding="utf-8")
+    path.write_text(
+        json.dumps(merged_results, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
     logger.info(
         f"[Persist] Merged ticker state "
         f"({len(results)} new/updated into {len(merged_results)} total) -> {path}"
@@ -4574,7 +4605,7 @@ def get_local_timestamp() -> str:
     """
     Kembalikan timestamp lokal dalam timezone yang dikonfigurasi (default: Asia/Jakarta).
 
-    [FIX-8] ZoneInfo sudah di-import di top-level â€” fungsi ini tidak perlu
+    [FIX-8] ZoneInfo sudah di-import di top-level â€" fungsi ini tidak perlu
     import lokal yang dieksekusi setiap kali dipanggil.
     """
     utc_now = datetime.now(timezone.utc)
@@ -4627,7 +4658,9 @@ def _batch_metadata_value(results: list[dict], key: str) -> str | None:
     return None
 
 
-def _conviction_breakdown_row(score: float, model_confidence: float, verdict: dict) -> str:
+def _conviction_breakdown_row(
+    score: float, model_confidence: float, verdict: dict
+) -> str:
     """Markdown table row showing how the conviction score was computed."""
     try:
         w_conf = float(ORCHESTRATOR_CONFIG["conviction_weights"]["confidence"])
@@ -4646,7 +4679,7 @@ def _conviction_breakdown_row(score: float, model_confidence: float, verdict: di
             breakdown += f" ({sign}{hist_adj:.2f} hist adj)"
         return f"| **Score Breakdown** | `{breakdown}` |"
     except Exception:
-        return f"| **Score Breakdown** | - |"
+        return "| **Score Breakdown** | - |"
 
 
 def _win_rate_row(ticker: str) -> str:
@@ -4680,7 +4713,7 @@ def generate_top3_report(
     Generate laporan Markdown eksekutif untuk Top N swing trade.
 
     [FIX-7] conviction_score di-reuse dari entry dict yang sudah diisi oleh
-    select_top3 â€” tidak ada pemanggilan ulang compute_conviction_score.
+    select_top3 â€" tidak ada pemanggilan ulang compute_conviction_score.
     Untuk ticker error (tidak masuk select_top3), skor default 0.0.
     """
     timestamp = get_local_timestamp()
@@ -4856,7 +4889,7 @@ def generate_top3_report(
     ]
 
     # [FIX-7] Untuk ticker yang sudah masuk select_top3, skor sudah ada di entry.
-    # Untuk ticker error/excluded, ambil dari entry atau default 0.0 â€” tidak ada
+    # Untuk ticker error/excluded, ambil dari entry atau default 0.0 â€" tidak ada
     # pemanggilan ulang compute_conviction_score.
     selected_tickers = {t["ticker"] for t in top_n}
     sorted_results = sorted(
@@ -5031,7 +5064,9 @@ async def main(
                 )
                 _cli_renderer.flush_buffered_alerts()
                 if raise_on_error:
-                    raise RuntimeError("Candidate validation failed and CANDIDATES_AUTO_RERUN is false.")
+                    raise RuntimeError(
+                        "Candidate validation failed and CANDIDATES_AUTO_RERUN is false."
+                    )
                 return
         else:
             logger.info(f"[Validator] {validation.message}")
@@ -5134,7 +5169,9 @@ async def main(
                 )
                 _cli_renderer.flush_buffered_alerts()
                 if raise_on_error:
-                    raise RuntimeError("No price provider available (provider health check failed).")
+                    raise RuntimeError(
+                        "No price provider available (provider health check failed)."
+                    )
                 return
             logger.warning(
                 "[ProviderHealth] Planner allowed degraded mode despite provider "
@@ -5344,7 +5381,7 @@ async def main(
 
 
 # ---------------------------------------------------------------------------
-# CLI helper functions â€” output terminal yang informatif
+# CLI helper functions â€" output terminal yang informatif
 # ---------------------------------------------------------------------------
 
 
@@ -5437,7 +5474,11 @@ def _watchlist_rows(results: list[dict]) -> list[dict[str, Any]]:
             )
             low, high = _parse_entry_bounds(verdict.get("entry_price_range"))
             rr = float(verdict.get("risk_reward_ratio") or 0.0)
-            reason_codes = risk.get("reason_codes") if isinstance(risk.get("reason_codes"), list) else []
+            reason_codes = (
+                risk.get("reason_codes")
+                if isinstance(risk.get("reason_codes"), list)
+                else []
+            )
             non_price = [c for c in reason_codes if c not in _PRICE_POSITION_CODES]
             reason = ", ".join(_reason_token_label(c) for c in non_price[:2]) or "-"
             rows.append(
@@ -5461,7 +5502,8 @@ def _watchlist_rows(results: list[dict]) -> list[dict[str, Any]]:
 def _strong_watchlist_rows(results: list[dict]) -> list[dict[str, Any]]:
     """HOLDs with R/R >= 2.0 and confidence >= 0.35, sorted by R/R desc."""
     rows = [
-        row for row in _watchlist_rows(results)
+        row
+        for row in _watchlist_rows(results)
         if row.get("rr", 0.0) >= 2.0 and row.get("confidence", 0.0) >= 0.35
     ]
     return sorted(rows, key=lambda r: r.get("rr", 0.0), reverse=True)
@@ -5513,7 +5555,9 @@ def _print_watchlist_summary(watchlist_rows: list[dict[str, Any]]) -> None:
     _print_strong_watchlist(watchlist_rows)
 
 
-def _print_top3_summary(top_n: list[dict], all_results: list[dict] | None = None) -> None:
+def _print_top3_summary(
+    top_n: list[dict], all_results: list[dict] | None = None
+) -> None:
     """
     Tampilkan ringkasan Top N hasil debate sebagai panel statis.
     """
@@ -5615,7 +5659,7 @@ def _print_top3_summary(top_n: list[dict], all_results: list[dict] | None = None
 
 
 # ---------------------------------------------------------------------------
-# Interactive CLI â€” Rich-powered terminal UI
+# Interactive CLI â€" Rich-powered terminal UI
 # ---------------------------------------------------------------------------
 
 
@@ -5630,18 +5674,18 @@ class InteractiveCLI:
     - Subprocess berjalan di dalam Live spinner agar status proses tetap terlihat jelas.
     """
 
-    # â”€â”€ Teks & konstanta tampilan â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # â"€â"€ Teks & konstanta tampilan â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
     _BRAND_TITLE = "IDX Fundamental Analysis"
     _BRAND_SUB = "Quant Scouting  ->  Multi-Agent Debate  ->  CIO Verdict"
 
     def __init__(self, con: Console = console) -> None:
         self.con = con
 
-    # â”€â”€ Private helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # â"€â"€ Private helpers â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
     def _render_banner(self) -> None:
         """Tampilkan banner dan status sistem ringkas."""
-        # â”€â”€ Judul produk â”€â”€
+        # â"€â"€ Judul produk â"€â"€
         title = Text(self._BRAND_TITLE, style="brand", justify="center")
         sub = Text(self._BRAND_SUB, style="muted", justify="center")
         self.con.print(
@@ -5653,7 +5697,7 @@ class InteractiveCLI:
             )
         )
 
-        # â”€â”€ Status candidates file (sinkron, tersedia tanpa async) â”€â”€
+        # â"€â"€ Status candidates file (sinkron, tersedia tanpa async) â"€â"€
         # Regime tidak ditampilkan di sini karena fetch_ihsg_volatility adalah async;
         # regime akan muncul di log main() setelah detection selesai.
         validation = check_candidates_file(JSON_PATH, settings.CANDIDATES_MAX_AGE_HOURS)
@@ -5706,7 +5750,7 @@ class InteractiveCLI:
         Jalankan `main.py -f -o excel` di dalam Live spinner.
 
         Live spinner memberikan feedback visual bahwa sistem sedang bekerja.
-        subprocess.run() bersifat blocking â€” pipeline orchestrator tidak akan
+        subprocess.run() bersifat blocking â€" pipeline orchestrator tidak akan
         mulai sampai scraping selesai atau gagal.
 
         Returns:
@@ -5758,7 +5802,7 @@ class InteractiveCLI:
         self.con.print(Rule("[step]Memulai Pipeline Orkestrasi[/step]"))
         self.con.print()
 
-    # â”€â”€ Public entrypoint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # â"€â"€ Public entrypoint â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
     def _print_dependency_report(self, deps: DependencyCheckResult) -> None:
         """Tampilkan hasil pemeriksaan awal sebelum pipeline berjalan."""
@@ -5791,7 +5835,7 @@ class InteractiveCLI:
         scrape_cmd: list[str] | None = None,
     ) -> bool:
         """
-        Titik masuk CLI: banner â†’ prompt â†’ (opsional) scraping â†’ pipeline start.
+        Titik masuk CLI: banner â†' prompt â†' (opsional) scraping â†' pipeline start.
 
         Returns:
             True jika pipeline boleh dilanjutkan.
@@ -5799,7 +5843,7 @@ class InteractiveCLI:
             memilih tidak melanjutkan).
 
         Method ini dipisah dari asyncio.run(main()) agar CLI layer dan
-        pipeline layer tetap independen â€” mudah di-test secara terpisah.
+        pipeline layer tetap independen â€" mudah di-test secara terpisah.
         """
         if not interactive:
             return True
