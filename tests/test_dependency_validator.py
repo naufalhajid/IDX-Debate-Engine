@@ -111,6 +111,7 @@ def test_quant_filter_output_summary_keeps_pipeline_console_clean() -> None:
 2026-06-06 00:13:04,546 [INFO] Top 10 kandidat berhasil disaring.
 2026-06-06 00:13:04,549 [INFO] JSON diekspor -> output\\top10_candidates.json
 2026-06-06 00:12:53,460 [WARNING] [Graham] BMTR: capped.
+2026-06-06 00:12:53,470 [WARNING] yfinance flaky retry for XYZZ
 2026-06-06 00:13:03,541 [INFO] [BAPA] Excluded: suspek suspended/FCA (volume anomali)
 """
 

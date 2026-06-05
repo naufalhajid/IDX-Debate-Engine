@@ -120,6 +120,9 @@ def test_mean_reversion_mode_selects_oversold_pullback(monkeypatch):
 
     assert mr is not None  # oversold pullback IS a mean-reversion candidate
     assert "MR Oversold RSI" in mr["Entry Strategy"]
+    # A long's stop must sit BELOW entry; the SMA20-anchored stop would be above
+    # it here because price is below SMA20 by design.
+    assert mr["Stop Loss Level"] < mr["Current Price"]
     assert mom is None  # ... but fails momentum (price below EMA20 trend gate)
 
 

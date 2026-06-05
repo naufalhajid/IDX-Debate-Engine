@@ -576,9 +576,14 @@ def _analyze_ticker(
     total_score = max(0.0, min(total_score, 100.0))
 
     # ── Stop Loss (ATR-based + BEI tick size) ─────────────────────────────────
-    stop_candidate_1 = sma20_latest - (cfg["stop_atr_from_sma20"] * atr_14)
     stop_candidate_2 = current_px - (cfg["stop_atr_from_price"] * atr_14)
-    stop_loss: float = max(stop_candidate_1, stop_candidate_2)
+    if mode == "mean_reversion":
+        # Mean-reversion candidates are below SMA20 by design, so an
+        # SMA20-anchored stop would sit ABOVE entry. Anchor below current price.
+        stop_loss: float = stop_candidate_2
+    else:
+        stop_candidate_1 = sma20_latest - (cfg["stop_atr_from_sma20"] * atr_14)
+        stop_loss = max(stop_candidate_1, stop_candidate_2)
     stop_loss = max(stop_loss, current_px * cfg["stop_hard_floor_pct"])
     stop_loss = snap_to_tick(stop_loss)
 
@@ -952,14 +957,14 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         json_path = os.path.join(cfg["output_dir"], "top10_candidates.json")
         export_df = final_df.drop(columns=["_exdate_info"], errors="ignore")
         export_df.to_json(json_path, orient="records", indent=2, force_ascii=False)
-        logger.info(f"JSON diekspor → {json_path}")
+        logger.info(f"JSON diekspor -> {json_path}")
 
     # Export Markdown Report
     md_content = _build_markdown_report(final_df, cfg)
     report_path = os.path.join(cfg["scratch_dir"], "report.md")
     with open(report_path, "w", encoding="utf-8") as f:
         f.write(md_content)
-    logger.info(f"Report → {report_path}")
+    logger.info(f"Report -> {report_path}")
 
     logger.info("PIPELINE SELESAI.")
     return final_df

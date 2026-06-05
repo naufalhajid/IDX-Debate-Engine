@@ -81,9 +81,11 @@ def _summarize_quant_filter_output(output: str) -> str:
         if match:
             parts.append(f"{label}={match.group(1).strip()}")
 
-    warnings = len(re.findall(r"\[WARNING\]", text))
     graham_caps = len(re.findall(r"\[Graham\]", text))
     suspended = len(re.findall(r"Excluded: suspek suspended/FCA", text))
+    # [Graham] caps log at WARNING level; report the remainder so the counts
+    # stay disjoint instead of double-counting Graham caps as warnings.
+    warnings = max(0, len(re.findall(r"\[WARNING\]", text)) - graham_caps)
     if warnings:
         parts.append(f"warnings={warnings}")
     if graham_caps:
@@ -376,8 +378,8 @@ def maybe_rerun_quant_filter(
     Jalankan run_quant_filter.py via subprocess jika CANDIDATES_AUTO_RERUN=True.
 
     Catatan desain: subprocess dijalankan dengan interpreter yang sama (sys.executable)
-    untuk memastikan virtualenv aktif terkena. stdout/stderr diteruskan langsung ke
-    terminal agar progress scraping terlihat — tidak di-capture ke variabel.
+    untuk memastikan virtualenv aktif terkena. Output di-capture lalu diringkas
+    menjadi satu baris status; output mentah hanya ditampilkan saat gagal.
 
     Returns:
         True jika script selesai dengan returncode 0, False jika gagal.
@@ -406,8 +408,6 @@ def maybe_rerun_quant_filter(
         text=True,
         encoding="utf-8",
         errors="replace",
-        # Tidak capture output — biarkan mengalir ke terminal
-        # supaya user bisa melihat progress scraping secara real-time.
     )
 
     captured_output = "\n".join(
