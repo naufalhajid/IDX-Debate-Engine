@@ -213,6 +213,64 @@ def test_build_sector_map_resolves_cache_hardcode_keyword_and_default(monkeypatc
     }
 
 
+def test_price_path_records_missing_ohlcv_columns() -> None:
+    data = pd.concat(
+        {"TEST.JK": pd.DataFrame({"Close": pd.Series([100.0, 101.0])})},
+        axis=1,
+    )
+    cfg = _analysis_cfg()
+    cfg["min_bars"] = 1
+    failures: list[dict[str, str]] = []
+
+    result = pipeline._safe_analyze_price_candidate(
+        row=_analysis_row(),
+        data=data,
+        cfg=cfg,
+        logger=logging.getLogger("test.quant_filter.price_path"),
+        ihsg_close=None,
+        ihsg_return_1m=0.0,
+        adapter=None,
+        failures=failures,
+    )
+
+    assert result is None
+    assert failures == [
+        {
+            "ticker": "TEST",
+            "stage": "price_columns",
+            "reason": "missing OHLCV columns: High, Low, Volume",
+        }
+    ]
+
+
+def test_price_path_records_ticker_analysis_exception(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_analysis(*_args, **_kwargs):
+        raise KeyError("raw_data")
+
+    monkeypatch.setattr(pipeline, "_analyze_ticker", fail_analysis)
+    data = pd.concat({"TEST.JK": _market_frame()}, axis=1)
+    failures: list[dict[str, str]] = []
+
+    result = pipeline._safe_analyze_price_candidate(
+        row=_analysis_row(),
+        data=data,
+        cfg=_analysis_cfg(),
+        logger=logging.getLogger("test.quant_filter.price_path"),
+        ihsg_close=None,
+        ihsg_return_1m=0.0,
+        adapter=None,
+        failures=failures,
+    )
+
+    assert result is None
+    assert failures[0]["ticker"] == "TEST"
+    assert failures[0]["stage"] == "ticker_analysis"
+    assert failures[0]["failure_type"] == "KeyError"
+    assert "raw_data" in failures[0]["reason"]
+
+
 @pytest.mark.parametrize(
     ("price", "expected"),
     [

@@ -648,6 +648,147 @@ def _analyze_ticker(
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+def _exception_message(exc: BaseException) -> str:
+    text = str(exc).strip()
+    if text:
+        return text
+    if getattr(exc, "args", None):
+        return repr(exc.args)
+    return type(exc).__name__
+
+
+def _record_price_failure(
+    failures: list[dict[str, str]],
+    ticker: str,
+    *,
+    stage: str,
+    reason: str,
+    logger: logging.Logger,
+    exc: BaseException | None = None,
+) -> None:
+    record = {"ticker": ticker, "stage": stage, "reason": reason}
+    if exc is not None:
+        record["failure_type"] = type(exc).__name__
+    failures.append(record)
+
+    message = f"[{ticker}] Price path {stage} failed: {reason}; skip."
+    if exc is None:
+        logger.warning(message)
+    else:
+        logger.error(message, exc_info=(type(exc), exc, exc.__traceback__))
+
+
+def _log_price_failure_summary(
+    failures: list[dict[str, str]],
+    logger: logging.Logger,
+) -> None:
+    if not failures:
+        return
+    counts: dict[str, int] = {}
+    for failure in failures:
+        stage = failure.get("stage", "unknown")
+        counts[stage] = counts.get(stage, 0) + 1
+    summary = ", ".join(f"{stage}={count}" for stage, count in sorted(counts.items()))
+    logger.warning(f"Price path failures: total={len(failures)} | {summary}")
+
+
+def _safe_analyze_price_candidate(
+    *,
+    row: pd.Series,
+    data: pd.DataFrame,
+    cfg: dict,
+    logger: logging.Logger,
+    ihsg_close: pd.Series | None,
+    ihsg_return_1m: float,
+    adapter: "XlsxDataAdapter | None",
+    failures: list[dict[str, str]],
+) -> dict | None:
+    ticker = str(row["Ticker"])
+    t_yf = f"{ticker}.JK"
+
+    try:
+        available_tickers = set(data.columns.get_level_values(0))
+    except (AttributeError, IndexError, TypeError) as exc:
+        _record_price_failure(
+            failures,
+            ticker,
+            stage="price_columns",
+            reason=_exception_message(exc),
+            logger=logger,
+            exc=exc,
+        )
+        return None
+
+    if t_yf not in available_tickers:
+        _record_price_failure(
+            failures,
+            ticker,
+            stage="price_download",
+            reason=f"missing yfinance OHLCV for {t_yf}",
+            logger=logger,
+        )
+        return None
+
+    try:
+        df_t = data[t_yf].dropna(how="all")
+    except (KeyError, TypeError, AttributeError) as exc:
+        _record_price_failure(
+            failures,
+            ticker,
+            stage="price_slice",
+            reason=_exception_message(exc),
+            logger=logger,
+            exc=exc,
+        )
+        return None
+
+    required_columns = {"Close", "Volume", "High", "Low"}
+    missing_columns = sorted(required_columns - set(df_t.columns))
+    if missing_columns:
+        _record_price_failure(
+            failures,
+            ticker,
+            stage="price_columns",
+            reason="missing OHLCV columns: " + ", ".join(missing_columns),
+            logger=logger,
+        )
+        return None
+
+    if ihsg_close is not None and not ihsg_close.empty:
+        df_t = df_t.reindex(ihsg_close.index).dropna(how="all")
+
+    min_bars = int(cfg["min_bars"])
+    if len(df_t) < min_bars:
+        _record_price_failure(
+            failures,
+            ticker,
+            stage="price_bars",
+            reason=f"only {len(df_t)} bars (< min_bars={min_bars})",
+            logger=logger,
+        )
+        return None
+
+    try:
+        return _analyze_ticker(
+            row,
+            df_t,
+            cfg,
+            logger,
+            ihsg_return_1m=ihsg_return_1m,
+            adapter=adapter,
+        )
+    except (KeyError, TypeError, ValueError, IndexError) as exc:
+        _record_price_failure(
+            failures,
+            ticker,
+            stage="ticker_analysis",
+            reason=_exception_message(exc),
+            logger=logger,
+            exc=exc,
+        )
+        return None
+
+
 def run_pipeline(cfg: dict) -> pd.DataFrame:
     cfg = dict(cfg)
     logger = setup_logging(cfg["scratch_dir"])
@@ -921,26 +1062,21 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         ihsg_return_1m = 0.0
 
     results = []
+    price_failures: list[dict[str, str]] = []
     for _, row in filtered.iterrows():
-        t_yf = row["Ticker"] + ".JK"
-        if t_yf not in data.columns.get_level_values(0):
-            logger.warning(f"[{row['Ticker']}] Data yfinance tidak tersedia, skip.")
-            continue
-        df_t = data[t_yf].dropna(how="all")
-        if ihsg_close is not None and not ihsg_close.empty:
-            df_t = df_t.reindex(ihsg_close.index).dropna(how="all")
-        if len(df_t) < cfg["min_bars"]:
-            continue
-        result = _analyze_ticker(
-            row,
-            df_t,
-            cfg,
-            logger,
+        result = _safe_analyze_price_candidate(
+            row=row,
+            data=data,
+            cfg=cfg,
+            logger=logger,
+            ihsg_close=ihsg_close,
             ihsg_return_1m=ihsg_return_1m,
             adapter=adapter,
+            failures=price_failures,
         )
         if result:
             results.append(result)
+    _log_price_failure_summary(price_failures, logger)
 
     # ── 7. FINALIZE & OUTPUT ──────────────────────────────────────────────────
     final_df = pd.DataFrame(results)
