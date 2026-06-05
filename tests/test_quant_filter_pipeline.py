@@ -77,6 +77,71 @@ def _stub_indicators(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
+def _pullback_frame() -> pd.DataFrame:
+    """Long uptrend (price well above MA200) with a recent sharp pullback that
+    dips the latest price below EMA20 — an oversold-in-uptrend setup."""
+    rise = [100 + 60 * i / 54 for i in range(55)]  # 100 -> 160
+    drop = [158.0, 150.0, 142.0, 135.0, 130.0]  # last 5 bars pull back below EMA20
+    close = pd.Series(rise + drop, dtype=float)
+    return pd.DataFrame(
+        {
+            "Close": close,
+            "Volume": pd.Series([1_000_000.0] * 60),
+            "High": close + 2,
+            "Low": close - 2,
+        }
+    )
+
+
+def test_mean_reversion_mode_selects_oversold_pullback(monkeypatch):
+    """An oversold pullback in an uptrend passes mean-reversion but fails momentum."""
+    monkeypatch.setattr(pipeline, "_resolve_exdate", _flat_exdate)
+    monkeypatch.setattr(
+        pipeline,
+        "compute_rsi",
+        lambda close: pd.Series([32.0] * len(close), index=close.index),
+    )
+    monkeypatch.setattr(
+        pipeline,
+        "compute_atr",
+        lambda high, low, close: pd.Series([5.0] * len(close), index=close.index),
+    )
+    logger = logging.getLogger("test.quant_filter.mr")
+    frame = _pullback_frame()
+    row = _analysis_row()
+
+    mr_cfg = _analysis_cfg()
+    mr_cfg["screener_mode"] = "mean_reversion"
+    mom_cfg = _analysis_cfg()
+    mom_cfg["screener_mode"] = "momentum"
+
+    mr = pipeline._analyze_ticker(row, frame, mr_cfg, logger)
+    mom = pipeline._analyze_ticker(row, frame, mom_cfg, logger)
+
+    assert mr is not None  # oversold pullback IS a mean-reversion candidate
+    assert "MR Oversold RSI" in mr["Entry Strategy"]
+    assert mom is None  # ... but fails momentum (price below EMA20 trend gate)
+
+
+def test_momentum_mode_rejects_what_mean_reversion_accepts(monkeypatch):
+    """A steady uptrend (price above EMA20) passes momentum but fails mean-reversion."""
+    _stub_indicators(monkeypatch)  # RSI stubbed at 50 on a 100->120 uptrend frame
+    logger = logging.getLogger("test.quant_filter.mom")
+    frame = _market_frame()
+    row = _analysis_row()
+
+    mr_cfg = _analysis_cfg()
+    mr_cfg["screener_mode"] = "mean_reversion"
+    mom_cfg = _analysis_cfg()
+    mom_cfg["screener_mode"] = "momentum"
+
+    mom = pipeline._analyze_ticker(row, frame, mom_cfg, logger)
+    mr = pipeline._analyze_ticker(row, frame, mr_cfg, logger)
+
+    assert mom is not None  # uptrend IS a momentum candidate
+    assert mr is None  # ... but fails mean-reversion (no pullback below EMA20)
+
+
 def test_analyze_ticker_applies_piotroski_bonus_and_penalty(monkeypatch):
     """Verifies Piotroski F-Score changes the deterministic composite score."""
     _stub_indicators(monkeypatch)

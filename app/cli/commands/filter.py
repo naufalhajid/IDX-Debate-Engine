@@ -9,11 +9,20 @@ from app.cli.ui.console import console
 from app.cli.ui.tables import build_filter_results_table
 
 
+def _normalize_mode(mode: str) -> str:
+    """Map user-facing mode spellings to the config value."""
+    m = (mode or "").strip().lower().replace("-", "_")
+    if m in {"mean_reversion", "meanreversion", "mr", "reversion"}:
+        return "mean_reversion"
+    return "momentum"
+
+
 def run_filter(
     *,
     top: int,
     input_file: Path | None,
     output_dir: Path,
+    mode: str = "momentum",
 ) -> object:
     from core.quant_filter.config import CONFIG
     from core.quant_filter.pipeline import run_pipeline
@@ -21,6 +30,7 @@ def run_filter(
     cfg = dict(CONFIG)
     cfg["top_n"] = top
     cfg["output_dir"] = str(output_dir)
+    cfg["screener_mode"] = _normalize_mode(mode)
     if input_file is not None:
         cfg["input_file"] = str(input_file)
     return run_pipeline(cfg)
@@ -39,6 +49,14 @@ def filter_command(
         Path,
         typer.Option("--output-dir", help="Directory for top10_candidates.json."),
     ] = Path("output"),
+    mode: Annotated[
+        str,
+        typer.Option(
+            "--mode",
+            help="Strategy: 'momentum' (trend-following, default) or "
+            "'mean-reversion' (oversold pullbacks in an uptrend).",
+        ),
+    ] = "momentum",
     ctx: typer.Context = typer.Context,
 ) -> None:
     """Screen top swing-trade candidates from IHSG stocks using quant signals."""
@@ -46,10 +64,16 @@ def filter_command(
 
     verbose = (ctx.obj or {}).get("verbose", False)
     scratch_dir = str(CONFIG.get("scratch_dir", "scratch"))
+    norm_mode = _normalize_mode(mode)
 
     if verbose:
-        console.print(f"[idx.header]Running quantitative filter[/idx.header] top={top}")
-        df = run_filter(top=top, input_file=input_file, output_dir=output_dir)
+        console.print(
+            f"[idx.header]Running quantitative filter[/idx.header] "
+            f"top={top} mode={norm_mode}"
+        )
+        df = run_filter(
+            top=top, input_file=input_file, output_dir=output_dir, mode=norm_mode
+        )
     else:
         from app.cli.ui.progress import quiet_filter_pipeline
 
@@ -61,7 +85,12 @@ def filter_command(
                 scratch_dir,
                 lambda msg: status_obj.update(f"[idx.header]{msg}[/idx.header]"),
             ):
-                df = run_filter(top=top, input_file=input_file, output_dir=output_dir)
+                df = run_filter(
+                    top=top,
+                    input_file=input_file,
+                    output_dir=output_dir,
+                    mode=norm_mode,
+                )
 
     if df is None or df.empty:
         console.print("[idx.warn]No candidates passed all filters.[/idx.warn]")

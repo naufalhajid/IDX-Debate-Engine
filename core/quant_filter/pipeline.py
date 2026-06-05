@@ -346,12 +346,26 @@ def _analyze_ticker(
         else:
             ma200_context = "ABOVE" if current_px >= ma200_value else "BELOW"
 
-    min_price_vs_ema20 = cfg.get(
-        "min_price_vs_ema20", cfg.get("min_price_vs_sma50", 1.0)
-    )
-    if current_px < ema20_latest * min_price_vs_ema20:
-        logger.debug(f"[{t}] Price below EMA20 trend filter, skip")
-        return None
+    mode = cfg.get("screener_mode", "momentum")
+    if mode == "mean_reversion":
+        # Pullback in an intact uptrend: price has dipped below EMA20, but the
+        # long-term trend is still up (above MA200) to avoid falling knives.
+        if current_px >= ema20_latest:
+            logger.debug(f"[{t}] MR: price not below EMA20 (no pullback), skip")
+            return None
+        if ma200_value is None or current_px < ma200_value * cfg["mr_ma200_floor"]:
+            logger.debug(
+                f"[{t}] MR: price {current_px:.0f} below MA200 floor "
+                f"({cfg['mr_ma200_floor']:.0%} of {ma200_value}), skip"
+            )
+            return None
+    else:
+        min_price_vs_ema20 = cfg.get(
+            "min_price_vs_ema20", cfg.get("min_price_vs_sma50", 1.0)
+        )
+        if current_px < ema20_latest * min_price_vs_ema20:
+            logger.debug(f"[{t}] Price below EMA20 trend filter, skip")
+            return None
 
     # Relative Strength vs IHSG: reject candidates underperforming the index.
     if len(close) <= price_mom_period:
@@ -360,7 +374,13 @@ def _analyze_ticker(
         (current_px / float(close.iloc[-price_mom_period - 1])) - 1
     )
     rs_vs_ihsg: float = price_return_1m - ihsg_return_1m
-    if rs_vs_ihsg < cfg["min_rs_vs_ihsg_1m"]:
+    if mode == "mean_reversion":
+        # Oversold names underperform short-term by definition, so the RS gate
+        # does not apply. Reject only freefall (falling-knife) drops.
+        if price_return_1m < cfg["mr_max_pullback_1m"]:
+            logger.debug(f"[{t}] MR: 1m drop {price_return_1m:.1%} too deep, skip")
+            return None
+    elif rs_vs_ihsg < cfg["min_rs_vs_ihsg_1m"]:
         logger.debug(f"[{t}] RS vs IHSG {rs_vs_ihsg:.2%} < threshold, skip")
         return None
 
@@ -381,7 +401,14 @@ def _analyze_ticker(
         return None
     rsi_latest: float = float(rsi_series.iloc[-1])
 
-    if rsi_latest > cfg["rsi_hard_reject"]:
+    if mode == "mean_reversion":
+        if rsi_latest > cfg["mr_rsi_oversold_max"]:
+            logger.debug(
+                f"[{t}] MR: RSI {rsi_latest:.1f} > {cfg['mr_rsi_oversold_max']} "
+                f"(not oversold), skip"
+            )
+            return None
+    elif rsi_latest > cfg["rsi_hard_reject"]:
         logger.debug(
             f"[{t}] RSI {rsi_latest:.1f} > {cfg['rsi_hard_reject']}, hard reject"
         )
@@ -481,6 +508,26 @@ def _analyze_ticker(
     elif ma200_context == "BELOW":
         total_score -= 7
         mom_note.append("Below MA200 (-7)")
+
+    if mode == "mean_reversion":
+        # MR v1 score (override): fundamentals + oversold-RSI only. The momentum,
+        # volume, price-momentum and trend adjustments above reward the opposite
+        # of a pullback, so they are replaced here. Lower RSI = stronger setup.
+        # Fundamental penalties (Piotroski/Altman/ROE/margin) below still apply.
+        if rsi_latest <= 30:
+            mr_rsi_score = 1.00
+        elif rsi_latest <= 35:
+            mr_rsi_score = 0.80
+        else:
+            mr_rsi_score = 0.50
+        momentum_rsi_score = rsi_w * mr_rsi_score
+        momentum_vol_score = 0.0
+        price_momentum_score = 0.0
+        total_score = row["Val_Score"] + row["Prof_Score"] + momentum_rsi_score
+        mom_note = [
+            f"MR Oversold RSI ({rsi_latest:.1f})",
+            f"Pullback {price_return_1m * 100:.1f}% (below EMA20)",
+        ]
 
     # [v3.2 FIX] Piotroski F-Score adjustment & Turnaround Penalty.
     piotroski = int(row.get("Piotroski F-Score", 0) or 0)

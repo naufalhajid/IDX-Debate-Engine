@@ -159,6 +159,19 @@ CONFIG = {
     "penalty_roe_fail": -15,
     "penalty_piotroski_fail": -15,
     "penalty_altman_z_fail": -20,
+    # ── Mean-Reversion Mode (v3.3) ────────────────────────────────────────────
+    # screener_mode = "momentum" (default, trend-following) | "mean_reversion".
+    # Mean-reversion looks for a pullback in an intact uptrend: price has dipped
+    # BELOW EMA20 but the long-term trend is still up (above MA200), and RSI is
+    # oversold. This surfaces counter-trend reversal candidates in markets where
+    # the momentum screener (which requires price > EMA20) finds nothing.
+    "screener_mode": "momentum",
+    "mr_rsi_oversold_max": 40.0,  # RSI <= this counts as oversold (reversal setup)
+    "mr_max_pullback_1m": -0.30,  # reject 1m drops deeper than this (falling knife)
+    # Long-term support floor: price must be within 10% below MA200 (near/above
+    # long-term support). Strict "above MA200" is near-empty in a bear market;
+    # this keeps falling-knife protection while allowing a real dip.
+    "mr_ma200_floor": 0.90,
     # ── Output
     "top_n": 10,
 }

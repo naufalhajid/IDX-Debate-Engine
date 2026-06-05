@@ -70,8 +70,8 @@ def test_scan_dry_run_does_not_run_etl(monkeypatch):
 def test_filter_applies_safe_overrides(monkeypatch):
     calls = []
 
-    def fake_run_filter(*, top, input_file, output_dir):
-        calls.append((top, input_file, output_dir))
+    def fake_run_filter(*, top, input_file, output_dir, mode="momentum"):
+        calls.append((top, input_file, output_dir, mode))
 
     monkeypatch.setattr("app.cli.commands.filter.run_filter", fake_run_filter)
 
@@ -89,7 +89,7 @@ def test_filter_applies_safe_overrides(monkeypatch):
     )
 
     assert result.exit_code == 0, result.output
-    assert calls == [(5, Path("output/sample.xlsx"), Path("tmp/filter"))]
+    assert calls == [(5, Path("output/sample.xlsx"), Path("tmp/filter"), "momentum")]
 
 
 def test_debate_normalizes_tickers_and_output_dir(monkeypatch):
