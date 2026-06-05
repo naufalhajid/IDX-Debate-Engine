@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
 import pytest
 
+import core.orchestrator.legacy as orchestrator
 from core.orchestrator.legacy import (
     MIN_CONFIDENCE_FOR_SETUP,
     SetupCoherenceError,
@@ -12,6 +14,7 @@ from core.orchestrator.legacy import (
     apply_minimum_confidence_gate,
     apply_setup_coherence_gate,
     generate_top3_report,
+    run_batch_debates,
     save_full_results,
     save_merged_results,
     sync_metric_aliases,
@@ -293,3 +296,48 @@ def test_full_results_are_snapshot_and_merged_state_is_separate(tmp_path: Path) 
     merged_text = merged_path.read_text(encoding="utf-8")
     assert "OLD" in merged_text
     assert "NEW" in merged_text
+
+
+@pytest.mark.asyncio
+async def test_batch_debate_records_unexpected_ticker_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeChamber:
+        async def run(self, ticker: str) -> dict:
+            if ticker == "BADX":
+                raise KeyError("raw_data")
+            return {
+                "ticker": ticker,
+                "final_verdict": json.dumps(
+                    {"ticker": ticker, "rating": "HOLD", "confidence": 0.4}
+                ),
+                "round_count": 1,
+                "raw_data": "ok",
+                "debate_history": [],
+                "metadata": {},
+            }
+
+    monkeypatch.setitem(orchestrator.ORCHESTRATOR_CONFIG, "batch_delay", 0)
+    monkeypatch.setattr(
+        "core.orchestrator.legacy.get_usage",
+        lambda: {
+            "pro_calls": 0,
+            "pro_budget": 10,
+            "flash_calls": 0,
+            "flash_budget": 10,
+        },
+    )
+
+    results = await run_batch_debates(
+        ["BBCA", "BADX", "TLKM"],
+        sector_map={"BADX": "technology"},
+        chamber_factory=FakeChamber,
+    )
+
+    assert [result["ticker"] for result in results] == ["BBCA", "BADX", "TLKM"]
+    failed = results[1]
+    assert failed["status"] == "failed"
+    assert failed["sector_key"] == "technology"
+    assert "KeyError" in failed["error"]
+    assert failed["metadata"]["failure_type"] == "KeyError"
+    assert failed["metadata"]["failure_stage"] == "single_debate"

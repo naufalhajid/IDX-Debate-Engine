@@ -69,9 +69,11 @@ def filter_command(
     )
     if option_mode is not None and positional_mode is not None:
         if option_mode != positional_mode:
-            raise typer.BadParameter(
-                "positional mode conflicts with --mode; choose one strategy."
+            console.print(
+                "[idx.error]positional mode conflicts with --mode; "
+                "choose one strategy.[/idx.error]"
             )
+            raise typer.Exit(code=2)
     norm_mode = positional_mode or option_mode or "momentum"
 
     if verbose:

@@ -2789,13 +2789,26 @@ async def fetch_price_with_retry(ticker: str) -> float:
 # ---------------------------------------------------------------------------
 
 
-def _empty_result(ticker: str, error: str, sector_key: str = "unknown") -> dict:
+def _empty_result(
+    ticker: str,
+    error: str,
+    sector_key: str = "unknown",
+    *,
+    failure_stage: str | None = None,
+    failure_type: str | None = None,
+) -> dict:
     """
     Bentuk seragam untuk debate yang gagal atau di-abort.
 
     [FIX-10] Status selalu FAILED â€" fungsi ini tidak pernah dipanggil
     untuk kondisi sukses, jadi tidak ada dead code `else "SUCCESS"`.
     """
+    metadata: dict[str, Any] = {}
+    if failure_stage:
+        metadata["failure_stage"] = failure_stage
+    if failure_type:
+        metadata["failure_type"] = failure_type
+
     return {
         "ticker": ticker,
         "verdict": {},
@@ -2807,12 +2820,43 @@ def _empty_result(ticker: str, error: str, sector_key: str = "unknown") -> dict:
         "disagreement_type": None,
         "debate_history": [],
         "raw_data_summary": "",
-        "metadata": {},
+        "metadata": metadata,
         "error": error,
         "status": "failed",
         "conviction_score": 0.0,
         "sector_key": sector_key,
     }
+
+
+def _exception_message(exc: BaseException) -> str:
+    text = str(exc).strip()
+    if text:
+        return text
+    if getattr(exc, "args", None):
+        return repr(exc.args)
+    return type(exc).__name__
+
+
+def _exception_failure_result(
+    ticker: str,
+    exc: BaseException,
+    *,
+    stage: str,
+    sector_key: str = "unknown",
+    prefix: str | None = None,
+) -> dict:
+    failure_type = type(exc).__name__
+    message = _exception_message(exc)
+    error = f"{prefix}: {message}" if prefix else f"{failure_type}: {message}"
+    result = _empty_result(
+        ticker,
+        error,
+        sector_key,
+        failure_stage=stage,
+        failure_type=failure_type,
+    )
+    result["metadata"]["failure_message"] = message
+    return result
 
 
 def _dict_or_empty(value: Any) -> dict[str, Any]:
@@ -3600,7 +3644,13 @@ async def _run_single_debate(ticker: str, chamber: Any) -> dict:
     try:
         result = await chamber.run(ticker)
         if result.get("error") is not None:
-            raise RuntimeError(result["error"])
+            error = str(result["error"])
+            return _empty_result(
+                ticker,
+                f"Chamber reported error: {error}",
+                failure_stage="debate_chamber",
+                failure_type="ChamberReportedError",
+            )
 
         verdict_dict: dict = {}
         if result.get("final_verdict"):
@@ -3609,10 +3659,20 @@ async def _run_single_debate(ticker: str, chamber: Any) -> dict:
                 verdict_dict = CIOVerdict(**verdict_raw).model_dump()
             except ValidationError as e:
                 logger.error(f"[Debate] Schema tidak valid untuk {ticker}: {e}")
-                return _empty_result(ticker, f"Schema validation failed: {e}")
+                return _exception_failure_result(
+                    ticker,
+                    e,
+                    stage="final_verdict_schema",
+                    prefix="Schema validation failed",
+                )
             except json.JSONDecodeError as e:
                 logger.error(f"[Debate] JSON rusak untuk {ticker}: {e}")
-                return _empty_result(ticker, f"JSON decode error: {e}")
+                return _exception_failure_result(
+                    ticker,
+                    e,
+                    stage="final_verdict_json",
+                    prefix="JSON decode error",
+                )
 
         logger.info(f"[Debate] OK Selesai: {ticker}")
         missing_keys = {"ticker", "round_count", "raw_data"} - set(result)
@@ -3666,11 +3726,12 @@ async def _run_single_debate(ticker: str, chamber: Any) -> dict:
     except BudgetExhaustedError as e:
         logger.error(f"[Debate] STOP Budget habis saat debating {ticker}: {e}")
         _cli_renderer.record_failure_detail(ticker, traceback.format_exc())
-        return _empty_result(ticker, f"Budget exhausted: {e}")
-    except Exception as e:
-        logger.error(f"[Debate] ERROR {ticker} gagal: {e}")
-        _cli_renderer.record_failure_detail(ticker, traceback.format_exc())
-        return _empty_result(ticker, str(e))
+        return _exception_failure_result(
+            ticker,
+            e,
+            stage="debate_budget",
+            prefix="Budget exhausted",
+        )
 
 
 async def run_batch_debates(
@@ -3874,14 +3935,27 @@ async def run_batch_debates(
                     _cli_renderer.record_failure_detail(ticker, traceback.format_exc())
                     _set_status(ticker, "ERROR", step="warning")
                     return _finish_result(
-                        _empty_result(ticker, f"Budget exhausted: {e}", sector_key)
+                        _exception_failure_result(
+                            ticker,
+                            e,
+                            stage="debate_budget",
+                            sector_key=sector_key,
+                            prefix="Budget exhausted",
+                        )
                     )
 
                 except Exception as e:
-                    logger.error(f"[{ticker}] Error saat eksekusi: {e}")
+                    logger.exception(f"[{ticker}] Error saat eksekusi: {e}")
                     _cli_renderer.record_failure_detail(ticker, traceback.format_exc())
                     _set_status(ticker, "ERROR", step="warning")
-                    return _finish_result(_empty_result(ticker, str(e), sector_key))
+                    return _finish_result(
+                        _exception_failure_result(
+                            ticker,
+                            e,
+                            stage="single_debate",
+                            sector_key=sector_key,
+                        )
+                    )
 
         except asyncio.CancelledError:
             # [FIX-6] INTENTIONAL: CancelledError ditelan secara eksplisit.
@@ -3915,7 +3989,13 @@ async def run_batch_debates(
             )
             _set_status(ticker, "ABORTED", step="stopped")
             return _finish_result(
-                _empty_result(ticker, "Task cancelled by abort event", sector_key)
+                _empty_result(
+                    ticker,
+                    "Task cancelled by abort event",
+                    sector_key,
+                    failure_stage="abort_event",
+                    failure_type="CancelledError",
+                )
             )
 
         except Exception as e:
@@ -3923,7 +4003,13 @@ async def run_batch_debates(
             _cli_renderer.record_failure_detail(ticker, traceback.format_exc())
             _set_status(ticker, "ERROR", step="warning")
             return _finish_result(
-                _empty_result(ticker, f"Orchestrator error: {e}", sector_key)
+                _exception_failure_result(
+                    ticker,
+                    e,
+                    stage="batch_guard",
+                    sector_key=sector_key,
+                    prefix="Orchestrator error",
+                )
             )
 
         finally:
@@ -3962,7 +4048,14 @@ async def run_batch_debates(
                 "".join(traceback.format_exception(type(res), res, res.__traceback__)),
             )
             sector_key = (sector_map or {}).get(ticker, "unknown")
-            safe_results.append(_empty_result(ticker, str(res), sector_key))
+            safe_results.append(
+                _exception_failure_result(
+                    ticker,
+                    res,
+                    stage="gather_fallback",
+                    sector_key=sector_key,
+                )
+            )
         else:
             safe_results.append(res)
 

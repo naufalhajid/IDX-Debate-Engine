@@ -84,7 +84,10 @@ def _resolve_pipeline_tokens(
     lowered = [token.strip().lower() for token in extra_args]
     if "choose" in lowered:
         if no_interactive:
-            raise typer.BadParameter("choose cannot be used with --no-interactive")
+            console.print(
+                "[idx.error]choose cannot be used with --no-interactive[/idx.error]"
+            )
+            raise typer.Exit(code=2)
         if len(extra_args) > 1:
             raise typer.BadParameter(
                 "choose cannot be combined with positional modes or tickers; "
