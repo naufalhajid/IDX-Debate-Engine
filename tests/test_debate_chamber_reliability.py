@@ -710,6 +710,10 @@ async def test_cio_parse_fallback_survives_low_fair_value_blend(monkeypatch):
 
     assert verdict["rating"] == "HOLD"
     assert verdict["stop_loss"] < entry_low <= entry_high < verdict["target_price"]
+    failure = result["metadata"]["cio_parse_failure"]
+    assert failure["stage"] == "json_parse"
+    assert failure["type"] == "JSONDecodeError"
+    assert failure["message"]
 
 
 @pytest.mark.asyncio

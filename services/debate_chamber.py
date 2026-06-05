@@ -30,7 +30,7 @@ from typing import Any, Literal
 import pandas as pd
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, START, StateGraph
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 try:
@@ -153,6 +153,15 @@ def _ledger_call(operation: str, func, *args, **kwargs) -> None:
 def _state_metadata(state: DebateChamberState) -> dict:
     metadata = state.get("metadata") or {}
     return metadata if isinstance(metadata, dict) else {}
+
+
+def _exception_message(exc: BaseException) -> str:
+    text = str(exc).strip()
+    if text:
+        return text
+    if getattr(exc, "args", None):
+        return repr(exc.args)
+    return type(exc).__name__
 
 
 def _state_run_id(state: DebateChamberState) -> str:
@@ -3738,13 +3747,31 @@ Start your response with '{' and end with '}'. Nothing else."""
             )
             return p
 
+        def _record_cio_parse_failure(stage: str, exc: BaseException) -> str:
+            message = _exception_message(exc)
+            metadata = dict(_state_metadata(state))
+            metadata["cio_parse_failure"] = {
+                "stage": stage,
+                "type": type(exc).__name__,
+                "message": message,
+            }
+            state["metadata"] = metadata
+            return message
+
+        def _cio_parse_failure_stage(exc: BaseException) -> str:
+            if isinstance(exc, json.JSONDecodeError):
+                return "json_parse"
+            if isinstance(exc, ValidationError):
+                return "cio_verdict_validation"
+            return "cio_verdict_parse"
+
+        resp = await self._invoke_llm_for_state(
+            state,
+            self.pro_llm,
+            messages,
+            inject_rules=False,
+        )
         try:
-            resp = await self._invoke_llm_for_state(
-                state,
-                self.pro_llm,
-                messages,
-                inject_rules=False,
-            )
             parsed = json.loads(
                 self._sanitize_json(self._llm_content_to_text(resp.content))
             )
@@ -3755,9 +3782,21 @@ Start your response with '{' and end with '}'. Nothing else."""
             parsed = _apply_citation_guard(parsed)
             verdict_json = CIOVerdict(**parsed).model_dump_json()
             logger.info(f"[CIO] JSON parsed successfully for {ticker}")
-        except Exception as e:
+        except (
+            json.JSONDecodeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            ValidationError,
+        ) as e:
+            error_message = _record_cio_parse_failure(
+                _cio_parse_failure_stage(e),
+                e,
+            )
             logger.warning(
-                f"[CIO] Primary JSON parse failed ({e}); using safe fallback verdict"
+                "[CIO] Primary JSON parse failed "
+                f"({type(e).__name__}: {error_message}); "
+                "using safe fallback verdict"
             )
             verdict_json = CIOVerdict(
                 ticker=ticker,
@@ -3783,7 +3822,7 @@ Start your response with '{' and end with '}'. Nothing else."""
         logger.info(f"[CIO] Verdict delivered for {ticker}")
         try:
             verdict_detail = json.loads(verdict_json)
-        except Exception:
+        except json.JSONDecodeError:
             verdict_detail = {}
         _ledger_stage_success(
             state,
