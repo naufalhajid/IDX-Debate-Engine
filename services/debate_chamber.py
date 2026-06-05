@@ -68,6 +68,7 @@ from schemas.debate import (
 from services.context_pack_builder import build_context_pack, pack_to_prompt_string
 from services.evidence_ranker import (
     DEFAULT_RANKER as rag_store,
+    CitationGuardReport,
     EvidenceCitation,
     citations_for_bundle,
     guard_evidence_citation_ids,
@@ -233,15 +234,34 @@ def _rag_citation_ids_from_text(value: Any) -> list[str]:
     return [chunk_id for chunk_id in dict.fromkeys(found) if chunk_id]
 
 
-def _rag_citations_from_metadata(metadata: dict[str, Any]) -> list[EvidenceCitation]:
+def _rag_citations_from_metadata(
+    metadata: dict[str, Any],
+    *,
+    failures: list[dict[str, str]] | None = None,
+) -> list[EvidenceCitation]:
     citations: list[EvidenceCitation] = []
-    for item in metadata.get("rag_citations") or []:
+    for index, item in enumerate(metadata.get("rag_citations") or []):
         if not isinstance(item, dict):
+            if failures is not None:
+                failures.append(
+                    {
+                        "index": str(index),
+                        "type": type(item).__name__,
+                        "message": "RAG citation metadata entry is not an object",
+                    }
+                )
             continue
         try:
             citations.append(EvidenceCitation(**item))
-        except Exception:
-            continue
+        except (TypeError, ValueError, ValidationError) as exc:
+            if failures is not None:
+                failures.append(
+                    {
+                        "index": str(index),
+                        "type": type(exc).__name__,
+                        "message": _exception_message(exc),
+                    }
+                )
     return citations
 
 
@@ -386,15 +406,19 @@ async def _news_context_for_state(
     ticker: str,
     llm_news_sentiment: str | None = None,
 ) -> dict[str, object]:
+    failure_stage = "import_fetcher"
     try:
         from services.news_fetcher import DEFAULT_FETCHER
 
+        failure_stage = "build_bundle"
         news_bundle = await DEFAULT_FETCHER.build_bundle_async(ticker)
+        failure_stage = "render_bundle"
         news_str = DEFAULT_FETCHER.bundle_to_prompt_string(news_bundle)
 
         # Default to the keyword-derived signal; override with the LLM judgment
         # when available (preferred). Keyword stays only as the sparse-social
         # fallback (the LLM bails to INSUFFICIENT_DATA under 5 social posts).
+        failure_stage = "normalize_bundle"
         overall_sentiment = news_bundle.overall_sentiment.value
         adjustment = news_bundle.confidence_adjustment
         normalized_llm = str(llm_news_sentiment or "").strip().upper()
@@ -434,6 +458,11 @@ async def _news_context_for_state(
     except Exception as exc:
         logger.warning(f"[News] {ticker}: fetch failed: {exc}")
         metadata = dict(state.get("metadata") or {})
+        metadata["news_fetch_failure"] = {
+            "stage": failure_stage,
+            "type": type(exc).__name__,
+            "message": _exception_message(exc),
+        }
         metadata["has_breaking_news"] = False
         metadata["breaking_news_headlines"] = []
         metadata["news_confidence_adjustment"] = 0.0
@@ -2497,6 +2526,7 @@ Current Date (Asia/Jakarta): {current_date}
                 f"[ContextPack] {ticker} token_estimate={context_pack.token_estimate}"
             )
         run_id = str((state.get("metadata") or {}).get("run_id", "unknown"))
+        rag_stage = "build_bundle"
         try:
             bundle = rag_store.build_bundle(
                 pack=context_pack,
@@ -2544,6 +2574,7 @@ Current Date (Asia/Jakarta): {current_date}
                 f"{bundle.total_chunks_considered} chunks, "
                 f"~{bundle.token_estimate} tokens"
             )
+            rag_stage = "render_bundle"
             decision_brief = rag_store.bundle_to_prompt_string(bundle)
         except Exception as exc:
             logger.warning(
@@ -2553,6 +2584,14 @@ Current Date (Asia/Jakarta): {current_date}
             failure_record = classify_exception(exc, "context_build").model_dump(
                 mode="json"
             )
+            metadata = dict(state.get("metadata") or {})
+            metadata["rag_selection_failure"] = {
+                "stage": rag_stage,
+                "type": type(exc).__name__,
+                "message": _exception_message(exc),
+                "classification": failure_record,
+            }
+            state["metadata"] = metadata
             decision = _planner_decision_for_state(
                 state,
                 stage=PipelineStage.CONTEXT_BUILD,
@@ -3724,8 +3763,41 @@ Start your response with '{' and end with '}'. Nothing else."""
             return p
 
         def _apply_citation_guard(parsed: dict) -> dict:
-            citations = _rag_citations_from_metadata(_state_metadata(state))
+            citation_parse_failures: list[dict[str, str]] = []
+            citations = _rag_citations_from_metadata(
+                _state_metadata(state),
+                failures=citation_parse_failures,
+            )
+            if citation_parse_failures:
+                metadata = dict(_state_metadata(state))
+                metadata["rag_citation_parse_failures"] = citation_parse_failures
+                state["metadata"] = metadata
+                logger.warning(
+                    f"[RAG] {ticker} citation metadata parse failed: "
+                    f"{citation_parse_failures}"
+                )
             if not citations:
+                if citation_parse_failures:
+                    report = CitationGuardReport(
+                        valid=False,
+                        cited_chunks=[],
+                        missing_citation_ids=[],
+                        stale_citation_ids=[],
+                        errors=[
+                            "RAG citation metadata invalid: "
+                            f"{len(citation_parse_failures)} malformed entry(s)."
+                        ],
+                    )
+                    metadata = dict(_state_metadata(state))
+                    metadata["rag_citation_guard"] = report.model_dump(mode="json")
+                    state["metadata"] = metadata
+                    p = dict(parsed)
+                    p["weighted_reasoning"] = self._append_reason(
+                        p.get("weighted_reasoning"),
+                        "Evidence citation guard warning: "
+                        + "; ".join(report.errors),
+                    )
+                    return p
                 return parsed
             cited_ids = _rag_citation_ids_from_text(parsed)
             report = guard_evidence_citation_ids(

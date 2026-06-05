@@ -264,6 +264,46 @@ def test_generate_ticker_report_contains_confidence_percent() -> None:
     assert "{:.0%}".format(confidence) in report
 
 
+def test_generate_ticker_report_shows_data_quality_warnings() -> None:
+    result = _mock_result()
+    result["metadata"]["news_fetch_failure"] = {
+        "stage": "build_bundle",
+        "type": "OSError",
+        "message": "news provider unavailable",
+    }
+    result["metadata"]["rag_selection_failure"] = {
+        "stage": "build_bundle",
+        "type": "OSError",
+        "message": "rag evidence log locked",
+    }
+
+    report = MarkdownFormatter().generate_ticker_report(result)
+
+    assert "Data Quality Warnings" in report
+    assert "News fetch failure: build_bundle/OSError" in report
+    assert "news provider unavailable" in report
+    assert "RAG selection failure: build_bundle/OSError" in report
+    assert "rag evidence log locked" in report
+
+
+def test_render_ticker_panel_shows_data_quality_warnings() -> None:
+    console = Console(record=True, width=140)
+    formatter = RichFormatter(console=console)
+    result = _mock_result()
+    result["metadata"]["cio_parse_failure"] = {
+        "stage": "json_parse",
+        "type": "JSONDecodeError",
+        "message": "invalid JSON",
+    }
+
+    formatter.render_ticker_panel(result)
+
+    output = console.export_text()
+    assert "Data Quality" in output
+    assert "CIO parse fallback: json_parse/JSONDecodeError" in output
+    assert "invalid JSON" in output
+
+
 def test_generate_batch_summary_contains_run_id_and_title() -> None:
     report = MarkdownFormatter().generate_batch_summary([_mock_result()], "run-123")
 

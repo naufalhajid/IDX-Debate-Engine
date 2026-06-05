@@ -319,6 +319,52 @@ def _breaking_news_lines(result: dict[str, Any]) -> list[str]:
     return lines
 
 
+def _failure_warning_line(label: str, value: Any) -> str | None:
+    failure = _dict_or_empty(value)
+    if not failure:
+        return None
+    stage = str(failure.get("stage") or "unknown").strip() or "unknown"
+    failure_type = str(
+        failure.get("type") or failure.get("failure_type") or "unknown"
+    ).strip() or "unknown"
+    message = _short_text(
+        failure.get("message") or failure.get("reason") or "details unavailable",
+        limit=96,
+    )
+    return f"{label}: {stage}/{failure_type} - {message}"
+
+
+def _data_quality_warning_lines(result: dict[str, Any]) -> list[str]:
+    metadata = _dict_or_empty(result.get("metadata"))
+    lines: list[str] = []
+    for key, label in (
+        ("news_fetch_failure", "News fetch failure"),
+        ("rag_selection_failure", "RAG selection failure"),
+        ("cio_parse_failure", "CIO parse fallback"),
+    ):
+        line = _failure_warning_line(label, metadata.get(key) or result.get(key))
+        if line:
+            lines.append(line)
+
+    citation_failures = _list_or_empty(metadata.get("rag_citation_parse_failures"))
+    if citation_failures:
+        first = _dict_or_empty(citation_failures[0])
+        first_type = first.get("type") or "unknown"
+        first_message = _short_text(first.get("message"), limit=80)
+        lines.append(
+            "RAG citation metadata failure: "
+            f"{len(citation_failures)} malformed entry(s); "
+            f"first={first_type} - {first_message}"
+        )
+
+    citation_guard = _dict_or_empty(metadata.get("rag_citation_guard"))
+    guard_errors = _list_or_empty(citation_guard.get("errors"))
+    if citation_guard and citation_guard.get("valid") is False and guard_errors:
+        lines.append(f"RAG citation guard: {_short_text(guard_errors[0], limit=96)}")
+
+    return lines[:6]
+
+
 def _short_text(value: Any, limit: int = 60) -> str:
     text = str(value or "").strip()
     if not text:
@@ -1084,6 +1130,13 @@ class RichFormatter:
                     "Key Catalysts", "\n".join(f"• {c}" for c in catalysts)
                 )
 
+            quality_lines = _data_quality_warning_lines(data)
+            if quality_lines:
+                sys_table.add_row(
+                    "Data Quality",
+                    "\n".join(f"- {line}" for line in quality_lines),
+                )
+
             sys_panel = Panel(
                 sys_table,
                 title="[bold blue]SYSTEM & RISK MANAGEMENT[/bold blue]",
@@ -1395,6 +1448,7 @@ class MarkdownFormatter:
                     lines.append("Catalyst data unavailable.")
                 lines.append("")
 
+            quality_lines = _data_quality_warning_lines(data)
             lines.extend(
                 [
                     "---",
@@ -1407,6 +1461,7 @@ class MarkdownFormatter:
                     f"| **News Sentiment** | {news_sentiment} ({news_adj:+.2f}) |",
                     f"| **Available Data** | {', '.join(sources) if sources else 'None'} |",
                     f"| **Missing Fields** | {', '.join(missing) if missing else 'None'} |",
+                    f"| **Data Quality Warnings** | {'; '.join(quality_lines) if quality_lines else 'None'} |",
                     "",
                     "---",
                     "",

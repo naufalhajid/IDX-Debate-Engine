@@ -556,6 +556,29 @@ def test_news_context_falls_back_to_keyword_when_no_llm_sentiment(monkeypatch):
     assert out["metadata"]["news_overall_sentiment"] == "POSITIVE"
 
 
+def test_news_context_records_fetch_failure(monkeypatch):
+    class _FailingFetcher:
+        async def build_bundle_async(self, ticker):
+            raise OSError("news provider unavailable")
+
+        def bundle_to_prompt_string(self, bundle):
+            return "SHOULD_NOT_RENDER"
+
+    monkeypatch.setattr("services.news_fetcher.DEFAULT_FETCHER", _FailingFetcher())
+
+    state = {"metadata": {"run_id": "run-1"}}
+    out = asyncio.run(dc._news_context_for_state(state, "DSSA"))
+
+    failure = out["metadata"]["news_fetch_failure"]
+    assert out["news_brief"] == ""
+    assert out["news_confidence_adjustment"] == 0.0
+    assert out["metadata"]["has_breaking_news"] is False
+    assert failure["stage"] == "build_bundle"
+    assert failure["type"] == "OSError"
+    assert failure["message"] == "news provider unavailable"
+    assert state["metadata"]["news_fetch_failure"] == failure
+
+
 def test_fair_value_rejected_without_current_run_rag_evidence():
     fair_value, metadata = dc._reject_unverified_fair_value_if_needed(
         ticker="BBCA",
@@ -587,6 +610,41 @@ def test_fair_value_accepted_with_current_run_rag_evidence():
 
     assert fair_value == 10474
     assert metadata["fair_value_rag_verified"] is True
+
+
+@pytest.mark.asyncio
+async def test_synthesizer_records_rag_selection_failure(monkeypatch):
+    chamber = _chamber()
+
+    class _FailingRanker:
+        def build_bundle(self, *, pack, run_id, query_context):
+            raise OSError("rag evidence log locked")
+
+        def bundle_to_prompt_string(self, bundle):
+            return "SHOULD_NOT_RENDER"
+
+    monkeypatch.setattr(dc, "rag_store", _FailingRanker())
+
+    result = await chamber._synthesizer_node(
+        {
+            "ticker": "BBRI",
+            "fundamental_data": "Revenue improving",
+            "technical_data": "MA50 support",
+            "sentiment_data": "Position: HOLD",
+            "current_price": 1000.0,
+            "fair_value_estimate": 0.0,
+            "technical_indicators": {"ma50": 980.0, "atr14": 30.0},
+            "market_data": {},
+            "metadata": {"run_id": "run-1"},
+        }
+    )
+
+    failure = result["metadata"]["rag_selection_failure"]
+    assert result["decision_brief"]
+    assert failure["stage"] == "build_bundle"
+    assert failure["type"] == "OSError"
+    assert failure["message"] == "rag evidence log locked"
+    assert "classification" in failure
 
 
 @pytest.mark.asyncio
@@ -939,6 +997,81 @@ async def test_cio_records_rag_citation_guard_when_evidence_id_missing(monkeypat
     assert guard["valid"] is False
     assert guard["missing_citation_ids"] == []
     assert "expected at least 1 citation" in guard["errors"][0]
+    assert "Evidence citation guard warning" in verdict["weighted_reasoning"]
+
+
+@pytest.mark.asyncio
+async def test_cio_records_malformed_rag_citation_metadata(monkeypatch):
+    chamber = _chamber()
+    chamber.pro_llm = FakeLLM(model="gemini-2.5-pro")
+
+    async def fake_invoke(llm, messages, inject_rules=True):
+        return SimpleNamespace(
+            content=json.dumps(
+                {
+                    "ticker": "BBRI",
+                    "rating": "BUY",
+                    "confidence": 0.72,
+                    "summary": "Valid setup.",
+                    "weighted_reasoning": "Evidence-backed decision.",
+                    "key_catalysts": ["volume"],
+                    "key_risks": ["breakdown"],
+                    "timeframe": "1-3 Months",
+                    "entry_price_range": "1 - 2",
+                    "target_price": 3,
+                    "stop_loss": 1,
+                    "current_price": 1000,
+                    "fair_value": 1200,
+                    "expected_return": "+5.0%",
+                    "risk_reward_ratio": 2.0,
+                    "consensus_reached": False,
+                    "consensus_method": None,
+                    "dissenting_agents": [],
+                }
+            )
+        )
+
+    monkeypatch.setattr(chamber, "_invoke_llm", fake_invoke)
+
+    result = await chamber._cio_judge_node(
+        {
+            "ticker": "BBRI",
+            "current_price": 1000.0,
+            "technical_indicators": {"ma50": 980, "atr14": 30},
+            "fair_value_estimate": 1200.0,
+            "debate_history": [
+                DebateMessage(role="bull", content="BUY with momentum", round_num=1)
+            ],
+            "raw_data": "compact raw",
+            "decision_brief": "Evidence ID: BBRI_run_1_technical_0\nRSI support holds.",
+            "consensus_reached": False,
+            "consensus_method": None,
+            "dissenting_agents": [],
+            "agent_votes": [],
+            "disagreement_type": "direction",
+            "devils_advocate_question": "What if support breaks?",
+            "metadata": {
+                "rag_citation_ids": ["BBRI_run_1_technical_0"],
+                "rag_citations": [
+                    {
+                        "chunk_id": "BBRI_run_1_technical_0",
+                        "category": "unknown",
+                        "relevance_score": 0.95,
+                        "is_stale": False,
+                    }
+                ],
+            },
+        }
+    )
+
+    verdict = json.loads(result["final_verdict"])
+    failures = result["metadata"]["rag_citation_parse_failures"]
+    guard = result["metadata"]["rag_citation_guard"]
+
+    assert failures[0]["index"] == "0"
+    assert failures[0]["type"] == "ValidationError"
+    assert guard["valid"] is False
+    assert "RAG citation metadata invalid" in guard["errors"][0]
     assert "Evidence citation guard warning" in verdict["weighted_reasoning"]
 
 

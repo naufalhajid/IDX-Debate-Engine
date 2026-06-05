@@ -2,7 +2,7 @@
 
 > **A multi-agent AI research pipeline that fights back against information asymmetry in the Indonesian Stock Exchange.**
 
-Indonesia has over 13 million retail investors — but nearly all of them make decisions without access to the structured, multi-angle analysis that institutional traders take for granted. This engine closes that gap by automating an investment committee workflow: multiple AI agents argue opposite sides of each stock, and a CIO judge makes the final call backed by deterministic financial guardrails.
+Indonesia has over 13 million retail investors, but nearly all of them make decisions without access to the structured, multi-angle analysis that institutional traders take for granted. This engine closes that gap by automating an investment committee workflow: multiple AI agents argue opposite sides of each stock, and a CIO judge makes the final call backed by deterministic financial guardrails.
 
 **Built for decision-support, not decision-making.**
 
@@ -11,31 +11,31 @@ Indonesia has over 13 million retail investors — but nearly all of them make d
 ## Live Demo
 
 <p align="center">
-  <img src="docs/assets/idx_cli_help.png" alt="uv run idx — CLI help showing all available commands" width="100%">
+  <img src="docs/assets/idx_cli_help.png" alt="uv run idx: CLI help showing all available commands" width="100%">
 </p>
 
 <p align="center">
-  <img src="docs/assets/idx_filter.png" alt="uv run idx filter — Top 10 Swing-Trade Candidates table with scores, Graham FV, RSI, and strategy signals" width="100%">
+  <img src="docs/assets/idx_filter.png" alt="uv run idx filter: Top 10 Swing-Trade Candidates table with scores, Graham FV, RSI, and strategy signals" width="100%">
 </p>
 
 <p align="center"><em>
-  <code>uv run idx filter</code> — quantitative screener ranks all IDX-listed stocks by composite score, showing Graham Fair Value, RSI, upside %, and strategy signal per ticker.
+  <code>uv run idx filter</code>: quantitative screener ranks all IDX-listed stocks by composite score, showing Graham Fair Value, RSI, upside %, and strategy signal per ticker.
 </em></p>
 
 <p align="center">
-  <img src="docs/assets/Video Project 1.gif" alt="uv run idx debate — live demo showing full debate analysis with agent voting, bull vs bear arguments, and CIO verdict" width="100%">
+  <img src="docs/assets/Video Project 1.gif" alt="uv run idx debate: live demo showing full debate analysis with agent voting, bull vs bear arguments, and CIO verdict" width="100%">
 </p>
 
 <p align="center"><em>
-  <code>uv run idx debate</code> — live debate: Trade Plan & Valuation, Agent Voting matrix (Bull / Bear / Chartist / Scouts), Key Arguments, and final CIO Verdict with Risk Governor.
+  <code>uv run idx debate</code>: live debate: Trade Plan & Valuation, Agent Voting matrix (Bull / Bear / Chartist / Scouts), Key Arguments, and final CIO Verdict with Risk Governor.
 </em></p>
 
 <p align="center">
-  <img src="docs/assets/idx_pipeline_verdict.png" alt="Pipeline verdict summary table — all tickers with BUY/HOLD/AVOID ratings, confidence, R/R, entry, target, and stop levels" width="100%">
+  <img src="docs/assets/idx_pipeline_verdict.png" alt="Pipeline verdict summary table: all tickers with BUY/HOLD/AVOID ratings, confidence, R/R, entry, target, and stop levels" width="100%">
 </p>
 
 <p align="center"><em>
-  Pipeline final output — Verdict Summary across all debated tickers, with ratings, confidence %, risk/reward ratios, entry zones, targets, and stops.
+  Pipeline final output: Verdict Summary across all debated tickers, with ratings, confidence %, risk/reward ratios, entry zones, targets, and stops.
 </em></p>
 
 ---
@@ -44,8 +44,8 @@ Indonesia has over 13 million retail investors — but nearly all of them make d
 
 Retail investors in Indonesia face a structural disadvantage:
 
-- **No access to structured analysis** — institutional desks have teams of analysts; retail investors have Twitter and gut feeling
-- **Single-perspective LLM analysis is dangerously biased** — asking an AI "should I buy BBRI?" produces a confident-sounding answer with no stress-test
+- **No access to structured analysis**: institutional desks have teams of analysts; retail investors have Twitter and gut feeling
+- **Single-perspective LLM analysis is dangerously biased**: asking an AI "should I buy BBRI?" produces a confident-sounding answer with no stress-test
 - **Market manipulation by "bandar"** (large operators) exploits retail traders who don't have the tools to separate signal from noise
 
 This engine builds the counter-system: one AI argues bull, one argues bear, a third stress-tests both, and a CIO judge applies a strict conflict-resolution matrix before a trade is approved.
@@ -59,14 +59,14 @@ Quant Screener → Regime Detection → Debate Chamber → Risk Governor → Rep
 ```
 
 <p align="center">
-  <img src="docs/assets/idx_pipeline_preflight.png" alt="Pipeline pre-flight checks — LLM API, database, disk, models all green before batch starts" width="100%">
+  <img src="docs/assets/idx_pipeline_preflight.png" alt="Pipeline pre-flight checks: LLM API, database, disk, models all green before batch starts" width="100%">
 </p>
 
 <p align="center"><em>
-  Before every batch run, the pipeline performs pre-flight checks: API connectivity, database, disk space, and live LLM model probes — all must be green before any debate begins.
+  Before every batch run, the pipeline performs pre-flight checks: API connectivity, database, disk space, and live LLM model probes: all must be green before any debate begins.
 </em></p>
 
-### A real output — what the CIO decides
+### A real output: what the CIO decides
 
 ```json
 {
@@ -119,7 +119,7 @@ graph TD
     CJ -->|4. CIOVerdict JSON| HS["core/historical_scorer.py: Win-Rate Matcher"]
     HS -->|5. Final Score| PSIZ["core/quant_filter/position_sizer.py: Money Management"]
     PSIZ -->|6. Markdown Report| OUT["output/TOP_3_SWING_TRADES.md"]
-    PSIZ -->|7. Database| DB[("db.sqlite3 via SQLAlchemy")]
+    PSIZ -->|7. Database| DB[("db/idx-fundamental.db via SQLAlchemy")]
 ```
 
 ---
@@ -134,11 +134,11 @@ A LangGraph `StateGraph` with typed `DebateChamberState`, purpose-built to count
 
 **Scout Phase** *(parallel, gemini-flash-lite):*
 - **Fundamental Scout**: EPS TTM, ROE, DER, PBV, Graham Number, multi-method fair value
-- **Chartist**: MA50, MA200, RSI, ATR — pre-computed in Python, not LLM-generated
+- **Chartist**: MA50, MA200, RSI, ATR (pre-computed in Python, not LLM-generated)
 - **Sentiment Scout**: News freshness scoring, Stockbit analyst signals
 
 **Debate Phase** *(up to 3 rounds):*
-- **Anti-groupthink protocol:** Bull vs Bear across rounds. In Round 2, the Bear is programmatically forbidden from repeating any argument from Round 1 — it must challenge the Bull's margin of safety using ATR-based downside
+- **Anti-groupthink protocol:** Bull vs Bear across rounds. In Round 2, the Bear is programmatically forbidden from repeating any argument from Round 1; it must challenge the Bull's margin of safety using ATR-based downside
 - **Devil's Advocate node:** triggered automatically if consensus appears too early, before it reaches the CIO
 
 **CIO Judge** *(gemini-pro-preview):*
@@ -149,7 +149,7 @@ A LangGraph `StateGraph` with typed `DebateChamberState`, purpose-built to count
 **Files:** [`core/quant_filter/config.py`](core/quant_filter/config.py) · [`core/quant_filter/pipeline.py`](core/quant_filter/pipeline.py)
 
 Multi-stage screening across all IDX-listed stocks:
-- **Stage 1 (Static Gate):** Hard excludes — DER cap, PBV ceiling, ROE floor > 10%, Altman Z-Score > 1.1
+- **Stage 1 (Static Gate):** Hard excludes: DER cap, PBV ceiling, ROE floor > 10%, Altman Z-Score > 1.1
 - **Stage 2 (Technical Gate):** Price > SMA50, RSI < 80, Min ADT Rp 5B
 - **Stage 3 (Composite Scoring):** 70/30 Technical-Fundamental split optimised for swing trading momentum
 
@@ -178,7 +178,7 @@ Structured failure taxonomy for inherently unreliable external dependencies (Sto
 
 **File:** [`services/evidence_ranker.py`](services/evidence_ranker.py)
 
-A freshness-aware, deterministic selection layer between data scouts and debate context. Filters and scores normalized `ContextPack` chunks by category, query keywords, and per-source freshness — preventing prompt overflow and minimising token spend.
+A freshness-aware, deterministic selection layer between data scouts and debate context. Filters and scores normalized `ContextPack` chunks by category, query keywords, and per-source freshness, preventing prompt overflow and minimising token spend.
 
 ---
 
@@ -188,7 +188,8 @@ A freshness-aware, deterministic selection layer between data scouts and debate 
 IDX-Debate-Engine/
 ├── app/
 │   ├── api/                        # FastAPI application (SSE streaming)
-│   └── cli/                        # Rich console UI and Typer commands
+│   ├── cli/                        # Rich console UI and Typer commands
+│   └── ui/                         # Svelte 5 + SvelteKit frontend dashboard
 ├── core/
 │   ├── regime.py                   # ^JKSE realized-vol regime classifier
 │   ├── risk_governor.py            # Deterministic buyability gate
@@ -205,7 +206,7 @@ IDX-Debate-Engine/
 │   └── stockbit.py                 # Stockbit API client
 ├── schemas/                        # Pydantic v2 data contracts
 ├── db/                             # SQLAlchemy async models
-├── tests/                          # 49 test modules
+├── tests/                          # 50 test files (518 test cases)
 ├── output/                         # Generated Markdown trade reports
 └── orchestrator.py                 # Batch pipeline entry point
 ```
@@ -247,7 +248,7 @@ uv run idx pipeline --mode compare --screener-mode mean-reversion
 
 ## Testing
 
-49 test modules covering unit, integration, and pipeline reliability tests.
+518 test cases across 50 test files covering unit, integration, and pipeline reliability tests.
 
 ```bash
 uv run pytest -v
@@ -268,14 +269,14 @@ uv run pytest tests/test_debate_chamber_reliability.py -v
 | Persistence | SQLAlchemy async + SQLite |
 | Validation | Pydantic v2 |
 
-LLM provider can be switched interactively at runtime — no code changes needed:
+LLM provider can be switched interactively at runtime (no code changes needed):
 
 <p align="center">
-  <img src="docs/assets/idx model.gif" alt="uv run idx model — interactive LLM provider switcher showing Gemini, Anthropic, and Codex options" width="80%">
+  <img src="docs/assets/idx model.gif" alt="uv run idx model: interactive LLM provider switcher showing Gemini, Anthropic, and Codex options" width="80%">
 </p>
 
 ---
 
 ## License
 
-MIT — This software is built for research and decision-support. **It does not constitute financial advice.**
+MIT License: This software is built for research and decision-support. **It does not constitute financial advice.**
