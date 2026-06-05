@@ -244,6 +244,7 @@ def download_yf_with_retry(
                 group_by="ticker",
                 progress=False,
                 auto_adjust=True,
+                timeout=30,
             )
             if data.empty:
                 raise ValueError("yfinance mengembalikan DataFrame kosong.")

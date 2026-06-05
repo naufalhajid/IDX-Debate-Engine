@@ -57,6 +57,7 @@ async def fetch_ihsg_volatility(lookback_days: int = 20) -> float | None:
                 period=f"{lookback_days + 5}d",
                 progress=False,
                 auto_adjust=True,
+                timeout=15,
             ),
         )
 

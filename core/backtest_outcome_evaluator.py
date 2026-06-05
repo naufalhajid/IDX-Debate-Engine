@@ -21,6 +21,11 @@ DEFAULT_HORIZON_TRADING_DAYS = 15
 EVALUATED_RATINGS = {"BUY", "STRONG_BUY", "HOLD"}
 Outcome = Literal["win", "loss"]
 
+# Per-request network timeout (seconds) for yfinance. Without it, a single
+# stalled socket blocks the whole startup backtest-eval indefinitely — the
+# pipeline appears to hang ("macet") before any analysis begins.
+_YF_DOWNLOAD_TIMEOUT_S = 15
+
 
 @dataclass(frozen=True)
 class PriceBar:
@@ -167,6 +172,40 @@ def evaluate_memory(
     fetcher = price_fetcher or fetch_yfinance_price_bars
     evaluation_day = today or date.today()
 
+    # ── Pre-pass: dedup network fetches by ticker ─────────────────────────────
+    # Open records frequently share a ticker (e.g. 81 records → 32 tickers).
+    # Fetch each ticker's bars ONCE over the widest range any of its records
+    # needs. evaluate_trade_outcome re-filters per record by its own entry_date,
+    # so a superset of bars yields identical outcomes with far fewer requests —
+    # the difference between a ~2-minute and a ~45-second startup.
+    earliest_start: dict[str, date] = {}
+    for record in records:
+        if record.outcome != "open":
+            continue
+        if record.verdict_rating.upper() not in EVALUATED_RATINGS:
+            continue
+        if not _matching_debate_artifact_exists(record, debates_dir):
+            continue
+        try:
+            entry_date = _parse_date(record.entry_date)
+        except Exception:
+            continue
+        if entry_date >= evaluation_day:
+            continue
+        key = record.ticker.upper()
+        start = entry_date + timedelta(days=1)
+        if key not in earliest_start or start < earliest_start[key]:
+            earliest_start[key] = start
+
+    bars_by_ticker: dict[str, list[PriceBar]] = {}
+    fetch_failed: set[str] = set()
+    for key, start in earliest_start.items():
+        try:
+            bars_by_ticker[key] = fetcher(key, start, evaluation_day)
+        except Exception as exc:
+            logger.warning(f"[BacktestEval] {key}: price fetch failed: {exc}")
+            fetch_failed.add(key)
+
     for record in records:
         updated_records.append(record)
         rating = record.verdict_rating.upper()
@@ -184,17 +223,19 @@ def evaluate_memory(
 
         try:
             entry_date = _parse_date(record.entry_date)
-            if entry_date >= evaluation_day:
-                details.append(_detail(record, "skipped", "too_early_to_evaluate"))
-                continue
-            bars = fetcher(
-                record.ticker, entry_date + timedelta(days=1), evaluation_day
-            )
         except Exception as exc:
-            logger.warning(f"[BacktestEval] {record.ticker}: price fetch failed: {exc}")
+            logger.warning(f"[BacktestEval] {record.ticker}: bad entry_date: {exc}")
             details.append(_detail(record, "skipped", "price_fetch_failed"))
             continue
+        if entry_date >= evaluation_day:
+            details.append(_detail(record, "skipped", "too_early_to_evaluate"))
+            continue
 
+        key = record.ticker.upper()
+        if key in fetch_failed:
+            details.append(_detail(record, "skipped", "price_fetch_failed"))
+            continue
+        bars = bars_by_ticker.get(key, [])
         if not bars:
             details.append(_detail(record, "skipped", "no_price_data"))
             continue
@@ -254,6 +295,7 @@ def fetch_yfinance_price_bars(ticker: str, start: date, end: date) -> list[Price
                 progress=False,
                 auto_adjust=False,
                 threads=False,
+                timeout=_YF_DOWNLOAD_TIMEOUT_S,
             )
     finally:
         yf_logger.disabled = previous_disabled
