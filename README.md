@@ -91,12 +91,13 @@ Quant Screener → Regime Detection → Debate Chamber → Risk Governor → Rep
 The pipeline is **sequential at the batch level** and **parallel at the agent level**. Each ticker traverses the entire graph before the next begins, ensuring clean state isolation and predictable token budgeting.
 
 ```mermaid
-graph TD
+graph LR
     EP["orchestrator.py / main.py"] -->|1. Start Pipeline| MR["core/regime.py: Regime Detection"]
     MR -->|2. Volatility Classification| QF["core/quant_filter/pipeline.py: Quant Filter"]
     QF -->|3. Selected Tickers| DC["services/debate_chamber.py: DebateChamber"]
 
     subgraph SUB_DC ["Debate Chamber (LangGraph State Machine)"]
+        direction LR
         DC -->|Flash LLM| FS[Fundamental Scout]
         DC -->|Flash LLM| CS[Chartist Scout]
         DC -->|Flash LLM| SS[Sentiment Scout]
