@@ -14,7 +14,8 @@ Failure mode:
   volatility dikembalikan sebagai None dan regime di-set ke NORMAL
   sebagai safe fallback. Pipeline tidak dihentikan.
 
-Regime effects (via get_regime_params()):
+Regime effects (via get_regime_params()) — nilai di bawah adalah default,
+bisa di-override lewat env/settings (REGIME_HIGH_* / REGIME_LOW_*):
   HIGH   → top_n=2, rpm_limit=5,  rr_cap=4.0, min_conviction=0.45
   NORMAL → defaults (tidak ada override)
   LOW    → top_n=5, rpm_limit=15, rr_cap=6.0, min_conviction=0.20
@@ -25,6 +26,7 @@ from __future__ import annotations
 import asyncio
 from typing import Literal
 
+from core.settings import settings
 from utils.logger_config import logger
 
 RegimeType = Literal["HIGH", "NORMAL", "LOW"]
@@ -49,12 +51,12 @@ async def fetch_ihsg_volatility(lookback_days: int = 20) -> float | None:
         Daily std of returns sebagai float, atau None jika fetch gagal.
     """
     try:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         df = await loop.run_in_executor(
             None,
             lambda: _get_yfinance().download(
                 "^JKSE",
-                period=f"{lookback_days + 5}d",
+                period=f"{lookback_days + max(10, lookback_days // 2)}d",
                 progress=False,
                 auto_adjust=True,
                 timeout=15,
@@ -66,11 +68,15 @@ async def fetch_ihsg_volatility(lookback_days: int = 20) -> float | None:
             return None
 
         close = df["Close"].squeeze().dropna()
-        if len(close) < 5:
-            logger.warning("[Regime] yfinance ^JKSE: data OHLCV terlalu sedikit.")
+        returns = close.pct_change().dropna()
+        if len(returns) < lookback_days:
+            logger.warning(
+                f"[Regime] yfinance ^JKSE: data return terlalu sedikit "
+                f"({len(returns)}/{lookback_days})."
+            )
             return None
 
-        returns = close.pct_change().dropna()
+        returns = returns.tail(lookback_days)
         vol = float(returns.std())
         logger.info(
             f"[Regime] IHSG realized vol ({lookback_days}d): {vol:.4f} ({vol * 100:.2f}%)"
@@ -129,18 +135,18 @@ def get_regime_params(regime: RegimeType) -> dict:
     """
     if regime == "HIGH":
         return {
-            "top_n_selection": 2,  # kurangi exposure di pasar volatile
-            "rpm_limit": 5,  # hemat budget API
-            "rr_normalization_cap": 4.0,  # tighten cap (R/R > 4x lebih mencurigakan)
-            "min_conviction_override": 0.45,  # standar lebih ketat
+            "top_n_selection": settings.REGIME_HIGH_TOP_N,
+            "rpm_limit": settings.REGIME_HIGH_RPM_LIMIT,
+            "rr_normalization_cap": settings.REGIME_HIGH_RR_CAP,
+            "min_conviction_override": settings.REGIME_HIGH_MIN_CONVICTION,
         }
 
     if regime == "LOW":
         return {
-            "top_n_selection": 5,  # opportunity lebih banyak di pasar tenang
-            "rpm_limit": 15,
-            "rr_normalization_cap": 6.0,  # lebih toleran ke R/R tinggi
-            "min_conviction_override": 0.20,
+            "top_n_selection": settings.REGIME_LOW_TOP_N,
+            "rpm_limit": settings.REGIME_LOW_RPM_LIMIT,
+            "rr_normalization_cap": settings.REGIME_LOW_RR_CAP,
+            "min_conviction_override": settings.REGIME_LOW_MIN_CONVICTION,
         }
 
     return {}  # NORMAL — no overrides

@@ -108,6 +108,17 @@ class Settings(BaseSettings):
     REGIME_VOLATILITY_LOW_THRESHOLD: float = 0.01  # daily std < 1%  → LOW
     REGIME_VOLATILITY_LOOKBACK_DAYS: int = 20
 
+    # Regime override params (di-merge ke ORCHESTRATOR_CONFIG via get_regime_params)
+    # HIGH = lebih konservatif, LOW = lebih agresif. NORMAL tidak punya override.
+    REGIME_HIGH_TOP_N: int = 2  # kurangi exposure di pasar volatile
+    REGIME_HIGH_RPM_LIMIT: int = 5  # hemat budget API
+    REGIME_HIGH_RR_CAP: float = 4.0  # tighten cap (R/R > 4x lebih mencurigakan)
+    REGIME_HIGH_MIN_CONVICTION: float = 0.45  # standar lebih ketat
+    REGIME_LOW_TOP_N: int = 5  # opportunity lebih banyak di pasar tenang
+    REGIME_LOW_RPM_LIMIT: int = 15
+    REGIME_LOW_RR_CAP: float = 6.0  # lebih toleran ke R/R tinggi
+    REGIME_LOW_MIN_CONVICTION: float = 0.20
+
     # ── Portfolio Diversification ────────────────────────────────────────────
     # PORTFOLIO_MAX_PER_SECTOR: max saham per sektor dalam top N
     # PORTFOLIO_MIN_CONVICTION: minimum conviction score agar eligible masuk top N
@@ -151,6 +162,51 @@ class Settings(BaseSettings):
                 f"harus sum = 1.0, got {total:.6f}. "
                 "Periksa environment variables."
             )
+        return self
+
+    @model_validator(mode="after")
+    def validate_regime_config(self) -> "Settings":
+        """Pastikan market-regime override tidak membuat pipeline unsafe."""
+        if self.REGIME_VOLATILITY_LOOKBACK_DAYS < 2:
+            raise ValueError("REGIME_VOLATILITY_LOOKBACK_DAYS must be >= 2.")
+        if self.REGIME_VOLATILITY_LOW_THRESHOLD < 0:
+            raise ValueError("REGIME_VOLATILITY_LOW_THRESHOLD must be >= 0.")
+        if (
+            self.REGIME_VOLATILITY_HIGH_THRESHOLD
+            <= self.REGIME_VOLATILITY_LOW_THRESHOLD
+        ):
+            raise ValueError(
+                "REGIME_VOLATILITY_HIGH_THRESHOLD must be greater than "
+                "REGIME_VOLATILITY_LOW_THRESHOLD."
+            )
+
+        positive_int_fields = (
+            "REGIME_HIGH_TOP_N",
+            "REGIME_HIGH_RPM_LIMIT",
+            "REGIME_LOW_TOP_N",
+            "REGIME_LOW_RPM_LIMIT",
+        )
+        for field_name in positive_int_fields:
+            if getattr(self, field_name) <= 0:
+                raise ValueError(f"{field_name} must be > 0.")
+
+        positive_float_fields = (
+            "REGIME_HIGH_RR_CAP",
+            "REGIME_LOW_RR_CAP",
+        )
+        for field_name in positive_float_fields:
+            if getattr(self, field_name) <= 0:
+                raise ValueError(f"{field_name} must be > 0.")
+
+        conviction_fields = (
+            "REGIME_HIGH_MIN_CONVICTION",
+            "REGIME_LOW_MIN_CONVICTION",
+        )
+        for field_name in conviction_fields:
+            value = getattr(self, field_name)
+            if not 0 <= value <= 1:
+                raise ValueError(f"{field_name} must be between 0 and 1.")
+
         return self
 
 
