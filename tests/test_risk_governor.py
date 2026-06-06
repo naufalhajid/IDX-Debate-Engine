@@ -31,6 +31,39 @@ def test_current_price_inside_entry_range_is_deployable() -> None:
     assert decision.reason_codes == ["price_inside_entry_range"]
 
 
+def test_current_price_inside_entry_range_stays_deployable_in_normal_regime() -> None:
+    decision = evaluate_risk(
+        _candidate(
+            market_regime={
+                "regime": "NORMAL",
+                "defensive_triggered": False,
+                "reasons": [],
+            }
+        )
+    )
+
+    assert decision.status == "deployable"
+    assert decision.sizing_allowed is True
+    assert "market_regime_defensive" not in decision.reason_codes
+
+
+def test_defensive_regime_downgrades_deployable_buy_to_watchlist() -> None:
+    decision = evaluate_risk(
+        _candidate(
+            market_regime={
+                "regime": "DEFENSIVE",
+                "defensive_triggered": True,
+                "reasons": ["weekly_return_below_threshold"],
+            }
+        )
+    )
+
+    assert decision.status == "watchlist_only"
+    assert decision.sizing_allowed is False
+    assert "market_regime_defensive" in decision.reason_codes
+    assert "price_inside_entry_range" in decision.reason_codes
+
+
 def test_current_price_above_entry_high_waits_for_pullback() -> None:
     decision = evaluate_risk(
         _candidate(verdict={"current_price": 1100, "target_price": 1200})
@@ -57,6 +90,20 @@ def test_invalid_or_missing_entry_range_rejects() -> None:
     assert decision.status == "reject"
     assert decision.sizing_allowed is False
     assert "invalid_entry_range" in decision.reason_codes
+
+
+def test_defensive_regime_keeps_invalid_setup_rejected() -> None:
+    decision = evaluate_risk(
+        _candidate(
+            market_regime={"regime": "DEFENSIVE"},
+            verdict={"entry_price_range": None},
+        )
+    )
+
+    assert decision.status == "reject"
+    assert decision.sizing_allowed is False
+    assert "invalid_entry_range" in decision.reason_codes
+    assert "market_regime_defensive" not in decision.reason_codes
 
 
 def test_stop_loss_at_or_above_current_price_rejects() -> None:
@@ -99,6 +146,25 @@ def test_avoid_verdict_rejects_even_inside_entry_range() -> None:
     assert "overvalued" in decision.reason_codes
     assert "rr_too_low" in decision.reason_codes
     assert "insufficient_technical_data" in decision.reason_codes
+
+
+def test_defensive_regime_keeps_avoid_rejected_not_watchlist() -> None:
+    decision = evaluate_risk(
+        _candidate(
+            market_regime={"regime": "DEFENSIVE"},
+            verdict={
+                "rating": "AVOID",
+                "confidence": 0.22,
+                "is_overvalued": True,
+                "risk_reward_ratio": 0.56,
+            },
+        )
+    )
+
+    assert decision.status == "reject"
+    assert decision.sizing_allowed is False
+    assert "rating_not_buyable" in decision.reason_codes
+    assert "market_regime_defensive" not in decision.reason_codes
 
 
 def test_large_cap_rr_above_tier_threshold_is_not_too_low() -> None:

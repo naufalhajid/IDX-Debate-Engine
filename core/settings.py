@@ -107,9 +107,14 @@ class Settings(BaseSettings):
     REGIME_VOLATILITY_HIGH_THRESHOLD: float = 0.02  # daily std >= 2% → HIGH
     REGIME_VOLATILITY_LOW_THRESHOLD: float = 0.01  # daily std < 1%  → LOW
     REGIME_VOLATILITY_LOOKBACK_DAYS: int = 20
+    REGIME_DEFENSIVE_WEEKLY_DROP_THRESHOLD: float = 0.05
 
     # Regime override params (di-merge ke ORCHESTRATOR_CONFIG via get_regime_params)
     # HIGH = lebih konservatif, LOW = lebih agresif. NORMAL tidak punya override.
+    REGIME_DEFENSIVE_TOP_N: int = 3
+    REGIME_DEFENSIVE_RPM_LIMIT: int = 5
+    REGIME_DEFENSIVE_MIN_CONVICTION: float = 0.70
+    REGIME_DEFENSIVE_MAX_RR_FOR_SCORING: float = 4.0
     REGIME_HIGH_TOP_N: int = 2  # kurangi exposure di pasar volatile
     REGIME_HIGH_RPM_LIMIT: int = 5  # hemat budget API
     REGIME_HIGH_RR_CAP: float = 4.0  # tighten cap (R/R > 4x lebih mencurigakan)
@@ -171,6 +176,8 @@ class Settings(BaseSettings):
             raise ValueError("REGIME_VOLATILITY_LOOKBACK_DAYS must be >= 2.")
         if self.REGIME_VOLATILITY_LOW_THRESHOLD < 0:
             raise ValueError("REGIME_VOLATILITY_LOW_THRESHOLD must be >= 0.")
+        if self.REGIME_DEFENSIVE_WEEKLY_DROP_THRESHOLD <= 0:
+            raise ValueError("REGIME_DEFENSIVE_WEEKLY_DROP_THRESHOLD must be > 0.")
         if (
             self.REGIME_VOLATILITY_HIGH_THRESHOLD
             <= self.REGIME_VOLATILITY_LOW_THRESHOLD
@@ -181,6 +188,8 @@ class Settings(BaseSettings):
             )
 
         positive_int_fields = (
+            "REGIME_DEFENSIVE_TOP_N",
+            "REGIME_DEFENSIVE_RPM_LIMIT",
             "REGIME_HIGH_TOP_N",
             "REGIME_HIGH_RPM_LIMIT",
             "REGIME_LOW_TOP_N",
@@ -191,6 +200,7 @@ class Settings(BaseSettings):
                 raise ValueError(f"{field_name} must be > 0.")
 
         positive_float_fields = (
+            "REGIME_DEFENSIVE_MAX_RR_FOR_SCORING",
             "REGIME_HIGH_RR_CAP",
             "REGIME_LOW_RR_CAP",
         )
@@ -199,6 +209,7 @@ class Settings(BaseSettings):
                 raise ValueError(f"{field_name} must be > 0.")
 
         conviction_fields = (
+            "REGIME_DEFENSIVE_MIN_CONVICTION",
             "REGIME_HIGH_MIN_CONVICTION",
             "REGIME_LOW_MIN_CONVICTION",
         )

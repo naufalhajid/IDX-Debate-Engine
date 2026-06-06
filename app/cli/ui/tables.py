@@ -57,6 +57,37 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
         return default
 
 
+def _risk_reason_codes(risk: dict[str, Any]) -> list[str]:
+    raw = risk.get("reason_codes") if isinstance(risk, dict) else None
+    if isinstance(raw, list):
+        return [str(item) for item in raw if str(item)]
+    return []
+
+
+def _execution_action_text(item: dict[str, Any]) -> Text:
+    risk = item.get("risk_governor") if isinstance(item, dict) else None
+    if not isinstance(risk, dict):
+        return Text("-", style="idx.muted")
+
+    reason_codes = _risk_reason_codes(risk)
+    status = str(risk.get("status") or "unknown")
+    sizing_allowed = risk.get("sizing_allowed")
+
+    if "market_regime_defensive" in reason_codes:
+        return Text("No sizing: defensive market", style="amber")
+    if status == "deployable" and sizing_allowed is not False:
+        return Text("Ready", style="idx.bull")
+    if status == "conditional_deployable":
+        return Text("Conditional", style="amber")
+    if status == "wait_for_pullback":
+        return Text("Wait entry", style="amber")
+    if status == "watchlist_only":
+        return Text("Watchlist", style="idx.hold")
+    if status == "reject":
+        return Text("Rejected", style="idx.avoid")
+    return Text(status.replace("_", " "), style="idx.muted")
+
+
 def build_filter_results_table(df: "pd.DataFrame", top_n: int = 10) -> Table:
     """Rich table showing the top swing-trade candidates from the quant filter."""
     table = Table(
@@ -169,6 +200,7 @@ def build_verdict_summary_table(results: list[dict]) -> Table:
     )
     table.add_column("Ticker", style="idx.ticker", min_width=6)
     table.add_column("Rating", min_width=8)
+    table.add_column("Action", min_width=16, max_width=28)
     table.add_column("Conf%", justify="right", width=6)
     table.add_column("R/R", justify="right", width=5)
     table.add_column("Entry", min_width=14)
@@ -230,6 +262,7 @@ def build_verdict_summary_table(results: list[dict]) -> Table:
         table.add_row(
             ticker,
             rating_text,
+            _execution_action_text(item),
             conf_text,
             rr_text,
             entry,

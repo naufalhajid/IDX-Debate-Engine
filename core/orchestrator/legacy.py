@@ -112,8 +112,7 @@ from core.prompt_pack_linter import lint_prompt_pack
 from core.provider_health import check_all_providers
 from core.regime import (
     RegimeType,
-    classify_regime,
-    fetch_ihsg_volatility,
+    detect_market_regime,
     get_regime_params,
 )
 from core.report_consistency import check_consistency
@@ -1053,10 +1052,14 @@ class CliRenderer:
         volatility: float | None,
         regime: str,
         regime_params: dict[str, Any],
+        snapshot: dict[str, Any] | None = None,
     ) -> None:
         vol_text = "-" if volatility is None else f"vol {volatility * 100:.2f}%"
         override_text = _format_overrides(regime_params)
-        detail = f"{regime} ({vol_text})"
+        detail = _market_regime_summary_label(
+            snapshot,
+            fallback=f"{regime} ({vol_text})",
+        )
         if regime_params:
             detail = f"{detail}; {override_text}"
         self.set_pipeline_status("Market regime", "OK", detail)
@@ -1073,6 +1076,23 @@ class CliRenderer:
             else f"{volatility:.4f} ({volatility * 100:.2f}%)",
         )
         table.add_row("Regime", regime)
+        if snapshot:
+            table.add_row("Volatility regime", str(snapshot.get("volatility_regime")))
+            weekly_return = snapshot.get("weekly_return")
+            table.add_row(
+                "IHSG 5d return",
+                "-"
+                if weekly_return is None
+                else f"{float(weekly_return):.4f} ({float(weekly_return) * 100:.2f}%)",
+            )
+            latest_close = snapshot.get("latest_close")
+            table.add_row(
+                "IHSG close",
+                "-" if latest_close is None else f"{float(latest_close):,.2f}",
+            )
+            reasons = snapshot.get("reasons")
+            if isinstance(reasons, list) and reasons:
+                table.add_row("Regime reasons", _format_regime_reasons(reasons))
         table.add_row("Overrides", _format_overrides(regime_params))
         diagnostics = [
             message
@@ -1092,7 +1112,13 @@ class CliRenderer:
         if diagnostics:
             notes = "\n".join(diagnostics)
             table.add_row("Diagnostics", Text(notes))
-        border = "red" if regime == "HIGH" else "green" if regime == "LOW" else "cyan"
+        border = (
+            "red"
+            if regime in {"DEFENSIVE", "HIGH"}
+            else "green"
+            if regime == "LOW"
+            else "cyan"
+        )
         self.con.print(Panel(table, title="Market Regime", border_style=border))
         self.regime_events = []
 
@@ -1610,6 +1636,10 @@ class CliRenderer:
         flash_budget = int(self.budget_usage.get("flash_budget", 0))
         estimated_tokens = pro_calls * 2000 + flash_calls * 800
         portfolio_note = self._portfolio_threshold_note(sizing_result)
+        regime_detail = _market_regime_summary_label(
+            ORCHESTRATOR_CONFIG.get("market_regime"),
+            fallback=regime,
+        )
 
         if self.verbose:
             table = Table(box=box.SIMPLE, expand=False, show_edge=False, pad_edge=False)
@@ -1622,7 +1652,7 @@ class CliRenderer:
             )
             table.add_row("Pro usage", f"{pro_calls}/{pro_budget}")
             table.add_row("Flash usage", f"{flash_calls}/{flash_budget}")
-            table.add_row("Regime", regime)
+            table.add_row("Regime", regime_detail)
             table.add_row(
                 "Total deployed", _format_cli_money(summary.get("total_deployed"))
             )
@@ -1667,7 +1697,7 @@ class CliRenderer:
             )
             table.add_row(
                 "Market Regime",
-                regime,
+                regime_detail,
                 "Capital Deployed",
                 f"{_format_cli_money(summary.get('total_deployed'))} ({deployed_pct})",
             )
@@ -1952,12 +1982,18 @@ _REASON_LABELS = {
     "low_confidence": "low conf",
     "counter_trend_setup": "counter-trend",
     "price_inside_entry_range": "inside entry",
+    "price_above_entry_range": "above entry",
+    "price_below_entry_range": "below entry",
     "upside_exhausted": "upside exhausted",
     "wait_for_pullback": "wait pullback",
     "watchlist_only": "watchlist",
     "conditional_deployable": "conditional",
     "deployable": "deployable",
     "reject": "reject",
+    "market_regime_defensive": "defensive market",
+    "weekly_return_below_threshold": "IHSG 5d drop",
+    "close_below_ma20_ma50_ma200": "below MA20/50/200",
+    "ihsg_data_unavailable_fallback_to_volatility": "IHSG data fallback",
 }
 
 
@@ -2113,6 +2149,12 @@ def _final_selection_label(result: dict[str, Any], *, selected: bool) -> Text:
             else {}
         )
         risk_status = str(risk.get("status") or "").lower()
+        reason_codes = risk.get("reason_codes")
+        if (
+            isinstance(reason_codes, list)
+            and "market_regime_defensive" in reason_codes
+        ):
+            return Text("No Sizing", style="warn")
         if risk_status == "conditional_deployable":
             return Text("Conditional", style="warn")
         if rating == "HOLD":
@@ -2140,6 +2182,37 @@ def _format_overrides(regime_params: dict[str, Any]) -> str:
     if not regime_params:
         return "No overrides applied"
     return ", ".join(f"{key}={value}" for key, value in regime_params.items())
+
+
+def _format_regime_reasons(reasons: Any) -> str:
+    if not isinstance(reasons, list):
+        return "-"
+    labels = [_reason_token_label(str(reason)) for reason in reasons if str(reason)]
+    return ", ".join(labels) or "-"
+
+
+def _market_regime_summary_label(
+    snapshot: Any,
+    *,
+    fallback: str,
+) -> str:
+    if not isinstance(snapshot, dict):
+        return fallback
+    regime = str(snapshot.get("regime") or fallback)
+    parts = [regime]
+    volatility_regime = snapshot.get("volatility_regime")
+    if volatility_regime and str(volatility_regime) != regime:
+        parts.append(f"vol={volatility_regime}")
+    weekly_return = snapshot.get("weekly_return")
+    try:
+        if weekly_return is not None:
+            parts.append(f"5d {float(weekly_return) * 100:+.1f}%")
+    except (TypeError, ValueError):
+        pass
+    reasons = _format_regime_reasons(snapshot.get("reasons"))
+    if reasons != "-":
+        parts.append(reasons)
+    return " | ".join(parts)
 
 
 def _ticker_list(entries: list[dict[str, Any]]) -> list[str]:
@@ -2233,7 +2306,23 @@ ORCHESTRATOR_CONFIG: dict[str, Any] = {
     "batch_delay": float(os.getenv("BATCH_DELAY_SECONDS", "0.2")),
     # Diisi oleh regime detection di main()
     "min_conviction_override": settings.PORTFOLIO_MIN_CONVICTION,
+    "market_regime": None,
 }
+
+
+def _orchestrator_runtime_defaults() -> dict[str, Any]:
+    return {
+        "rr_normalization_cap": settings.CONVICTION_RR_NORMALIZATION_CAP,
+        "top_n_selection": int(os.getenv("TOP_N_SELECTION", "3")),
+        "rpm_limit": int(os.getenv("GEMINI_RPM_LIMIT", "30")),
+        "min_conviction_override": settings.PORTFOLIO_MIN_CONVICTION,
+        "market_regime": None,
+    }
+
+
+def _reset_orchestrator_runtime_config() -> None:
+    """Clear per-run regime overrides before a new orchestrator invocation."""
+    ORCHESTRATOR_CONFIG.update(_orchestrator_runtime_defaults())
 
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", "output"))
 JSON_PATH = OUTPUT_DIR / "top10_candidates.json"
@@ -3327,6 +3416,7 @@ def _attach_risk_governor_to_result(
             "ticker": ticker,
             "verdict": verdict,
             "current_price": verdict.get("current_price"),
+            "market_regime": ORCHESTRATOR_CONFIG.get("market_regime"),
             "raw_data": raw_data,
             "raw_data_summary": result.get("raw_data_summary"),
             "metadata": metadata,
@@ -4462,6 +4552,7 @@ def _build_sizing_candidates(top_n: list[dict]) -> list[dict]:
 def _annotate_risk_governor(top_n: list[dict]) -> None:
     """Attach deterministic actionability metadata before sizing/reporting."""
     for entry in top_n:
+        entry.setdefault("market_regime", ORCHESTRATOR_CONFIG.get("market_regime"))
         decision = annotate_risk(entry)
         if not decision.sizing_allowed:
             logger.info(
@@ -5073,6 +5164,7 @@ async def main(
     Step 3:  Score & rank dengan historical records + sector diversification.
     Step 4:  Persist + generate Markdown report.
     """
+    _reset_orchestrator_runtime_config()
     if not _CLI_LOGGING_CONFIGURED:
         configure_cli_logging(verbose=False)
     _cli_renderer.reset_run()
@@ -5191,12 +5283,11 @@ async def main(
 
     # Step 0b: Market Regime Detection
     _cli_renderer.phase("Market Regime")
-    vol = await fetch_ihsg_volatility(settings.REGIME_VOLATILITY_LOOKBACK_DAYS)
-    regime: RegimeType = classify_regime(
-        vol,
-        high_threshold=settings.REGIME_VOLATILITY_HIGH_THRESHOLD,
-        low_threshold=settings.REGIME_VOLATILITY_LOW_THRESHOLD,
-    )
+    regime_snapshot = await detect_market_regime()
+    regime_snapshot_payload = regime_snapshot.model_dump()
+    ORCHESTRATOR_CONFIG["market_regime"] = regime_snapshot_payload
+    vol = regime_snapshot.volatility
+    regime: RegimeType = regime_snapshot.regime
     regime_params = get_regime_params(regime)
     if regime_params:
         logger.info(f"[Regime] {regime} -- applying overrides: {regime_params}")
@@ -5213,6 +5304,7 @@ async def main(
         volatility=vol,
         regime=regime,
         regime_params=regime_params,
+        snapshot=regime_snapshot_payload,
     )
 
     # Step 1: Parse
@@ -5582,14 +5674,25 @@ def _watchlist_rows(results: list[dict]) -> list[dict[str, Any]]:
             verdict = (
                 entry.get("verdict") if isinstance(entry.get("verdict"), dict) else {}
             )
-            rating = str(verdict.get("rating") or "").upper()
-            if rating != "HOLD":
-                continue
             risk = (
                 entry.get("risk_governor")
                 if isinstance(entry.get("risk_governor"), dict)
                 else {}
             )
+            rating = str(verdict.get("rating") or "").upper()
+            risk_status = str(risk.get("status") or "").lower()
+            is_execution_hold = (
+                risk.get("sizing_allowed") is False
+                and risk_status in {
+                    "watchlist_only",
+                    "conditional_deployable",
+                    "wait_for_pullback",
+                }
+            )
+            if rating != "HOLD" and not (
+                rating in {"BUY", "STRONG_BUY"} and is_execution_hold
+            ):
+                continue
             low, high = _parse_entry_bounds(verdict.get("entry_price_range"))
             rr = float(verdict.get("risk_reward_ratio") or 0.0)
             reason_codes = (
@@ -5618,7 +5721,7 @@ def _watchlist_rows(results: list[dict]) -> list[dict[str, Any]]:
 
 
 def _strong_watchlist_rows(results: list[dict]) -> list[dict[str, Any]]:
-    """HOLDs with R/R >= 2.0 and confidence >= 0.35, sorted by R/R desc."""
+    """Watchlist candidates with R/R >= 2.0 and confidence >= 0.35."""
     rows = [
         row
         for row in _watchlist_rows(results)
@@ -5628,21 +5731,25 @@ def _strong_watchlist_rows(results: list[dict]) -> list[dict[str, Any]]:
 
 
 def _print_strong_watchlist(strong_rows: list[dict[str, Any]]) -> None:
-    """Render a Rich table of HOLD candidates with strong R/R as near-BUY watchlist."""
+    """Render a Rich table of candidates withheld from executable sizing."""
     try:
         tbl = Table(
             box=box.SIMPLE,
             expand=False,
             show_edge=False,
             pad_edge=False,
-            title="[amber]Watchlist Candidates[/amber]  —  Wait for Entry Signal (R/R >= 2.0)",
+            title=(
+                "[amber]Watchlist Candidates[/amber]  -  "
+                "No Sizing / Wait for Entry (R/R >= 2.0)"
+            ),
         )
         tbl.add_column("Ticker", style="bold", no_wrap=True)
+        tbl.add_column("Model", no_wrap=True)
         tbl.add_column("Conf", justify="right", no_wrap=True)
         tbl.add_column("R/R", justify="right", no_wrap=True)
         tbl.add_column("Entry Zone", no_wrap=True)
         tbl.add_column("Target", justify="right", no_wrap=True)
-        tbl.add_column("Why HOLD", overflow="fold", max_width=28)
+        tbl.add_column("Execution Hold", overflow="fold", max_width=28)
         for row in strong_rows:
             low = row.get("entry_low")
             high = row.get("entry_high")
@@ -5656,6 +5763,7 @@ def _print_strong_watchlist(strong_rows: list[dict[str, Any]]) -> None:
             target_text = f"Rp {float(target):,.0f}" if target else "N/A"
             tbl.add_row(
                 str(row.get("ticker", "-")),
+                str(row.get("rating", "-")),
                 f"{float(row.get('confidence') or 0):.0%}",
                 f"{float(row.get('rr') or 0):.2f}x",
                 entry_text,

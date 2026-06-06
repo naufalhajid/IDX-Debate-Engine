@@ -175,6 +175,18 @@ def test_risk_governor_conditional_line() -> None:
     assert "Conditional" in line
 
 
+def test_risk_governor_defensive_watchlist_line_is_plain_language() -> None:
+    line = RichFormatter()._risk_governor_line(
+        {
+            "status": "watchlist_only",
+            "reason_codes": ["market_regime_defensive"],
+        }
+    )
+
+    assert line == "No sizing (defensive market)"
+    assert "market_regime_defensive" not in line
+
+
 def test_generate_ticker_report_contains_title_and_ticker(tmp_path) -> None:
     report = MarkdownFormatter().generate_ticker_report(_mock_result(), _mock_packet())
     path = tmp_path / "latest_report.md"

@@ -421,7 +421,13 @@ def _risk(result: dict[str, Any]) -> dict[str, Any]:
 
 
 def _risk_governor_label(risk: dict) -> str:
-    status = _dict_or_empty(risk).get("status", "unknown")
+    payload = _dict_or_empty(risk)
+    status = payload.get("status", "unknown")
+    reason_codes = payload.get("reason_codes")
+    if isinstance(reason_codes, list) and "market_regime_defensive" in {
+        str(item) for item in reason_codes
+    }:
+        return "No sizing (defensive market)"
     labels = {
         "deployable": "Execution ready",
         "conditional_deployable": "Conditional watchlist",

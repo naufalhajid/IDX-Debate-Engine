@@ -6,6 +6,7 @@ from pathlib import Path
 
 from rich.console import Console
 
+from app.cli.ui.tables import build_verdict_summary_table
 from core.dependency_validator import DependencyCheck, DependencyCheckResult
 
 sys.modules.setdefault("yfinance", types.SimpleNamespace())
@@ -122,6 +123,74 @@ def test_final_results_table_explains_price_validation_context() -> None:
     assert "+10.2% above entry" in output
     assert "tgt -1.2%" in output
     assert "upside exhausted" in output
+
+
+def test_final_results_table_shows_defensive_no_sizing_as_plain_language() -> None:
+    console = _recording_console(width=180)
+    renderer = CliRenderer(con=console)
+    result = {
+        "ticker": "BBCA",
+        "verdict": {
+            "rating": "BUY",
+            "confidence": 0.76,
+            "risk_reward_ratio": 2.4,
+            "expected_return": "+14.0%",
+            "current_price": 1000,
+            "entry_price_range": "950 - 1050",
+            "target_price": 1200,
+            "stop_loss": 930,
+        },
+        "risk_governor": {
+            "status": "watchlist_only",
+            "sizing_allowed": False,
+            "reason_codes": ["price_inside_entry_range", "market_regime_defensive"],
+            "current_price": 1000,
+            "entry_low": 950,
+            "entry_high": 1050,
+            "target_price": 1200,
+            "stop_loss": 930,
+        },
+    }
+
+    renderer.render_final_results_table([result], [])
+
+    output = console.export_text()
+    assert "No Sizing" in output
+    assert "defensive market" in output
+    assert "market_regime_defensive" not in output
+
+
+def test_verdict_summary_table_shows_defensive_execution_guard() -> None:
+    console = _recording_console(width=180)
+    table = build_verdict_summary_table(
+        [
+            {
+                "ticker": "BBCA",
+                "verdict": {
+                    "rating": "BUY",
+                    "confidence": 0.76,
+                    "risk_reward_ratio": 2.4,
+                    "entry_price_range": "950 - 1050",
+                    "target_price": 1200,
+                    "stop_loss": 930,
+                    "expected_return": "+14.0%",
+                },
+                "risk_governor": {
+                    "status": "watchlist_only",
+                    "sizing_allowed": False,
+                    "reason_codes": ["market_regime_defensive"],
+                },
+                "debate_rounds": 3,
+            }
+        ]
+    )
+
+    console.print(table)
+
+    output = console.export_text()
+    assert "Action" in output
+    assert "No sizing: defensive market" in output
+    assert "market_regime_defensive" not in output
 
 
 def test_live_batch_progress_uses_compact_headers_and_summary_note() -> None:

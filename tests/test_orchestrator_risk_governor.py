@@ -8,6 +8,7 @@ sys.modules.setdefault("undetected_chromedriver", types.SimpleNamespace())
 legacy = importlib.import_module("core.orchestrator.legacy")
 _annotate_risk_governor = legacy._annotate_risk_governor
 _build_sizing_candidates = legacy._build_sizing_candidates
+_reset_orchestrator_runtime_config = legacy._reset_orchestrator_runtime_config
 
 
 def _entry(
@@ -77,3 +78,26 @@ def test_conditional_top_pick_is_not_sized() -> None:
     assert top_n[0]["risk_governor"]["status"] == "conditional_deployable"
     assert top_n[0]["risk_governor"]["sizing_allowed"] is False
     assert candidates == []
+
+
+def test_runtime_config_reset_clears_prior_defensive_overrides() -> None:
+    _reset_orchestrator_runtime_config()
+    keys = (
+        "top_n_selection",
+        "rpm_limit",
+        "rr_normalization_cap",
+        "min_conviction_override",
+        "market_regime",
+    )
+    defaults = {key: legacy.ORCHESTRATOR_CONFIG[key] for key in keys}
+
+    legacy.ORCHESTRATOR_CONFIG.update(legacy.get_regime_params("DEFENSIVE"))
+    legacy.ORCHESTRATOR_CONFIG["market_regime"] = {"regime": "DEFENSIVE"}
+    assert legacy.ORCHESTRATOR_CONFIG["rpm_limit"] != defaults["rpm_limit"]
+    assert legacy.ORCHESTRATOR_CONFIG["min_conviction_override"] != defaults[
+        "min_conviction_override"
+    ]
+
+    _reset_orchestrator_runtime_config()
+
+    assert {key: legacy.ORCHESTRATOR_CONFIG[key] for key in keys} == defaults

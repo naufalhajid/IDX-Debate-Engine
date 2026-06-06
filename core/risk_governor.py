@@ -192,17 +192,22 @@ def evaluate_risk(candidate: dict[str, Any]) -> RiskDecision:
                 )
             )
         return _log_decision(
-            RiskDecision(
-                ticker=ticker,
-                status="deployable",
-                sizing_allowed=True,
-                reason_codes=["price_inside_entry_range"],
-                message="Harga sekarang berada di zona entry; kandidat boleh masuk sizing.",
-                current_price=current_price,
-                entry_low=entry_low,
-                entry_high=entry_high,
-                target_price=target_price,
-                stop_loss=stop_loss,
+            apply_defensive_guard(
+                RiskDecision(
+                    ticker=ticker,
+                    status="deployable",
+                    sizing_allowed=True,
+                    reason_codes=["price_inside_entry_range"],
+                    message=(
+                        "Harga sekarang berada di zona entry; kandidat boleh masuk sizing."
+                    ),
+                    current_price=current_price,
+                    entry_low=entry_low,
+                    entry_high=entry_high,
+                    target_price=target_price,
+                    stop_loss=stop_loss,
+                ),
+                candidate,
             )
         )
 
@@ -245,6 +250,30 @@ def annotate_risk(entry: dict[str, Any]) -> RiskDecision:
     return decision
 
 
+def apply_defensive_guard(
+    decision: RiskDecision,
+    candidate: dict[str, Any],
+) -> RiskDecision:
+    """Downgrade executable setups to watchlist-only during DEFENSIVE regimes."""
+    if decision.status != "deployable" or not decision.sizing_allowed:
+        return decision
+    if _market_regime(candidate) != "DEFENSIVE":
+        return decision
+    return decision.model_copy(
+        update={
+            "status": "watchlist_only",
+            "sizing_allowed": False,
+            "reason_codes": _dedupe(
+                [*decision.reason_codes, "market_regime_defensive"]
+            ),
+            "message": (
+                "Market regime DEFENSIVE; setup tetap valid sebagai watchlist, "
+                "tetapi sizing/eksekusi ditahan sampai IHSG membaik."
+            ),
+        }
+    )
+
+
 def _log_decision(decision: RiskDecision) -> RiskDecision:
     """Log the computed risk decision and return it unchanged."""
     logger.debug(
@@ -261,6 +290,28 @@ def _log_decision(decision: RiskDecision) -> RiskDecision:
 def _clean_ticker(value: Any) -> str:
     text = str(value or "").strip().upper()
     return text.removesuffix(".JK") or "UNKNOWN"
+
+
+def _market_regime(candidate: dict[str, Any]) -> str:
+    for source in (
+        candidate.get("market_regime"),
+        _dict_value(candidate.get("risk_context"), "market_regime"),
+        _dict_value(candidate.get("metadata"), "market_regime"),
+    ):
+        if isinstance(source, dict):
+            regime = source.get("regime")
+        else:
+            regime = source
+        text = str(regime or "").strip().upper()
+        if text:
+            return text
+    return ""
+
+
+def _dict_value(value: Any, key: str) -> Any:
+    if isinstance(value, dict):
+        return value.get(key)
+    return None
 
 
 def _first_float(*values: Any) -> float | None:

@@ -38,6 +38,11 @@ def test_blank_database_type_falls_back_to_sqlite() -> None:
 
 
 def test_regime_overrides_load_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("REGIME_DEFENSIVE_WEEKLY_DROP_THRESHOLD", "0.06")
+    monkeypatch.setenv("REGIME_DEFENSIVE_TOP_N", "4")
+    monkeypatch.setenv("REGIME_DEFENSIVE_RPM_LIMIT", "7")
+    monkeypatch.setenv("REGIME_DEFENSIVE_MIN_CONVICTION", "0.75")
+    monkeypatch.setenv("REGIME_DEFENSIVE_MAX_RR_FOR_SCORING", "3.8")
     monkeypatch.setenv("REGIME_HIGH_TOP_N", "4")
     monkeypatch.setenv("REGIME_HIGH_RPM_LIMIT", "6")
     monkeypatch.setenv("REGIME_HIGH_RR_CAP", "3.5")
@@ -49,6 +54,11 @@ def test_regime_overrides_load_from_env(monkeypatch: pytest.MonkeyPatch) -> None
 
     settings = Settings(_env_file=None)
 
+    assert settings.REGIME_DEFENSIVE_WEEKLY_DROP_THRESHOLD == 0.06
+    assert settings.REGIME_DEFENSIVE_TOP_N == 4
+    assert settings.REGIME_DEFENSIVE_RPM_LIMIT == 7
+    assert settings.REGIME_DEFENSIVE_MIN_CONVICTION == 0.75
+    assert settings.REGIME_DEFENSIVE_MAX_RR_FOR_SCORING == 3.8
     assert settings.REGIME_HIGH_TOP_N == 4
     assert settings.REGIME_HIGH_RPM_LIMIT == 6
     assert settings.REGIME_HIGH_RR_CAP == 3.5
@@ -65,11 +75,25 @@ def test_regime_overrides_load_from_env(monkeypatch: pytest.MonkeyPatch) -> None
         ({"REGIME_VOLATILITY_LOOKBACK_DAYS": 1}, "REGIME_VOLATILITY_LOOKBACK_DAYS"),
         ({"REGIME_VOLATILITY_LOW_THRESHOLD": -0.01}, "REGIME_VOLATILITY_LOW_THRESHOLD"),
         (
+            {"REGIME_DEFENSIVE_WEEKLY_DROP_THRESHOLD": 0},
+            "REGIME_DEFENSIVE_WEEKLY_DROP_THRESHOLD",
+        ),
+        (
             {
                 "REGIME_VOLATILITY_HIGH_THRESHOLD": 0.01,
                 "REGIME_VOLATILITY_LOW_THRESHOLD": 0.01,
             },
             "REGIME_VOLATILITY_HIGH_THRESHOLD",
+        ),
+        ({"REGIME_DEFENSIVE_TOP_N": 0}, "REGIME_DEFENSIVE_TOP_N"),
+        ({"REGIME_DEFENSIVE_RPM_LIMIT": 0}, "REGIME_DEFENSIVE_RPM_LIMIT"),
+        (
+            {"REGIME_DEFENSIVE_MAX_RR_FOR_SCORING": 0},
+            "REGIME_DEFENSIVE_MAX_RR_FOR_SCORING",
+        ),
+        (
+            {"REGIME_DEFENSIVE_MIN_CONVICTION": 1.5},
+            "REGIME_DEFENSIVE_MIN_CONVICTION",
         ),
         ({"REGIME_HIGH_TOP_N": 0}, "REGIME_HIGH_TOP_N"),
         ({"REGIME_LOW_RPM_LIMIT": 0}, "REGIME_LOW_RPM_LIMIT"),

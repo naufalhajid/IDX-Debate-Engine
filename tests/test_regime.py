@@ -10,6 +10,10 @@ from core.regime import classify_regime, get_regime_params
 from core.settings import Settings
 
 
+def _ihsg_frame(closes: list[float]) -> pd.DataFrame:
+    return pd.DataFrame({"Close": closes})
+
+
 def test_classify_high_volatility() -> None:
     """vol >= high_threshold harus menghasilkan regime HIGH."""
     assert classify_regime(0.025, high_threshold=0.02, low_threshold=0.01) == "HIGH"
@@ -60,6 +64,10 @@ def test_get_regime_params_reads_settings_overrides(
 ) -> None:
     """HIGH/LOW override harus berasal dari settings, bukan literal hardcode."""
     override_settings = Settings(
+        REGIME_DEFENSIVE_TOP_N=6,
+        REGIME_DEFENSIVE_RPM_LIMIT=4,
+        REGIME_DEFENSIVE_MIN_CONVICTION=0.80,
+        REGIME_DEFENSIVE_MAX_RR_FOR_SCORING=3.25,
         REGIME_HIGH_TOP_N=4,
         REGIME_HIGH_RPM_LIMIT=6,
         REGIME_HIGH_RR_CAP=3.5,
@@ -72,6 +80,12 @@ def test_get_regime_params_reads_settings_overrides(
     )
     monkeypatch.setattr(regime, "settings", override_settings)
 
+    assert get_regime_params("DEFENSIVE") == {
+        "top_n_selection": 6,
+        "rpm_limit": 4,
+        "rr_normalization_cap": 3.25,
+        "min_conviction_override": 0.80,
+    }
     assert get_regime_params("HIGH") == {
         "top_n_selection": 4,
         "rpm_limit": 6,
@@ -84,6 +98,42 @@ def test_get_regime_params_reads_settings_overrides(
         "rr_normalization_cap": 7.0,
         "min_conviction_override": 0.15,
     }
+
+
+def test_compute_snapshot_weekly_drop_triggers_defensive() -> None:
+    """5-day IHSG drop harus memicu DEFENSIVE dengan reason eksplisit."""
+    snapshot = regime.compute_ihsg_snapshot(
+        _ihsg_frame([100.0] * 215 + [94.0]),
+        defensive_weekly_drop_threshold=0.05,
+    )
+
+    assert snapshot.regime == "DEFENSIVE"
+    assert snapshot.defensive_triggered is True
+    assert snapshot.weekly_return == pytest.approx(-0.06)
+    assert "weekly_return_below_threshold" in snapshot.reasons
+
+
+def test_compute_snapshot_triple_ma_breakdown_triggers_defensive_low_vol() -> None:
+    """Close di bawah MA20/50/200 harus DEFENSIVE walau volatility regime LOW."""
+    closes = [120.0 - (i * 0.10) for i in range(220)]
+    snapshot = regime.compute_ihsg_snapshot(_ihsg_frame(closes))
+
+    assert snapshot.regime == "DEFENSIVE"
+    assert snapshot.volatility_regime == "LOW"
+    assert snapshot.latest_close < snapshot.ma20
+    assert snapshot.latest_close < snapshot.ma50
+    assert snapshot.latest_close < snapshot.ma200
+    assert "close_below_ma20_ma50_ma200" in snapshot.reasons
+
+
+def test_compute_snapshot_missing_ihsg_data_falls_back_to_volatility() -> None:
+    """Missing IHSG data tidak boleh crash dan harus memberi reason fallback."""
+    snapshot = regime.compute_ihsg_snapshot(None)
+
+    assert snapshot.regime == "NORMAL"
+    assert snapshot.volatility_regime == "NORMAL"
+    assert snapshot.defensive_triggered is False
+    assert snapshot.reasons == ["ihsg_data_unavailable_fallback_to_volatility"]
 
 
 async def test_fetch_ihsg_volatility_uses_buffered_period_and_exact_lookback(
@@ -137,6 +187,18 @@ def test_regime_params_have_required_keys_high() -> None:
         "min_conviction_override",
     ):
         assert key in params, f"Key '{key}' missing from HIGH regime params"
+
+
+def test_regime_params_have_required_keys_defensive() -> None:
+    """DEFENSIVE params harus punya semua kunci yang dibutuhkan orchestrator."""
+    params = get_regime_params("DEFENSIVE")
+    for key in (
+        "top_n_selection",
+        "rpm_limit",
+        "rr_normalization_cap",
+        "min_conviction_override",
+    ):
+        assert key in params, f"Key '{key}' missing from DEFENSIVE regime params"
 
 
 def test_regime_params_have_required_keys_low() -> None:

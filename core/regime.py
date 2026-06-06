@@ -24,18 +24,171 @@ bisa di-override lewat env/settings (REGIME_HIGH_* / REGIME_LOW_*):
 from __future__ import annotations
 
 import asyncio
+from dataclasses import asdict, dataclass
 from typing import Literal
 
 from core.settings import settings
 from utils.logger_config import logger
 
-RegimeType = Literal["HIGH", "NORMAL", "LOW"]
+VolatilityRegimeType = Literal["HIGH", "NORMAL", "LOW"]
+RegimeType = Literal["DEFENSIVE", "HIGH", "NORMAL", "LOW"]
+
+
+@dataclass
+class RegimeSnapshot:
+    regime: RegimeType
+    volatility_regime: VolatilityRegimeType
+    volatility: float | None
+    weekly_return: float | None
+    latest_close: float | None
+    ma20: float | None
+    ma50: float | None
+    ma200: float | None
+    defensive_triggered: bool
+    reasons: list[str]
+
+    def model_dump(self) -> dict:
+        return asdict(self)
 
 
 def _get_yfinance():
     import yfinance as yf
 
     return yf
+
+
+def _close_series(df):
+    if df is None or getattr(df, "empty", True):
+        return None
+    try:
+        close = df["Close"].squeeze().dropna()
+    except Exception:
+        return None
+    if len(close) == 0:
+        return None
+    return close
+
+
+def _realized_volatility(close, lookback_days: int) -> float | None:
+    returns = close.pct_change().dropna()
+    if len(returns) < lookback_days:
+        return None
+    return float(returns.tail(lookback_days).std())
+
+
+async def fetch_ihsg_ohlcv(period_days: int = 320):
+    """Fetch IHSG OHLCV data for direction-aware regime detection."""
+    try:
+        loop = asyncio.get_running_loop()
+        df = await loop.run_in_executor(
+            None,
+            lambda: _get_yfinance().download(
+                "^JKSE",
+                period=f"{period_days}d",
+                progress=False,
+                auto_adjust=True,
+                timeout=15,
+            ),
+        )
+        if df.empty:
+            logger.warning("[Regime] yfinance ^JKSE: DataFrame kosong.")
+            return None
+        return df
+    except Exception as e:
+        logger.warning(f"[Regime] Gagal fetch IHSG OHLCV: {e}.")
+        return None
+
+
+def compute_ihsg_snapshot(
+    df,
+    *,
+    lookback_days: int = 20,
+    high_threshold: float = 0.02,
+    low_threshold: float = 0.01,
+    defensive_weekly_drop_threshold: float = 0.05,
+) -> RegimeSnapshot:
+    """Compute direction-aware market regime from an IHSG price frame."""
+    close = _close_series(df)
+    if close is None:
+        volatility_regime = classify_regime(None, high_threshold, low_threshold)
+        return RegimeSnapshot(
+            regime=volatility_regime,
+            volatility_regime=volatility_regime,
+            volatility=None,
+            weekly_return=None,
+            latest_close=None,
+            ma20=None,
+            ma50=None,
+            ma200=None,
+            defensive_triggered=False,
+            reasons=["ihsg_data_unavailable_fallback_to_volatility"],
+        )
+
+    volatility = _realized_volatility(close, lookback_days)
+    volatility_regime = classify_regime(volatility, high_threshold, low_threshold)
+    latest_close = float(close.iloc[-1])
+    weekly_return = (
+        float((close.iloc[-1] / close.iloc[-6]) - 1.0) if len(close) >= 6 else None
+    )
+    ma20 = float(close.tail(20).mean()) if len(close) >= 20 else None
+    ma50 = float(close.tail(50).mean()) if len(close) >= 50 else None
+    ma200 = float(close.tail(200).mean()) if len(close) >= 200 else None
+
+    reasons: list[str] = []
+    if (
+        weekly_return is not None
+        and weekly_return <= -defensive_weekly_drop_threshold
+    ):
+        reasons.append("weekly_return_below_threshold")
+
+    if (
+        ma20 is not None
+        and ma50 is not None
+        and ma200 is not None
+        and latest_close < ma20
+        and latest_close < ma50
+        and latest_close < ma200
+    ):
+        reasons.append("close_below_ma20_ma50_ma200")
+
+    defensive_triggered = bool(reasons)
+    if not defensive_triggered and (
+        volatility is None or weekly_return is None or ma200 is None
+    ):
+        reasons.append("ihsg_data_unavailable_fallback_to_volatility")
+
+    return RegimeSnapshot(
+        regime="DEFENSIVE" if defensive_triggered else volatility_regime,
+        volatility_regime=volatility_regime,
+        volatility=volatility,
+        weekly_return=weekly_return,
+        latest_close=latest_close,
+        ma20=ma20,
+        ma50=ma50,
+        ma200=ma200,
+        defensive_triggered=defensive_triggered,
+        reasons=reasons,
+    )
+
+
+async def detect_market_regime() -> RegimeSnapshot:
+    """Fetch IHSG data and classify the final market regime."""
+    df = await fetch_ihsg_ohlcv()
+    snapshot = compute_ihsg_snapshot(
+        df,
+        lookback_days=settings.REGIME_VOLATILITY_LOOKBACK_DAYS,
+        high_threshold=settings.REGIME_VOLATILITY_HIGH_THRESHOLD,
+        low_threshold=settings.REGIME_VOLATILITY_LOW_THRESHOLD,
+        defensive_weekly_drop_threshold=(
+            settings.REGIME_DEFENSIVE_WEEKLY_DROP_THRESHOLD
+        ),
+    )
+    logger.info(
+        f"[Regime] IHSG regime={snapshot.regime} "
+        f"volatility_regime={snapshot.volatility_regime} "
+        f"reasons={','.join(snapshot.reasons) or '-'}"
+    )
+    return snapshot
 
 
 async def fetch_ihsg_volatility(lookback_days: int = 20) -> float | None:
@@ -67,17 +220,20 @@ async def fetch_ihsg_volatility(lookback_days: int = 20) -> float | None:
             logger.warning("[Regime] yfinance ^JKSE: DataFrame kosong.")
             return None
 
-        close = df["Close"].squeeze().dropna()
-        returns = close.pct_change().dropna()
-        if len(returns) < lookback_days:
+        close = _close_series(df)
+        if close is None:
+            logger.warning("[Regime] yfinance ^JKSE: data close tidak tersedia.")
+            return None
+
+        vol = _realized_volatility(close, lookback_days)
+        if vol is None:
+            returns = close.pct_change().dropna()
             logger.warning(
                 f"[Regime] yfinance ^JKSE: data return terlalu sedikit "
                 f"({len(returns)}/{lookback_days})."
             )
             return None
 
-        returns = returns.tail(lookback_days)
-        vol = float(returns.std())
         logger.info(
             f"[Regime] IHSG realized vol ({lookback_days}d): {vol:.4f} ({vol * 100:.2f}%)"
         )
@@ -94,7 +250,7 @@ def classify_regime(
     vol: float | None,
     high_threshold: float = 0.02,
     low_threshold: float = 0.01,
-) -> RegimeType:
+) -> VolatilityRegimeType:
     """
     Klasifikasikan market regime berdasarkan realized volatility.
 
@@ -133,6 +289,14 @@ def get_regime_params(regime: RegimeType) -> dict:
     Kunci yang bisa di-override:
       top_n_selection, rpm_limit, rr_normalization_cap, min_conviction_override
     """
+    if regime == "DEFENSIVE":
+        return {
+            "top_n_selection": settings.REGIME_DEFENSIVE_TOP_N,
+            "rpm_limit": settings.REGIME_DEFENSIVE_RPM_LIMIT,
+            "rr_normalization_cap": settings.REGIME_DEFENSIVE_MAX_RR_FOR_SCORING,
+            "min_conviction_override": settings.REGIME_DEFENSIVE_MIN_CONVICTION,
+        }
+
     if regime == "HIGH":
         return {
             "top_n_selection": settings.REGIME_HIGH_TOP_N,

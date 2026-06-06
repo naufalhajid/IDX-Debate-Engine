@@ -27,6 +27,7 @@ from core.backtest_memory import DEFAULT_MEMORY, TradeOutcome
 from core.execution_ledger import DEFAULT_LEDGER, EventSeverity, EventType, LedgerEvent
 from core.ops_telemetry import DEFAULT_TELEMETRY, TickerMetric
 from core.prompt_pack_linter import lint_prompt_pack
+from core.regime import detect_market_regime
 from core.report_consistency import InconsistencyType, check_consistency
 from core.risk_governor import annotate_risk
 from core.settings import settings
@@ -39,6 +40,7 @@ PROMPT_MANIFEST_PATH = (
 )
 _batch_failed_count: int = 0
 _DEBATE_LOGGING_CONFIGURED = False
+_MARKET_REGIME_SNAPSHOT: dict[str, Any] | None = None
 
 
 def _ensure_utf8_console() -> None:
@@ -918,6 +920,27 @@ def _dict_or_empty(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def _market_regime_summary(snapshot: dict[str, Any] | None) -> str:
+    if not isinstance(snapshot, dict):
+        return "unavailable"
+    regime = str(snapshot.get("regime") or "unknown")
+    parts = [regime]
+    volatility_regime = snapshot.get("volatility_regime")
+    if volatility_regime and str(volatility_regime) != regime:
+        parts.append(f"vol={volatility_regime}")
+    weekly_return = snapshot.get("weekly_return")
+    try:
+        if weekly_return is not None:
+            parts.append(f"5d {float(weekly_return) * 100:+.1f}%")
+    except (TypeError, ValueError):
+        pass
+    reasons = snapshot.get("reasons")
+    if isinstance(reasons, list) and reasons:
+        reason_text = ", ".join(str(item).replace("_", " ") for item in reasons[:2])
+        parts.append(reason_text)
+    return " | ".join(parts)
+
+
 def _attach_risk_governor(
     *,
     ticker: str,
@@ -943,10 +966,12 @@ def _attach_risk_governor(
             "ticker": ticker,
             "verdict": verdict,
             "current_price": verdict.get("current_price"),
+            "market_regime": _MARKET_REGIME_SNAPSHOT,
             "risk_context": {
                 "atr14": atr14,
                 "avg_volume": avg_volume,
                 "exdate_days": None,
+                "market_regime": _MARKET_REGIME_SNAPSHOT,
                 "sector": None,
                 "run_id": run_id,
             },
@@ -1204,8 +1229,9 @@ async def _debate_one(
 
 
 async def main(argv: list[str] | None = None) -> None:
-    global _batch_failed_count
+    global _MARKET_REGIME_SNAPSHOT, _batch_failed_count
     _batch_failed_count = 0
+    _MARKET_REGIME_SNAPSHOT = None
 
     args = parse_args(argv)
     configure_debate_logging(verbose=bool(args.verbose))
@@ -1238,6 +1264,18 @@ async def main(argv: list[str] | None = None) -> None:
         "[idx.header]Debate batch[/idx.header] "
         f"{len(args.tickers)} ticker | output=[idx.path]{output_dir}[/idx.path]"
     )
+
+    try:
+        regime_snapshot = await detect_market_regime()
+        _MARKET_REGIME_SNAPSHOT = regime_snapshot.model_dump()
+        cli_console.print(
+            "[idx.section]Market regime[/idx.section] "
+            f"{_market_regime_summary(_MARKET_REGIME_SNAPSHOT)}"
+        )
+    except Exception as exc:
+        _MARKET_REGIME_SNAPSHOT = None
+        logger.warning(f"[run_debate] Market regime unavailable: {exc}")
+        cli_console.print("[idx.section]Market regime[/idx.section] unavailable")
 
     # LLM instances created once and reused for all tickers
     from services.debate_chamber import DebateChamber
