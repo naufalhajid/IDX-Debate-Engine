@@ -444,6 +444,46 @@ def test_fetch_news_failure_returns_empty_list() -> None:
     assert news == []
 
 
+def test_build_bundle_fetch_failure_records_failure_metadata() -> None:
+    async def failing_fetch(*args, **kwargs):
+        raise RuntimeError("network failed")
+
+    patcher = patch("services.news_fetcher.fetch_news_rss", failing_fetch)
+    patcher.start()
+    try:
+        bundle = NewsFetcher().build_bundle("BBCA")
+    finally:
+        patcher.stop()
+
+    assert bundle.data_available is False
+    assert bundle.fetch_failure == {
+        "stage": "rss_fetch",
+        "type": "RuntimeError",
+        "message": "network failed",
+    }
+    assert "News fetch failed" in bundle.confidence_adjustment_reason
+
+
+def test_build_bundle_rss_source_failure_records_source_metadata() -> None:
+    async def failing_text(*args, **kwargs):
+        raise OSError("rss transport down")
+
+    patcher = patch("services.news_fetcher._fetch_text", failing_text)
+    patcher.start()
+    try:
+        bundle = NewsFetcher().build_bundle("BBCA")
+    finally:
+        patcher.stop()
+
+    assert bundle.data_available is False
+    assert bundle.fetch_failure is not None
+    assert bundle.fetch_failure["stage"] == "rss_fetch"
+    assert bundle.fetch_failure["source"] == "Google News RSS"
+    assert bundle.fetch_failure["type"] == "OSError"
+    assert "rss transport down" in bundle.fetch_failure["message"]
+    assert "Google News RSS" in bundle.confidence_adjustment_reason
+
+
 def test_fetch_news_rss_uses_kontan_fallback_when_google_empty() -> None:
     calls: list[str] = []
     now = datetime.now(timezone.utc)

@@ -447,6 +447,11 @@ async def _news_context_for_state(
         metadata["news_confidence_adjustment"] = adjustment
         metadata["news_overall_sentiment"] = overall_sentiment
         metadata["news_brief"] = news_str
+        fetch_failure = getattr(news_bundle, "fetch_failure", None)
+        if isinstance(fetch_failure, dict) and fetch_failure:
+            metadata["news_fetch_failure"] = fetch_failure
+        else:
+            metadata.pop("news_fetch_failure", None)
         state["news_brief"] = news_str
         state["news_confidence_adjustment"] = adjustment
         state["metadata"] = metadata

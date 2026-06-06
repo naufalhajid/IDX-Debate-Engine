@@ -112,11 +112,21 @@ MACRO_KEYWORDS = [
 logger = logging.getLogger(__name__)
 
 
+def _exception_message(exc: BaseException) -> str:
+    text = str(exc).strip()
+    if text:
+        return text
+    if getattr(exc, "args", None):
+        return repr(exc.args)
+    return type(exc).__name__
+
+
 async def fetch_news_rss(
     ticker: str,
     company_name: str = "",
     lookback_days: int = 60,
     limit: int = 10,
+    diagnostics: list[dict[str, str]] | None = None,
 ) -> list[dict]:
     """Fetch recent IDX news through Google News RSS with a best-effort Kontan fallback."""
     normalized_ticker = _normalize_ticker(ticker)
@@ -128,6 +138,7 @@ async def fetch_news_rss(
         google_url,
         ticker=normalized_ticker,
         source="Google News RSS",
+        diagnostics=diagnostics,
     )
     selected = _recent_rss_items(
         google_items,
@@ -144,6 +155,7 @@ async def fetch_news_rss(
             default_item_source="Kontan",
             silent_http_statuses={403},
             silent_timeout=True,
+            diagnostics=diagnostics,
         )
         selected = _recent_rss_items(
             [*google_items, *kontan_items],
@@ -162,6 +174,7 @@ async def _fetch_rss_items(
     default_item_source: str | None = None,
     silent_http_statuses: set[int] | None = None,
     silent_timeout: bool = False,
+    diagnostics: list[dict[str, str]] | None = None,
 ) -> list[dict]:
     try:
         xml_text = await _fetch_text(
@@ -170,7 +183,18 @@ async def _fetch_rss_items(
             silent_timeout=silent_timeout,
         )
     except Exception as exc:
-        if _should_silence_rss_error(exc, silent_http_statuses, silent_timeout):
+        silenced = _should_silence_rss_error(exc, silent_http_statuses, silent_timeout)
+        if diagnostics is not None:
+            diagnostics.append(
+                {
+                    "source": source,
+                    "stage": "fetch",
+                    "type": type(exc).__name__,
+                    "message": _exception_message(exc),
+                    "silenced": str(silenced).lower(),
+                }
+            )
+        if silenced:
             logger.debug("[News] %s %s skipped: %s", ticker, source, exc)
         else:
             logger.warning("[News] %s %s fetch failed: %s", ticker, source, exc)
@@ -184,6 +208,16 @@ async def _fetch_rss_items(
             xml_text, default_source=default_item_source, ticker=ticker
         )
     except Exception as exc:
+        if diagnostics is not None:
+            diagnostics.append(
+                {
+                    "source": source,
+                    "stage": "parse",
+                    "type": type(exc).__name__,
+                    "message": _exception_message(exc),
+                    "silenced": "false",
+                }
+            )
         logger.warning("[News] %s %s parse failed: %s", ticker, source, exc)
         return []
 
@@ -452,6 +486,7 @@ class NewsBundle(BaseModel):
     confidence_adjustment_reason: str
     staleness_warning: str | None
     data_available: bool
+    fetch_failure: dict[str, str] | None = None
 
 
 class NewsFetcher:
@@ -459,20 +494,49 @@ class NewsFetcher:
 
     def __init__(self) -> None:
         self._cache: dict[str, tuple[NewsBundle, datetime]] = {}
+        self._last_fetch_failure: dict[str, str] | None = None
 
     async def fetch_news_async(self, ticker: str, company_name: str = "") -> list[dict]:
         """Fetch raw RSS news for an IDX ticker without raising."""
         normalized = _normalize_ticker(ticker)
+        self._last_fetch_failure = None
         if not _is_valid_idx_ticker(normalized):
             return []
+        diagnostics: list[dict[str, str]] = []
         try:
-            return await fetch_news_rss(
+            items = await fetch_news_rss(
                 normalized,
                 company_name=company_name,
                 lookback_days=NEWS_LOOKBACK_DAYS,
                 limit=MAX_NEWS_ITEMS,
+                diagnostics=diagnostics,
             )
+            if not items:
+                failure = next(
+                    (
+                        item
+                        for item in diagnostics
+                        if item.get("silenced") != "true"
+                    ),
+                    None,
+                )
+                if failure:
+                    self._last_fetch_failure = {
+                        "stage": f"rss_{failure.get('stage') or 'fetch'}",
+                        "source": failure.get("source") or "unknown",
+                        "type": failure.get("type") or "unknown",
+                        "message": (
+                            f"{failure.get('source') or 'unknown'}: "
+                            f"{failure.get('message') or 'unknown'}"
+                        ),
+                    }
+            return items
         except Exception as exc:
+            self._last_fetch_failure = {
+                "stage": "rss_fetch",
+                "type": type(exc).__name__,
+                "message": _exception_message(exc),
+            }
             logger.warning(
                 "[News] RSS fetch failed for %s: %s",
                 normalized,
@@ -568,6 +632,18 @@ class NewsFetcher:
                 return cached_bundle
 
         raw_items = await self.fetch_news_async(normalized_ticker)
+        if not raw_items and self._last_fetch_failure:
+            bundle = _empty_bundle(
+                ticker=normalized_ticker,
+                fetched_at=now,
+                reason=(
+                    "News fetch failed - "
+                    f"{self._last_fetch_failure['message']}"
+                ),
+                fetch_failure=self._last_fetch_failure,
+            )
+            self._cache[normalized_ticker] = (bundle, now)
+            return bundle
         cutoff = now - timedelta(days=NEWS_LOOKBACK_DAYS)
         classified = [self.classify_item(raw, normalized_ticker) for raw in raw_items]
         recent_items = [
@@ -727,7 +803,13 @@ def _normalize_symbol(ticker: str) -> str | None:
     return f"{normalized}.JK"
 
 
-def _empty_bundle(*, ticker: str, fetched_at: datetime, reason: str) -> NewsBundle:
+def _empty_bundle(
+    *,
+    ticker: str,
+    fetched_at: datetime,
+    reason: str,
+    fetch_failure: dict[str, str] | None = None,
+) -> NewsBundle:
     return NewsBundle(
         ticker=ticker,
         fetched_at=fetched_at.isoformat(),
@@ -744,6 +826,7 @@ def _empty_bundle(*, ticker: str, fetched_at: datetime, reason: str) -> NewsBund
         confidence_adjustment_reason=reason,
         staleness_warning=None,
         data_available=False,
+        fetch_failure=fetch_failure,
     )
 
 

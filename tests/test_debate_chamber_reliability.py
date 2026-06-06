@@ -579,6 +579,39 @@ def test_news_context_records_fetch_failure(monkeypatch):
     assert state["metadata"]["news_fetch_failure"] == failure
 
 
+def test_news_context_carries_bundle_fetch_failure(monkeypatch):
+    failure = {
+        "stage": "rss_fetch",
+        "type": "RuntimeError",
+        "message": "network failed",
+    }
+    bundle = SimpleNamespace(
+        overall_sentiment=SimpleNamespace(value="UNKNOWN"),
+        sentiment_score=0.0,
+        confidence_adjustment=0.0,
+        confidence_adjustment_reason="News fetch failed - network failed",
+        has_breaking_news=False,
+        items=[],
+        fetch_failure=failure,
+    )
+
+    class _FetcherWithFailureBundle:
+        async def build_bundle_async(self, ticker):
+            return bundle
+
+        def bundle_to_prompt_string(self, b):
+            return "No news data available"
+
+    monkeypatch.setattr(
+        "services.news_fetcher.DEFAULT_FETCHER",
+        _FetcherWithFailureBundle(),
+    )
+
+    out = asyncio.run(dc._news_context_for_state({}, "DSSA"))
+
+    assert out["metadata"]["news_fetch_failure"] == failure
+
+
 def test_fair_value_rejected_without_current_run_rag_evidence():
     fair_value, metadata = dc._reject_unverified_fair_value_if_needed(
         ticker="BBCA",
