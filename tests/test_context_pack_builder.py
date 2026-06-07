@@ -14,6 +14,9 @@ def test_build_context_pack_full_data_populates_all_fields() -> None:
         "as_of": "2026-05-12T10:00:00+00:00",
         "current_price": 2600,
         "fair_value_estimate": 2919,
+        "fair_value_low": 2500,
+        "fair_value_high": 3300,
+        "risk_overvalued": "False",
         "fundamentals": {"roe": 0.12, "net_margin": 0.22},
         "technical_indicators": {"ma50": 2375, "rsi14": 66.7},
         "sentiment_summary": "INSUFFICIENT_DATA but no red flags.",
@@ -25,12 +28,19 @@ def test_build_context_pack_full_data_populates_all_fields() -> None:
     assert pack.ticker == "ADRO"
     assert pack.price == 2600.0
     assert pack.fair_value == 2919.0
+    assert pack.fair_value_base == 2919.0
+    assert pack.fair_value_low == 2500.0
+    assert pack.fair_value_high == 3300.0
+    assert pack.risk_overvalued is False
     assert pack.fundamentals == {"roe": 0.12, "net_margin": 0.22}
     assert pack.technicals == {"ma50": 2375, "rsi14": 66.7}
     assert pack.sentiment_summary == "INSUFFICIENT_DATA but no red flags."
     assert pack.data_sources == ["stockbit", "yfinance", "gemini"]
     assert pack.missing_fields == []
     assert pack.token_estimate == len(pack_to_prompt_string(pack)) // 4
+    assert pack.priority_fields["fair_value_low"] == 2500.0
+    assert pack.priority_fields["fair_value_high"] == 3300.0
+    assert pack.priority_fields["risk_overvalued"] is False
 
 
 def test_build_context_pack_partial_data_lists_missing_fields() -> None:

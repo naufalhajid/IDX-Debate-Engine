@@ -47,6 +47,61 @@ def test_current_price_inside_entry_range_stays_deployable_in_normal_regime() ->
     assert "market_regime_defensive" not in decision.reason_codes
 
 
+def test_soft_overvalued_inside_range_stays_deployable() -> None:
+    decision = evaluate_risk(
+        _candidate(
+            verdict={
+                "current_price": 1040,
+                "fair_value": 1000,
+                "fair_value_base": 1000,
+                "fair_value_high": 1150,
+                "risk_overvalued": False,
+                "is_overvalued": False,
+            }
+        )
+    )
+
+    assert decision.status == "deployable"
+    assert decision.sizing_allowed is True
+    assert "overvalued" not in decision.reason_codes
+
+
+def test_explicit_risk_overvalued_false_overrides_legacy_true() -> None:
+    decision = evaluate_risk(
+        _candidate(
+            verdict={
+                "current_price": 1040,
+                "fair_value": 1000,
+                "fair_value_high": 1150,
+                "risk_overvalued": False,
+                "is_overvalued": True,
+            }
+        )
+    )
+
+    assert decision.status == "deployable"
+    assert "overvalued" not in decision.reason_codes
+
+
+def test_explicit_risk_overvalued_rejects_even_if_legacy_flag_absent() -> None:
+    decision = evaluate_risk(
+        _candidate(
+            verdict={
+                "current_price": 1200,
+                "fair_value": 1000,
+                "fair_value_high": 1150,
+                "risk_overvalued": True,
+                "is_overvalued": False,
+                "target_price": 1300,
+            }
+        )
+    )
+
+    assert decision.status == "reject"
+    assert decision.sizing_allowed is False
+    assert "overvalued" in decision.reason_codes
+
+
 def test_defensive_regime_downgrades_deployable_buy_to_watchlist() -> None:
     decision = evaluate_risk(
         _candidate(

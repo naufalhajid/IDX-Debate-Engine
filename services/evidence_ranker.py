@@ -631,11 +631,24 @@ def _fair_value_content(pack: ContextPack) -> str:
     fair_value = (
         f"{pack.fair_value:.0f}" if pack.fair_value is not None else "INSUFFICIENT_DATA"
     )
+    fair_value_low = (
+        f"{pack.fair_value_low:.0f}"
+        if getattr(pack, "fair_value_low", None) is not None
+        else "INSUFFICIENT_DATA"
+    )
+    fair_value_high = (
+        f"{pack.fair_value_high:.0f}"
+        if getattr(pack, "fair_value_high", None) is not None
+        else "INSUFFICIENT_DATA"
+    )
+    risk_overvalued = getattr(pack, "risk_overvalued", None)
     upside = "INSUFFICIENT_DATA"
     if pack.price and pack.fair_value is not None:
         upside = f"{((pack.fair_value - pack.price) / pack.price) * 100:.1f}%"
     return (
-        f"Current Price: {pack.price:.0f} | Fair Value: {fair_value} | Upside: {upside}"
+        f"Current Price: {pack.price:.0f} | Fair Value Base: {fair_value} | "
+        f"Fair Value Range: {fair_value_low} - {fair_value_high} | "
+        f"Upside: {upside} | Risk Overvalued: {risk_overvalued}"
     )
 
 

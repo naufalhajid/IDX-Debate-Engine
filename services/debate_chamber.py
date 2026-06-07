@@ -73,7 +73,7 @@ from services.evidence_ranker import (
     citations_for_bundle,
     guard_evidence_citation_ids,
 )
-from services.fair_value_calculator import build_fair_value_report
+from services.fair_value_calculator import build_fair_value_payload
 from services.debate_prompt_registry import PROMPT_REGISTRY, PROMPT_VERSION
 from services.debate_run_guard import run_with_guard
 from utils.logger_config import logger
@@ -1680,6 +1680,11 @@ class DebateChamber:
             "decision_brief": "",
             "technical_indicators": {},
             "fair_value_estimate": 0.0,
+            "fair_value_base": None,
+            "fair_value_low": None,
+            "fair_value_high": None,
+            "fair_value_range_pct": None,
+            "risk_overvalued": False,
             "debate_history": [],
             "round_count": 0,
             "consensus_reached": False,
@@ -1728,6 +1733,10 @@ class DebateChamber:
             },
             "fundamental": {
                 "fair_value": state.get("fair_value_estimate", 0.0),
+                "fair_value_base": state.get("fair_value_base"),
+                "fair_value_low": state.get("fair_value_low"),
+                "fair_value_high": state.get("fair_value_high"),
+                "risk_overvalued": state.get("risk_overvalued", False),
                 "position": self._extract_agent_signal(
                     str(state.get("fundamental_data", "")),
                     "fundamental_scout",
@@ -1960,7 +1969,8 @@ Current Date (Asia/Jakarta): {current_date}
                 )
                 return {"fundamental_data": content}
 
-            report_str, fv_price = build_fair_value_report(raw, ticker, current_price)
+            report_str, fv_result = build_fair_value_payload(raw, ticker, current_price)
+            fv_price = fv_result.get("fair_value")
             logger.info(f"[Fundamental] Fair value for {ticker}: {fv_price}")
             if fv_price is None:
                 logger.warning(
@@ -1987,6 +1997,11 @@ Current Date (Asia/Jakarta): {current_date}
             return {
                 "fundamental_data": content,
                 "fair_value_estimate": fv_price,
+                "fair_value_base": fv_result.get("fair_value_base"),
+                "fair_value_low": fv_result.get("fair_value_low"),
+                "fair_value_high": fv_result.get("fair_value_high"),
+                "fair_value_range_pct": fv_result.get("range_pct"),
+                "risk_overvalued": fv_result.get("risk_overvalued"),
             }
         except Exception as e:
             logger.error(f"[Fundamental] Error: {e}")
@@ -2453,6 +2468,11 @@ Current Date (Asia/Jakarta): {current_date}
 
         # ── Margin-of-Safety pre-check (pure Python, zero token cost) ──────
         fair_value_estimate = state.get("fair_value_estimate") or 0.0
+        fair_value_base = state.get("fair_value_base") or fair_value_estimate
+        fair_value_low = state.get("fair_value_low")
+        fair_value_high = state.get("fair_value_high")
+        fair_value_range_pct = state.get("fair_value_range_pct")
+        risk_overvalued = bool(state.get("risk_overvalued"))
         current_price = state.get("current_price") or 0.0
 
         if fair_value_estimate > 0 and current_price > 0:
@@ -2462,6 +2482,7 @@ Current Date (Asia/Jakarta): {current_date}
                 target_price=0.0,  # not known yet — only overvaluation checked here
                 entry_price_range="0 - 0",
                 stop_loss=0.0,
+                fair_value_high=fair_value_high,
             )
             if not validation["is_valid"]:
                 raw = (
@@ -2508,9 +2529,19 @@ Current Date (Asia/Jakarta): {current_date}
                 "as_of": market_data_as_of,
                 "current_price": current_price,
                 "fair_value_estimate": fair_value_estimate,
+                "fair_value_base": fair_value_base,
+                "fair_value_low": fair_value_low,
+                "fair_value_high": fair_value_high,
+                "fair_value_range_pct": fair_value_range_pct,
+                "risk_overvalued": risk_overvalued,
                 "fundamentals": {
                     "brief": self._compact_text(f, 1_000),
                     "exdate": exdate_block,
+                    "fair_value": fair_value_estimate,
+                    "fair_value_base": fair_value_base,
+                    "fair_value_low": fair_value_low,
+                    "fair_value_high": fair_value_high,
+                    "risk_overvalued": risk_overvalued,
                 },
                 "technicals": {
                     "brief": self._compact_text(t, 1_000),
@@ -2669,6 +2700,17 @@ Current Date (Asia/Jakarta): {current_date}
             )
         )
         state["fair_value_estimate"] = fair_value_estimate
+        if fair_value_estimate <= 0:
+            fair_value_base = None
+            fair_value_low = None
+            fair_value_high = None
+            fair_value_range_pct = None
+            risk_overvalued = False
+        state["fair_value_base"] = fair_value_base
+        state["fair_value_low"] = fair_value_low
+        state["fair_value_high"] = fair_value_high
+        state["fair_value_range_pct"] = fair_value_range_pct
+        state["risk_overvalued"] = risk_overvalued
         state["metadata"] = verified_metadata
         if news_brief:
             decision_brief = f"{decision_brief}\n\n{news_brief}"
@@ -2689,6 +2731,11 @@ Current Date (Asia/Jakarta): {current_date}
             "raw_data": raw,
             "decision_brief": decision_brief,
             "fair_value_estimate": fair_value_estimate,
+            "fair_value_base": fair_value_base,
+            "fair_value_low": fair_value_low,
+            "fair_value_high": fair_value_high,
+            "fair_value_range_pct": fair_value_range_pct,
+            "risk_overvalued": risk_overvalued,
             "metadata": state.get("metadata", {}),
         }
 
@@ -2944,6 +2991,7 @@ Current Date (Asia/Jakarta): {current_date}
         current_price: float,
         fair_value: float,
         ma50: float,
+        fair_value_high: float | None = None,
     ) -> tuple[bool | None, bool | None, bool, str]:
         """
         Classify the trade setup using tolerance bands (not binary thresholds).
@@ -2966,11 +3014,16 @@ Current Date (Asia/Jakarta): {current_date}
             fundamental_ok: bool | None = None
             fund_reason = "fair_value=null (insufficient fundamental data)"
         else:
-            fv_ceiling = fair_value * (1 + self.FV_TOL)
+            if fair_value_high is not None and fair_value_high > 0:
+                fv_ceiling = fair_value_high
+                fv_context = "FV range high"
+            else:
+                fv_ceiling = fair_value * (1 + self.FV_TOL)
+                fv_context = f"FV Rp {fair_value:,.0f} + {self.FV_TOL:.0%} tolerance"
             fundamental_ok = current_price <= fv_ceiling
             fund_reason = (
                 f"price Rp {current_price:,.0f} vs FV ceiling Rp {fv_ceiling:,.0f} "
-                f"(FV Rp {fair_value:,.0f} + {self.FV_TOL:.0%} tolerance) → "
+                f"({fv_context}) → "
                 f"{'within tolerance' if fundamental_ok else 'overvalued'}"
             )
 
@@ -3194,8 +3247,17 @@ Current Date (Asia/Jakarta): {current_date}
         """Format trade envelope as a human-readable string for the CIO prompt."""
         fv = envelope.get("fair_value")
         fv_str = f"Rp {fv:,.0f}" if fv else "N/A (insufficient data)"
+        fv_low = envelope.get("fair_value_low")
+        fv_high = envelope.get("fair_value_high")
+        fv_range_str = (
+            f"Rp {fv_low:,.0f} - Rp {fv_high:,.0f}"
+            if fv_low and fv_high
+            else "N/A"
+        )
         return (
             f"FAIR VALUE         : {fv_str}\n"
+            f"FAIR VALUE RANGE   : {fv_range_str}\n"
+            f"RISK OVERVALUED    : {bool(envelope.get('risk_overvalued'))}\n"
             f"ENTRY ZONE         : Rp {envelope['entry_low']:,.0f} – Rp {envelope['entry_high']:,.0f}\n"
             f"ENTRY MIDPOINT     : Rp {envelope['entry_mid']:,.0f}\n"
             f"TARGET PRICE       : Rp {envelope['target_price']:,.0f}\n"
@@ -3384,7 +3446,19 @@ Current Date (Asia/Jakarta): {current_date}
                     fv = float(p.get("fair_value") or 0.0)
                 except (TypeError, ValueError):
                     cp, fv = 0.0, 0.0
-                value_driven_avoid = fv <= 0 or cp > fv  # overvalued or no FV anchor
+                try:
+                    fv_high = float(
+                        p.get("fair_value_high")
+                        or state.get("fair_value_high")
+                        or 0.0
+                    )
+                except (TypeError, ValueError):
+                    fv_high = 0.0
+                value_driven_avoid = (
+                    fv <= 0
+                    or (fv_high > 0 and cp > fv_high)
+                    or (fv_high <= 0 and cp > fv)
+                )
 
                 tech = state.get("technical_indicators") or {}
                 try:
@@ -3418,10 +3492,12 @@ Current Date (Asia/Jakarta): {current_date}
                             p.get("weighted_reasoning"),
                             (
                                 f"MOMENTUM WATCHLIST — confidence_winner was AVOID "
-                                f"({winner.get('agent', 'bear')}) but a volume-confirmed breakout "
+                                f"({winner.get('agent', 'bear')}) but a "
+                                "volume-confirmed breakout "
                                 f"(vol {volume_surge:.1f}x avg, +{recent_return:.1f}% 5d) with "
-                                f"non-bearish sentiment ({sentiment_position}) on an "
-                                "overvalued/FV-less name prevents hard rejection. Escalated to "
+                                f"non-bearish sentiment ({sentiment_position}) on a "
+                                "range-overvalued/FV-less name prevents hard rejection. "
+                                "Escalated to "
                                 "HOLD watchlist — monitor for trend confirmation before entry."
                             ),
                         )
@@ -3478,6 +3554,27 @@ Current Date (Asia/Jakarta): {current_date}
             if state_metadata.get("fair_value_rejected")
             else state.get("fair_value_estimate", 0.0)
         )
+        fair_value_base = (
+            None
+            if state_metadata.get("fair_value_rejected")
+            else state.get("fair_value_base") or fair_value or None
+        )
+        fair_value_low = (
+            None
+            if state_metadata.get("fair_value_rejected")
+            else state.get("fair_value_low")
+        )
+        fair_value_high = (
+            None
+            if state_metadata.get("fair_value_rejected")
+            else state.get("fair_value_high")
+        )
+        risk_overvalued = False
+        if current_price and current_price > 0:
+            if fair_value_high:
+                risk_overvalued = current_price > fair_value_high
+            elif fair_value:
+                risk_overvalued = current_price > fair_value
         logger.info(
             f"[CIO] Deliberating on {ticker} (current price: {current_price:,.0f})"
         )
@@ -3499,6 +3596,10 @@ Current Date (Asia/Jakarta): {current_date}
                 summary="Harga pasar tidak valid; trade envelope tidak dibuat.",
                 current_price=current_price,
                 fair_value=fair_value if fair_value and fair_value > 0 else None,
+                fair_value_base=fair_value_base,
+                fair_value_low=fair_value_low,
+                fair_value_high=fair_value_high,
+                risk_overvalued=risk_overvalued,
                 valuation_gap=(
                     "unverified"
                     if _state_metadata(state).get("fair_value_rejected")
@@ -3526,12 +3627,21 @@ Current Date (Asia/Jakarta): {current_date}
 
         # ── Compute Trade Envelope (deterministic, Python-only) ──────────────
         envelope = self._compute_trade_envelope(current_price, fair_value, tech)
+        envelope["fair_value_base"] = fair_value_base
+        envelope["fair_value_low"] = fair_value_low
+        envelope["fair_value_high"] = fair_value_high
+        envelope["risk_overvalued"] = risk_overvalued
         envelope_text = self._format_trade_envelope(envelope)
 
         # ── Conflict Resolution signal (deterministic, Python-only) ──────────
         ma50 = tech.get("ma50", 0) or 0
         fundamental_ok, technical_ok, overextended_flag, signal_reason = (
-            self._classify_signals(current_price, fair_value, ma50)
+            self._classify_signals(
+                current_price,
+                fair_value,
+                ma50,
+                fair_value_high=fair_value_high,
+            )
         )
 
         if fundamental_ok and technical_ok:
@@ -3707,8 +3817,22 @@ Start your response with '{' and end with '}'. Nothing else."""
                     p["fair_value"] = fv_env
             else:
                 p["fair_value"] = p.get("fair_value") or None
+            for key in ("fair_value_base", "fair_value_low", "fair_value_high"):
+                value = envelope.get(key)
+                if value is None:
+                    p[key] = None
+                    continue
+                try:
+                    p[key] = int(value)
+                except Exception:
+                    p[key] = value
+            p["risk_overvalued"] = bool(envelope.get("risk_overvalued"))
             if _state_metadata(state).get("fair_value_rejected"):
                 p["fair_value"] = None
+                p["fair_value_base"] = None
+                p["fair_value_low"] = None
+                p["fair_value_high"] = None
+                p["risk_overvalued"] = False
                 p["valuation_gap"] = "unverified"
                 p["weighted_reasoning"] = self._append_reason(
                     p.get("weighted_reasoning"),
@@ -3882,6 +4006,10 @@ Start your response with '{' and end with '}'. Nothing else."""
                 summary=f"CIO parse error — raw response stored. Error: {e}",
                 current_price=current_price,
                 fair_value=envelope["fair_value"],
+                fair_value_base=envelope.get("fair_value_base"),
+                fair_value_low=envelope.get("fair_value_low"),
+                fair_value_high=envelope.get("fair_value_high"),
+                risk_overvalued=bool(envelope.get("risk_overvalued")),
                 valuation_gap=(
                     "unverified"
                     if _state_metadata(state).get("fair_value_rejected")
@@ -4215,6 +4343,11 @@ Start your response with '{' and end with '}'. Nothing else."""
             "decision_brief": "",
             "technical_indicators": {},
             "fair_value_estimate": 0.0,
+            "fair_value_base": None,
+            "fair_value_low": None,
+            "fair_value_high": None,
+            "fair_value_range_pct": None,
+            "risk_overvalued": False,
             "debate_history": [],
             "round_count": 0,
             "consensus_reached": False,

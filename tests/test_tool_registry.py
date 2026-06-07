@@ -138,3 +138,28 @@ def test_execute_tool_invalid_output_is_contract_failure() -> None:
 
     assert result.status == "failed"
     assert "Output validation failed" in str(result.error)
+
+
+def test_fair_value_tool_exposes_range_fields() -> None:
+    result = execute_tool(
+        DEFAULT_REGISTRY,
+        "FairValueTool",
+        {
+            "ticker": "TEST",
+            "fundamentals": {
+                "current_price": 108,
+                "eps_ttm": 10,
+                "book_value_per_share": 100,
+                "dps": 5,
+            },
+        },
+    )
+
+    assert result.status == "success"
+    assert result.output_payload is not None
+    assert result.output_payload["fair_value"] is not None
+    assert result.output_payload["fair_value_base"] == result.output_payload["fair_value"]
+    assert result.output_payload["fair_value_low"] is not None
+    assert result.output_payload["fair_value_high"] is not None
+    assert "range_pct" in result.output_payload
+    assert result.output_payload["risk_overvalued"] is False

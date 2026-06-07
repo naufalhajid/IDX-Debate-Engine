@@ -350,6 +350,16 @@ def _parse_entry_range(value: Any) -> tuple[float | None, float | None]:
     return parsed[0], parsed[1]
 
 
+def _risk_overvalued_flag(candidate: dict[str, Any], verdict: dict[str, Any]) -> bool:
+    for value in (
+        verdict.get("risk_overvalued"),
+        candidate.get("risk_overvalued"),
+    ):
+        if value not in (None, ""):
+            return _truthy(value)
+    return _truthy(verdict.get("is_overvalued") or candidate.get("is_overvalued"))
+
+
 def _verdict_reason_codes(
     candidate: dict[str, Any],
     verdict: dict[str, Any],
@@ -369,7 +379,7 @@ def _verdict_reason_codes(
     if confidence is not None and confidence < MIN_BUYABLE_CONFIDENCE:
         reason_codes.append("low_confidence")
 
-    if _truthy(verdict.get("is_overvalued") or candidate.get("is_overvalued")):
+    if _risk_overvalued_flag(candidate, verdict):
         reason_codes.append("overvalued")
 
     rr_ratio = _first_float(

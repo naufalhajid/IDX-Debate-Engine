@@ -189,6 +189,20 @@ def _yes_no(value: Any) -> str:
     return "Yes" if bool(value) else "No"
 
 
+def _optional_bool(value: Any) -> bool | None:
+    if value in (None, ""):
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "1", "yes", "y"}:
+            return True
+        if normalized in {"false", "0", "no", "n"}:
+            return False
+    return bool(value)
+
+
 def _now_wib() -> datetime:
     try:
         return datetime.now(ZoneInfo("Asia/Jakarta"))
@@ -264,16 +278,41 @@ def _downside_pct(stop_loss: Any, current_price: Any) -> float | None:
     return ((price - stop_number) / price) * 100
 
 
-def _valuation_status(fair_value: Any, current_price: Any) -> str:
+def _valuation_status(
+    fair_value: Any,
+    current_price: Any,
+    fair_value_low: Any = None,
+    fair_value_high: Any = None,
+) -> str:
     fv = _safe_float(fair_value)
     price = _safe_float(current_price)
     if fv is None or fv <= 0 or price is None or price <= 0:
         return "N/A"
+    fv_low = _safe_float(fair_value_low)
+    fv_high = _safe_float(fair_value_high)
+    if fv_low is not None and fv_low > 0 and price < fv_low:
+        return "UNDERVALUED"
+    if price < fv * 0.95:
+        return "SLIGHTLY_UNDERVALUED"
+    if price <= fv * 1.05:
+        return "FAIRLY_VALUED"
+    if fv_high is not None and fv_high > 0 and price <= fv_high:
+        return "SLIGHTLY_OVERVALUED"
+    if fv_high is not None and fv_high > 0 and price > fv_high:
+        return "OVERVALUED"
     if fv > price:
         return "UNDERVALUED"
     if fv < price:
         return "OVERVALUED"
     return "FAIR VALUE"
+
+
+def _fair_value_range_text(fair_value_low: Any, fair_value_high: Any) -> str | None:
+    low = _safe_float(fair_value_low)
+    high = _safe_float(fair_value_high)
+    if low is None or low <= 0 or high is None or high <= 0:
+        return None
+    return f"{_money(low)} - {_money(high)}"
 
 
 # FIX: ISSUE 1 — Treat rejected fair value as an unverified valuation gap.
@@ -988,8 +1027,20 @@ class RichFormatter:
             )
             current_price = verdict.get("current_price")
             fair_value = verdict.get("fair_value")
+            fair_value_low = verdict.get("fair_value_low")
+            fair_value_high = verdict.get("fair_value_high")
+            fair_value_range = _fair_value_range_text(
+                fair_value_low, fair_value_high
+            )
+            risk_overvalued = _optional_bool(verdict.get("risk_overvalued"))
             valuation_unverified = _valuation_gap_is_unverified(data, verdict)
             value_gap = _price_diff_pct(fair_value, current_price)
+            value_status = _valuation_status(
+                fair_value,
+                current_price,
+                fair_value_low,
+                fair_value_high,
+            )
             value_style = "green" if (value_gap or 0) >= 0 else "red"
             entry_low, entry_high = _entry_bounds(verdict)
             target = verdict.get("target_price")
@@ -1032,13 +1083,17 @@ class RichFormatter:
             left_table.add_row("Current Price", _money(current_price))
             if not valuation_unverified:
                 left_table.add_row("Fair Value", _money(fair_value))
+                if fair_value_range:
+                    left_table.add_row("FV Range", fair_value_range)
+                if risk_overvalued is not None:
+                    left_table.add_row("Risk Overvalued", str(risk_overvalued))
             left_table.add_row(
                 "Valuation Gap",
                 Text(
                     (
                         "unverified"
                         if valuation_unverified
-                        else f"{_signed_pct(value_gap)} ({_valuation_status(fair_value, current_price)})"
+                        else f"{_signed_pct(value_gap)} ({value_status})"
                     ),
                     style="yellow" if valuation_unverified else value_style,
                 ),
@@ -1341,12 +1396,23 @@ class MarkdownFormatter:
             confidence_text = "N/A" if confidence is None else f"{confidence:.0%}"
             current_price = verdict.get("current_price")
             fair_value = verdict.get("fair_value")
+            fair_value_low = verdict.get("fair_value_low")
+            fair_value_high = verdict.get("fair_value_high")
+            fair_value_range = _fair_value_range_text(
+                fair_value_low, fair_value_high
+            )
+            risk_overvalued = _optional_bool(verdict.get("risk_overvalued"))
             valuation_unverified = _valuation_gap_is_unverified(data, verdict)
             value_gap = _price_diff_pct(fair_value, current_price)
             value_status = (
                 "unverified"
                 if valuation_unverified
-                else _valuation_status(fair_value, current_price)
+                else _valuation_status(
+                    fair_value,
+                    current_price,
+                    fair_value_low,
+                    fair_value_high,
+                )
             )
             low, high = _entry_bounds(verdict)
             target = verdict.get("target_price")
@@ -1379,6 +1445,18 @@ class MarkdownFormatter:
                     []
                     if valuation_unverified
                     else [f"| **Fair Value** | {_money(fair_value)} |"]
+                ),
+                *(
+                    []
+                    if valuation_unverified or not fair_value_range
+                    else [f"| **Fair Value Range** | {fair_value_range} |"]
+                ),
+                *(
+                    []
+                    if valuation_unverified or risk_overvalued is None
+                    else [
+                        f"| **Risk Overvalued** | {str(risk_overvalued)} |"
+                    ]
                 ),
                 (
                     f"| **Gap** | {value_status} |"

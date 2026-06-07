@@ -71,6 +71,11 @@ class FairValueInput(BaseModel):
 
 class FairValueOutput(BaseModel):
     fair_value: float | None
+    fair_value_base: float | None = None
+    fair_value_low: float | None = None
+    fair_value_high: float | None = None
+    range_pct: float | None = None
+    risk_overvalued: bool = False
     method: str
     confidence: str
 
@@ -237,6 +242,11 @@ def fair_value_tool(input_data: FairValueInput | dict[str, Any]) -> FairValueOut
 
     return FairValueOutput(
         fair_value=result.get("fair_value"),
+        fair_value_base=result.get("fair_value_base"),
+        fair_value_low=result.get("fair_value_low"),
+        fair_value_high=result.get("fair_value_high"),
+        range_pct=result.get("range_pct"),
+        risk_overvalued=bool(result.get("risk_overvalued")),
         method="weighted",
         confidence=str(result.get("confidence") or "UNKNOWN"),
     )

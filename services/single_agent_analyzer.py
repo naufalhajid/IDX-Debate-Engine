@@ -25,7 +25,7 @@ from services.context_pack_builder import (
     build_context_pack,
     pack_to_prompt_string,
 )
-from services.fair_value_calculator import build_fair_value_report
+from services.fair_value_calculator import build_fair_value_payload
 from utils.logger_config import logger
 from utils.market_data_cache import derive_current_price, prefetch_market_data
 from utils.technicals import compute_atr, compute_rsi
@@ -356,10 +356,16 @@ Rules:
         if not raw:
             return {"brief": "Fundamental data unavailable"}, None
 
-        report, fair_value = build_fair_value_report(raw, ticker, current_price)
+        report, fv_payload = build_fair_value_payload(raw, ticker, current_price)
+        fair_value = fv_payload.get("fair_value")
         return {
             "brief": report,
             "fair_value": fair_value,
+            "fair_value_base": fv_payload.get("fair_value_base"),
+            "fair_value_low": fv_payload.get("fair_value_low"),
+            "fair_value_high": fv_payload.get("fair_value_high"),
+            "range_pct": fv_payload.get("range_pct"),
+            "risk_overvalued": fv_payload.get("risk_overvalued"),
         }, fair_value
 
     def _fetch_sentiment_summary(self, ticker: str) -> str | None:

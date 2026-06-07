@@ -369,6 +369,28 @@ def test_generate_ticker_report_suppresses_unverified_fair_value() -> None:
     assert "| **Gap** | unverified |" in report
 
 
+def test_generate_ticker_report_shows_fair_value_range_and_risk_flag() -> None:
+    result = _mock_result()
+    result["verdict"].update(
+        {
+            "current_price": 108,
+            "fair_value": 100,
+            "fair_value_base": 100,
+            "fair_value_low": 85,
+            "fair_value_high": 115,
+            "risk_overvalued": False,
+        }
+    )
+
+    report = MarkdownFormatter().generate_ticker_report(result)
+
+    assert "| **Fair Value** | Rp 100 |" in report
+    assert "| **Fair Value Range** | Rp 85 - Rp 115 |" in report
+    assert "| **Risk Overvalued** | False |" in report
+    assert "| **Gap** | -7.4% (SLIGHTLY_OVERVALUED) |" in report
+    assert "| **Gap** | -7.4% (OVERVALUED) |" not in report
+
+
 def test_render_ticker_panel_handles_minimal_result() -> None:
     console = Console(record=True, width=100)
     formatter = RichFormatter(console=console)

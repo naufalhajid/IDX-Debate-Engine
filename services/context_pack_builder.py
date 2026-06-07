@@ -17,6 +17,9 @@ CONTEXT_FIELD_TIERS = {
         "rating",
         "current_price",
         "fair_value",
+        "fair_value_low",
+        "fair_value_high",
+        "risk_overvalued",
         "rr",
         "confidence",
         "entry_low",
@@ -52,6 +55,10 @@ class ContextPack(BaseModel):
     as_of: datetime
     price: float
     fair_value: float | None
+    fair_value_base: float | None = None
+    fair_value_low: float | None = None
+    fair_value_high: float | None = None
+    risk_overvalued: bool | None = None
     fundamentals: dict
     technicals: dict
     sentiment_summary: str | None
@@ -83,13 +90,55 @@ def build_context_pack(ticker: str, raw_data: dict) -> ContextPack:
     fair_value = _first_number(
         raw_data,
         "fair_value",
+        "fair_value_base",
         "fair_value_estimate",
         nested_paths=(
             ("fundamentals", "fair_value"),
+            ("fundamentals", "fair_value_base"),
             ("fundamental_data", "fair_value"),
+            ("fundamental_data", "fair_value_base"),
             ("verdict", "fair_value"),
+            ("verdict", "fair_value_base"),
         ),
     )
+    fair_value_base = _first_number(
+        raw_data,
+        "fair_value_base",
+        nested_paths=(
+            ("fundamentals", "fair_value_base"),
+            ("fundamental_data", "fair_value_base"),
+            ("verdict", "fair_value_base"),
+        ),
+    )
+    fair_value_low = _first_number(
+        raw_data,
+        "fair_value_low",
+        nested_paths=(
+            ("fundamentals", "fair_value_low"),
+            ("fundamental_data", "fair_value_low"),
+            ("verdict", "fair_value_low"),
+        ),
+    )
+    fair_value_high = _first_number(
+        raw_data,
+        "fair_value_high",
+        nested_paths=(
+            ("fundamentals", "fair_value_high"),
+            ("fundamental_data", "fair_value_high"),
+            ("verdict", "fair_value_high"),
+        ),
+    )
+    risk_overvalued = _first_present(raw_data, "risk_overvalued")
+    if risk_overvalued is None:
+        for path in (
+            ("fundamentals", "risk_overvalued"),
+            ("fundamental_data", "risk_overvalued"),
+            ("verdict", "risk_overvalued"),
+        ):
+            value = _nested_get(raw_data, path)
+            if value not in (None, ""):
+                risk_overvalued = value
+                break
     fundamentals = _first_dict(
         raw_data, "fundamentals", "fundamental_data", "fundamental"
     )
@@ -125,6 +174,10 @@ def build_context_pack(ticker: str, raw_data: dict) -> ContextPack:
         as_of=_resolve_as_of(raw_data),
         price=price or 0.0,
         fair_value=fair_value,
+        fair_value_base=fair_value_base or fair_value,
+        fair_value_low=fair_value_low,
+        fair_value_high=fair_value_high,
+        risk_overvalued=_optional_bool(risk_overvalued),
         fundamentals=fundamentals,
         technicals=technicals,
         sentiment_summary=sentiment_summary,
@@ -136,6 +189,10 @@ def build_context_pack(ticker: str, raw_data: dict) -> ContextPack:
             raw_data,
             current_price=price,
             fair_value=fair_value,
+            fair_value_base=fair_value_base or fair_value,
+            fair_value_low=fair_value_low,
+            fair_value_high=fair_value_high,
+            risk_overvalued=_optional_bool(risk_overvalued),
         ),
     )
     pack.token_estimate = len(pack_to_prompt_string(pack)) // 4
@@ -197,6 +254,13 @@ def pack_to_prompt_string(
             omitted.append(field_name)
 
     prompt = candidate_text(extra_lines)
+    while len(prompt) > limit and extra_lines:
+        removed_line = extra_lines.pop()
+        removed_name = removed_line.split(":", 1)[0].strip() or "field"
+        if removed_name not in omitted:
+            omitted.append(removed_name)
+        prompt = candidate_text(extra_lines)
+
     if omitted:
         logger.warning(
             "Context pack fields truncated for %s to keep prompt under %s chars: %s",
@@ -212,6 +276,10 @@ def _collect_priority_fields(
     *,
     current_price: float | None,
     fair_value: float | None,
+    fair_value_base: float | None = None,
+    fair_value_low: float | None = None,
+    fair_value_high: float | None = None,
+    risk_overvalued: Any = None,
 ) -> dict[str, Any]:
     """Collect tiered context fields from raw provider and verdict payloads."""
     verdict = _first_dict(raw_data, "verdict", "final_verdict")
@@ -226,6 +294,10 @@ def _collect_priority_fields(
         "rating": _first_present(verdict, raw_data, "rating"),
         "current_price": current_price,
         "fair_value": fair_value,
+        "fair_value_base": fair_value_base or fair_value,
+        "fair_value_low": fair_value_low,
+        "fair_value_high": fair_value_high,
+        "risk_overvalued": risk_overvalued,
         "rr": _first_present(verdict, raw_data, "rr", "risk_reward_ratio", "rr_ratio"),
         "confidence": _first_present(
             verdict, raw_data, "confidence", "model_confidence"
@@ -270,10 +342,28 @@ def _priority_fields_for_pack(pack: ContextPack) -> dict[str, Any]:
     fields = dict(pack.priority_fields)
     fields["current_price"] = fields.get("current_price", pack.price)
     fields["fair_value"] = fields.get("fair_value", pack.fair_value)
+    fields["fair_value_base"] = fields.get("fair_value_base", pack.fair_value_base)
+    fields["fair_value_low"] = fields.get("fair_value_low", pack.fair_value_low)
+    fields["fair_value_high"] = fields.get("fair_value_high", pack.fair_value_high)
+    fields["risk_overvalued"] = fields.get("risk_overvalued", pack.risk_overvalued)
     fields.setdefault("news_summary", pack.sentiment_summary)
     for field_name in CONTEXT_FIELD_TIERS["tier1"]:
         fields.setdefault(field_name, "INSUFFICIENT_DATA")
     return fields
+
+
+def _optional_bool(value: Any) -> bool | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "1", "yes", "y"}:
+            return True
+        if normalized in {"false", "0", "no", "n"}:
+            return False
+    return bool(value)
 
 
 def _first_present(*dicts_and_keys: Any) -> Any:

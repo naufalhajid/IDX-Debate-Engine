@@ -4,11 +4,85 @@ fair_value_calculator.py — Pure-Python fair value engine untuk saham IHSG.
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
+from typing import Any
 
 from utils.logger_config import logger
 from utils.trade_math import calculate_rr
+
+
+SECTOR_CACHE_PATH = Path("output/sector_cache.json")
+
+
+def _normalize_ticker_key(ticker: str) -> str:
+    """Return the cache key used across IDX ticker payloads."""
+    return str(ticker or "").upper().replace(".JK", "").strip()
+
+
+@lru_cache(maxsize=1)
+def _load_sector_cache() -> dict[str, Any]:
+    """Load output/sector_cache.json if available, otherwise return an empty map."""
+    try:
+        with SECTOR_CACHE_PATH.open("r", encoding="utf-8") as handle:
+            raw = json.load(handle)
+    except FileNotFoundError:
+        return {}
+    except Exception as exc:
+        logger.warning("[FairValue] Failed to load sector cache: {}", exc)
+        return {}
+
+    if not isinstance(raw, dict):
+        logger.warning("[FairValue] sector_cache.json is not a mapping; ignored.")
+        return {}
+
+    return {
+        _normalize_ticker_key(ticker): payload
+        for ticker, payload in raw.items()
+        if _normalize_ticker_key(ticker)
+    }
+
+
+def _sector_from_cache(ticker: str) -> str | None:
+    payload = _load_sector_cache().get(_normalize_ticker_key(ticker))
+    if isinstance(payload, dict):
+        sector = str(payload.get("sector") or "").strip().lower()
+        return sector or None
+    if isinstance(payload, str):
+        sector = payload.strip().lower()
+        return sector or None
+    return None
+
+
+def _range_pct_for_method_count(method_count: int) -> float | None:
+    if method_count >= 3:
+        return 0.10
+    if method_count == 2:
+        return 0.15
+    if method_count == 1:
+        return 0.25
+    return None
+
+
+def _valuation_verdict_from_range(
+    *,
+    price: float,
+    fair_value_base: float,
+    fair_value_low: float,
+    fair_value_high: float,
+) -> str:
+    if price < fair_value_low:
+        return "UNDERVALUED"
+    if price < fair_value_base * 0.95:
+        return "SLIGHTLY_UNDERVALUED"
+    if price <= fair_value_base * 1.05:
+        return "FAIRLY_VALUED"
+    if price <= fair_value_high:
+        return "SLIGHTLY_OVERVALUED"
+    return "OVERVALUED"
 
 
 # ---------------------------------------------------------------------------
@@ -477,9 +551,33 @@ class FairValueCalculator:
         "SMRA": "property",
     }
 
+    SECTOR_PROFILE_ALIAS = {
+        "bank": "bank",
+        "finance_nonbank": "bank",
+        "consumer_staples": "consumer",
+        "consumer_disc": "consumer",
+        "consumer": "consumer",
+        "energy": "mining",
+        "basic_materials": "mining",
+        "mining": "mining",
+        "property": "property",
+        "industrials": "default",
+        "infrastructure": "default",
+        "transport": "default",
+        "tech": "default",
+        "healthcare": "default",
+        "default": "default",
+    }
+
     def __init__(self, stats: KeyStats, sector: str | None = None):
         self.stats = stats
-        self.sector = sector or self.TICKER_SECTOR.get(stats.ticker.upper(), "default")
+        self.raw_sector = (
+            str(sector).strip().lower()
+            if sector
+            else _sector_from_cache(stats.ticker)
+            or self.TICKER_SECTOR.get(_normalize_ticker_key(stats.ticker), "default")
+        )
+        self.sector = self.SECTOR_PROFILE_ALIAS.get(self.raw_sector, "default")
         self.weights = self.SECTOR_WEIGHTS[self.sector]
         self._weighted_result_cache: dict | None = None
         assert abs(sum(self.weights.values()) - 1.0) < 1e-9, (
@@ -557,6 +655,11 @@ class FairValueCalculator:
             return self._cache_weighted_result(
                 {
                     "fair_value": None,
+                    "fair_value_base": None,
+                    "fair_value_low": None,
+                    "fair_value_high": None,
+                    "range_pct": None,
+                    "risk_overvalued": False,
                     "breakdown": {},
                     "confidence": "INSUFFICIENT_DATA",
                     "margin_of_safety_pct": None,
@@ -572,29 +675,40 @@ class FairValueCalculator:
 
         n = len(results)
         confidence = "HIGH" if n == 3 else ("MEDIUM" if n == 2 else "LOW")
+        range_pct = _range_pct_for_method_count(n)
+        if range_pct is None:
+            fair_value_low = None
+            fair_value_high = None
+        else:
+            fair_value_low = round(weighted_fv * (1 - range_pct), 0)
+            fair_value_high = round(weighted_fv * (1 + range_pct), 0)
 
         mos = None
         verdict = "DATA_UNAVAILABLE"
+        risk_overvalued = False
         if self.stats.current_price > 0 and weighted_fv > 0:
             mos = round(
                 ((weighted_fv - self.stats.current_price) / self.stats.current_price)
                 * 100,
                 1,
             )
-            if mos >= 20:
-                verdict = "UNDERVALUED"
-            elif mos >= 5:
-                verdict = "SLIGHTLY_UNDERVALUED"
-            elif mos >= -5:
-                verdict = "FAIRLY_VALUED"
-            elif mos >= -20:
-                verdict = "SLIGHTLY_OVERVALUED"
-            else:
-                verdict = "OVERVALUED"
+            if fair_value_low is not None and fair_value_high is not None:
+                verdict = _valuation_verdict_from_range(
+                    price=self.stats.current_price,
+                    fair_value_base=weighted_fv,
+                    fair_value_low=fair_value_low,
+                    fair_value_high=fair_value_high,
+                )
+                risk_overvalued = self.stats.current_price > fair_value_high
 
         return self._cache_weighted_result(
             {
                 "fair_value": weighted_fv,
+                "fair_value_base": weighted_fv,
+                "fair_value_low": fair_value_low,
+                "fair_value_high": fair_value_high,
+                "range_pct": range_pct,
+                "risk_overvalued": risk_overvalued,
                 "breakdown": {k: int(v) for k, v in results.items()},
                 "confidence": confidence,
                 "margin_of_safety_pct": mos,
@@ -635,6 +749,10 @@ class FairValueCalculator:
 
         result = self._weighted_result_cache or self.fair_value_weighted()
         fv = result["fair_value"]
+        fv_base = result.get("fair_value_base")
+        fv_low = result.get("fair_value_low")
+        fv_high = result.get("fair_value_high")
+        risk_overvalued = bool(result.get("risk_overvalued"))
         bdown = result["breakdown"]
         mos = result["margin_of_safety_pct"]
         conf = result["confidence"]
@@ -689,11 +807,20 @@ class FairValueCalculator:
             if fv is not None
             else "Tidak dapat dikalkulasi (Data Kosong / None)"
         )
+        fv_base_str = f"Rp {fv_base:,.0f}" if fv_base is not None else "N/A"
+        fv_range_str = (
+            f"Rp {fv_low:,.0f} - Rp {fv_high:,.0f}"
+            if fv_low is not None and fv_high is not None
+            else "N/A"
+        )
         lines += [
             "",
             "── HASIL AKHIR ─────────────────────────────────────────────────",
             f"  FAIR VALUE (weighted avg) : {fv_str}",
+            f"  FAIR VALUE BASE           : {fv_base_str}",
+            f"  FAIR VALUE RANGE          : {fv_range_str}",
             f"  Kalkulasi confidence      : {conf} ({len(bdown)}/3 metode valid)",
+            f"  RISK OVERVALUED           : {risk_overvalued}",
             "",
         ]
 
@@ -702,22 +829,34 @@ class FairValueCalculator:
             lines += [
                 "── MARGIN OF SAFETY ────────────────────────────────────────────",
                 f"  Harga Pasar   : Rp {self.stats.current_price:,.0f}",
-                f"  Fair Value    : Rp {fv:,.0f}",
+                f"  Fair Value    : {fv_base_str}",
+                f"  FV Range      : {fv_range_str}",
                 f"  Gap           : {mos:+.1f}% ({symbol})",
                 f"  Verdict       : {verdict}",
+                f"  Risk Overval. : {risk_overvalued}",
                 "",
             ]
 
-            if verdict in ("OVERVALUED", "SLIGHTLY_OVERVALUED"):
+            if verdict == "OVERVALUED":
                 premium = abs(mos)
                 lines += [
                     "🚨 PERINGATAN OVERVALUATION 🚨",
-                    f"   Harga pasar {premium:.1f}% DI ATAS fair value.",
+                    f"   Harga pasar {premium:.1f}% DI ATAS base fair value "
+                    "dan di atas range high.",
                     "   IMPLIKASI SWING TRADE:",
                     "   • Margin of safety NEGATIF — tidak ada bantalan jika tesis salah.",
                     "   • Entry hanya valid jika ada momentum kuat dan katalis spesifik.",
                     "   • CIO HARUS memberikan rating HOLD atau AVOID kecuali ada alasan",
                     "     teknikal yang sangat kuat untuk override.",
+                    "",
+                ]
+            elif verdict == "SLIGHTLY_OVERVALUED":
+                lines += [
+                    "CATATAN VALUASI:",
+                    "   Harga berada di atas base fair value, "
+                    "tetapi masih dalam fair value range.",
+                    "   Tidak dianggap overvalued oleh risk governor "
+                    "selama harga <= range high.",
                     "",
                 ]
             elif verdict == "UNDERVALUED":
@@ -770,7 +909,7 @@ HISTORICAL_MULTIPLES: dict[str, dict] = {
 
 def get_historical_multiples(ticker: str) -> dict:
     return HISTORICAL_MULTIPLES.get(
-        ticker.upper(),
+        _normalize_ticker_key(ticker),
         {"pe": 15.0, "pb": 2.0, "cost_of_equity": 0.10, "growth_rate": 0.06},
     )
 
@@ -852,11 +991,11 @@ def extract_historical_multiples(api_response: dict, ticker: str) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def build_fair_value_report(
+def build_fair_value_payload(
     api_response: dict,
     ticker: str,
     current_price: float,
-) -> tuple[str, float | None]:
+) -> tuple[str, dict]:
     multiples = extract_historical_multiples(api_response, ticker)
     stats = extract_keystats(api_response, ticker=ticker)
 
@@ -895,4 +1034,13 @@ def build_fair_value_report(
             "[FairValue] {}: fair value tidak dapat dikalkulasi — semua metode gagal",
             ticker,
         )
-    return report, fv
+    return report, result
+
+
+def build_fair_value_report(
+    api_response: dict,
+    ticker: str,
+    current_price: float,
+) -> tuple[str, float | None]:
+    report, result = build_fair_value_payload(api_response, ticker, current_price)
+    return report, result["fair_value"]

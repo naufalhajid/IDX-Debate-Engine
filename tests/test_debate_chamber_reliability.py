@@ -497,6 +497,22 @@ def test_momentum_override_blocked_when_not_overvalued():
     assert "MOMENTUM WATCHLIST" not in (result.get("weighted_reasoning") or "")
 
 
+def test_momentum_override_blocked_when_price_inside_fair_value_range():
+    chamber = _chamber()
+
+    parsed = {
+        "rating": "AVOID",
+        "confidence": 0.0,
+        "current_price": 108.0,
+        "fair_value": 100.0,
+        "fair_value_high": 115.0,
+    }
+    result = chamber._apply_consensus_override(parsed, _confidence_winner_state("HOLD"))
+
+    assert result["rating"] == "AVOID"
+    assert "MOMENTUM WATCHLIST" not in (result.get("weighted_reasoning") or "")
+
+
 def test_news_adjustment_from_sentiment_is_consistent():
     # Adjustment is derived from the sentiment label, so the two can never
     # contradict (the keyword path could: BREN was POSITIVE overall + -0.20 adj).
@@ -1120,6 +1136,42 @@ def test_cio_verdict_rejects_invalid_price_ordering():
             current_price=100,
             fair_value=120,
         )
+
+
+def test_cio_verdict_uses_high_bound_for_overvalued_flag():
+    verdict = CIOVerdict(
+        ticker="SOFT",
+        rating="BUY",
+        confidence=0.7,
+        entry_price_range="95 - 105",
+        target_price=120,
+        stop_loss=90,
+        current_price=108,
+        fair_value=100,
+        fair_value_base=100,
+        fair_value_high=115,
+    )
+
+    assert verdict.risk_overvalued is False
+    assert verdict.is_overvalued is False
+
+
+def test_cio_verdict_marks_risk_overvalued_above_high_bound():
+    verdict = CIOVerdict(
+        ticker="HARD",
+        rating="BUY",
+        confidence=0.7,
+        entry_price_range="95 - 105",
+        target_price=130,
+        stop_loss=90,
+        current_price=116,
+        fair_value=100,
+        fair_value_base=100,
+        fair_value_high=115,
+    )
+
+    assert verdict.risk_overvalued is True
+    assert verdict.is_overvalued is True
 
 
 def test_sanitize_json_preserves_url_and_hash_inside_strings():

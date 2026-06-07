@@ -5,7 +5,7 @@ Swing Trade update (this session):
 - CIOVerdict rebuilt for 1-3 month swing trade frame:
     • fair_value, entry_price_range, target_price, stop_loss (concrete prices)
     • expected_return auto-calculated from entry midpoint → target_price
-    • is_overvalued auto-flag when current_price > fair_value
+    • is_overvalued auto-flag follows risk_overvalued (range-aware when available)
     • risk_reward_ratio auto-calculated; rating forced to HOLD/AVOID when < 1.0
     • wait_and_see kept (confidence < 0.60 gate)
 - DebateChamberState gains `current_price` field for margin-of-safety logic
@@ -63,7 +63,7 @@ class CIOVerdict(BaseDataClass):
     Auto-computed fields (model_validator, never sent by the LLM):
         expected_return   — % gain from entry_mid to target_price
         risk_reward_ratio — expected_return / stop_loss_pct
-        is_overvalued     — current_price > fair_value
+        is_overvalued     — follows risk_overvalued for backward compatibility
         wait_and_see      — confidence < 0.60  OR  risk_reward_ratio < 1.0
 
     Used with LangChain's `.with_structured_output()`.
@@ -90,6 +90,18 @@ class CIOVerdict(BaseDataClass):
             "Intrinsic value calculated from Relative Valuation. "
             "Pass null if INSUFFICIENT_DATA or 0."
         ),
+    )
+    fair_value_base: float | None = Field(
+        default=None,
+        description="Base fair value used for scoring; same value as fair_value.",
+    )
+    fair_value_low: float | None = Field(
+        default=None,
+        description="Conservative low end of the fair value range.",
+    )
+    fair_value_high: float | None = Field(
+        default=None,
+        description="Optimistic high end of the fair value range.",
     )
     # FIX: ISSUE 1 — Carry unverified valuation state into final artifacts.
     valuation_gap: str | None = Field(
@@ -166,7 +178,12 @@ class CIOVerdict(BaseDataClass):
 
     is_overvalued: bool | None = Field(
         default=None,
-        description="Auto-flag: True when current_price > fair_value.",
+        description="Backward-compatible auto-flag; mirrors risk_overvalued.",
+    )
+
+    risk_overvalued: bool | None = Field(
+        default=None,
+        description="Risk flag: True only when current_price is above fair_value_high.",
     )
 
     wait_and_see: bool = Field(
@@ -255,15 +272,22 @@ class CIOVerdict(BaseDataClass):
         else:
             self.risk_reward_ratio = None
 
-        # 4. Overvaluation flag — Margin of Safety check
-        if (
-            self.current_price is not None
-            and self.fair_value is not None
-            and self.fair_value > 0
-        ):
-            self.is_overvalued = self.current_price > self.fair_value
+        # 4. Overvaluation flag - range-aware margin-of-safety check.
+        if self.fair_value_base is None and self.fair_value is not None:
+            self.fair_value_base = self.fair_value
+        if self.fair_value is None and self.fair_value_base is not None:
+            self.fair_value = self.fair_value_base
+
+        if self.current_price is not None and self.current_price > 0:
+            if self.fair_value_high is not None and self.fair_value_high > 0:
+                self.risk_overvalued = self.current_price > self.fair_value_high
+            elif self.fair_value is not None and self.fair_value > 0:
+                self.risk_overvalued = self.current_price > self.fair_value
+            else:
+                self.risk_overvalued = False
         else:
-            self.is_overvalued = None
+            self.risk_overvalued = False
+        self.is_overvalued = self.risk_overvalued
 
         # 5. Rating downgrade guard — only trigger on genuinely bad R/R.
         #    Missing fair_value is noted via wait_and_see but does NOT force
@@ -284,7 +308,8 @@ class CIOVerdict(BaseDataClass):
                 "fundamental" in s.lower() for s in self.key_risks
             ):
                 self.key_risks = list(self.key_risks) + [
-                    "Fair value tidak tersedia — validasi fundamental secara manual sebelum entry."
+                    "Fair value tidak tersedia — validasi fundamental "
+                    "secara manual sebelum entry."
                 ]
 
         # 7. ── PRICES ARE ALWAYS PRESERVED ──────────────────────────────────
@@ -387,9 +412,13 @@ class CIOVerdict(BaseDataClass):
             "sell_at": self.target_price,
             "cut_loss": self.stop_loss,
             "fair_value": self.fair_value,
+            "fair_value_base": self.fair_value_base,
+            "fair_value_low": self.fair_value_low,
+            "fair_value_high": self.fair_value_high,
             "expected_return": self.expected_return,
             "risk_reward": self.risk_reward_ratio,
             "is_overvalued": self.is_overvalued,
+            "risk_overvalued": self.risk_overvalued,
             "wait_and_see": self.wait_and_see,
             "confidence": self.confidence,
             "summary": self.summary,
@@ -408,6 +437,7 @@ def validate_swing_targets(
     target_price: float,
     entry_price_range: str,
     stop_loss: float,
+    fair_value_high: float | None = None,
 ) -> dict:
     """
     Pure-Python margin-of-safety check injected by the Synthesizer node
@@ -418,12 +448,19 @@ def validate_swing_targets(
     """
     warnings: list[str] = []
 
-    # Overvaluation
-    if fair_value > 0 and current_price > fair_value:
-        premium = ((current_price - fair_value) / fair_value) * 100
+    # Overvaluation: prefer fair_value_high when available, so prices still
+    # inside the valuation range do not create a hard warning.
+    uses_high_bound = fair_value_high is not None and fair_value_high > 0
+    overvaluation_threshold = fair_value_high if uses_high_bound else fair_value
+    if overvaluation_threshold > 0 and current_price > overvaluation_threshold:
+        premium = (
+            (current_price - overvaluation_threshold) / overvaluation_threshold
+        ) * 100
+        threshold_label = "fair value high" if uses_high_bound else "fair value"
         warnings.append(
             f"⚠️ OVERVALUED: Current price ({current_price:,.0f}) is "
-            f"{premium:.1f}% above fair value ({fair_value:,.0f}). "
+            f"{premium:.1f}% above {threshold_label} "
+            f"({overvaluation_threshold:,.0f}). "
             "Swing trade is HIGH RISK — margin of safety is negative."
         )
 
@@ -572,6 +609,11 @@ class DebateChamberState(TypedDict):
 
     # Parsed fair value estimate for CIO trade envelope computation
     fair_value_estimate: float
+    fair_value_base: float | None
+    fair_value_low: float | None
+    fair_value_high: float | None
+    fair_value_range_pct: float | None
+    risk_overvalued: bool
 
     # Debate engine
     debate_history: Annotated[list[DebateMessage], history_updater]

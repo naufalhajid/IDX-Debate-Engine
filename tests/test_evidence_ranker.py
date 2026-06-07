@@ -26,6 +26,10 @@ def _pack(
         as_of=as_of or datetime.now(timezone.utc),
         price=6125.0,
         fair_value=10474.0,
+        fair_value_base=10474.0,
+        fair_value_low=8903.0,
+        fair_value_high=12045.0,
+        risk_overvalued=False,
         fundamentals={
             "brief": "ROE 22.4%, net margin 49.5%, dividend yield 5.49%.",
             "exdate": "30 Mar 26",
@@ -77,6 +81,13 @@ def test_chunk_context_pack_returns_chunks_for_non_empty_categories(
     }.issubset(categories)
     assert all(chunk.content_hash for chunk in chunks)
     assert all("_run_1_" in chunk.chunk_id for chunk in chunks)
+
+    fair_value_chunk = next(
+        chunk for chunk in chunks if chunk.category == "fair_value"
+    )
+    assert "Fair Value Base: 10474" in fair_value_chunk.content
+    assert "Fair Value Range: 8903 - 12045" in fair_value_chunk.content
+    assert "Risk Overvalued: False" in fair_value_chunk.content
 
 
 def test_chunk_context_pack_uses_source_timestamp_for_staleness(
