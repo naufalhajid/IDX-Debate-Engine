@@ -25,9 +25,11 @@ from langchain_core.messages import (
 )
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 from openai import AsyncOpenAI, OpenAI
-from pydantic import SecretStr, PrivateAttr
+from pydantic import SecretStr, PrivateAttr, field_validator
 
 from utils.logger_config import logger
+
+REASONING_EFFORTS = {"none", "minimal", "low", "medium", "high", "xhigh"}
 
 
 class ChatCodexResponses(BaseChatModel):
@@ -39,10 +41,27 @@ class ChatCodexResponses(BaseChatModel):
     temperature: Optional[float] = None
     max_completion_tokens: Optional[int] = None
     max_tokens: Optional[int] = None
+    reasoning_effort: Optional[str] = None
     base_url: Optional[str] = None
 
     _client: Any = PrivateAttr()
     _sync_client: Any = PrivateAttr()
+
+    @field_validator("reasoning_effort")
+    @classmethod
+    def _validate_reasoning_effort(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        effort = value.strip().lower()
+        if not effort:
+            return None
+        if effort not in REASONING_EFFORTS:
+            raise ValueError(
+                "reasoning_effort must be one of "
+                "none, minimal, low, medium, high, xhigh. "
+                "Use 'xhigh' for Extra High."
+            )
+        return effort
 
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
@@ -132,6 +151,9 @@ class ChatCodexResponses(BaseChatModel):
         if not instructions:
             instructions = "You are a helpful AI assistant."
         api_kwargs["instructions"] = instructions
+
+        if self.reasoning_effort:
+            api_kwargs["reasoning"] = {"effort": self.reasoning_effort}
 
         tools = kwargs.get("tools")
         if tools:

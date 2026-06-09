@@ -39,6 +39,21 @@ async def test_run_with_guard_returns_failed_result_on_exception() -> None:
 
 
 @pytest.mark.asyncio
+async def test_run_with_guard_names_empty_exception() -> None:
+    async def failed_run() -> dict[str, str]:
+        raise RuntimeError()
+
+    result = await run_with_guard("BBRI", failed_run())
+
+    assert result == {
+        "ticker": "BBRI",
+        "status": "failed",
+        "error": "RuntimeError",
+        "result": None,
+    }
+
+
+@pytest.mark.asyncio
 async def test_run_with_guard_returns_ok_result_on_success() -> None:
     expected_payload = {"verdict": "BUY", "confidence": 0.82}
 

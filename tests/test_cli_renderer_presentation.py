@@ -38,6 +38,34 @@ def test_cli_alerts_are_buffered_until_execution_warning_block() -> None:
     assert "possibly delisted" in output
 
 
+def test_cli_alerts_summarize_provider_dns_noise() -> None:
+    console = _recording_console(width=180)
+    renderer = CliRenderer(con=console)
+
+    renderer.render_error(
+        "Stockbit failure classified: HTTPSConnectionPool(host='exodus.stockbit.com', "
+        "port=443): Failed to resolve 'exodus.stockbit.com' ([Errno 11001] getaddrinfo failed)"
+    )
+    renderer.render_warning(
+        "[MarketData] BREN info fetch failed: Failed to perform, curl: (6) "
+        "Could not resolve host: query2.finance.yahoo.com."
+    )
+    renderer.render_warning(
+        "$BREN.JK: possibly delisted; no price data found  (period=5d)"
+    )
+    renderer.render_warning("[News] BREN: BREAKING NEWS DETECTED")
+
+    renderer.flush_buffered_alerts()
+
+    output = console.export_text()
+    assert "Provider DNS/network failures" in output
+    assert "exodus.stockbit.com x1" in output
+    assert "query2.finance.yahoo.com x1" in output
+    assert "Market price data unavailable for BREN.JK" in output
+    assert "BREAKING NEWS DETECTED" in output
+    assert "HTTPSConnectionPool" not in output
+
+
 def test_summary_footer_uses_explicit_metric_labels() -> None:
     console = _recording_console()
     renderer = CliRenderer(con=console)

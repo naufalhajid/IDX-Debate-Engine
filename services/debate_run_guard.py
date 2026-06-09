@@ -19,6 +19,13 @@ class GuardResult(BaseModel):
     result: Any | None
 
 
+def _exception_message(exc: Exception) -> str:
+    message = str(exc).strip()
+    if message:
+        return message
+    return type(exc).__name__
+
+
 async def run_with_guard(
     ticker: str,
     coro: Awaitable[Any],
@@ -38,7 +45,7 @@ async def run_with_guard(
         return GuardResult(
             ticker=ticker,
             status="failed",
-            error=str(exc),
+            error=_exception_message(exc),
             result=None,
         ).model_dump()
 

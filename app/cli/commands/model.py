@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Optional
 
 import typer
 from rich.panel import Panel
@@ -73,6 +74,12 @@ MODELS = {
     },
 }
 
+CODEX_REASONING_CHOICES = ("low", "medium", "high", "xhigh")
+CODEX_REASONING_DEFAULTS = {
+    "flash": "medium",
+    "pro": "xhigh",
+}
+
 
 def update_env_file(key: str, value: str) -> None:
     """Update or add a variable in .env."""
@@ -116,6 +123,39 @@ def _get_current_models(provider: str) -> tuple[str, str]:
     return _read(f"{p}_FLASH_MODEL"), _read(f"{p}_PRO_MODEL")
 
 
+def _get_current_codex_reasoning() -> tuple[str, str]:
+    """Return (flash_reasoning, pro_reasoning) for Codex from .env."""
+    if not ENV_PATH.exists():
+        return "(default)", "(default)"
+    content = ENV_PATH.read_text(encoding="utf-8")
+
+    def _read(key: str) -> str:
+        m = re.search(rf"^{key}=(.*)$", content, re.MULTILINE)
+        return m.group(1).strip() if m else "(default)"
+
+    return _read("CODEX_FLASH_REASONING_EFFORT"), _read(
+        "CODEX_PRO_REASONING_EFFORT"
+    )
+
+
+def _configured_or_default(value: str, provider: str, tier: str) -> str:
+    if value and value != "(default)":
+        return value
+    return MODELS[provider][tier][0]
+
+
+def _normalize_reasoning_effort(value: str, *, tier: str) -> str:
+    effort = value.strip().lower()
+    if effort not in CODEX_REASONING_CHOICES:
+        console.print(
+            "[idx.error]Invalid Codex reasoning effort "
+            f"'{value}'. Choose: low, medium, high, xhigh. "
+            "Use 'xhigh' for Extra High.[/idx.error]"
+        )
+        raise typer.Exit(1)
+    return effort
+
+
 def select_model(provider: str, tier: str) -> str:
     choices = MODELS[provider][tier]
     console.print(
@@ -142,12 +182,90 @@ def select_model(provider: str, tier: str) -> str:
     return choices[0]
 
 
+def select_codex_reasoning(tier: str) -> str:
+    default = CODEX_REASONING_DEFAULTS[tier]
+    console.print(
+        f"\nSelect reasoning for [idx.highlight]Codex - {tier.capitalize()} Tier[/idx.highlight]:"
+    )
+    for i, effort in enumerate(CODEX_REASONING_CHOICES, 1):
+        marker = " [idx.ok]<- Recommended[/idx.ok]" if effort == default else ""
+        console.print(f"  [[idx.highlight]{i}[/idx.highlight]] {effort}{marker}")
+
+    choice = input(
+        f"Your choice [1-{len(CODEX_REASONING_CHOICES)}] "
+        f"(default: {default}): "
+    ).strip().lower()
+
+    if not choice:
+        return default
+    if choice in CODEX_REASONING_CHOICES:
+        return choice
+    try:
+        idx = int(choice) - 1
+        if 0 <= idx < len(CODEX_REASONING_CHOICES):
+            return CODEX_REASONING_CHOICES[idx]
+    except ValueError:
+        pass
+
+    console.print("[idx.warn]Invalid choice, using recommended default.[/idx.warn]")
+    return default
+
+
+def _configure_codex_non_interactive(
+    flash_reasoning: Optional[str],
+    pro_reasoning: Optional[str],
+) -> tuple[str, str, str, str]:
+    current_flash_model, current_pro_model = _get_current_models("codex")
+    current_flash_reasoning, current_pro_reasoning = _get_current_codex_reasoning()
+
+    flash_model = _configured_or_default(current_flash_model, "codex", "flash")
+    pro_model = _configured_or_default(current_pro_model, "codex", "pro")
+    flash_effort_source = (
+        flash_reasoning
+        or (
+            current_flash_reasoning
+            if current_flash_reasoning != "(default)"
+            else CODEX_REASONING_DEFAULTS["flash"]
+        )
+    )
+    pro_effort_source = (
+        pro_reasoning
+        or (
+            current_pro_reasoning
+            if current_pro_reasoning != "(default)"
+            else CODEX_REASONING_DEFAULTS["pro"]
+        )
+    )
+    flash_effort = _normalize_reasoning_effort(flash_effort_source, tier="flash")
+    pro_effort = _normalize_reasoning_effort(pro_effort_source, tier="pro")
+
+    update_env_file("DEFAULT_LLM_PROVIDER", "codex")
+    update_env_file("CODEX_FLASH_MODEL", flash_model)
+    update_env_file("CODEX_PRO_MODEL", pro_model)
+    update_env_file("CODEX_FLASH_REASONING_EFFORT", flash_effort)
+    update_env_file("CODEX_PRO_REASONING_EFFORT", pro_effort)
+
+    return flash_model, pro_model, flash_effort, pro_effort
+
+
 def model_command(
-    provider: str = typer.Argument(
+    provider: Optional[str] = typer.Argument(
         None, help="Provider name: gemini, anthropic, or codex."
+    ),
+    flash_reasoning: Optional[str] = typer.Option(
+        None,
+        "--flash-reasoning",
+        help="Codex flash reasoning effort: low, medium, high, or xhigh.",
+    ),
+    pro_reasoning: Optional[str] = typer.Option(
+        None,
+        "--pro-reasoning",
+        help="Codex pro reasoning effort: low, medium, high, or xhigh.",
     ),
 ) -> None:
     """Switch LLM provider and configure flash/pro model variants."""
+    reasoning_flags_used = flash_reasoning is not None or pro_reasoning is not None
+
     if provider:
         provider = provider.lower()
         if provider not in ["gemini", "anthropic", "codex"]:
@@ -156,20 +274,62 @@ def model_command(
             )
             raise typer.Exit(1)
 
+        if reasoning_flags_used and provider != "codex":
+            console.print(
+                "[idx.error]Reasoning flags only apply to provider 'codex'.[/idx.error]"
+            )
+            raise typer.Exit(1)
+
+        if provider == "codex" and reasoning_flags_used:
+            flash_model, pro_model, flash_effort, pro_effort = (
+                _configure_codex_non_interactive(flash_reasoning, pro_reasoning)
+            )
+            console.print(
+                Panel(
+                    f"[idx.label]Provider:[/idx.label]           [idx.highlight]Codex[/idx.highlight]\n"
+                    f"[idx.label]Flash:[/idx.label]              [idx.value]{flash_model}[/idx.value]\n"
+                    f"[idx.label]Flash Reasoning:[/idx.label]    [idx.value]{flash_effort}[/idx.value]\n"
+                    f"[idx.label]Pro:[/idx.label]                [idx.value]{pro_model}[/idx.value]\n"
+                    f"[idx.label]Pro Reasoning:[/idx.label]      [idx.value]{pro_effort}[/idx.value]",
+                    title="[idx.ok]Configuration Updated[/idx.ok]",
+                    border_style="idx.ok",
+                    expand=False,
+                )
+            )
+            return
+
         update_env_file("DEFAULT_LLM_PROVIDER", provider)
         console.print(
             f"[idx.ok]Default provider changed to: [idx.highlight]{provider}[/idx.highlight][/idx.ok]"
         )
         return
 
+    if reasoning_flags_used:
+        console.print(
+            "[idx.error]Reasoning flags require provider 'codex'. "
+            "Example: idx model codex --flash-reasoning medium --pro-reasoning xhigh[/idx.error]"
+        )
+        raise typer.Exit(1)
+
     current = get_current_provider()
     flash_model, pro_model = _get_current_models(current)
+    panel_lines = [
+        f"[idx.label]Provider:[/idx.label]     [idx.highlight]{current.capitalize()}[/idx.highlight]",
+        f"[idx.label]Flash:[/idx.label]        [idx.value]{flash_model}[/idx.value]",
+        f"[idx.label]Pro:[/idx.label]          [idx.value]{pro_model}[/idx.value]",
+    ]
+    if current == "codex":
+        flash_effort, pro_effort = _get_current_codex_reasoning()
+        panel_lines.extend(
+            [
+                f"[idx.label]Flash Reasoning:[/idx.label] [idx.value]{flash_effort}[/idx.value]",
+                f"[idx.label]Pro Reasoning:[/idx.label]   [idx.value]{pro_effort}[/idx.value]",
+            ]
+        )
 
     console.print(
         Panel(
-            f"[idx.label]Provider:[/idx.label]     [idx.highlight]{current.capitalize()}[/idx.highlight]\n"
-            f"[idx.label]Flash:[/idx.label]        [idx.value]{flash_model}[/idx.value]\n"
-            f"[idx.label]Pro:[/idx.label]          [idx.value]{pro_model}[/idx.value]",
+            "\n".join(panel_lines),
             title="[idx.header]Current LLM Configuration[/idx.header]",
             border_style="idx.header",
             expand=False,
@@ -211,12 +371,27 @@ def model_command(
         elif selected_provider == "codex":
             update_env_file("CODEX_FLASH_MODEL", flash_model)
             update_env_file("CODEX_PRO_MODEL", pro_model)
+            flash_reasoning = select_codex_reasoning("flash")
+            pro_reasoning = select_codex_reasoning("pro")
+            update_env_file("CODEX_FLASH_REASONING_EFFORT", flash_reasoning)
+            update_env_file("CODEX_PRO_REASONING_EFFORT", pro_reasoning)
+
+        result_lines = [
+            f"[idx.label]Provider:[/idx.label]     [idx.highlight]{selected_provider.capitalize()}[/idx.highlight]",
+            f"[idx.label]Flash:[/idx.label]        [idx.value]{flash_model}[/idx.value]",
+            f"[idx.label]Pro:[/idx.label]          [idx.value]{pro_model}[/idx.value]",
+        ]
+        if selected_provider == "codex":
+            result_lines.extend(
+                [
+                    f"[idx.label]Flash Reasoning:[/idx.label] [idx.value]{flash_reasoning}[/idx.value]",
+                    f"[idx.label]Pro Reasoning:[/idx.label]   [idx.value]{pro_reasoning}[/idx.value]",
+                ]
+            )
 
         console.print(
             Panel(
-                f"[idx.label]Provider:[/idx.label]     [idx.highlight]{selected_provider.capitalize()}[/idx.highlight]\n"
-                f"[idx.label]Flash:[/idx.label]        [idx.value]{flash_model}[/idx.value]\n"
-                f"[idx.label]Pro:[/idx.label]          [idx.value]{pro_model}[/idx.value]",
+                "\n".join(result_lines),
                 title="[idx.ok]Configuration Updated[/idx.ok]",
                 border_style="idx.ok",
                 expand=False,

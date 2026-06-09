@@ -80,9 +80,15 @@ class Settings(BaseSettings):
     CODEX_OAUTH_CLIENT_ID: str = "app_EMoamEEZ73f0CkXaXp7hrann"
     CODEX_FLASH_MODEL: str = "gpt-5.4-mini"
     CODEX_PRO_MODEL: str = "gpt-5.5"
+    CODEX_FLASH_REASONING_EFFORT: str = "medium"
+    CODEX_PRO_REASONING_EFFORT: str = "xhigh"
 
     # Token storage directory for OAuth credentials
     TOKEN_STORAGE_DIR: str = "output/tokens"
+
+    # Debate runtime guard. Codex high/xhigh runs need more wall-clock time.
+    DEBATE_TIMEOUT_SECONDS: int = 300
+    CODEX_DEBATE_TIMEOUT_SECONDS: int = 900
 
     # ── Conviction Scoring Weights (must sum to 1.0) ─────────────────────────
     # Override via: CONVICTION_WEIGHT_CONFIDENCE=0.6 CONVICTION_WEIGHT_RR_RATIO=0.4

@@ -18,6 +18,8 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from langchain_core.messages import HumanMessage, SystemMessage
+from pydantic import SecretStr
 
 
 # ---------------------------------------------------------------------------
@@ -201,6 +203,171 @@ class TestGetLlm:
         result = get_llm("pro", provider="gemini")
         mock_pro.assert_called_once()
         assert result is mock_pro.return_value
+
+
+# ---------------------------------------------------------------------------
+# Codex Responses API payload
+# ---------------------------------------------------------------------------
+
+
+class TestCodexResponsesPayload:
+    """Test Codex Responses API payload construction."""
+
+    def test_build_api_kwargs_includes_reasoning(self):
+        from providers.codex_responses_llm import ChatCodexResponses
+
+        llm = ChatCodexResponses(
+            model="gpt-5.5",
+            api_key=SecretStr("test-token"),
+            reasoning_effort="xhigh",
+            max_tokens=1234,
+        )
+
+        payload = llm._build_api_kwargs(
+            [
+                SystemMessage(content="Use exact JSON."),
+                HumanMessage(content="Analyze BBCA."),
+            ]
+        )
+
+        assert payload["reasoning"] == {"effort": "xhigh"}
+        assert "max_output_tokens" not in payload
+        assert "max_tokens" not in payload
+        assert payload["instructions"] == "Use exact JSON."
+
+    def test_build_api_kwargs_omits_empty_reasoning(self):
+        from providers.codex_responses_llm import ChatCodexResponses
+
+        llm = ChatCodexResponses(
+            model="gpt-5.4-mini",
+            api_key=SecretStr("test-token"),
+            reasoning_effort="",
+            max_tokens=4000,
+        )
+
+        payload = llm._build_api_kwargs([HumanMessage(content="ping")])
+
+        assert "reasoning" not in payload
+        assert "max_output_tokens" not in payload
+        assert "max_tokens" not in payload
+
+    def test_invalid_reasoning_mentions_xhigh_hint(self):
+        from providers.codex_responses_llm import ChatCodexResponses
+
+        with pytest.raises(ValueError, match="xhigh"):
+            ChatCodexResponses(
+                model="gpt-5.5",
+                api_key=SecretStr("test-token"),
+                reasoning_effort="extra-high",
+            )
+
+
+# ---------------------------------------------------------------------------
+# Codex adapter settings
+# ---------------------------------------------------------------------------
+
+
+class TestCodexAdapter:
+    """Test Codex adapter forwards model and reasoning settings."""
+
+    def test_codex_flash_uses_medium_reasoning(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        calls = []
+
+        class FakeChatCodexResponses:
+            def __init__(self, **kwargs):
+                calls.append(kwargs)
+
+        monkeypatch.setattr("providers.codex_adapter.resolve_codex_token", lambda: "t")
+        monkeypatch.setattr(
+            "providers.codex_adapter.settings",
+            MagicMock(
+                CODEX_FLASH_MODEL="gpt-5.4-mini",
+                CODEX_FLASH_REASONING_EFFORT="medium",
+            ),
+        )
+        monkeypatch.setattr(
+            "providers.codex_responses_llm.ChatCodexResponses",
+            FakeChatCodexResponses,
+        )
+
+        from providers.codex_adapter import get_codex_flash_llm
+
+        get_codex_flash_llm()
+
+        assert calls[0]["model"] == "gpt-5.4-mini"
+        assert calls[0]["reasoning_effort"] == "medium"
+        assert calls[0]["max_tokens"] == 4000
+
+    def test_codex_pro_uses_xhigh_reasoning(self, monkeypatch: pytest.MonkeyPatch):
+        calls = []
+
+        class FakeChatCodexResponses:
+            def __init__(self, **kwargs):
+                calls.append(kwargs)
+
+        monkeypatch.setattr("providers.codex_adapter.resolve_codex_token", lambda: "t")
+        monkeypatch.setattr(
+            "providers.codex_adapter.settings",
+            MagicMock(
+                CODEX_PRO_MODEL="gpt-5.5",
+                CODEX_PRO_REASONING_EFFORT="xhigh",
+            ),
+        )
+        monkeypatch.setattr(
+            "providers.codex_responses_llm.ChatCodexResponses",
+            FakeChatCodexResponses,
+        )
+
+        from providers.codex_adapter import get_codex_pro_llm
+
+        get_codex_pro_llm()
+
+        assert calls[0]["model"] == "gpt-5.5"
+        assert calls[0]["reasoning_effort"] == "xhigh"
+        assert calls[0]["max_tokens"] == 10000
+
+
+# ---------------------------------------------------------------------------
+# Debate timeout selection
+# ---------------------------------------------------------------------------
+
+
+class TestDebateTimeoutSelection:
+    """Test provider-aware debate timeout defaults."""
+
+    def test_codex_xhigh_uses_extended_timeout(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(
+            "services.debate_chamber.settings",
+            MagicMock(
+                DEFAULT_LLM_PROVIDER="codex",
+                CODEX_PRO_REASONING_EFFORT="xhigh",
+                CODEX_FLASH_REASONING_EFFORT="medium",
+                DEBATE_TIMEOUT_SECONDS=300,
+                CODEX_DEBATE_TIMEOUT_SECONDS=900,
+            ),
+        )
+        from services.debate_chamber import DebateChamber
+
+        assert DebateChamber._default_timeout_seconds() == 900
+
+    def test_gemini_keeps_base_timeout(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(
+            "services.debate_chamber.settings",
+            MagicMock(
+                DEFAULT_LLM_PROVIDER="gemini",
+                CODEX_PRO_REASONING_EFFORT="xhigh",
+                CODEX_FLASH_REASONING_EFFORT="medium",
+                DEBATE_TIMEOUT_SECONDS=300,
+                CODEX_DEBATE_TIMEOUT_SECONDS=900,
+            ),
+        )
+        from services.debate_chamber import DebateChamber
+
+        assert DebateChamber._default_timeout_seconds() == 300
 
 
 # ---------------------------------------------------------------------------

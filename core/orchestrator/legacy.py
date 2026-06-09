@@ -625,9 +625,25 @@ class CliRenderer:
         table.add_column("Message", overflow="fold")
         seen: set[tuple[str, str]] = set()
         has_error = False
+        dns_counts: dict[str, int] = {}
+        dns_has_error = False
+        price_missing: set[str] = set()
+        price_missing_count = 0
+        price_missing_has_error = False
         for kind, message in pending:
             cleaned = _clean_cli_text(str(message)).strip()
             if not cleaned:
+                continue
+            dns_host = self._dns_failure_host(cleaned)
+            if dns_host:
+                dns_counts[dns_host] = dns_counts.get(dns_host, 0) + 1
+                dns_has_error = dns_has_error or kind == "error"
+                continue
+            missing_ticker = self._missing_price_ticker(cleaned)
+            if missing_ticker:
+                price_missing.add(missing_ticker)
+                price_missing_count += 1
+                price_missing_has_error = price_missing_has_error or kind == "error"
                 continue
             key = (kind, cleaned)
             if key in seen:
@@ -637,6 +653,35 @@ class CliRenderer:
             has_error = has_error or kind == "error"
             table.add_row(
                 Text(level, style="danger" if kind == "error" else "warn"), cleaned
+            )
+        if dns_counts:
+            level = "ERROR" if dns_has_error else "WARNING"
+            has_error = has_error or dns_has_error
+            hosts = ", ".join(
+                f"{host} x{count}" for host, count in sorted(dns_counts.items())
+            )
+            key = ("error" if dns_has_error else "warning", f"dns:{hosts}")
+            seen.add(key)
+            table.add_row(
+                Text(level, style="danger" if dns_has_error else "warn"),
+                (
+                    "Provider DNS/network failures: "
+                    f"{hosts}. Check internet/DNS; full request URLs remain in logs."
+                ),
+            )
+        if price_missing:
+            tickers = ", ".join(sorted(price_missing))
+            level = "ERROR" if price_missing_has_error else "WARNING"
+            key = ("error" if price_missing_has_error else "warning", f"price:{tickers}")
+            has_error = has_error or price_missing_has_error
+            seen.add(key)
+            table.add_row(
+                Text(level, style="danger" if price_missing_has_error else "warn"),
+                (
+                    "Market price data unavailable for "
+                    f"{tickers} ({price_missing_count} possibly delisted/no-price event(s)). "
+                    "This can indicate provider outage, delisting, or DNS failure."
+                ),
             )
         if not seen:
             return
@@ -648,6 +693,41 @@ class CliRenderer:
                 title_align="left",
             )
         )
+
+    @staticmethod
+    def _dns_failure_host(message: str) -> str | None:
+        lower = message.lower()
+        if not any(
+            marker in lower
+            for marker in (
+                "nameresolutionerror",
+                "could not resolve host",
+                "failed to resolve",
+                "getaddrinfo failed",
+            )
+        ):
+            return None
+        patterns = (
+            r"host='([^']+)'",
+            r'host="([^"]+)"',
+            r"Could not resolve host:\s*([^.\s]+(?:\.[^.\s]+)+)",
+            r"Failed to resolve '([^']+)'",
+            r"Failed to resolve \"([^\"]+)\"",
+        )
+        for pattern in patterns:
+            match = re.search(pattern, message, flags=re.IGNORECASE)
+            if match:
+                return match.group(1).strip(" .,:;")
+        return "unknown-host"
+
+    @staticmethod
+    def _missing_price_ticker(message: str) -> str | None:
+        if "possibly delisted; no price data found" not in message.lower():
+            return None
+        match = re.search(r"\$?([A-Z]{4}(?:\.JK)?)", message)
+        if match:
+            return match.group(1)
+        return "UNKNOWN"
 
     def has_single_agent_warning(self, ticker: str) -> bool:
         return str(ticker or "").upper() in self._single_agent_warning_seen
@@ -2292,18 +2372,65 @@ def _pipeline_file_logging_only():
 # Weights dibaca dari settings (env-configurable) untuk menghindari hardcode.
 # ORCHESTRATOR_CONFIG bersifat mutable agar regime override bisa di-apply
 # di main() sebelum pipeline dijalankan.
+
+
+def _active_provider_prefix() -> str:
+    provider = str(getattr(settings, "DEFAULT_LLM_PROVIDER", "") or "gemini")
+    return provider.strip().upper()
+
+
+def _provider_env_key(suffix: str) -> str:
+    return f"{_active_provider_prefix()}_{suffix}"
+
+
+def _provider_env_value(suffix: str, fallback_key: str, default: str) -> str:
+    provider_value = os.getenv(_provider_env_key(suffix))
+    if provider_value is not None and provider_value.strip():
+        return provider_value
+    return os.getenv(fallback_key, default)
+
+
+def _provider_env_int(suffix: str, fallback_key: str, default: int) -> int:
+    return int(_provider_env_value(suffix, fallback_key, str(default)))
+
+
+def _provider_env_float(suffix: str, fallback_key: str, default: float) -> float:
+    return float(_provider_env_value(suffix, fallback_key, str(default)))
+
+
+def _provider_specific_env_exists(suffix: str) -> bool:
+    value = os.getenv(_provider_env_key(suffix))
+    return value is not None and value.strip() != ""
+
+
+def _runtime_max_concurrent_debates() -> int:
+    return _provider_env_int(
+        "MAX_CONCURRENT_DEBATES",
+        "MAX_CONCURRENT_DEBATES",
+        5,
+    )
+
+
+def _runtime_rpm_limit() -> int:
+    return _provider_env_int("RPM_LIMIT", "GEMINI_RPM_LIMIT", 30)
+
+
+def _runtime_batch_delay() -> float:
+    return _provider_env_float("BATCH_DELAY_SECONDS", "BATCH_DELAY_SECONDS", 0.2)
+
+
 ORCHESTRATOR_CONFIG: dict[str, Any] = {
     "conviction_weights": {
         "confidence": settings.CONVICTION_WEIGHT_CONFIDENCE,
         "rr_ratio": settings.CONVICTION_WEIGHT_RR_RATIO,
     },
     "rr_normalization_cap": settings.CONVICTION_RR_NORMALIZATION_CAP,
-    "max_concurrent_debates": int(os.getenv("MAX_CONCURRENT_DEBATES", "5")),
+    "max_concurrent_debates": _runtime_max_concurrent_debates(),
     "excluded_ratings": {"AVOID", "HOLD", "SELL", "INSUFFICIENT_DATA"},
     "top_n_selection": int(os.getenv("TOP_N_SELECTION", "3")),
     "max_price_retry_attempts": int(os.getenv("MAX_PRICE_RETRY_ATTEMPTS", "3")),
-    "rpm_limit": int(os.getenv("GEMINI_RPM_LIMIT", "30")),
-    "batch_delay": float(os.getenv("BATCH_DELAY_SECONDS", "0.2")),
+    "rpm_limit": _runtime_rpm_limit(),
+    "batch_delay": _runtime_batch_delay(),
     # Diisi oleh regime detection di main()
     "min_conviction_override": settings.PORTFOLIO_MIN_CONVICTION,
     "market_regime": None,
@@ -2313,8 +2440,10 @@ ORCHESTRATOR_CONFIG: dict[str, Any] = {
 def _orchestrator_runtime_defaults() -> dict[str, Any]:
     return {
         "rr_normalization_cap": settings.CONVICTION_RR_NORMALIZATION_CAP,
+        "max_concurrent_debates": _runtime_max_concurrent_debates(),
         "top_n_selection": int(os.getenv("TOP_N_SELECTION", "3")),
-        "rpm_limit": int(os.getenv("GEMINI_RPM_LIMIT", "30")),
+        "rpm_limit": _runtime_rpm_limit(),
+        "batch_delay": _runtime_batch_delay(),
         "min_conviction_override": settings.PORTFOLIO_MIN_CONVICTION,
         "market_regime": None,
     }
@@ -2323,6 +2452,24 @@ def _orchestrator_runtime_defaults() -> dict[str, Any]:
 def _reset_orchestrator_runtime_config() -> None:
     """Clear per-run regime overrides before a new orchestrator invocation."""
     ORCHESTRATOR_CONFIG.update(_orchestrator_runtime_defaults())
+
+
+def _apply_regime_params(regime_params: dict[str, Any]) -> None:
+    provider_rpm_pinned = _provider_specific_env_exists("RPM_LIMIT")
+    for key in ("top_n_selection", "rpm_limit", "rr_normalization_cap"):
+        if key not in regime_params:
+            continue
+        if key == "rpm_limit" and provider_rpm_pinned:
+            logger.info(
+                "[Regime] Skipping rpm_limit override because "
+                f"{_provider_env_key('RPM_LIMIT')} is set."
+            )
+            continue
+        ORCHESTRATOR_CONFIG[key] = regime_params[key]
+    if "min_conviction_override" in regime_params:
+        ORCHESTRATOR_CONFIG["min_conviction_override"] = regime_params[
+            "min_conviction_override"
+        ]
 
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", "output"))
 JSON_PATH = OUTPUT_DIR / "top10_candidates.json"
@@ -5291,13 +5438,7 @@ async def main(
     regime_params = get_regime_params(regime)
     if regime_params:
         logger.info(f"[Regime] {regime} -- applying overrides: {regime_params}")
-        for key in ("top_n_selection", "rpm_limit", "rr_normalization_cap"):
-            if key in regime_params:
-                ORCHESTRATOR_CONFIG[key] = regime_params[key]
-        if "min_conviction_override" in regime_params:
-            ORCHESTRATOR_CONFIG["min_conviction_override"] = regime_params[
-                "min_conviction_override"
-            ]
+        _apply_regime_params(regime_params)
     else:
         logger.info(f"[Regime] {regime} -- no overrides applied.")
     _cli_renderer.render_market_regime(

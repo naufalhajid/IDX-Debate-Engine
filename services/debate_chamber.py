@@ -57,6 +57,7 @@ from core.execution_ledger import DEFAULT_LEDGER
 from core.failure_taxonomy import classify_exception
 from core.handoff_envelope import make_envelope
 from core.observation_store import AgentObservation, DEFAULT_STORE
+from core.settings import settings
 from providers.llm_factory import get_llm
 from schemas.debate import (
     CIOVerdict,
@@ -864,9 +865,20 @@ class DebateChamber:
                                                         END
     """
 
-    def __init__(self, flash_llm=None, pro_llm=None, stockbit_client=None):
+    def __init__(
+        self,
+        flash_llm=None,
+        pro_llm=None,
+        stockbit_client=None,
+        timeout_seconds: int | None = None,
+    ):
         self.flash_llm = flash_llm or get_llm("flash")
         self.pro_llm = pro_llm or get_llm("pro")
+        self.timeout_seconds = (
+            timeout_seconds
+            if timeout_seconds is not None
+            else self._default_timeout_seconds()
+        )
         if stockbit_client is None:
             from services.stockbit_api_client import StockbitApiClient
 
@@ -876,6 +888,16 @@ class DebateChamber:
         self.prompt_version = PROMPT_VERSION
         self._llm_call_counts: dict[tuple[str, str], dict[str, int]] = {}
         self.agent_calibration_weights = load_agent_calibration_weights()
+
+    @staticmethod
+    def _default_timeout_seconds() -> int:
+        base = int(settings.DEBATE_TIMEOUT_SECONDS)
+        provider = str(settings.DEFAULT_LLM_PROVIDER or "").lower()
+        pro_effort = str(settings.CODEX_PRO_REASONING_EFFORT or "").lower()
+        flash_effort = str(settings.CODEX_FLASH_REASONING_EFFORT or "").lower()
+        if provider == "codex" and {pro_effort, flash_effort} & {"high", "xhigh"}:
+            return max(base, int(settings.CODEX_DEBATE_TIMEOUT_SECONDS))
+        return base
 
     # -- Agent signal helpers -------------------------------------------------
 
@@ -4376,7 +4398,7 @@ Start your response with '{' and end with '}'. Nothing else."""
         guarded = await run_with_guard(
             ticker=ticker,
             coro=self.app.ainvoke(initial_state),
-            timeout_seconds=300,
+            timeout_seconds=self.timeout_seconds,
         )
         if guarded["status"] != "ok":
             logger.error(f"[DebateChamber] Guard failed for {ticker}: {guarded}")

@@ -37,6 +37,7 @@ def get_codex_flash_llm() -> "ChatCodexResponses":
             "model": model_name,
             "api_key": SecretStr(access_token),
             "request_timeout": 60,
+            "reasoning_effort": settings.CODEX_FLASH_REASONING_EFFORT,
         }
 
         if (
@@ -73,10 +74,13 @@ def get_codex_pro_llm() -> "ChatCodexResponses":
             "model": model_name,
             "api_key": SecretStr(access_token),
             "request_timeout": 90,
+            "reasoning_effort": settings.CODEX_PRO_REASONING_EFFORT,
         }
 
         # OpenAI reasoning models (o1, o3, o4) do not support temperature
-        # and prefer max_completion_tokens over max_tokens
+        # and prefer max_completion_tokens over max_tokens.
+        # ChatCodexResponses intentionally does not serialize token-limit fields:
+        # the ChatGPT Codex backend rejects max_output_tokens in live probes.
         if (
             model_name.startswith("o1")
             or model_name.startswith("o3")

@@ -101,3 +101,45 @@ def test_runtime_config_reset_clears_prior_defensive_overrides() -> None:
     _reset_orchestrator_runtime_config()
 
     assert {key: legacy.ORCHESTRATOR_CONFIG[key] for key in keys} == defaults
+
+
+def test_runtime_config_uses_codex_specific_throttle_env(monkeypatch) -> None:
+    with monkeypatch.context() as env:
+        env.setattr(legacy.settings, "DEFAULT_LLM_PROVIDER", "codex")
+        env.setenv("MAX_CONCURRENT_DEBATES", "8")
+        env.setenv("GEMINI_RPM_LIMIT", "30")
+        env.setenv("BATCH_DELAY_SECONDS", "0.2")
+        env.setenv("CODEX_MAX_CONCURRENT_DEBATES", "3")
+        env.setenv("CODEX_RPM_LIMIT", "12")
+        env.setenv("CODEX_BATCH_DELAY_SECONDS", "0")
+
+        _reset_orchestrator_runtime_config()
+
+        assert legacy.ORCHESTRATOR_CONFIG["max_concurrent_debates"] == 3
+        assert legacy.ORCHESTRATOR_CONFIG["rpm_limit"] == 12
+        assert legacy.ORCHESTRATOR_CONFIG["batch_delay"] == 0
+
+    _reset_orchestrator_runtime_config()
+
+
+def test_codex_rpm_env_is_not_overwritten_by_regime(monkeypatch) -> None:
+    with monkeypatch.context() as env:
+        env.setattr(legacy.settings, "DEFAULT_LLM_PROVIDER", "codex")
+        env.setenv("CODEX_RPM_LIMIT", "12")
+
+        _reset_orchestrator_runtime_config()
+        legacy._apply_regime_params(
+            {
+                "top_n_selection": 3,
+                "rpm_limit": 5,
+                "rr_normalization_cap": 4.0,
+                "min_conviction_override": 0.7,
+            }
+        )
+
+        assert legacy.ORCHESTRATOR_CONFIG["top_n_selection"] == 3
+        assert legacy.ORCHESTRATOR_CONFIG["rpm_limit"] == 12
+        assert legacy.ORCHESTRATOR_CONFIG["rr_normalization_cap"] == 4.0
+        assert legacy.ORCHESTRATOR_CONFIG["min_conviction_override"] == 0.7
+
+    _reset_orchestrator_runtime_config()

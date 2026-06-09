@@ -38,6 +38,60 @@ def test_command_help_pages_render():
         assert "Usage" in result.output
 
 
+def test_model_codex_reasoning_flags_write_env(monkeypatch, tmp_path):
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        "CODEX_FLASH_MODEL=custom-flash\nCODEX_PRO_MODEL=custom-pro\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("app.cli.commands.model.ENV_PATH", env_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "model",
+            "codex",
+            "--flash-reasoning",
+            "medium",
+            "--pro-reasoning",
+            "xhigh",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    content = env_path.read_text(encoding="utf-8")
+    assert "DEFAULT_LLM_PROVIDER=codex" in content
+    assert "CODEX_FLASH_MODEL=custom-flash" in content
+    assert "CODEX_PRO_MODEL=custom-pro" in content
+    assert "CODEX_FLASH_REASONING_EFFORT=medium" in content
+    assert "CODEX_PRO_REASONING_EFFORT=xhigh" in content
+
+
+def test_model_codex_interactive_writes_reasoning(monkeypatch, tmp_path):
+    env_path = tmp_path / ".env"
+    monkeypatch.setattr("app.cli.commands.model.ENV_PATH", env_path)
+
+    result = runner.invoke(app, ["model"], input="3\n1\n1\n2\n4\n")
+
+    assert result.exit_code == 0, result.output
+    content = env_path.read_text(encoding="utf-8")
+    assert "DEFAULT_LLM_PROVIDER=codex" in content
+    assert "CODEX_FLASH_MODEL=gpt-5.4-mini" in content
+    assert "CODEX_PRO_MODEL=gpt-5.5" in content
+    assert "CODEX_FLASH_REASONING_EFFORT=medium" in content
+    assert "CODEX_PRO_REASONING_EFFORT=xhigh" in content
+
+
+def test_model_codex_rejects_extra_high_reasoning(monkeypatch, tmp_path):
+    env_path = tmp_path / ".env"
+    monkeypatch.setattr("app.cli.commands.model.ENV_PATH", env_path)
+
+    result = runner.invoke(app, ["model", "codex", "--pro-reasoning", "extra-high"])
+
+    assert result.exit_code != 0
+    assert "Use 'xhigh' for Extra High" in result.output
+
+
 def test_scan_maps_options_without_running_etl(monkeypatch):
     calls = []
 
