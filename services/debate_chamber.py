@@ -899,6 +899,11 @@ class DebateChamber:
             return max(base, int(settings.CODEX_DEBATE_TIMEOUT_SECONDS))
         return base
 
+    def _timeout_seconds(self) -> int:
+        return int(
+            getattr(self, "timeout_seconds", None) or self._default_timeout_seconds()
+        )
+
     # -- Agent signal helpers -------------------------------------------------
 
     _CONFIDENCE_RE = re.compile(
@@ -4401,8 +4406,7 @@ Start your response with '{' and end with '}'. Nothing else."""
         guarded = await run_with_guard(
             ticker=ticker,
             coro=self.app.ainvoke(initial_state),
-            timeout_seconds=getattr(self, "timeout_seconds", None)
-            or self._default_timeout_seconds(),
+            timeout_seconds=self._timeout_seconds(),
         )
         if guarded["status"] != "ok":
             logger.error(f"[DebateChamber] Guard failed for {ticker}: {guarded}")
