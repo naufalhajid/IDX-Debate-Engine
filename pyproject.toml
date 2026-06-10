@@ -71,18 +71,12 @@ include = [
     "core*",
     "db*",
     "providers*",
-    "repositories*",
     "schemas*",
     "services*",
     "utils*",
 ]
 exclude = ["scratch*", "tests*"]
 namespaces = true
-
-[project.optional-dependencies]
-crawler = [
-    "crawl4ai>=0.4.0",
-]
 
 [dependency-groups]
 dev = [

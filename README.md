@@ -203,7 +203,6 @@ IDX-Debate-Engine/
 │   └── fair_value_calculator.py    # Multi-method IDX fair value engine
 ├── providers/
 │   ├── gemini.py                   # LangChain Gemini Flash/Pro adapter
-│   ├── yfinance.py                 # OHLCV and index data wrapper
 │   └── stockbit.py                 # Stockbit API client
 ├── schemas/                        # Pydantic v2 data contracts
 ├── db/                             # SQLAlchemy async models
