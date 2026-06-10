@@ -3196,8 +3196,11 @@ Current Date (Asia/Jakarta): {current_date}
         if stop >= entry_low:  # double-check post snap
             stop = self._previous_tick_below(entry_low)
 
-        # Target calculation (based on entry_high as worst-case fill to ensure
-        # that conservative R/R evaluated from entry_high is >= 2.0x)
+        # Target calculation: seed the target at a 2.0x R/R from entry_high
+        # (worst-case fill). This is only the starting point — the resistance
+        # bump, FV-blend, no-FV cap, and tick fallback below may raise OR lower
+        # it, so the final R/R is recomputed at the end and is NOT guaranteed
+        # to remain >= 2.0x.
         risk_from_entry_high = entry_high - stop
         rr_target = entry_high + (risk_from_entry_high * 2.0)
 
@@ -3286,9 +3289,9 @@ Current Date (Asia/Jakarta): {current_date}
             f"TARGET BASIS       : {envelope.get('target_basis', 'Unknown')}\n"
             f"STOP LOSS          : Rp {envelope['stop_loss']:,.0f}\n"
             f"ATR(14)            : Rp {envelope['atr14']:,.0f}\n"
-            f"EXPECTED RETURN    : +{envelope['expected_return_pct']:.1f}%\n"
-            f"MAX RISK           : -{envelope['max_risk_pct']:.1f}%\n"
-            f"RISK/REWARD RATIO  : {envelope['risk_reward_ratio']:.2f}\n"
+            f"EXPECTED RETURN    : +{envelope['expected_return_pct']:.1f}% (dari entry midpoint)\n"
+            f"MAX RISK           : -{envelope['max_risk_pct']:.1f}% (dari entry midpoint)\n"
+            f"RISK/REWARD RATIO  : {envelope['risk_reward_ratio']:.2f} (dari entry_high / worst-case fill)\n"
             f"\n"
             f"⚠️ These prices are IHSG tick-rounded and Python-computed.\n"
             f"   CIO must use these VERBATIM — do NOT override."
@@ -4398,7 +4401,8 @@ Start your response with '{' and end with '}'. Nothing else."""
         guarded = await run_with_guard(
             ticker=ticker,
             coro=self.app.ainvoke(initial_state),
-            timeout_seconds=self.timeout_seconds,
+            timeout_seconds=getattr(self, "timeout_seconds", None)
+            or self._default_timeout_seconds(),
         )
         if guarded["status"] != "ok":
             logger.error(f"[DebateChamber] Guard failed for {ticker}: {guarded}")

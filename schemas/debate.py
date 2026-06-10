@@ -62,7 +62,10 @@ class CIOVerdict(BaseDataClass):
 
     Auto-computed fields (model_validator, never sent by the LLM):
         expected_return   — % gain from entry_mid to target_price
-        risk_reward_ratio — expected_return / stop_loss_pct
+        risk_reward_ratio — calculate_rr from entry_high (worst-case fill):
+                            (target - entry_high) / (entry_high - stop).
+                            Does NOT equal expected_return / stop_loss_pct,
+                            which use the entry-midpoint basis.
         is_overvalued     — follows risk_overvalued for backward compatibility
         wait_and_see      — confidence < 0.60  OR  risk_reward_ratio < 1.0
 
@@ -173,7 +176,12 @@ class CIOVerdict(BaseDataClass):
 
     risk_reward_ratio: float | None = Field(
         default=None,
-        description="Auto-calculated: potential_gain_pct / potential_loss_pct. null if invalid.",
+        description=(
+            "Auto-calculated from entry_high (worst-case fill): "
+            "(target_price - entry_high) / (entry_high - stop_loss). "
+            "Will NOT equal expected_return / max_risk, which use the "
+            "entry-midpoint basis. null if invalid."
+        ),
     )
 
     is_overvalued: bool | None = Field(
