@@ -106,6 +106,34 @@ def test_chunk_context_pack_uses_source_timestamp_for_staleness(
     assert all(chunk.is_stale for chunk in technical_chunks)
 
 
+def test_chunk_falls_back_and_warns_on_unparseable_source_timestamp(
+    tmp_path: Path,
+    caplog,
+) -> None:
+    pack_time = datetime(2026, 6, 10, 9, 0, tzinfo=timezone.utc)
+    valid_fallback = datetime(2026, 6, 6, 9, 0, tzinfo=timezone.utc)
+    store = EvidenceRanker(tmp_path / "evidence.jsonl")
+
+    chunks = store.chunk_context_pack(
+        _pack(
+            as_of=pack_time,
+            source_timestamps={
+                "yfinance": "not-a-date",
+                "market_data": valid_fallback.isoformat(),
+            },
+        ),
+        run_id="run-1",
+    )
+
+    technical_chunk = next(chunk for chunk in chunks if chunk.category == "technical")
+    assert technical_chunk.fetched_at == valid_fallback.isoformat()
+    assert technical_chunk.is_stale is True
+    assert any(
+        "Unparseable source timestamp 'not-a-date' for BBCA/yfinance" in message
+        for message in caplog.messages
+    )
+
+
 def test_score_chunks_fair_value_scores_higher_than_metadata(tmp_path: Path) -> None:
     store = EvidenceRanker(tmp_path / "evidence.jsonl")
     chunks = [
@@ -288,3 +316,30 @@ def test_market_freshness_seconds_excludes_weekends_and_holidays(monkeypatch):
         start.astimezone(timezone.utc), end.astimezone(timezone.utc)
     )
     assert age == 10 * 3600
+
+
+def test_market_freshness_warns_once_for_uncovered_year(monkeypatch, caplog):
+    from services.evidence_ranker import (
+        _holiday_calendar,
+        _market_freshness_seconds,
+        _warn_uncovered_holiday_year,
+    )
+
+    monkeypatch.setattr(
+        "services.evidence_ranker.settings.IDX_ADDITIONAL_HOLIDAYS",
+        "",
+    )
+    _holiday_calendar.cache_clear()
+    _warn_uncovered_holiday_year.cache_clear()
+
+    start = datetime(2027, 1, 4, 9, 0, tzinfo=timezone.utc)
+    end = datetime(2027, 1, 4, 10, 0, tzinfo=timezone.utc)
+
+    assert _market_freshness_seconds(start, end) == 3600
+    assert _market_freshness_seconds(start, end) == 3600
+    warnings = [
+        message
+        for message in caplog.messages
+        if "No IDX holidays known for 2027" in message
+    ]
+    assert len(warnings) == 1

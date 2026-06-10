@@ -7,7 +7,8 @@ import hashlib
 import json
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import datetime, time, timedelta, timezone
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
 
@@ -116,6 +117,7 @@ class EvidenceRanker:
         """Convert a normalized context pack into category-aware evidence chunks."""
         chunks: list[EvidenceChunk] = []
         category_counts: dict[CategoryName, int] = {}
+        pack_time = _ensure_utc(pack.as_of)
 
         def append_chunk(category: CategoryName, content: str) -> None:
             clean_content = content.strip()
@@ -124,14 +126,12 @@ class EvidenceRanker:
             category_index = category_counts.get(category, 0)
             category_counts[category] = category_index + 1
             source = _source_for_category(pack.data_sources, category)
-            fetched_at_dt = _resolve_chunk_timestamp(pack, category, source)
-            fetched_at = fetched_at_dt.isoformat()
-            pack_time = _resolve_pack_timestamp(pack)
-            freshness_seconds = _freshness_seconds(fetched_at_dt, pack_time)
-            is_stale = (
-                freshness_seconds is not None
-                and freshness_seconds > STALE_THRESHOLD_SECONDS
+            fetched_at_dt = (
+                _resolve_chunk_timestamp(pack, category, source) or pack_time
             )
+            fetched_at = fetched_at_dt.isoformat()
+            freshness_seconds = _market_freshness_seconds(fetched_at_dt, pack_time)
+            is_stale = freshness_seconds > STALE_THRESHOLD_SECONDS
             chunks.append(
                 EvidenceChunk(
                     chunk_id=(
@@ -173,7 +173,7 @@ class EvidenceRanker:
         sources = ", ".join(pack.data_sources) if pack.data_sources else "unknown"
         timestamps = (
             _compact_json(pack.source_timestamps)
-            if getattr(pack, "source_timestamps", None)
+            if pack.source_timestamps
             else "unknown"
         )
         missing = ", ".join(pack.missing_fields) if pack.missing_fields else "none"
@@ -197,7 +197,7 @@ class EvidenceRanker:
         query = query_context.lower()
         scored_chunks: list[EvidenceChunk] = []
         for chunk in chunks:
-            score = CATEGORY_WEIGHTS.get(chunk.category, 0.0)
+            score = CATEGORY_WEIGHTS[chunk.category]
             score += _keyword_boost(chunk.category, query)
             if chunk.is_stale:
                 score *= 0.5
@@ -260,6 +260,8 @@ class EvidenceRanker:
         """Build, log, and return a selected evidence bundle."""
         chunks = self.chunk_context_pack(pack, run_id)
         selected = self.select_evidence(chunks, query_context)
+        # select_evidence already enforces MAX_BUNDLE_CHARS via _selection_fits,
+        # which renders through this same _make_bundle.
         bundle = _make_bundle(
             ticker=pack.ticker,
             run_id=run_id,
@@ -267,15 +269,6 @@ class EvidenceRanker:
             selected=selected,
             total_considered=len(chunks),
         )
-        while bundle.rendered_char_count > MAX_BUNDLE_CHARS and selected:
-            selected = selected[:-1]
-            bundle = _make_bundle(
-                ticker=pack.ticker,
-                run_id=run_id,
-                query_context=query_context,
-                selected=selected,
-                total_considered=len(chunks),
-            )
         self.log_bundle(bundle)
         return bundle
 
@@ -400,7 +393,10 @@ def _make_bundle(
         total_chunks_selected=len(selected),
         has_stale_data=has_stale_data,
         staleness_warning=(
-            "Some selected evidence is older than 24 hours." if has_stale_data else None
+            "Some selected evidence is older than 24 market hours "
+            "(weekends/IDX holidays excluded)."
+            if has_stale_data
+            else None
         ),
         token_estimate=selected_content_chars // CHARS_PER_TOKEN,
         selected_content_chars=selected_content_chars,
@@ -480,8 +476,8 @@ def _resolve_chunk_timestamp(
     pack: ContextPack,
     category: CategoryName,
     source: str,
-) -> datetime:
-    timestamps = getattr(pack, "source_timestamps", {}) or {}
+) -> datetime | None:
+    """Best source timestamp for a chunk, or None when no usable one exists."""
     candidates = (
         source,
         source.lower(),
@@ -490,11 +486,18 @@ def _resolve_chunk_timestamp(
         "context",
     )
     for key in candidates:
-        value = _timestamp_for_key(timestamps, key)
+        value = _timestamp_for_key(pack.source_timestamps, key)
         if value is None:
             continue
-        return _parse_timestamp(value)
-    return _resolve_pack_timestamp(pack)
+        parsed = _parse_timestamp(value)
+        if parsed is None:
+            logger.warning(
+                f"Unparseable source timestamp {value!r} for "
+                f"{pack.ticker}/{key}; ignoring it."
+            )
+            continue
+        return parsed
+    return None
 
 
 def _timestamp_for_key(timestamps: dict[str, str], key: str) -> str | None:
@@ -507,50 +510,28 @@ def _timestamp_for_key(timestamps: dict[str, str], key: str) -> str | None:
     return None
 
 
-def _resolve_pack_timestamp(pack: ContextPack) -> datetime:
-    value = getattr(pack, "generated_at", None) or pack.as_of
-    return _parse_timestamp(value)
+def _parse_timestamp(value: str) -> datetime | None:
+    """Parse an ISO timestamp into aware UTC, or None when unparseable."""
+    try:
+        timestamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return _ensure_utc(timestamp)
 
 
-def _parse_timestamp(value: Any) -> datetime:
-    if isinstance(value, datetime):
-        timestamp = value
-    elif isinstance(value, str) and value.strip():
-        try:
-            timestamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        except ValueError:
-            timestamp = datetime.now(timezone.utc)
-    else:
-        timestamp = datetime.now(timezone.utc)
-
+def _ensure_utc(timestamp: datetime) -> datetime:
     if timestamp.tzinfo is None:
         return timestamp.replace(tzinfo=timezone.utc)
     return timestamp.astimezone(timezone.utc)
 
 
-def _freshness_seconds(
-    fetched_at: datetime, reference_time: datetime | None = None
-) -> int | None:
-    try:
-        ref = reference_time or datetime.now(timezone.utc)
-        return _market_freshness_seconds(fetched_at, ref)
-    except TypeError:
-        return None
+_WIB = timezone(timedelta(hours=7))
 
-
-def _market_freshness_seconds(fetched_at: datetime, current_time: datetime) -> int:
-    """
-    Calculate the age of the data in seconds, excluding weekends and IDX holidays.
-    If the period spans Saturday, Sunday, or a bursa holiday, those periods are excluded
-    to prevent false positive staleness classifications during closures.
-    """
-    if fetched_at >= current_time:
-        return 0
-
-    total_seconds = int((current_time - fetched_at).total_seconds())
-
-    # Indonesian Stock Exchange (IDX) Trading Holidays for 2026
-    idx_holidays_2026 = {
+# Indonesian Stock Exchange (IDX) trading holidays. Years missing from this set
+# (and from IDX_ADDITIONAL_HOLIDAYS) fall back to weekend-only exclusion, with
+# a warning logged once per year.
+_IDX_HOLIDAYS = frozenset(
+    {
         "2026-01-01",
         "2026-01-16",
         "2026-02-16",
@@ -574,33 +555,58 @@ def _market_freshness_seconds(fetched_at: datetime, current_time: datetime) -> i
         "2026-12-25",
         "2026-12-31",
     }
+)
 
-    # Parse custom/additional holidays from settings dynamically
-    additional_holidays = set()
-    if settings.IDX_ADDITIONAL_HOLIDAYS:
+
+@lru_cache(maxsize=4)
+def _holiday_calendar(raw_additional: str) -> tuple[frozenset[str], frozenset[int]]:
+    """Resolve (holiday dates, covered years) from the static set plus settings."""
+    additional: set[str] = set()
+    val = raw_additional.strip()
+    if val:
         try:
-            val = settings.IDX_ADDITIONAL_HOLIDAYS.strip()
             if val.startswith("[") and val.endswith("]"):
                 dates = json.loads(val)
             else:
                 dates = [d.strip() for d in val.split(",") if d.strip()]
             for d in dates:
-                if re.match(r"^\d{4}-\d{2}-\d{2}$", d):
-                    additional_holidays.add(d)
+                if re.match(r"^\d{4}-\d{2}-\d{2}$", str(d)):
+                    additional.add(str(d))
         except Exception as e:
             logger.warning(f"Failed to parse IDX_ADDITIONAL_HOLIDAYS settings: {e}")
+    holidays = _IDX_HOLIDAYS | additional
+    return holidays, frozenset(int(day[:4]) for day in holidays)
 
-    all_holidays = idx_holidays_2026 | additional_holidays
 
-    import datetime as dt_mod
+@lru_cache(maxsize=16)
+def _warn_uncovered_holiday_year(year: int) -> None:
+    logger.warning(
+        f"No IDX holidays known for {year}; exchange holidays in that year will "
+        "count toward evidence staleness. Extend IDX_ADDITIONAL_HOLIDAYS."
+    )
 
-    wib = dt_mod.timezone(dt_mod.timedelta(hours=7))
 
-    start_local = fetched_at.astimezone(wib)
-    end_local = current_time.astimezone(wib)
+def _market_freshness_seconds(fetched_at: datetime, current_time: datetime) -> int:
+    """
+    Calculate the age of the data in seconds, excluding weekends and IDX holidays.
+    If the period spans Saturday, Sunday, or a bursa holiday, those periods are excluded
+    to prevent false positive staleness classifications during closures.
+    """
+    if fetched_at >= current_time:
+        return 0
+
+    total_seconds = int((current_time - fetched_at).total_seconds())
+    all_holidays, covered_years = _holiday_calendar(settings.IDX_ADDITIONAL_HOLIDAYS)
+
+    start_local = fetched_at.astimezone(_WIB)
+    end_local = current_time.astimezone(_WIB)
 
     start_date = start_local.date()
     end_date = end_local.date()
+
+    for year in range(start_date.year, end_date.year + 1):
+        if year not in covered_years:
+            _warn_uncovered_holiday_year(year)
 
     if start_date == end_date:
         is_holiday = (
@@ -615,14 +621,14 @@ def _market_freshness_seconds(fetched_at: datetime, current_time: datetime) -> i
     while curr <= end_date:
         is_closed = curr.weekday() in (5, 6) or curr.isoformat() in all_holidays
         if is_closed:
-            day_start_local = dt_mod.datetime.combine(curr, dt_mod.time.min, tzinfo=wib)
-            day_end_local = day_start_local + dt_mod.timedelta(days=1)
+            day_start_local = datetime.combine(curr, time.min, tzinfo=_WIB)
+            day_end_local = day_start_local + timedelta(days=1)
 
             overlap_start = max(start_local, day_start_local)
             overlap_end = min(end_local, day_end_local)
             if overlap_start < overlap_end:
                 closed_seconds += int((overlap_end - overlap_start).total_seconds())
-        curr += dt_mod.timedelta(days=1)
+        curr += timedelta(days=1)
 
     return max(0, total_seconds - closed_seconds)
 
@@ -633,22 +639,21 @@ def _fair_value_content(pack: ContextPack) -> str:
     )
     fair_value_low = (
         f"{pack.fair_value_low:.0f}"
-        if getattr(pack, "fair_value_low", None) is not None
+        if pack.fair_value_low is not None
         else "INSUFFICIENT_DATA"
     )
     fair_value_high = (
         f"{pack.fair_value_high:.0f}"
-        if getattr(pack, "fair_value_high", None) is not None
+        if pack.fair_value_high is not None
         else "INSUFFICIENT_DATA"
     )
-    risk_overvalued = getattr(pack, "risk_overvalued", None)
     upside = "INSUFFICIENT_DATA"
     if pack.price and pack.fair_value is not None:
         upside = f"{((pack.fair_value - pack.price) / pack.price) * 100:.1f}%"
     return (
         f"Current Price: {pack.price:.0f} | Fair Value Base: {fair_value} | "
         f"Fair Value Range: {fair_value_low} - {fair_value_high} | "
-        f"Upside: {upside} | Risk Overvalued: {risk_overvalued}"
+        f"Upside: {upside} | Risk Overvalued: {pack.risk_overvalued}"
     )
 
 
