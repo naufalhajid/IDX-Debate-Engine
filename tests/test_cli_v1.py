@@ -435,6 +435,100 @@ def test_pipeline_runner_passes_argparse_argv_without_program_name(monkeypatch):
     ]
 
 
+def _probe_orchestrator_pipeline_reasoning(
+    monkeypatch, tickers: list[str], provider: str = "codex"
+):
+    import orchestrator
+
+    calls = []
+
+    class FakeChatCodexResponses:
+        def __init__(self, **kwargs):
+            calls.append(kwargs)
+
+    args = SimpleNamespace(
+        verbose=False,
+        details=False,
+        output_dir="output",
+        scrape_cmd=None,
+        no_interactive=True,
+        skip_scraping=True,
+        dry_run=True,
+        tickers=tickers,
+    )
+
+    async def fake_main(**_kwargs):
+        from providers.codex_adapter import get_codex_flash_llm, get_codex_pro_llm
+
+        get_codex_flash_llm()
+        get_codex_pro_llm()
+
+    monkeypatch.setattr(
+        orchestrator,
+        "settings",
+        SimpleNamespace(DEFAULT_LLM_PROVIDER=provider),
+    )
+    monkeypatch.setattr(orchestrator._pipeline, "_ensure_utf8_stdout", lambda: None)
+    monkeypatch.setattr(orchestrator._pipeline, "_parse_cli_args", lambda _argv: args)
+    monkeypatch.setattr(orchestrator._pipeline, "configure_cli_logging", lambda **_: None)
+    monkeypatch.setattr(
+        orchestrator._pipeline,
+        "_cli_renderer",
+        SimpleNamespace(show_details=False),
+    )
+    monkeypatch.setattr(orchestrator, "configure_output_dir", lambda _path: None)
+    monkeypatch.setattr(
+        orchestrator._pipeline,
+        "_cli",
+        SimpleNamespace(run=lambda **_kwargs: True),
+    )
+    monkeypatch.setattr(orchestrator._pipeline, "main", fake_main)
+    monkeypatch.setattr("providers.codex_adapter.resolve_codex_token", lambda: "t")
+    monkeypatch.setattr(
+        "providers.codex_adapter.settings",
+        SimpleNamespace(
+            CODEX_FLASH_MODEL="gpt-5.4-mini",
+            CODEX_FLASH_REASONING_EFFORT="medium",
+            CODEX_PRO_MODEL="gpt-5.5",
+            CODEX_PRO_REASONING_EFFORT="high",
+        ),
+    )
+    monkeypatch.setattr(
+        "providers.codex_responses_llm.ChatCodexResponses",
+        FakeChatCodexResponses,
+    )
+
+    orchestrator._run_cli(["--dry-run"])
+
+    return [call["reasoning_effort"] for call in calls]
+
+
+def test_pipeline_without_explicit_tickers_disables_codex_reasoning(monkeypatch):
+    assert _probe_orchestrator_pipeline_reasoning(monkeypatch, []) == [None, None]
+
+
+def test_pipeline_with_three_explicit_tickers_keeps_codex_reasoning(monkeypatch):
+    assert _probe_orchestrator_pipeline_reasoning(
+        monkeypatch, ["BBCA", "BBRI", "TLKM"]
+    ) == ["medium", "high"]
+
+
+def test_pipeline_with_more_than_three_explicit_tickers_disables_codex_reasoning(
+    monkeypatch,
+):
+    assert _probe_orchestrator_pipeline_reasoning(
+        monkeypatch, ["BBCA", "BBRI", "TLKM", "ASII"]
+    ) == [None, None]
+
+
+def test_pipeline_non_codex_provider_never_applies_reasoning_override(monkeypatch):
+    # Gating regression: with gemini active, _run_cli must leave the Codex
+    # reasoning ContextVar untouched (efforts come straight from settings).
+    assert _probe_orchestrator_pipeline_reasoning(
+        monkeypatch, [], provider="gemini"
+    ) == ["medium", "high"]
+
+
 def test_run_debate_cli_invokes_isolated_debate_runner(monkeypatch):
     calls = []
 
@@ -479,6 +573,33 @@ def test_run_debate_cli_invokes_isolated_debate_runner(monkeypatch):
             "--no-details",
         ]
     ]
+
+
+def test_run_debate_cli_does_not_apply_pipeline_reasoning_override(monkeypatch):
+    calls = []
+
+    async def fake_main(argv):
+        calls.append(argv)
+
+    def forbidden_override(**_kwargs):
+        raise AssertionError("idx debate must not use the pipeline reasoning override")
+
+    monkeypatch.setitem(sys.modules, "run_debate", SimpleNamespace(main=fake_main))
+    monkeypatch.setattr(
+        "providers.codex_adapter.codex_reasoning_override",
+        forbidden_override,
+    )
+
+    from app.cli.commands.debate import run_debate_cli
+
+    run_debate_cli(
+        tickers=["BBRI"],
+        output_dir=Path("output/debates"),
+        verbose=False,
+        details=True,
+    )
+
+    assert calls == [["--tickers", "BBRI", "--output-dir", str(Path("output/debates"))]]
 
 
 def test_sector_list_and_show_use_cache_file():

@@ -8,7 +8,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict
 
 from utils.logger_config import logger
-from utils.trade_math import get_rr_resolution
+from utils.trade_math import calculate_rr, get_rr_resolution
 
 
 RiskStatus = Literal[
@@ -59,18 +59,18 @@ def evaluate_risk(candidate: dict[str, Any]) -> RiskDecision:
         candidate.get("verdict") if isinstance(candidate.get("verdict"), dict) else {}
     )
     ticker = _clean_ticker(candidate.get("ticker") or verdict.get("ticker"))
-    current_price = _first_float(
+    current_price = _first_price(
         verdict.get("current_price"),
         candidate.get("current_price"),
     )
     entry_low, entry_high = _parse_entry_range(
         verdict.get("entry_price_range") or candidate.get("entry_price_range")
     )
-    target_price = _first_float(
+    target_price = _first_price(
         verdict.get("target_price"),
         candidate.get("target_price"),
     )
-    stop_loss = _first_float(verdict.get("stop_loss"), candidate.get("stop_loss"))
+    stop_loss = _first_price(verdict.get("stop_loss"), candidate.get("stop_loss"))
     logger.debug(
         "[Risk] raw inputs ticker={} rating={} confidence={} current={} entry={} "
         "target={} stop={} rr={}",
@@ -120,7 +120,13 @@ def evaluate_risk(candidate: dict[str, Any]) -> RiskDecision:
     assert target_price is not None
     assert stop_loss is not None
 
-    verdict_reason_codes = _verdict_reason_codes(candidate, verdict)
+    verdict_reason_codes = _verdict_reason_codes(
+        candidate,
+        verdict,
+        entry_high=entry_high,
+        target_price=target_price,
+        stop_loss=stop_loss,
+    )
     hard_rejects = [code for code in verdict_reason_codes if code in HARD_REJECT_CODES]
     if hard_rejects:
         return _log_decision(
@@ -322,7 +328,16 @@ def _first_float(*values: Any) -> float | None:
     return None
 
 
-def _to_float(value: Any) -> float | None:
+def _first_price(*values: Any) -> float | None:
+    """Like _first_float, but parses Indonesian thousand-dot price strings."""
+    for value in values:
+        parsed = _to_float(value, idr_price=True)
+        if parsed is not None:
+            return parsed
+    return None
+
+
+def _to_float(value: Any, *, idr_price: bool = False) -> float | None:
     if value is None:
         return None
     if isinstance(value, int | float):
@@ -333,7 +348,12 @@ def _to_float(value: Any) -> float | None:
     match = _NUMBER_RE.search(text.replace("Rp", "").replace("rp", ""))
     if match is None:
         return None
-    cleaned = match.group(0).replace(",", "")
+    raw = match.group(0)
+    if idr_price:
+        # IDR prices are integers; a dot followed by exactly three digits is a
+        # thousand separator ("4.500" == 4500), matching schemas/debate.py.
+        raw = re.sub(r"\.(?=\d{3}(?!\d))", "", raw)
+    cleaned = raw.replace(",", "")
     try:
         return float(cleaned)
     except ValueError:
@@ -343,7 +363,18 @@ def _to_float(value: Any) -> float | None:
 def _parse_entry_range(value: Any) -> tuple[float | None, float | None]:
     if value is None:
         return None, None
-    numbers = [_to_float(match.group(0)) for match in _NUMBER_RE.finditer(str(value))]
+    text = str(value).replace("–", "-").replace("—", "-")
+    # Split on the dash separator first so unspaced ranges like "4500-4650"
+    # are not misread as 4500 and -4650 by the signed-number regex.
+    parts = text.split("-", 1)
+    if len(parts) == 2:
+        low = _to_float(parts[0], idr_price=True)
+        high = _to_float(parts[1], idr_price=True)
+        if low is not None and high is not None:
+            return low, high
+    numbers = [
+        _to_float(match.group(0), idr_price=True) for match in _NUMBER_RE.finditer(text)
+    ]
     parsed = [number for number in numbers if number is not None]
     if len(parsed) < 2:
         return None, None
@@ -363,6 +394,10 @@ def _risk_overvalued_flag(candidate: dict[str, Any], verdict: dict[str, Any]) ->
 def _verdict_reason_codes(
     candidate: dict[str, Any],
     verdict: dict[str, Any],
+    *,
+    entry_high: float | None,
+    target_price: float | None,
+    stop_loss: float | None,
 ) -> list[str]:
     reason_codes: list[str] = []
     ticker = _clean_ticker(candidate.get("ticker") or verdict.get("ticker"))
@@ -382,11 +417,17 @@ def _verdict_reason_codes(
     if _risk_overvalued_flag(candidate, verdict):
         reason_codes.append("overvalued")
 
-    rr_ratio = _first_float(
-        verdict.get("risk_reward_ratio"),
-        candidate.get("risk_reward_ratio"),
-        candidate.get("rr_ratio"),
-    )
+    # Precedence: canonical verdict ratio → recompute from current prices →
+    # candidate-level echoes last. Candidate values can be stale leftovers from
+    # an earlier run, so a fresh recompute must outrank them.
+    rr_ratio = _first_float(verdict.get("risk_reward_ratio"))
+    if rr_ratio is None:
+        rr_ratio = _recompute_rr(ticker, entry_high, target_price, stop_loss)
+    if rr_ratio is None:
+        rr_ratio = _first_float(
+            candidate.get("risk_reward_ratio"),
+            candidate.get("rr_ratio"),
+        )
     rr_minimum = _rr_minimum_for_candidate(candidate, verdict, ticker)
     if rr_ratio is not None and rr_ratio < rr_minimum:
         reason_codes.append("rr_too_low")
@@ -397,6 +438,29 @@ def _verdict_reason_codes(
         reason_codes.append("counter_trend_setup")
 
     return _dedupe(reason_codes)
+
+
+def _recompute_rr(
+    ticker: str,
+    entry_high: float | None,
+    target_price: float | None,
+    stop_loss: float | None,
+) -> float | None:
+    """Recompute the canonical entry_high-based R/R when the verdict omits it."""
+    if entry_high is None or target_price is None or stop_loss is None:
+        return None
+    try:
+        rr = calculate_rr(entry_high, target_price, stop_loss)
+    except ValueError:
+        # stop >= entry_high: setup geometry is broken. Return 0.0 so the
+        # floor check rejects it instead of skipping silently.
+        rr = 0.0
+    logger.debug(
+        "[Risk] {} risk_reward_ratio missing from verdict; recomputed rr={}",
+        ticker,
+        rr,
+    )
+    return rr
 
 
 def _clean_rating(value: Any) -> str:
@@ -580,7 +644,7 @@ def _is_conditional_setup(reason_codes: list[str], verdict: dict[str, Any]) -> b
         soft_only = [
             c for c in reason_codes if c not in {"counter_trend_setup", "rating_hold"}
         ]
-        rr = float(verdict.get("risk_reward_ratio") or 0)
+        rr = _first_float(verdict.get("risk_reward_ratio")) or 0.0
         if not soft_only and rr >= 3.5:
             return False
     return rating in SOFT_BUYABLE_RATINGS or "counter_trend_setup" in reason_codes

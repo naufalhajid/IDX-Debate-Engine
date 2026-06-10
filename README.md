@@ -165,9 +165,11 @@ Indonesia's equity market has no public volatility index. The system builds its 
 **File:** [`core/risk_governor.py`](core/risk_governor.py)
 
 A fully deterministic, **LLM-free gate** that classifies every CIO verdict before it reaches the portfolio optimizer:
-- Forces all LLM-generated prices to snap to official IDX tick sizes
-- Rejects trades where the LLM hallucinated a target below the current price
-- Validates Risk/Reward ratio strictly > 1.5x
+- Rejects trades where the LLM hallucinated a target below the current price or a stop above it
+- Validates the Risk/Reward ratio against a tier-aware floor (1.3x for large-caps ≥ Rp 50T, 1.5x default) — recomputing it from entry/target/stop when the verdict omits it
+- Downgrades executable setups to watchlist-only during DEFENSIVE market regimes
+
+(All entry/target/stop prices are snapped to official IDX tick sizes upstream, in the debate chamber's Python-computed trade envelope.)
 
 ### 5. Adaptive Planner & Resilience Engine
 
@@ -236,6 +238,10 @@ uv run idx pipeline choose          # Interactive mode selector
 uv run idx debate BBRI BBCA TLKM    # Debate specific tickers
 uv run idx scan                     # Quick fundamental sweep
 ```
+
+When Codex is the active LLM provider, `idx pipeline` runs in fast batch mode by
+omitting Codex reasoning effort unless you pass 1-3 explicit tickers. Use
+`idx debate` for deep per-ticker reasoning with the configured Codex effort.
 
 For scripts and CI, the explicit flags remain available:
 

@@ -893,9 +893,19 @@ class DebateChamber:
     def _default_timeout_seconds() -> int:
         base = int(settings.DEBATE_TIMEOUT_SECONDS)
         provider = str(settings.DEFAULT_LLM_PROVIDER or "").lower()
-        pro_effort = str(settings.CODEX_PRO_REASONING_EFFORT or "").lower()
-        flash_effort = str(settings.CODEX_FLASH_REASONING_EFFORT or "").lower()
-        if provider == "codex" and {pro_effort, flash_effort} & {"high", "xhigh"}:
+        if provider != "codex":
+            return base
+
+        from providers.codex_adapter import codex_reasoning_override_values
+
+        override = codex_reasoning_override_values()
+        if override is None:
+            flash_effort = settings.CODEX_FLASH_REASONING_EFFORT
+            pro_effort = settings.CODEX_PRO_REASONING_EFFORT
+        else:
+            flash_effort, pro_effort = override
+        efforts = {str(effort or "").lower() for effort in (pro_effort, flash_effort)}
+        if efforts & {"high", "xhigh"}:
             return max(base, int(settings.CODEX_DEBATE_TIMEOUT_SECONDS))
         return base
 

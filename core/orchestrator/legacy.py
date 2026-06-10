@@ -3508,6 +3508,28 @@ def _breaking_news_headlines_from_bundle(
 
 def _attach_news_signal(ticker: str, result: dict[str, Any]) -> None:
     try:
+        metadata = _result_metadata(result)
+        debate_sentiment = metadata.get("news_overall_sentiment")
+        if debate_sentiment not in (None, ""):
+            # The debate chamber already evaluated news for this run (LLM scout
+            # judgment preferred over the keyword heuristic) and applied its
+            # adjustment to the verdict confidence. Re-fetching here used to
+            # stamp a second, contradictory signal on the top level (e.g.
+            # NEUTRAL/-0.2 vs metadata POSITIVE/+0.05), so mirror the applied
+            # values instead and only fetch when the debate produced none.
+            try:
+                applied_adjustment = float(
+                    metadata.get("news_confidence_adjustment") or 0.0
+                )
+            except (TypeError, ValueError):
+                applied_adjustment = 0.0
+            result["news_sentiment"] = str(debate_sentiment)
+            result["news_confidence_adjustment"] = applied_adjustment
+            result["has_breaking_news"] = bool(metadata.get("has_breaking_news"))
+            result["breaking_news_headlines"] = list(
+                metadata.get("breaking_news_headlines") or []
+            )
+            return
         news_bundle = DEFAULT_FETCHER.build_bundle(ticker)
         logger.info(
             f"[News] {ticker}: sentiment={news_bundle.overall_sentiment.value} "
@@ -4685,6 +4707,9 @@ def _build_sizing_candidates(top_n: list[dict]) -> list[dict]:
             {
                 "ticker": entry.get("ticker") or verdict.get("ticker"),
                 "current_price": verdict.get("current_price"),
+                "entry_high": (
+                    risk.get("entry_high") if isinstance(risk, dict) else None
+                ),
                 "stop_loss": verdict.get("stop_loss"),
                 "rating": verdict.get("rating"),
                 "confidence": verdict.get("confidence"),

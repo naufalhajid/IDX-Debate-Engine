@@ -9,7 +9,9 @@ ChatOpenAI wrapper, authenticated with the Codex OAuth access token.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from contextlib import contextmanager
+from contextvars import ContextVar
+from typing import TYPE_CHECKING, Iterator
 
 from core.failure_taxonomy import classify_exception
 from core.settings import settings
@@ -18,6 +20,48 @@ from utils.logger_config import logger
 
 if TYPE_CHECKING:
     from providers.codex_responses_llm import ChatCodexResponses
+
+
+#: Batch pipelines keep deep Codex reasoning only when the operator passes at
+#: most this many explicit tickers; larger batches run with reasoning omitted.
+#: Single source of truth for orchestrator._run_cli and the CLI panel label.
+DEEP_REASONING_MAX_TICKERS = 3
+
+_reasoning_override: ContextVar[tuple[str | None, str | None] | None] = ContextVar(
+    "codex_reasoning_override",
+    default=None,
+)
+
+
+@contextmanager
+def codex_reasoning_override(
+    *, flash: str | None, pro: str | None
+) -> Iterator[None]:
+    """Temporarily override Codex reasoning effort for this execution context.
+
+    Passing None disables reasoning for that tier, causing the Responses payload
+    to omit the reasoning field entirely.
+    """
+    token = _reasoning_override.set((flash, pro))
+    try:
+        yield
+    finally:
+        _reasoning_override.reset(token)
+
+
+def codex_reasoning_override_values() -> tuple[str | None, str | None] | None:
+    """Return the active reasoning override, if this context has one."""
+    return _reasoning_override.get()
+
+
+def _codex_reasoning_effort(tier: str) -> str | None:
+    override = codex_reasoning_override_values()
+    if override is not None:
+        flash, pro = override
+        return flash if tier == "flash" else pro
+    if tier == "flash":
+        return settings.CODEX_FLASH_REASONING_EFFORT
+    return settings.CODEX_PRO_REASONING_EFFORT
 
 
 def get_codex_flash_llm() -> "ChatCodexResponses":
@@ -37,7 +81,7 @@ def get_codex_flash_llm() -> "ChatCodexResponses":
             "model": model_name,
             "api_key": SecretStr(access_token),
             "request_timeout": 60,
-            "reasoning_effort": settings.CODEX_FLASH_REASONING_EFFORT,
+            "reasoning_effort": _codex_reasoning_effort("flash"),
         }
 
         if (
@@ -74,7 +118,7 @@ def get_codex_pro_llm() -> "ChatCodexResponses":
             "model": model_name,
             "api_key": SecretStr(access_token),
             "request_timeout": 90,
-            "reasoning_effort": settings.CODEX_PRO_REASONING_EFFORT,
+            "reasoning_effort": _codex_reasoning_effort("pro"),
         }
 
         # OpenAI reasoning models (o1, o3, o4) do not support temperature

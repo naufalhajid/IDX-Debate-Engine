@@ -264,6 +264,24 @@ def pipeline_command(
     ticker_label = (
         ", ".join(selected_tickers) if selected_tickers else "(from quant filter)"
     )
+
+    # Codex-only panel line: reflect the actual configured efforts instead of
+    # claiming "deep", and stay silent for gemini/anthropic providers.
+    from core.settings import settings
+    from providers.codex_adapter import DEEP_REASONING_MAX_TICKERS
+
+    reasoning_line = ""
+    if str(settings.DEFAULT_LLM_PROVIDER or "").lower() == "codex":
+        if 0 < len(selected_tickers) <= DEEP_REASONING_MAX_TICKERS:
+            reasoning_label = (
+                f"on — flash={settings.CODEX_FLASH_REASONING_EFFORT}, "
+                f"pro={settings.CODEX_PRO_REASONING_EFFORT} "
+                f"(explicit <={DEEP_REASONING_MAX_TICKERS} tickers)"
+            )
+        else:
+            reasoning_label = "off (fast batch)"
+        reasoning_line = f"\n[idx.label]Codex Reasoning:[/idx.label] {reasoning_label}"
+
     flags_line = (
         f"\n[idx.label]Flags:[/idx.label]    [idx.muted]{', '.join(flags)}[/idx.muted]"
         if flags
@@ -274,7 +292,9 @@ def pipeline_command(
         Panel(
             f"[idx.label]Pipeline Mode:[/idx.label]  [idx.highlight]{selected_mode}[/idx.highlight]\n"
             f"[idx.label]Screener:[/idx.label]       [idx.highlight]{format_screener_mode(selected_screener_mode)}[/idx.highlight]\n"
-            f"[idx.label]Tickers:[/idx.label]        {ticker_label}" + flags_line,
+            f"[idx.label]Tickers:[/idx.label]        {ticker_label}"
+            + reasoning_line
+            + flags_line,
             title="[idx.header]IDX Pipeline[/idx.header]",
             border_style="idx.header",
             expand=False,

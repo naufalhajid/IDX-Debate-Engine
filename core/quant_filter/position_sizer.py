@@ -57,7 +57,16 @@ def _normalise_pct(value: Any, default: float) -> float:
     return max(0.0, min(pct, 1.0))
 
 
-def _parse_expected_return_pct(candidate: dict, current_price: float) -> float:
+def _parse_expected_return_pct(candidate: dict, entry_price: float) -> float:
+    # Prefer recomputing from target vs the SAME entry basis used to value the
+    # position (entry_high worst-case fill when available), so that
+    # expected_return_rp = position_value * pct shares one price basis. The
+    # verdict's expected_return string uses the entry-midpoint basis and would
+    # overstate the Rp return of a position valued at entry_high.
+    target_price = _to_float(candidate.get("target_price"))
+    if entry_price > 0 and target_price > entry_price:
+        return ((target_price - entry_price) / entry_price) * 100
+
     value = candidate.get("expected_return")
     if isinstance(value, str):
         cleaned = value.strip().replace("%", "").replace("+", "")
@@ -67,10 +76,6 @@ def _parse_expected_return_pct(candidate: dict, current_price: float) -> float:
     parsed = _to_float(value, None)
     if parsed is not None:
         return parsed * 100 if abs(parsed) <= 1.0 else parsed
-
-    target_price = _to_float(candidate.get("target_price"))
-    if current_price > 0 and target_price > current_price:
-        return ((target_price - current_price) / current_price) * 100
     return 0.0
 
 
@@ -306,12 +311,19 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
         current_price = _to_float(candidate.get("current_price"))
         stop_loss = _to_float(candidate.get("stop_loss"))
         rr_ratio = _to_float(candidate.get("rr_ratio"))
+        entry_high = _to_float(candidate.get("entry_high"), None)
 
-        risk_per_share = current_price - stop_loss
-        if not ticker or current_price <= 0 or risk_per_share <= 0:
+        # Worst-case fill basis: size risk from entry_high (top of the entry
+        # zone) when available, matching the canonical R/R convention, so the
+        # stop-risk budget still holds if the fill lands at the top of the zone.
+        entry_price = (
+            entry_high if entry_high is not None and entry_high > 0 else current_price
+        )
+        risk_per_share = entry_price - stop_loss
+        if not ticker or current_price <= 0 or entry_price <= 0 or risk_per_share <= 0:
             continue
 
-        expected_return_pct = _parse_expected_return_pct(candidate, current_price)
+        expected_return_pct = _parse_expected_return_pct(candidate, entry_price)
         weight = (
             _RATING_WEIGHT.get(rating, 0.0)
             * max(confidence, 0.10)
@@ -322,7 +334,7 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
                 "ticker": ticker,
                 "rating": rating,
                 "confidence": confidence,
-                "current_price": current_price,
+                "entry_price": entry_price,
                 "stop_loss": stop_loss,
                 "rr_ratio": rr_ratio,
                 "risk_per_share": risk_per_share,
@@ -339,7 +351,7 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
         )
         capital_allocated = total_capital * allocation_pct
         lot_from_risk = floor(max_loss_budget / (item["risk_per_share"] * LOT_SIZE))
-        lot_from_alloc = floor(capital_allocated / (item["current_price"] * LOT_SIZE))
+        lot_from_alloc = floor(capital_allocated / (item["entry_price"] * LOT_SIZE))
         final_lot = min(lot_from_risk, lot_from_alloc)
         if final_lot < 1:
             continue
@@ -358,7 +370,7 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
             "expected_return_pct": item["expected_return_pct"],
             "expected_return_rp": 0.0,
             "total_cost_est": 0.0,
-            "entry_price": item["current_price"],
+            "entry_price": item["entry_price"],
             "stop_loss": item["stop_loss"],
             "rr_ratio": item["rr_ratio"],
         }

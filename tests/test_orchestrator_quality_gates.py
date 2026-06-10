@@ -341,3 +341,52 @@ async def test_batch_debate_records_unexpected_ticker_failure(
     assert "KeyError" in failed["error"]
     assert failed["metadata"]["failure_type"] == "KeyError"
     assert failed["metadata"]["failure_stage"] == "single_debate"
+
+
+def test_attach_news_signal_mirrors_debate_evaluation(monkeypatch):
+    # Regression: the post-debate news re-fetch used to stamp a second,
+    # contradictory signal on the top level (e.g. keyword NEUTRAL/-0.2 while
+    # the debate applied LLM POSITIVE/+0.05 to the verdict confidence).
+    def _explode(_ticker):
+        raise AssertionError(
+            "must not re-fetch news when the debate already evaluated it"
+        )
+
+    monkeypatch.setattr(orchestrator.DEFAULT_FETCHER, "build_bundle", _explode)
+    result = {
+        "ticker": "ADMR",
+        "metadata": {
+            "news_overall_sentiment": "POSITIVE",
+            "news_confidence_adjustment": 0.05,
+            "has_breaking_news": False,
+            "breaking_news_headlines": [],
+        },
+    }
+
+    orchestrator._attach_news_signal("ADMR", result)
+
+    assert result["news_sentiment"] == "POSITIVE"
+    assert result["news_confidence_adjustment"] == 0.05
+    assert result["has_breaking_news"] is False
+    assert result["breaking_news_headlines"] == []
+
+
+def test_attach_news_signal_fetches_when_debate_has_no_news(monkeypatch):
+    from types import SimpleNamespace
+
+    bundle = SimpleNamespace(
+        overall_sentiment=SimpleNamespace(value="NEUTRAL"),
+        confidence_adjustment=-0.2,
+        confidence_adjustment_reason="stale coverage",
+        has_breaking_news=False,
+        items=[],
+    )
+    monkeypatch.setattr(
+        orchestrator.DEFAULT_FETCHER, "build_bundle", lambda _ticker: bundle
+    )
+    result = {"ticker": "ADMR", "metadata": {}}
+
+    orchestrator._attach_news_signal("ADMR", result)
+
+    assert result["news_sentiment"] == "NEUTRAL"
+    assert result["news_confidence_adjustment"] == -0.2

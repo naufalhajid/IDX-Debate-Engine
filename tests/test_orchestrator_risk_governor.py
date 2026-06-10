@@ -52,6 +52,7 @@ def test_deployable_top_pick_keeps_legacy_sizing_candidate_shape() -> None:
         {
             "ticker": "BBRI",
             "current_price": 1000,
+            "entry_high": 1050.0,
             "stop_loss": 900.0,
             "rating": "BUY",
             "confidence": 0.75,

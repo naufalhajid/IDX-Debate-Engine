@@ -328,6 +328,43 @@ class TestCodexAdapter:
         assert calls[0]["reasoning_effort"] == "xhigh"
         assert calls[0]["max_tokens"] == 10000
 
+    def test_codex_reasoning_override_disables_reasoning(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        calls = []
+
+        class FakeChatCodexResponses:
+            def __init__(self, **kwargs):
+                calls.append(kwargs)
+
+        monkeypatch.setattr("providers.codex_adapter.resolve_codex_token", lambda: "t")
+        monkeypatch.setattr(
+            "providers.codex_adapter.settings",
+            MagicMock(
+                CODEX_FLASH_MODEL="gpt-5.4-mini",
+                CODEX_FLASH_REASONING_EFFORT="medium",
+                CODEX_PRO_MODEL="gpt-5.5",
+                CODEX_PRO_REASONING_EFFORT="xhigh",
+            ),
+        )
+        monkeypatch.setattr(
+            "providers.codex_responses_llm.ChatCodexResponses",
+            FakeChatCodexResponses,
+        )
+
+        from providers.codex_adapter import (
+            codex_reasoning_override,
+            get_codex_flash_llm,
+            get_codex_pro_llm,
+        )
+
+        with codex_reasoning_override(flash=None, pro=None):
+            get_codex_flash_llm()
+            get_codex_pro_llm()
+
+        assert calls[0]["reasoning_effort"] is None
+        assert calls[1]["reasoning_effort"] is None
+
 
 # ---------------------------------------------------------------------------
 # Debate timeout selection
@@ -368,6 +405,25 @@ class TestDebateTimeoutSelection:
         from services.debate_chamber import DebateChamber
 
         assert DebateChamber._default_timeout_seconds() == 300
+
+    def test_codex_reasoning_override_keeps_base_timeout(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(
+            "services.debate_chamber.settings",
+            MagicMock(
+                DEFAULT_LLM_PROVIDER="codex",
+                CODEX_PRO_REASONING_EFFORT="xhigh",
+                CODEX_FLASH_REASONING_EFFORT="medium",
+                DEBATE_TIMEOUT_SECONDS=300,
+                CODEX_DEBATE_TIMEOUT_SECONDS=900,
+            ),
+        )
+        from providers.codex_adapter import codex_reasoning_override
+        from services.debate_chamber import DebateChamber
+
+        with codex_reasoning_override(flash=None, pro=None):
+            assert DebateChamber._default_timeout_seconds() == 300
 
 
 # ---------------------------------------------------------------------------

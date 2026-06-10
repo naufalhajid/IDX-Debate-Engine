@@ -350,7 +350,7 @@ class CIOVerdict(BaseDataClass):
             return None
         try:
             text = re.sub(r"[Rr][Pp]\.?\s*", "", self.entry_price_range).strip()
-            parts = re.split(r"\s*[-â€“]\s*", text, maxsplit=1)
+            parts = re.split(r"\s*[-–—]\s*", text, maxsplit=1)
             if len(parts) < 2:
                 return None
 
@@ -386,7 +386,7 @@ class CIOVerdict(BaseDataClass):
             # Use a greedy split on ' - ' or '-' surrounded by spaces so we
             # don't accidentally split a negative number (not applicable for
             # IHSG prices but keeps the parser generic).
-            parts = re.split(r"\s*[-–]\s*", text, maxsplit=1)
+            parts = re.split(r"\s*[-–—]\s*", text, maxsplit=1)
             if len(parts) < 2:
                 return 0.0
 

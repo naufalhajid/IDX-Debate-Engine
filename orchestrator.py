@@ -20,10 +20,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import asyncio
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
 from core.orchestrator import pipeline as _pipeline
+from core.settings import settings
 
 # Backward-compatible facade: expose all pipeline symbols, including private
 # helpers that tests or local scripts may import directly from orchestrator.py.
@@ -71,14 +73,28 @@ def _run_cli(argv: list[str] | None = None) -> None:
         if args.no_interactive
         else None
     )
-    asyncio.run(
-        _pipeline.main(
-            dry_run=args.dry_run,
-            output_dir=_pipeline.OUTPUT_DIR,
-            user_config=user_config,
-            raise_on_error=True,
+    # Codex-only: batch runs (no explicit tickers, or more than the deep-mode
+    # cap) drop reasoning effort for speed; other providers are unaffected.
+    reasoning_context = nullcontext()
+    if str(settings.DEFAULT_LLM_PROVIDER or "").lower() == "codex":
+        from providers.codex_adapter import (
+            DEEP_REASONING_MAX_TICKERS,
+            codex_reasoning_override,
         )
-    )
+
+        explicit_tickers = list(args.tickers or [])
+        if not (0 < len(explicit_tickers) <= DEEP_REASONING_MAX_TICKERS):
+            reasoning_context = codex_reasoning_override(flash=None, pro=None)
+
+    with reasoning_context:
+        asyncio.run(
+            _pipeline.main(
+                dry_run=args.dry_run,
+                output_dir=_pipeline.OUTPUT_DIR,
+                user_config=user_config,
+                raise_on_error=True,
+            )
+        )
 
 
 if __name__ == "__main__":

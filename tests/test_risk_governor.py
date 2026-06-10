@@ -294,3 +294,106 @@ def test_sentiment_insufficient_data_does_not_reject_when_technicals_exist() -> 
 
     assert decision.status == "deployable"
     assert "insufficient_technical_data" not in decision.reason_codes
+
+
+def test_missing_rr_is_recomputed_and_rejected_below_floor() -> None:
+    # Regression: a verdict without risk_reward_ratio used to skip the floor
+    # check entirely; the governor now recomputes the canonical entry_high R/R.
+    decision = evaluate_risk(
+        _candidate(
+            verdict={
+                "risk_reward_ratio": None,
+                "target_price": 1150,
+                "stop_loss": 930,
+            }
+        )
+    )
+
+    # (1150 - 1050) / (1050 - 930) = 0.83x — below any tier floor.
+    assert decision.status == "reject"
+    assert "rr_too_low" in decision.reason_codes
+
+
+def test_missing_rr_is_recomputed_and_passes_above_floor() -> None:
+    decision = evaluate_risk(
+        _candidate(
+            verdict={
+                "risk_reward_ratio": None,
+                "target_price": 1300,
+                "stop_loss": 930,
+            }
+        )
+    )
+
+    # (1300 - 1050) / (1050 - 930) = 2.08x — clears the floor.
+    assert decision.status == "deployable"
+    assert "rr_too_low" not in decision.reason_codes
+
+
+def test_unspaced_entry_range_parses_as_positive_bounds() -> None:
+    # Regression: "950-1050" used to parse the second bound as -1050 and
+    # false-reject the setup with invalid_entry_range.
+    decision = evaluate_risk(_candidate(verdict={"entry_price_range": "950-1050"}))
+
+    assert decision.status == "deployable"
+    assert "invalid_entry_range" not in decision.reason_codes
+
+
+def test_counter_trend_hold_with_string_rr_does_not_crash() -> None:
+    # Regression: _is_conditional_setup used a raw float() that raised on
+    # formatted ratios like "3.8x".
+    decision = evaluate_risk(
+        _candidate(
+            technical_indicators={"ma200_context": "BELOW"},
+            verdict={
+                "rating": "HOLD",
+                "risk_reward_ratio": "3.8x",
+                "target_price": 1510,
+                "stop_loss": 930,
+            },
+        )
+    )
+
+    # R/R >= 3.5 with only counter-trend + hold soft flags deploys directly.
+    assert decision.status == "deployable"
+
+
+def test_thousand_dot_entry_range_parses_as_full_idr_prices() -> None:
+    # Regression: "4.300 - 4.600" used to parse as (4.3, 4.6), making a price
+    # of 4500 look like it was far above the entry range.
+    decision = evaluate_risk(
+        _candidate(
+            verdict={
+                "current_price": 4500,
+                "entry_price_range": "4.300 - 4.600",
+                "target_price": "Rp 5.200",
+                "stop_loss": "Rp 4.100",
+                "risk_reward_ratio": 2.0,
+            }
+        )
+    )
+
+    assert decision.entry_low == 4300.0
+    assert decision.entry_high == 4600.0
+    assert decision.target_price == 5200.0
+    assert decision.stop_loss == 4100.0
+    assert decision.status == "deployable"
+
+
+def test_stale_candidate_rr_ratio_does_not_bypass_recompute() -> None:
+    # Regression: when the verdict ratio is missing, a stale top-level
+    # candidate rr_ratio used to win over a fresh recompute from prices.
+    decision = evaluate_risk(
+        _candidate(
+            rr_ratio=2.4,  # stale echo from an earlier run
+            verdict={
+                "risk_reward_ratio": None,
+                "target_price": 1150,
+                "stop_loss": 930,
+            },
+        )
+    )
+
+    # Fresh recompute: (1150 - 1050) / (1050 - 930) = 0.83x < floor.
+    assert decision.status == "reject"
+    assert "rr_too_low" in decision.reason_codes

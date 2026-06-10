@@ -1138,6 +1138,39 @@ def test_cio_verdict_rejects_invalid_price_ordering():
         )
 
 
+def test_cio_verdict_parses_en_dash_entry_range():
+    # Regression: _parse_entry_bounds had a mojibake character class that
+    # silently failed on en-dash ranges, leaving risk_reward_ratio = None and
+    # skipping the price-ordering invariant.
+    for dash in ("–", "—"):
+        verdict = CIOVerdict(
+            ticker="DASH",
+            rating="BUY",
+            confidence=0.7,
+            entry_price_range=f"95 {dash} 105",
+            target_price=120,
+            stop_loss=90,
+            current_price=100,
+            fair_value=120,
+        )
+
+        assert verdict.risk_reward_ratio == 1.0  # (120-105)/(105-90)
+
+
+def test_cio_verdict_en_dash_range_still_enforces_price_ordering():
+    with pytest.raises(ValueError, match="Invalid swing price ordering"):
+        CIOVerdict(
+            ticker="BAD",
+            rating="BUY",
+            confidence=0.7,
+            entry_price_range="100 – 110",
+            target_price=105,
+            stop_loss=90,
+            current_price=100,
+            fair_value=120,
+        )
+
+
 def test_cio_verdict_uses_high_bound_for_overvalued_flag():
     verdict = CIOVerdict(
         ticker="SOFT",
