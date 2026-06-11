@@ -262,6 +262,34 @@ def test_default_tier_rr_below_default_threshold_is_too_low() -> None:
     assert "rr_too_low" in decision.reason_codes
 
 
+def test_implausible_rr_is_hard_rejected() -> None:
+    # INDO 2026-06-11: R/R 22.3x from a pre-crash-high target over a 6-point
+    # ATR stop — broken geometry, not opportunity.
+    decision = evaluate_risk(_candidate(verdict={"risk_reward_ratio": 22.3}))
+
+    assert decision.status == "reject"
+    assert decision.sizing_allowed is False
+    assert "rr_implausible" in decision.reason_codes
+
+
+def test_high_but_plausible_rr_stays_deployable() -> None:
+    decision = evaluate_risk(_candidate(verdict={"risk_reward_ratio": 4.9}))
+
+    assert decision.status == "deployable"
+    assert decision.sizing_allowed is True
+    assert "rr_implausible" not in decision.reason_codes
+
+
+def test_rr_exactly_at_ceiling_is_rejected() -> None:
+    # Boundary must match _rr_component_score, which zeroes at exactly 5.0:
+    # an R/R the scorer treats as worthless may not pass the governor.
+    decision = evaluate_risk(_candidate(verdict={"risk_reward_ratio": 5.0}))
+
+    assert decision.status == "reject"
+    assert decision.sizing_allowed is False
+    assert "rr_implausible" in decision.reason_codes
+
+
 def test_hold_low_confidence_inside_entry_is_conditional_not_sized() -> None:
     decision = evaluate_risk(
         _candidate(

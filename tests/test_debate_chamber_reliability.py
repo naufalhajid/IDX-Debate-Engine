@@ -513,6 +513,76 @@ def test_momentum_override_blocked_when_price_inside_fair_value_range():
     assert "MOMENTUM WATCHLIST" not in (result.get("weighted_reasoning") or "")
 
 
+def _voting_state(winner_position: str, *, agent: str = "chartist") -> dict:
+    return {
+        "consensus_reached": True,
+        "consensus_method": "voting",
+        "consensus_winner": {
+            "agent": agent,
+            "position": winner_position,
+            "confidence": 0.78,
+        },
+        "dissenting_agents": ["bear"],
+        "agent_votes": [],
+    }
+
+
+def test_voting_override_clamps_cio_buy_to_hold_majority():
+    chamber = _chamber()
+
+    # INDO 2026-06-11: agents voted HOLD 4/5 + AVOID 1/5 (zero BUY) yet the CIO
+    # emitted BUY @ 0.66 — the voting method had no clamp at all.
+    parsed = {"rating": "BUY", "confidence": 0.66}
+    result = chamber._apply_consensus_override(parsed, _voting_state("HOLD"))
+
+    assert result["rating"] == "HOLD"
+    assert result["confidence"] == 0.55
+    assert "Consensus override" in result["weighted_reasoning"]
+
+
+def test_voting_override_keeps_more_bearish_cio_rating():
+    chamber = _chamber()
+
+    parsed = {"rating": "HOLD", "confidence": 0.6}
+    result = chamber._apply_consensus_override(parsed, _voting_state("BUY"))
+
+    assert result["rating"] == "HOLD"
+    assert result["confidence"] == 0.6
+    assert "Consensus override" not in (result.get("weighted_reasoning") or "")
+
+
+def test_voting_override_clamps_strong_buy_to_buy_majority():
+    chamber = _chamber()
+
+    parsed = {"rating": "STRONG_BUY", "confidence": 0.8}
+    result = chamber._apply_consensus_override(parsed, _voting_state("BUY"))
+
+    assert result["rating"] == "BUY"
+    assert result["confidence"] == 0.8
+
+
+def test_voting_override_clamps_spaced_rating_variant():
+    chamber = _chamber()
+
+    # "STRONG BUY" (space) must not dodge the clamp via a failed rank lookup.
+    parsed = {"rating": "STRONG BUY", "confidence": 0.8}
+    result = chamber._apply_consensus_override(parsed, _voting_state("HOLD"))
+
+    assert result["rating"] == "HOLD"
+    assert result["confidence"] == 0.55
+
+
+def test_voting_override_preserves_zero_confidence_on_clamp():
+    chamber = _chamber()
+
+    # Falsy-or must not inflate a legitimate 0.0 confidence to the 0.55 cap.
+    parsed = {"rating": "BUY", "confidence": 0.0}
+    result = chamber._apply_consensus_override(parsed, _voting_state("HOLD"))
+
+    assert result["rating"] == "HOLD"
+    assert result["confidence"] == 0.0
+
+
 def test_news_adjustment_from_sentiment_is_consistent():
     # Adjustment is derived from the sentiment label, so the two can never
     # contradict (the keyword path could: BREN was POSITIVE overall + -0.20 adj).
@@ -1340,6 +1410,102 @@ def test_trade_envelope_guarantees_sufficient_rr_from_entry_high():
 
     # R/R must be calculated conservatively from entry_high
     assert envelope["risk_reward_ratio"] >= 2.0
+
+
+def test_trade_envelope_fair_value_is_hard_ceiling_not_blend():
+    chamber = _chamber()
+
+    # INDO 2026-06-11: 52w high Rp 519 vs FV Rp 253 — the old blend produced
+    # target Rp 386 (above FV itself) and R/R 22.3x.
+    envelope = chamber._compute_trade_envelope(
+        current_price=165.0,
+        fair_value=253.0,
+        tech={"ma50": 162.0, "sma20": 165.0, "atr14": 6.0, "52w_high": 519.0},
+    )
+
+    assert envelope["target_price"] <= 253.0
+    assert envelope["target_price"] <= envelope["entry_high"] * 1.16
+    assert envelope["risk_reward_ratio"] < 5.0
+    assert "(FV Ceiling)" in envelope["target_basis"]
+    assert "(Swing Cap)" in envelope["target_basis"]
+
+
+def test_trade_envelope_swing_cap_applies_even_with_fair_value_above_resistance():
+    chamber = _chamber()
+
+    # NZIA 2026-06-11: FV Rp 417 sits above the 52w-high target Rp 316, so the
+    # FV ceiling never fired and the envelope shipped +78% / R/R 11.75x.
+    envelope = chamber._compute_trade_envelope(
+        current_price=177.0,
+        fair_value=417.0,
+        tech={"ma50": 173.0, "sma20": 175.0, "atr14": 7.0, "52w_high": 316.0},
+    )
+
+    assert envelope["target_price"] <= envelope["entry_high"] * 1.16
+    assert envelope["risk_reward_ratio"] < 5.0
+    assert "(Swing Cap)" in envelope["target_basis"]
+    assert "(FV Ceiling)" not in envelope["target_basis"]
+
+
+def test_trade_envelope_tick_fallback_preserves_ceiling_provenance():
+    chamber = _chamber()
+
+    # FV (800) below entry collapses the target; the fallback must append to
+    # target_basis, not overwrite it — the audit trail has to show that the
+    # FV ceiling (valuation), not tick geometry, killed the setup.
+    envelope = chamber._compute_trade_envelope(
+        current_price=1000.0,
+        fair_value=800.0,
+        tech={"ma50": 980.0, "sma20": 1000.0, "atr14": 10.0},
+    )
+
+    assert "(FV Ceiling)" in envelope["target_basis"]
+    assert "Tick Increment Fallback" in envelope["target_basis"]
+    assert envelope["target_price"] > envelope["entry_high"]
+
+
+@pytest.mark.asyncio
+async def test_fundamental_node_propagates_quality_rejection_to_metadata(monkeypatch):
+    chamber = _chamber()
+    chamber.flash_llm = None  # unused: _invoke_llm_for_state is patched
+
+    async def fake_fetch(url):
+        return {"data": "raw"}
+
+    async def fake_invoke(state, llm, messages):
+        return SimpleNamespace(content="analysis text")
+
+    monkeypatch.setattr(chamber, "_fetch_url", fake_fetch)
+    monkeypatch.setattr(chamber, "_invoke_llm_for_state", fake_invoke)
+    monkeypatch.setattr(
+        dc,
+        "build_fair_value_payload",
+        lambda raw, ticker, price: (
+            "report",
+            {
+                "fair_value": None,
+                "fair_value_base": None,
+                "fair_value_low": None,
+                "fair_value_high": None,
+                "range_pct": None,
+                "risk_overvalued": False,
+                "fv_quality_rejected": True,
+                "fv_quality_reasons": ["fv_methods_lt_2"],
+            },
+        ),
+    )
+
+    partial = await chamber._fundamental_node(
+        {"ticker": "NZIA", "current_price": 177.0, "metadata": {"run_id": "t1"}}
+    )
+
+    assert partial["fair_value_estimate"] is None
+    # Quality rejection must surface through the same metadata fields the
+    # RAG-evidence rejection uses, so report consumers treat both alike.
+    meta = partial["metadata"]
+    assert meta["fair_value_rejected"] is True
+    assert meta["valuation_gap"] == "unverified"
+    assert "fair_value_quality_rejected" in meta["reasons"]
 
 
 def test_sentiment_payload_from_response_sanitizes_markdown_json():

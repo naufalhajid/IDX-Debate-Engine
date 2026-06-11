@@ -1034,6 +1034,50 @@ def build_fair_value_payload(
             "[FairValue] {}: fair value tidak dapat dikalkulasi — semua metode gagal",
             ticker,
         )
+
+    # ── Data-quality gate ─────────────────────────────────────────────────
+    # A fair value built on thin or broken inputs must not anchor the trade
+    # envelope or a CIO "undervalued" narrative (NZIA: 1/3 methods valid → FV
+    # Rp 417 vs spot Rp 177 became the BUY catalyst; INDO: net margin 131%
+    # from a revenue/net-income mismatch). The per-method numbers stay
+    # visible in the report text; only the anchor fields are nulled, so the
+    # envelope falls back to its swing cap and risk_overvalued never fires
+    # off a garbage anchor. Note: the gate keys off structured signals — the
+    # LLM's NEEDS_RECONCILIATION label is prose, net_margin > 1.0 is its
+    # deterministic equivalent (post-normalisation, margins land in (1, ∞)
+    # only when net income exceeds revenue).
+    quality_reasons: list[str] = []
+    if result.get("confidence") == "LOW":
+        quality_reasons.append("fv_methods_lt_2")
+    if stats.net_margin > 1.0:
+        quality_reasons.append("net_margin_gt_100pct")
+    if quality_reasons and fv is not None:
+        logger.warning(
+            "[FairValue] {}: anchor ditolak quality gate ({}) — FV {} di-drop",
+            ticker,
+            ", ".join(quality_reasons),
+            fv,
+        )
+        result = {
+            **result,
+            "fair_value": None,
+            "fair_value_base": None,
+            "fair_value_low": None,
+            "fair_value_high": None,
+            "range_pct": None,
+            "risk_overvalued": False,
+            "margin_of_safety_pct": None,
+            "valuation_verdict": "QUALITY_REJECTED",
+            "fv_quality_rejected": True,
+            "fv_quality_reasons": quality_reasons,
+        }
+        report += (
+            "\n⚠️ FAIR VALUE QUALITY GATE: estimasi FV di atas TIDAK dipakai "
+            f"sebagai anchor valuasi ({', '.join(quality_reasons)}). Jangan "
+            "mengutip FV atau valuation gap sebagai fakta; perlakukan valuasi "
+            "sebagai UNKNOWN."
+        )
+
     return report, result
 
 

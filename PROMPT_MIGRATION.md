@@ -206,3 +206,184 @@ scorer to a fallback.
   tags; only the overall sentiment + adjustment are LLM-driven. Minor; could
   regenerate the brief later.
 - D2 couples news judgment to social volume; decouple later if needed.
+
+---
+
+## 2026-06-11 — `rr-sanity-v1` (CODE-LEVEL, no prompt_version bump)
+
+**Files changed:** `services/debate_chamber.py`, `core/risk_governor.py`,
+`tests/test_debate_chamber_reliability.py`, `tests/test_risk_governor.py`
+
+### Problem (run 2026-06-11, INDO/NZIA)
+- INDO: agents voted HOLD 4/5 + AVOID 1/5 (zero BUY) yet shipped **BUY @ 0.66,
+  target +133.9%, R/R 22.3x**, ranked #1 with trade conviction 0.83.
+- Three compounding mechanisms:
+  1. The envelope "FV ceiling" was a **blend** `(target + FV) / 2` — with a far
+     pre-crash 52w high it landed **above FV itself** (INDO: (519+253)/2 = 386
+     vs FV 253). And when FV sits above the resistance target (NZIA: FV 417 >
+     52w 316) no ceiling fired at all → +78% target, R/R 11.75x.
+  2. `_apply_consensus_override` had **no branch for `method == "voting"`** —
+     the CIO LLM rating passed through unclamped, so a HOLD majority exited as
+     BUY (the CIO even cited "R/R 22.30 extreme asymmetry" as validation).
+  3. R/R > 5 only produced a conviction-scorer *warning*; the saturated R/R
+     component (cap 5.0, weight 0.5) then **boosted** the ranking score.
+
+### Changes
+**1 — `_compute_trade_envelope`:** FV blend → hard ceiling (`min(target, FV)`,
+basis "(FV Ceiling)"), plus `MAX_TARGET_RETURN_NO_FV` renamed
+`MAX_TARGET_RETURN = 0.15` and applied **universally** (basis "(Swing Cap)"),
+not only when FV is missing. INDO-shape target now ~entry_high x 1.15, R/R ~4.
+
+**2 — `core/risk_governor.py`:** new `RR_IMPLAUSIBLE_CEILING = 5.0`; R/R above
+it appends `rr_implausible`, which is in `HARD_REJECT_CODES` → status reject,
+no sizing. Matches the existing "mencurigakan tinggi" warning threshold and
+`CONVICTION_RR_NORMALIZATION_CAP`. Backstop for tight-stop geometries that
+survive the envelope caps.
+
+**3 — `_apply_consensus_override` (`method == "voting"`):** new
+`RATING_BULLISHNESS_RANK` clamp — the CIO rating may be more bearish than the
+voting consensus, never more bullish (STRONG_BUY→BUY under a BUY vote;
+BUY→HOLD under a HOLD vote, confidence capped 0.55 mirroring soft_hold).
+Unknown ratings (INSUFFICIENT_DATA) pass through unchanged.
+
+### Tests (610 passed full suite)
+- `test_trade_envelope_fair_value_is_hard_ceiling_not_blend`
+- `test_trade_envelope_swing_cap_applies_even_with_fair_value_above_resistance`
+- `test_voting_override_clamps_cio_buy_to_hold_majority`
+- `test_voting_override_keeps_more_bearish_cio_rating`
+- `test_voting_override_clamps_strong_buy_to_buy_majority`
+- `test_implausible_rr_is_hard_rejected` / `test_high_but_plausible_rr_stays_deployable`
+
+### Known interaction
+`momentum-rr-override-v1/v2` prompt language ("R/R >= 5.0 → BUY Momentum") is
+now doubly inert: the envelope caps keep computed R/R below 5 for far-target
+shapes, and the governor hard-rejects anything still above it. The prompt
+cleanup flagged in v4 remains open.
+
+---
+
+## 2026-06-11 — `rr-sanity-v2` (CODE-LEVEL, no prompt_version bump)
+
+**Files changed:** `services/fair_value_calculator.py`, `services/debate_chamber.py`,
+`core/orchestrator/legacy.py`, `tests/test_fair_value_calculator.py`,
+`tests/test_orchestrator_realized_scoring.py`
+
+Continuation of `rr-sanity-v1` — items 4 and 5 of the same INDO/NZIA audit.
+
+### Part 1 — Fair-value data-quality gate (`build_fair_value_payload`)
+A fair value built on thin/broken inputs anchored the whole bull case (NZIA:
+1/3 methods valid yet "FV Rp 417 vs spot Rp 177" became the BUY catalyst;
+INDO: net margin 131% — net income > revenue — only flagged in prose as
+NEEDS_RECONCILIATION). New deterministic gate after the weighted calc:
+
+- `confidence == "LOW"` (fewer than 2 valid methods) → reason `fv_methods_lt_2`
+- `stats.net_margin > 1.0` (post-normalisation ⇔ margin > 100%) → reason
+  `net_margin_gt_100pct`
+
+On trip: `fair_value`/`base`/`low`/`high`/`range_pct` → None,
+`risk_overvalued` → False, `valuation_verdict` → `QUALITY_REJECTED`, and the
+report text gains a "FAIR VALUE QUALITY GATE" warning so scouts stop quoting
+the FV as fact. Per-method estimates stay visible in the report. Downstream
+the envelope then runs FV-less → universal Swing Cap (rr-sanity-v1) applies.
+Consumers: `_fundamental_node` (debate) and `single_agent_analyzer` both go
+through this choke-point; no changes needed there beyond suppressing the
+raw-JSON parse-failure log when the gate (not a parse failure) nulled the FV.
+
+Known pre-existing quirks (NOT fixed, out of scope):
+- `extract_keystats` Strategy B (legacy fallback) clobbers `net_margin` to 0.0
+  when EPS/BVPS are absent — the margin signal only survives Strategy A.
+- A decimal-format margin > 1.0 from a legacy source gets divided twice
+  (1.31 → 0.0131) by the `> 1.0` normalisation.
+
+### Part 2 — Conviction R/R component is now a tent (`_rr_component_score`)
+Old: `rr_score = min(rr / cap, 1.0)` — monotonic, so INDO's artifact R/R
+22.3x saturated at 1.0 and (at weight 0.5) pushed conviction to exactly 0.83:
+the most suspicious setup ranked #1. New tent, parameterised by the existing
+regime-tunable `rr_normalization_cap`:
+
+- rise: 0 → 1.0 over [0, 0.6×cap]
+- plateau: 1.0 on [0.6×cap, 0.8×cap]  (3.0–4.0 at default cap 5.0)
+- fall: 1.0 → 0.0 over [0.8×cap, cap]; 0.0 at and beyond cap
+
+Regime semantics preserved: DEFENSIVE/HIGH cap 4.0 → peak 2.4–3.2, zero at 4;
+LOW cap 6.0 → peak 3.6–4.8. `_conviction_breakdown_row` now reuses the same
+helper so the report breakdown matches the actual score (was an independent
+copy of the old ramp). The >5x/>3.5x warning strings are unchanged.
+
+INDO regression: conviction 0.83 → 0.33 (0.5×0.66 + 0.5×0.0).
+
+### Tests (617 passed full suite)
+- `test_quality_gate_rejects_single_method_fair_value`
+- `test_quality_gate_rejects_margin_above_100_percent`
+- `test_quality_gate_passes_two_methods_with_sane_margin`
+- `test_rr_component_is_zero_at_implausible_rr`
+- `test_rr_component_peaks_on_plateau`
+- `test_rr_component_declines_past_plateau`
+- `test_rr_component_still_rises_below_plateau`
+
+---
+
+## 2026-06-11 — `rr-sanity-v3` (CODE-LEVEL, review fixes)
+
+**Files changed:** `core/orchestrator/legacy.py`, `services/debate_chamber.py`,
+`tests/test_orchestrator_realized_scoring.py`, `tests/test_debate_chamber_reliability.py`
+
+Fixes for the CONFIRMED findings of the deep review of rr-sanity-v1/v2.
+
+### 1 — Tent zero-point anchored to the governor ceiling
+`_rr_component_score` previously fell to 0.0 at `rr_normalization_cap`, which
+diverged from the governor in both directions: LOW regime (cap 6.0) gave
+positive conviction to R/R 5.0–5.9 that `RR_IMPLAUSIBLE_CEILING=5.0` hard-
+rejects, and DEFENSIVE/HIGH (cap 4.0) zeroed R/R ≥ 4.0 that the governor still
+accepts (max conviction 0.50 < DEFENSIVE min_conviction 0.70 → silent
+exclusion). The fall now always ends at `RR_IMPLAUSIBLE_CEILING` (imported
+from `core.risk_governor`); the plateau stays regime-scaled (0.6–0.8 × cap).
+Default cap 5.0 behaviour is unchanged.
+
+Boundary fix (review follow-up): the governor reject comparison is `>=` so an
+R/R of exactly 5.0 — which the tent scores 0.0 — is also rejected; previously
+`>` let the exact boundary pass the governor with a zeroed score component.
+
+### 2 — Governor hard-rejects excluded from top_n
+`select_top_n` now skips entries with `risk_governor.status == "reject"`
+(annotated per-result during the batch loop), so a rejected setup can no
+longer occupy a ranked slot while the same report shows actionability=reject.
+Soft holds (wait_for_pullback / watchlist_only / conditional) still rank.
+
+### 3 — Voting clamp hardening (`_apply_consensus_override`)
+- CIO rating is space-normalised (`.replace(" ", "_")`, mirroring
+  `risk_governor._clean_rating`) so variants like "STRONG BUY" cannot dodge
+  the rank lookup and bypass the clamp into the Pydantic parse-fallback.
+- Falsy-zero fix: `or 0.55` → `or 0.0` — a legitimate 0.0 confidence is no
+  longer inflated to the HOLD cap. (Same latent pattern exists pre-diff in the
+  soft_hold branch `or 0.52` — NOT touched, out of scope.)
+
+### 4 — Envelope fallback preserves provenance
+The `target <= entry_high` tick fallback now APPENDS
+"(Tick Increment Fallback)" to `target_basis` instead of overwriting it, so
+the "(FV Ceiling)"/"(Swing Cap)" label that explains why the target collapsed
+survives into the audit trail.
+
+### 5 — Quality rejection propagates to shared rejection metadata
+`_fundamental_node` now mirrors the RAG-rejection fields when
+`fv_quality_rejected` is set: `metadata.fair_value_rejected=True`,
+`valuation_gap="unverified"`, reason `fair_value_quality_rejected`. Report and
+audit consumers (legacy.py valuation-gap row, report_formatter) treat both
+rejection kinds identically.
+
+### Deliberate non-fix (reviewed finding, decision documented)
+The quality gate keeps `risk_overvalued=False` for quality-rejected FV — the
+"overvalued" hard-reject intentionally does NOT fire off a garbage anchor in
+either direction. Restoring it would resurrect the DSSA failure mode
+(single-method Graham FV triggering AVOID on momentum names) that
+momentum-rr-override v1–v4 spent four iterations removing. The cohort is now
+visible via the `unverified` marker instead of silent.
+
+### Tests (624 passed full suite)
+- `test_rr_tent_zero_point_is_anchored_to_governor_ceiling`
+- `test_rr_tent_does_not_zero_below_governor_ceiling_in_tight_regimes`
+- `test_select_top_n_excludes_governor_rejected_entries`
+- `test_voting_override_clamps_spaced_rating_variant`
+- `test_voting_override_preserves_zero_confidence_on_clamp`
+- `test_trade_envelope_tick_fallback_preserves_ceiling_provenance`
+- `test_fundamental_node_propagates_quality_rejection_to_metadata`

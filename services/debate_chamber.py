@@ -718,6 +718,16 @@ ROUND1_CONSENSUS_THRESHOLD = 0.80
 CONSENSUS_AGENT_COUNT = 5
 MAX_DEBATE_ROUNDS = 3
 SOFT_HOLD_CONFIDENCE_DELTA = 0.27
+
+#: Bullishness ordering used to clamp the CIO rating to the voting consensus:
+#: the final verdict may be more cautious than the vote, never more bullish.
+RATING_BULLISHNESS_RANK = {
+    "SELL": 0,
+    "AVOID": 0,
+    "HOLD": 1,
+    "BUY": 2,
+    "STRONG_BUY": 3,
+}
 MAX_EVIDENCE_AGE_HOURS = 24
 MAX_STALENESS_PENALTY = 0.30
 SENTIMENT_STREAM_PAGE_SIZE = 20
@@ -2009,7 +2019,7 @@ Current Date (Asia/Jakarta): {current_date}
             report_str, fv_result = build_fair_value_payload(raw, ticker, current_price)
             fv_price = fv_result.get("fair_value")
             logger.info(f"[Fundamental] Fair value for {ticker}: {fv_price}")
-            if fv_price is None:
+            if fv_price is None and not fv_result.get("fv_quality_rejected"):
                 logger.warning(
                     f"[Fundamental] Raw API response for {ticker}: {json.dumps(raw)[:2000]}"
                 )
@@ -2031,7 +2041,7 @@ Current Date (Asia/Jakarta): {current_date}
                 started_at=started_at,
                 detail={"source": "stockbit", "fair_value": fv_price},
             )
-            return {
+            partial: dict = {
                 "fundamental_data": content,
                 "fair_value_estimate": fv_price,
                 "fair_value_base": fv_result.get("fair_value_base"),
@@ -2040,6 +2050,20 @@ Current Date (Asia/Jakarta): {current_date}
                 "fair_value_range_pct": fv_result.get("range_pct"),
                 "risk_overvalued": fv_result.get("risk_overvalued"),
             }
+            if fv_result.get("fv_quality_rejected"):
+                # Propagate the quality rejection through the same metadata
+                # fields the RAG-evidence rejection sets (see
+                # _reject_unverified_fair_value_if_needed) so report/audit
+                # consumers render both rejection kinds consistently.
+                metadata = dict(state.get("metadata") or {})
+                metadata["fair_value_rejected"] = True
+                metadata["valuation_gap"] = "unverified"
+                reasons = list(metadata.get("reasons") or [])
+                if "fair_value_quality_rejected" not in reasons:
+                    reasons.append("fair_value_quality_rejected")
+                metadata["reasons"] = reasons
+                partial["metadata"] = metadata
+            return partial
         except Exception as e:
             logger.error(f"[Fundamental] Error: {e}")
             failure_record = classify_exception(e, "stockbit").model_dump(mode="json")
@@ -3158,10 +3182,11 @@ Current Date (Asia/Jakarta): {current_date}
                 break
         return max(base - max(cls._tick_size_for_price(base), 1.0), 0.0)
 
-    #: Max target return (from entry_high) when no fair-value anchor is available.
-    #: Without an FV ceiling, resistance-based targets can run to a recent pre-crash
-    #: high and inflate R/R; this caps the implied upside to a realistic swing.
-    MAX_TARGET_RETURN_NO_FV = 0.15
+    #: Max target return (from entry_high) for a 1-3 month swing, applied with or
+    #: without a fair-value anchor. Resistance-based targets can run to a recent
+    #: pre-crash high (INDO: 52w high Rp 519 vs spot Rp 165) and the FV anchor
+    #: itself can sit far above spot; both inflate R/R past anything tradeable.
+    MAX_TARGET_RETURN = 0.15
 
     def _compute_trade_envelope(
         self,
@@ -3241,24 +3266,29 @@ Current Date (Asia/Jakarta): {current_date}
 
         target = snap_to_tick(target_candidate)
 
-        # Ceiling: blend with Fair Value if target > FV
+        # Ceiling 1: fair value is a hard ceiling. The old FV *blend*
+        # ((target + FV) / 2) could land the target above FV itself when the
+        # resistance was far away (INDO: (519 + 253) / 2 = 386 vs FV 253 →
+        # R/R 22.3x) — an average is not a ceiling.
         if fair_value and fair_value > 0 and target > fair_value:
-            target = snap_to_tick((target + fair_value) / 2)
-            target_basis += " (FV Blend)"
-        elif not fair_value or fair_value <= 0:
-            # No valuation anchor (Graham FV missing/0): the FV-blend ceiling cannot
-            # apply, so resistance levels — especially a recent pre-crash high still
-            # inside the 20-day window — push the target far above price and inflate
-            # R/R (e.g. DSSA target Rp 1,030 / R/R 9.22x vs the FV-anchored Rp 665 /
-            # 1.11x). Cap at a realistic swing ceiling so R/R stays trustworthy.
-            capped = snap_to_tick(entry_high * (1 + self.MAX_TARGET_RETURN_NO_FV))
-            if 0 < capped < target:
-                target = capped
-                target_basis += " (No-FV Cap)"
+            target = snap_to_tick(fair_value)
+            target_basis += " (FV Ceiling)"
+
+        # Ceiling 2: realistic swing cap, FV or not. Resistance levels —
+        # especially a recent pre-crash high — push the target far above price
+        # and inflate R/R (e.g. DSSA target Rp 1,030 / R/R 9.22x vs the
+        # FV-anchored Rp 665 / 1.11x), and an FV far above spot (NZIA: FV 417
+        # vs spot 177) never triggers Ceiling 1 at all.
+        capped = snap_to_tick(entry_high * (1 + self.MAX_TARGET_RETURN))
+        if 0 < capped < target:
+            target = capped
+            target_basis += " (Swing Cap)"
 
         if target <= entry_high:
             target = self._next_tick_above(entry_high)
-            target_basis = "Tick Increment (Fallback)"
+            # Append, don't overwrite: keep the "(FV Ceiling)"/"(Swing Cap)"
+            # provenance that explains WHY the target collapsed to a tick.
+            target_basis += " (Tick Increment Fallback)"
 
         # Compute display percentages from entry_mid, but canonical R/R from entry_high.
         gain_pct = ((target - entry_mid) / entry_mid) * 100 if entry_mid > 0 else 0
@@ -3290,9 +3320,7 @@ Current Date (Asia/Jakarta): {current_date}
         fv_low = envelope.get("fair_value_low")
         fv_high = envelope.get("fair_value_high")
         fv_range_str = (
-            f"Rp {fv_low:,.0f} - Rp {fv_high:,.0f}"
-            if fv_low and fv_high
-            else "N/A"
+            f"Rp {fv_low:,.0f} - Rp {fv_high:,.0f}" if fv_low and fv_high else "N/A"
         )
         return (
             f"FAIR VALUE         : {fv_str}\n"
@@ -3464,6 +3492,40 @@ Current Date (Asia/Jakarta): {current_date}
             )
             return p
 
+        if method == "voting":
+            winner_position = self._normalise_position(
+                str(winner.get("position", "HOLD"))
+            )
+            if winner_position == "UNKNOWN":
+                winner_position = "HOLD"
+
+            # Space-normalise like risk_governor._clean_rating so LLM variants
+            # ("STRONG BUY") cannot dodge the clamp via a failed rank lookup.
+            cio_rating = str(p.get("rating") or "").strip().upper().replace(" ", "_")
+            cio_rank = RATING_BULLISHNESS_RANK.get(cio_rating)
+            winner_rank = RATING_BULLISHNESS_RANK.get(winner_position, 1)
+            # Clamp only when the CIO is MORE bullish than the vote (a HOLD
+            # majority must not exit as BUY). A more cautious CIO is respected,
+            # and unknown ratings (e.g. INSUFFICIENT_DATA) pass through for the
+            # existing downstream handling.
+            if cio_rank is not None and cio_rank > winner_rank:
+                p["rating"] = winner_position
+                if winner_position == "HOLD":
+                    # Mirror the soft-hold/momentum HOLD confidence cap.
+                    # `or 0.0` (not 0.55): a legitimate 0.0 confidence must not
+                    # be inflated to the cap by falsy-or.
+                    p["confidence"] = min(float(p.get("confidence") or 0.0), 0.55)
+                p["weighted_reasoning"] = self._append_reason(
+                    p.get("weighted_reasoning"),
+                    (
+                        f"Consensus override: agents reached a voting consensus of "
+                        f"{winner_position}, so the CIO rating {cio_rating} is "
+                        f"clamped to {winner_position} — the verdict may not be "
+                        "more bullish than the vote."
+                    ),
+                )
+            return p
+
         if method == "confidence_winner":
             winner_position = self._normalise_position(
                 str(winner.get("position", "HOLD"))
@@ -3488,9 +3550,7 @@ Current Date (Asia/Jakarta): {current_date}
                     cp, fv = 0.0, 0.0
                 try:
                     fv_high = float(
-                        p.get("fair_value_high")
-                        or state.get("fair_value_high")
-                        or 0.0
+                        p.get("fair_value_high") or state.get("fair_value_high") or 0.0
                     )
                 except (TypeError, ValueError):
                     fv_high = 0.0
@@ -3963,8 +4023,7 @@ Start your response with '{' and end with '}'. Nothing else."""
                     p = dict(parsed)
                     p["weighted_reasoning"] = self._append_reason(
                         p.get("weighted_reasoning"),
-                        "Evidence citation guard warning: "
-                        + "; ".join(report.errors),
+                        "Evidence citation guard warning: " + "; ".join(report.errors),
                     )
                     return p
                 return parsed

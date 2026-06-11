@@ -23,12 +23,19 @@ RiskStatus = Literal[
 # confidence below 60% or R/R below the ticker's tier-specific floor should
 # remain a watchlist/reject signal, not an executable allocation.
 MIN_BUYABLE_CONFIDENCE = 0.60
+# R/R at or above this is broken setup geometry (stop inside the noise band or
+# target beyond realistic swing resistance), not opportunity — INDO printed R/R
+# 22.3x off a pre-crash-high target. Matches the conviction-scorer "suspicious"
+# warning threshold and CONVICTION_RR_NORMALIZATION_CAP; the rejection boundary
+# (>=) mirrors _rr_component_score, which zeroes exactly at this line.
+RR_IMPLAUSIBLE_CEILING = 5.0
 UNBUYABLE_RATINGS = {"AVOID", "SELL"}
 SOFT_BUYABLE_RATINGS = {"HOLD"}
 HARD_REJECT_CODES = {
     "rating_not_buyable",
     "overvalued",
     "rr_too_low",
+    "rr_implausible",
     "insufficient_technical_data",
 }
 
@@ -431,6 +438,8 @@ def _verdict_reason_codes(
     rr_minimum = _rr_minimum_for_candidate(candidate, verdict, ticker)
     if rr_ratio is not None and rr_ratio < rr_minimum:
         reason_codes.append("rr_too_low")
+    elif rr_ratio is not None and rr_ratio >= RR_IMPLAUSIBLE_CEILING:
+        reason_codes.append("rr_implausible")
 
     if _technical_data_insufficient(candidate, verdict):
         reason_codes.append("insufficient_technical_data")
@@ -659,6 +668,11 @@ def _reject_message(reason_codes: list[str]) -> str:
         return "Setup ditolak karena verdict menandai saham overvalued."
     if "rr_too_low" in reason_codes:
         return "Setup ditolak karena risk/reward terlalu rendah."
+    if "rr_implausible" in reason_codes:
+        return (
+            "Setup ditolak karena R/R tidak plausibel — stop terlalu sempit "
+            "atau target melampaui resistance realistis."
+        )
     return "Setup ditolak oleh risk governor."
 
 

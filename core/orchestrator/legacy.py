@@ -116,7 +116,7 @@ from core.regime import (
     get_regime_params,
 )
 from core.report_consistency import check_consistency
-from core.risk_governor import annotate_risk
+from core.risk_governor import RR_IMPLAUSIBLE_CEILING, annotate_risk
 from core.settings import settings
 from core.comparison_reporter import DEFAULT_REPORTER, ComparisonReporter
 from services.debate_prompt_registry import PROMPT_VERSION
@@ -4332,6 +4332,37 @@ async def run_batch_debates(
 # ---------------------------------------------------------------------------
 
 
+#: R/R component plateau, as fractions of rr_normalization_cap. At the default
+#: cap 5.0 the score rises to 1.0 over R/R 0→3.0 and plateaus on 3.0–4.0.
+#: Regime caps (DEFENSIVE/HIGH 4.0, LOW 6.0) shift the plateau proportionally,
+#: but the fall always reaches 0.0 at RR_IMPLAUSIBLE_CEILING — the governor's
+#: hard-reject line — so the scorer never rewards an R/R the governor refuses
+#: to deploy (LOW cap 6.0) and never zeroes an R/R it still accepts
+#: (DEFENSIVE/HIGH cap 4.0).
+_RR_PEAK_LOW_FRAC = 0.6
+_RR_PEAK_HIGH_FRAC = 0.8
+
+
+def _rr_component_score(rr_ratio: float, rr_cap: float) -> float:
+    """
+    Tent-shaped R/R score — NOT a monotonic ramp. Past the plateau, a bigger
+    R/R means a less trustworthy envelope (stop in the noise band / target
+    beyond realistic resistance), not a better trade: INDO's artifact R/R
+    22.3x saturated the old `min(rr/cap, 1)` at 1.0 and ranked #1.
+    """
+    if rr_cap <= 0 or rr_ratio <= 0:
+        return 0.0
+    if rr_ratio >= RR_IMPLAUSIBLE_CEILING:
+        return 0.0
+    peak_low = rr_cap * _RR_PEAK_LOW_FRAC
+    peak_high = rr_cap * _RR_PEAK_HIGH_FRAC
+    if rr_ratio < peak_low:
+        return rr_ratio / peak_low
+    if rr_ratio <= peak_high:
+        return 1.0
+    return (RR_IMPLAUSIBLE_CEILING - rr_ratio) / (RR_IMPLAUSIBLE_CEILING - peak_high)
+
+
 def compute_conviction_score(
     verdict: dict,
     ticker: str | None = None,
@@ -4344,10 +4375,11 @@ def compute_conviction_score(
     It is intentionally different from model_confidence, which is the CIO's
     model certainty before the R/R component is blended in.
 
-    Hitung Conviction Score = W_confidence Ã— CIO Confidence + W_rr Ã— Normalized R/R.
+    Hitung Conviction Score = W_confidence Ã— CIO Confidence + W_rr Ã— R/R tent score.
 
     Weights dibaca dari ORCHESTRATOR_CONFIG (dapat di-override via env vars di settings).
-    R/R dinormalisasi ke [0, 1] dengan cap dari ORCHESTRATOR_CONFIG['rr_normalization_cap'].
+    Komponen R/R memakai tent `_rr_component_score` dengan cap dari
+    ORCHESTRATOR_CONFIG['rr_normalization_cap'] (puncak 0.6-0.8 Ã— cap, nol di cap).
     Jika ticker + debate_records disediakan, historical win-rate adjustment diterapkan.
     """
     w_confidence = ORCHESTRATOR_CONFIG["conviction_weights"]["confidence"]
@@ -4373,7 +4405,7 @@ def compute_conviction_score(
             f"R/R {rr_ratio:.1f}x - verifikasi stop tidak berada di dalam noise band"
         )
 
-    rr_score = min(max(rr_ratio / rr_cap, 0.0), 1.0)
+    rr_score = _rr_component_score(rr_ratio, rr_cap)
     base_score = (w_confidence * confidence) + (w_rr * rr_score)
 
     # Historical adjustment — EV preferred over win rate; n passed for proportional scaling
@@ -4441,6 +4473,17 @@ def select_top_n(
         rating = verdict.get("rating", "AVOID")
         if rating in EXCLUDED_RATINGS:
             logger.info(f"[Rank] Excluded {entry['ticker']} – rating {rating}")
+            continue
+
+        # Hard governor rejects (rr_implausible, overvalued, dst.) must not
+        # occupy a top_n slot — the same report would otherwise show the entry
+        # both ranked and actionability="reject".
+        risk = entry.get("risk_governor")
+        if isinstance(risk, dict) and risk.get("status") == "reject":
+            logger.info(
+                f"[Rank] Excluded {entry['ticker']} – risk governor reject "
+                f"({', '.join(risk.get('reason_codes') or [])})"
+            )
             continue
 
         score, warning = compute_conviction_score(
@@ -5034,12 +5077,12 @@ def _conviction_breakdown_row(
         w_rr = float(ORCHESTRATOR_CONFIG["conviction_weights"]["rr_ratio"])
         rr_cap = float(ORCHESTRATOR_CONFIG["rr_normalization_cap"])
         rr = float(verdict.get("risk_reward_ratio") or 0.0)
-        rr_norm = min(rr / rr_cap, 1.0) if rr_cap > 0 else 0.0
+        rr_norm = _rr_component_score(rr, rr_cap)
         base = w_conf * model_confidence + w_rr * rr_norm
         hist_adj = score - base
         breakdown = (
             f"conf {model_confidence:.0%}x{w_conf:.0%} + "
-            f"R/R {rr:.1f}/{rr_cap:.0f}x{w_rr:.0%} = {base:.3f}"
+            f"R/R {rr:.1f}→{rr_norm:.2f}x{w_rr:.0%} = {base:.3f}"
         )
         if abs(hist_adj) > 0.001:
             sign = "+" if hist_adj > 0 else ""

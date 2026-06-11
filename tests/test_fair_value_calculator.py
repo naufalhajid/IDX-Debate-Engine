@@ -305,3 +305,67 @@ def test_build_fair_value_payload_exposes_range_fields():
     assert "fair_value_low" in payload
     assert "fair_value_high" in payload
     assert "risk_overvalued" in payload
+
+
+def _patch_methods(monkeypatch, pe=None, pb=None, ddm=None):
+    monkeypatch.setattr(FairValueCalculator, "fair_value_pe", lambda self: pe)
+    monkeypatch.setattr(FairValueCalculator, "fair_value_pb", lambda self: pb)
+    monkeypatch.setattr(FairValueCalculator, "fair_value_ddm", lambda self: ddm)
+
+
+def _quality_gate_response(margin: str) -> dict:
+    # EPS + BVPS keep extract_keystats on Strategy A so the margin field sticks
+    # (Strategy B legacy fallback would clobber net_margin back to 0.0).
+    return _stockbit_response(
+        [
+            ("Current EPS (TTM)", "10"),
+            ("Book Value Per Share", "100"),
+            ("Net Profit Margin (TTM)", margin),
+        ]
+    )
+
+
+def test_quality_gate_rejects_single_method_fair_value(monkeypatch):
+    # NZIA 2026-06-11: only 1/3 methods valid, yet FV Rp 417 vs spot Rp 177
+    # became the headline BUY catalyst.
+    _patch_methods(monkeypatch, pe=417.0)
+
+    report, result = build_fair_value_payload(
+        _quality_gate_response("12%"), "NZIA", 177.0
+    )
+
+    assert result["fair_value"] is None
+    assert result["fair_value_high"] is None
+    assert result["risk_overvalued"] is False
+    assert result["fv_quality_rejected"] is True
+    assert result["fv_quality_reasons"] == ["fv_methods_lt_2"]
+    assert result["valuation_verdict"] == "QUALITY_REJECTED"
+    assert "FAIR VALUE QUALITY GATE" in report
+
+
+def test_quality_gate_rejects_margin_above_100_percent(monkeypatch):
+    # INDO 2026-06-11: net margin 131.07% (net income > revenue) — broken data
+    # that the debate could only label NEEDS_RECONCILIATION in prose.
+    _patch_methods(monkeypatch, pe=250.0, pb=260.0)
+
+    report, result = build_fair_value_payload(
+        _quality_gate_response("131.07%"), "INDO", 165.0
+    )
+
+    assert result["fair_value"] is None
+    assert result["fv_quality_rejected"] is True
+    assert result["fv_quality_reasons"] == ["net_margin_gt_100pct"]
+    assert "FAIR VALUE QUALITY GATE" in report
+
+
+def test_quality_gate_passes_two_methods_with_sane_margin(monkeypatch):
+    _patch_methods(monkeypatch, pe=250.0, pb=260.0)
+
+    report, result = build_fair_value_payload(
+        _quality_gate_response("12%"), "BBCA", 200.0
+    )
+
+    assert result["fair_value"] is not None
+    assert result["confidence"] == "MEDIUM"
+    assert "fv_quality_rejected" not in result
+    assert "FAIR VALUE QUALITY GATE" not in report
