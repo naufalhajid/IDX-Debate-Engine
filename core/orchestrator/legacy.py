@@ -3744,6 +3744,41 @@ def _write_explainability_audit(
         logger.warning(f"[Audit] {ticker}: failed: {e}")
 
 
+_WATCHLIST_LOG_PATH = Path("output/backtest/watchlist_log.jsonl")
+
+
+def _append_jsonl(path: Path, record: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
+def _backtest_record_exists(
+    path: Path,
+    ticker: str,
+    entry_price: float,
+    target_price: float,
+    stop_loss: float,
+) -> bool:
+    if not path.exists():
+        return False
+    with path.open(encoding="utf-8") as f:
+        for line in f:
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if (
+                rec.get("ticker") == ticker
+                and rec.get("outcome") == "open"
+                and abs(float(rec.get("entry_price") or 0) - entry_price) < 1.0
+                and abs(float(rec.get("target_price") or 0) - target_price) < 1.0
+                and abs(float(rec.get("stop_loss") or 0) - stop_loss) < 1.0
+            ):
+                return True
+    return False
+
+
 def _record_backtest_memory(
     *,
     result: dict[str, Any],
@@ -3768,6 +3803,25 @@ def _record_backtest_memory(
                 ticker,
             )
             return
+        if verdict_rating == "HOLD":
+            _append_jsonl(
+                _WATCHLIST_LOG_PATH,
+                {
+                    "run_id": run_id,
+                    "ticker": ticker,
+                    "rating": "HOLD",
+                    "entry_date": datetime.now(timezone.utc).date().isoformat(),
+                    "confidence": _coerce_confidence(verdict.get("confidence")),
+                    "entry_price_range": verdict.get("entry_price_range"),
+                    "target_price": verdict.get("target_price"),
+                    "stop_loss": verdict.get("stop_loss"),
+                    "risk_reward_ratio": verdict.get("risk_reward_ratio"),
+                },
+            )
+            logger.info(
+                "[BacktestMemory] %s: HOLD logged to watchlist_log (not trade record)", ticker
+            )
+            return
 
         entry_price = _parse_entry_low(verdict.get("entry_price_range"))
         target_price = _parse_price_value(verdict.get("target_price"))
@@ -3775,6 +3829,9 @@ def _record_backtest_memory(
         if entry_price is None or target_price is None or stop_loss is None:
             raise ValueError("missing trade price fields")
         confidence = _coerce_confidence(verdict.get("confidence"))
+        if _backtest_record_exists(memory.path, ticker, entry_price, target_price, stop_loss):
+            logger.info("[BacktestMemory] %s: duplicate open record skipped (dedup)", ticker)
+            return
         today = datetime.now(timezone.utc).date().isoformat()
         memory.record(
             TradeOutcome(
@@ -4292,6 +4349,7 @@ async def run_batch_debates(
         if run_id:
             # FIX: ISSUE 1 — Propagate the batch run_id before RAG evidence IDs are built.
             setattr(chamber, "run_id", run_id)
+        setattr(chamber, "market_regime", ORCHESTRATOR_CONFIG.get("market_regime"))
         results = await asyncio.gather(
             *[_guarded(t) for t in tickers],
             return_exceptions=True,
@@ -5565,6 +5623,30 @@ async def main(
     # abort_event dibuat di sini agar signal handler bisa mengaksesnya sebelum gather.
     abort_event = asyncio.Event()
     _setup_abort_signal(asyncio.get_running_loop(), abort_event)
+
+    # Budget reservation: ensure enough pro calls remain for all tickers
+    _PRO_CALLS_PER_TICKER_ESTIMATE = 8  # conservative; tune from telemetry
+    _budget_usage = get_usage()
+    _remaining_pro = _budget_usage["pro_budget"] - _budget_usage["pro_calls"]
+    _max_feasible = _remaining_pro // _PRO_CALLS_PER_TICKER_ESTIMATE
+    if _max_feasible <= 0:
+        logger.error(
+            "[Orchestrator] Pro budget exhausted before debate batch (%d/%d calls used).",
+            _budget_usage["pro_calls"],
+            _budget_usage["pro_budget"],
+        )
+        raise BudgetExhaustedError("Pro budget exhausted before debate batch could start.")
+    if _max_feasible < len(tickers):
+        _skipped = tickers[_max_feasible:]
+        tickers = tickers[:_max_feasible]
+        logger.warning(
+            "[Orchestrator] Budget allows %d/%d tickers (%d remaining pro calls). Skipping: %s",
+            _max_feasible,
+            _max_feasible + len(_skipped),
+            _remaining_pro,
+            _skipped,
+        )
+
     _cli_renderer.start_batch_progress(tickers)
     try:
         with _cli_renderer.defer_logs():

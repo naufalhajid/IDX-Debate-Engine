@@ -17,9 +17,9 @@ from core.settings import settings
 from utils.logger_config import logger
 
 
-DEFAULT_HORIZON_TRADING_DAYS = 15
+DEFAULT_HORIZON_TRADING_DAYS = 45
 EVALUATED_RATINGS = {"BUY", "STRONG_BUY", "HOLD"}
-Outcome = Literal["win", "loss"]
+Outcome = Literal["win", "loss", "timeout_flat"]
 
 # Per-request network timeout (seconds) for yfinance. Without it, a single
 # stalled socket blocks the whole startup backtest-eval indefinitely — the
@@ -135,7 +135,20 @@ def evaluate_trade_outcome(
         return None
 
     horizon_bar = sorted_bars[horizon_trading_days - 1]
-    outcome: Outcome = "win" if horizon_bar.close > record.entry_price else "loss"
+    within_2pct = (
+        abs(horizon_bar.close - record.entry_price) / record.entry_price <= 0.02
+        if record.entry_price != 0
+        else False
+    )
+    if within_2pct:
+        outcome: Outcome = "timeout_flat"
+        evaluation_reason = "timeout_flat"
+    elif horizon_bar.close > record.entry_price:
+        outcome = "win"
+        evaluation_reason = "horizon_close_above_entry"
+    else:
+        outcome = "loss"
+        evaluation_reason = "horizon_close_at_or_below_entry"
     return _with_evaluation(
         record,
         outcome=outcome,
@@ -144,11 +157,7 @@ def evaluate_trade_outcome(
         hit_target=False,
         hit_stop=False,
         holding_period_days=horizon_trading_days,
-        evaluation_reason=(
-            "horizon_close_above_entry"
-            if outcome == "win"
-            else "horizon_close_at_or_below_entry"
-        ),
+        evaluation_reason=evaluation_reason,
         evaluation_date=evaluation_date,
     )
 

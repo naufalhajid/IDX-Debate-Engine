@@ -30,7 +30,7 @@ class TradeOutcome(BaseModel):
     stop_loss: float
     entry_date: str
     exit_date: str | None
-    outcome: Literal["win", "loss", "breakeven", "open"]
+    outcome: Literal["win", "loss", "breakeven", "open", "timeout_flat"]
     pnl_pct: float | None
     hit_target: bool | None
     hit_stop: bool | None

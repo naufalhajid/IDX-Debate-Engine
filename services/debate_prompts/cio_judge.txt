@@ -8,30 +8,26 @@ Do NOT invent or override these price levels. Your job is to APPROVE or REJECT t
 
 STEP 0 — PRE-CHECK DISQUALIFIERS (jalankan SEBELUM semua step lain):
 
-Cek field "ExDate Risk" dan "ExDate Date" dari Trade Envelope.
+Read the EXDATE_GATE line at the TOP of the brief and apply it exactly:
 
-Hitung selisih hari antara tanggal analisis dan ExDate:
+  EXDATE_GATE: AVOID   → WAJIB rating AVOID, confidence 0.10.
+                          weighted_reasoning harus dimulai dengan:
+                          "AUTO-DISQUALIFIED: Ex-dividend date terlalu dekat.
+                           Entry baru tidak disarankan — risiko price drop dividen
+                           mengancam stop loss sebelum trade sempat berkembang."
+                          STOP — jangan lanjutkan ke STEP 1 dst.
 
-• Jika ExDate <= 7 hari dari sekarang:
-  → WAJIB rating AVOID, confidence 0.10
-  → weighted_reasoning harus dimulai dengan:
-    "AUTO-DISQUALIFIED: Ex-dividend date dalam X hari (ExDate: [tanggal]).
-     Entry baru tidak disarankan — risiko price drop dividen langsung
-     mengancam stop loss sebelum trade sempat berkembang."
-  → STOP — jangan lanjutkan ke STEP 1 dst.
+  EXDATE_GATE: CAP_65  → Lanjutkan analisis normal, tapi confidence di-cap
+                          maksimal 0.65 untuk rating BUY apapun.
+                          Tambahkan ke weighted_reasoning:
+                          "⚠️ ExDate Warning: Ex-dividend dalam waktu dekat.
+                           Kurangi position size 50% dan set target lebih konservatif."
 
-• Jika ExDate 8-14 hari dari sekarang:
-  → Lanjutkan analisis normal, tapi:
-  → Tambahkan ke weighted_reasoning:
-    "⚠️ ExDate Warning: Ex-dividend dalam X hari.
-     Kurangi position size 50% dan set target lebih konservatif."
-  → Confidence di-cap maksimal 0.65 untuk rating BUY apapun.
+  EXDATE_GATE: MONITOR → Lanjutkan normal. Catat di weighted_reasoning.
 
-• Jika ExDate > 14 hari atau ExDate Risk = "CLEAR":
-  → Lanjutkan analisis normal, tidak ada adjustment.
+  EXDATE_GATE: CLEAR   → Lanjutkan normal.
 
-Catatan: Jika ExDate Date tidak tersedia atau null,
-asumsikan CLEAR dan lanjutkan normal.
+Do NOT recalculate the days. The Python pre-computation is authoritative.
 
 STEP 1 — FAIR VALUE:
   Read the fair value from the Trade Envelope. It is pre-calculated by Python.
@@ -40,11 +36,8 @@ STEP 1 — FAIR VALUE:
 
   • R/R < 2.0  → Strongly consider AVOID. Overvalued + poor setup = no edge.
   • R/R 2.0–4.9 → Strongly consider HOLD. Overvalued but asymmetric risk warrants watchlist.
-  • R/R ≥ 5.0  → Proceed to STEP 3 conflict resolution. Extreme asymmetry may justify entry
-                  despite overvaluation — let technical/momentum signals decide.
-
-  Rationale: A trade with R/R ≥ 5.0 only needs a 17% win rate to be profitable.
-  Rejecting it purely on Graham Number overvaluation discards valid momentum setups.
+  • R/R ≥ 5.0  → IMPLAUSIBLE. The Python envelope caps targets — this value should not appear.
+                  If you see it, flag in weighted_reasoning and rate HOLD.
 
 STEP 2 — TRADE ENVELOPE VALIDATION:
   Review the Python-calculated entry/target/stop prices.
@@ -61,12 +54,8 @@ STEP 3 — CONFLICT RESOLUTION (MANDATORY):
   • Fundamental ✅ + Technical ✅  → BUY; choose final confidence using the calibration rubric, caps, and Devil's Advocate penalty.
   • Fundamental ✅ + Technical ❌  → HOLD ("Wait for technical confirmation")
   • Fundamental ❌ + Technical ✅  → If strongly positive Foreign Flow / Momentum with Volume breakout, Lean BUY (Momentum Play, size 50%). Otherwise, HOLD.
-  • Fundamental ❌ + Technical ❌  →
-      IF R/R ≥ 5.0 AND Sentiment ≠ BEARISH: HOLD (Extreme Asymmetry Watchlist).
-        Add to weighted_reasoning: "EXTREME ASYMMETRY WATCHLIST — both fundamental
-        and technical are weak, but R/R ≥ 5.0 with non-bearish sentiment prevents
-        outright rejection. Monitor for technical confirmation before entry."
-      OTHERWISE: AVOID
+  • Fundamental ❌ + Technical ❌  → AVOID
+      (R/R ≥ 5.0 is treated as implausible data — do not use it to override two failing signals)
   • Any ✅ + Sentiment EXTREME    → Lower confidence by 0.10 (contrarian caution)
 
   CONSENSUS DISAGREEMENT ADJUSTMENT:
@@ -96,9 +85,9 @@ STEP 3 — CONFLICT RESOLUTION (MANDATORY):
 STEP 4 — FINAL RATING RULES:
   • STRONG_BUY        : Price < Fair Value, R/R ≥ 2.0, clear catalyst, strong support confirmed.
   • BUY               : Price ≤ Fair Value, R/R ≥ 1.5, support holds.
-  • BUY (Momentum)    : Price > Fair Value, R/R ≥ 5.0, Technical ✅, Volume breakout confirmed.
+  • BUY (Momentum)    : Price > Fair Value, R/R ≥ 2.5, Technical ✅, Volume breakout confirmed.
                         Use size 50%. Add to weighted_reasoning: "MOMENTUM PLAY — overvalued
-                        by Graham but extreme R/R + technical setup justifies reduced-size entry."
+                        by Graham but strong R/R + technical setup justifies reduced-size entry."
   • HOLD              : Price near Fair Value OR R/R < 1.5 OR target < 3%
                         OR (Price > Fair Value AND R/R 2.0–4.9).
   • AVOID             : (Price > Fair Value AND R/R < 2.0) OR R/R < 1.0 OR no clear catalyst.

@@ -697,7 +697,7 @@ async def test_synthesizer_records_rag_selection_failure(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_chartist_node_uses_pro_llm(monkeypatch):
+async def test_chartist_node_uses_flash_llm(monkeypatch):
     chamber = _chamber()
     chamber.flash_llm = FakeLLM(model="gemini-2.5-flash")
     chamber.pro_llm = FakeLLM(model="gemini-2.5-pro")
@@ -728,8 +728,8 @@ async def test_chartist_node_uses_pro_llm(monkeypatch):
         }
     )
 
-    assert captured["llm"] is chamber.pro_llm
-    assert captured["llm"] is not chamber.flash_llm
+    assert captured["llm"] is chamber.flash_llm
+    assert captured["llm"] is not chamber.pro_llm
     assert captured["messages"]
     assert "Position: HOLD" in result["technical_data"]
 
@@ -902,7 +902,7 @@ async def test_debate_run_derives_current_price_and_adds_prompt_metadata(monkeyp
 def test_prompt_registry_loads_required_prompts_and_version():
     registry = debate_prompt_registry.PROMPT_REGISTRY
 
-    assert registry.prompt_version == "2026-06-03-momentum-rr-override-v2"
+    assert registry.prompt_version == "2026-06-12-exdate-gate-precomputed-v1"
     assert set(debate_prompt_registry.REQUIRED_PROMPTS).issubset(registry.prompts)
     assert "CONFIDENCE CALIBRATION" in registry.prompts["CIO_SYSTEM_PROMPT"]
 
@@ -1391,3 +1391,94 @@ def test_sanitize_json_handles_single_quoted_json():
     parsed = json.loads(sanitized)
     assert parsed["position"] == "BUY"
     assert parsed["confidence"] == 0.85
+
+
+# ---------------------------------------------------------------------------
+# P0.1 — DEFENSIVE clamp: BUY must become HOLD when regime is DEFENSIVE
+# ---------------------------------------------------------------------------
+
+def _defensive_state(rating: str = "BUY", confidence: float = 0.75) -> dict:
+    """Minimal DebateChamberState with DEFENSIVE regime in metadata."""
+    return {
+        "metadata": {"regime": "DEFENSIVE"},
+        "technical_indicators": {},
+        "agent_votes": [],
+        "consensus_reached": True,
+        "consensus_method": "majority",
+        "dissenting_agents": [],
+        "ticker": "TEST",
+        "current_price": 1000.0,
+        "final_verdict": json.dumps(
+            {"rating": rating, "confidence": confidence, "risk_reward_ratio": 2.5}
+        ),
+    }
+
+
+def test_defensive_clamp_buy_becomes_hold():
+    """BUY with DEFENSIVE regime must be clamped to HOLD by _apply_consensus_override."""
+    chamber = _chamber()
+    parsed = {"rating": "BUY", "confidence": 0.75, "current_price": 1000.0, "fair_value": 800.0}
+    result = chamber._apply_consensus_override(parsed, _defensive_state("BUY", 0.75))
+    assert result["rating"] == "HOLD", "DEFENSIVE regime must clamp BUY to HOLD"
+    assert result["confidence"] <= 0.55
+
+
+def test_defensive_clamp_strong_buy_becomes_hold():
+    """STRONG_BUY with DEFENSIVE regime must also be clamped to HOLD."""
+    chamber = _chamber()
+    parsed = {"rating": "STRONG_BUY", "confidence": 0.88, "current_price": 500.0, "fair_value": 400.0}
+    result = chamber._apply_consensus_override(parsed, _defensive_state("STRONG_BUY", 0.88))
+    assert result["rating"] == "HOLD", "DEFENSIVE regime must clamp STRONG_BUY to HOLD"
+    assert result["confidence"] <= 0.55
+
+
+def test_defensive_clamp_not_applied_in_neutral():
+    """BUY in NEUTRAL regime must NOT be clamped."""
+    chamber = _chamber()
+    parsed = {"rating": "BUY", "confidence": 0.75, "current_price": 1000.0, "fair_value": 800.0}
+    neutral_state = _defensive_state("BUY", 0.75)
+    neutral_state["metadata"] = {"regime": "NEUTRAL"}
+    result = chamber._apply_consensus_override(parsed, neutral_state)
+    assert result["rating"] != "HOLD" or result.get("confidence", 1.0) > 0.55, (
+        "NEUTRAL regime should not trigger the DEFENSIVE clamp"
+    )
+
+
+# ---------------------------------------------------------------------------
+# P0.2 — ATR regime multiplier and noise rejection gate
+# ---------------------------------------------------------------------------
+
+def test_atr_multiplier_defensive_wider_stop_than_neutral():
+    """DEFENSIVE regime uses 3.0x ATR while NEUTRAL uses 2.5x — stop must be lower.
+
+    Inputs chosen so the k_atr candidate dominates the stop (price-sma20 gap > 1.5*atr14)
+    and both envelopes clear the noise gate (stop_distance > 1.5*atr14).
+    """
+    chamber = _chamber()
+    # current_price=1000, atr14=20, sma20=960:
+    #   NEUTRAL  stop = max(940, 950)=950; distance=50 > noise_floor=30 -> OK
+    #   DEFENSIVE stop = max(940, 940)=940; distance=60 > 30 -> OK
+    tech_neutral = {"regime": "NEUTRAL", "atr14": 20.0, "sma20": 960.0}
+    tech_defensive = {"regime": "DEFENSIVE", "atr14": 20.0, "sma20": 960.0}
+
+    env_neutral = chamber._compute_trade_envelope(1000.0, 1100.0, tech_neutral)
+    env_defensive = chamber._compute_trade_envelope(1000.0, 1100.0, tech_defensive)
+
+    assert not env_neutral.get("rejected"), f"NEUTRAL envelope rejected unexpectedly: {env_neutral}"
+    assert not env_defensive.get("rejected"), f"DEFENSIVE envelope rejected unexpectedly: {env_defensive}"
+    assert env_defensive["stop_loss"] < env_neutral["stop_loss"], (
+        f"DEFENSIVE stop {env_defensive['stop_loss']} should be lower than "
+        f"NEUTRAL stop {env_neutral['stop_loss']} (wider buffer)"
+    )
+
+
+def test_atr_noise_gate_rejects_stop_inside_noise():
+    """If stop_distance < 1.5 * atr14 the envelope must return rejected=True."""
+    chamber = _chamber()
+    # atr14=100 → noise_floor=150; entry_high≈1010; stop at ~808 → distance ≈202 → OK normally.
+    # Set atr14=600 so noise_floor=900 > entry_high-stop → rejection.
+    tech = {"regime": "NEUTRAL", "atr14": 600.0, "sma20": 500.0}
+    result = chamber._compute_trade_envelope(1000.0, 1100.0, tech)
+    assert result.get("rejected") is True, (
+        f"Expected rejected=True when stop is inside noise floor, got: {result}"
+    )
