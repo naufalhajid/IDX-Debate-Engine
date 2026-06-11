@@ -33,9 +33,9 @@ def test_goto_zero_pe_multiple_disables_pe_method(monkeypatch):
     captured: dict[str, KeyStats] = {}
     original_init = FairValueCalculator.__init__
 
-    def capturing_init(self, stats, sector=None):
+    def capturing_init(self, stats, sector=None, **kwargs):
         captured["stats"] = stats
-        original_init(self, stats, sector)
+        original_init(self, stats, sector, **kwargs)
 
     monkeypatch.setattr(FairValueCalculator, "__init__", capturing_init)
 
