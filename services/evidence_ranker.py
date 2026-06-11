@@ -485,7 +485,7 @@ def _resolve_chunk_timestamp(
         "market_data" if category in {"technical", "fair_value"} else "",
         "context",
     )
-    for key in candidates:
+    for key in dict.fromkeys(candidates):
         value = _timestamp_for_key(pack.source_timestamps, key)
         if value is None:
             continue
