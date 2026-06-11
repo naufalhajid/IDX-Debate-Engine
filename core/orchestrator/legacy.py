@@ -3829,7 +3829,8 @@ def _record_backtest_memory(
         if entry_price is None or target_price is None or stop_loss is None:
             raise ValueError("missing trade price fields")
         confidence = _coerce_confidence(verdict.get("confidence"))
-        if _backtest_record_exists(memory.path, ticker, entry_price, target_price, stop_loss):
+        _mem_path = getattr(memory, "path", None)
+        if _mem_path and _backtest_record_exists(_mem_path, ticker, entry_price, target_price, stop_loss):
             logger.info("[BacktestMemory] %s: duplicate open record skipped (dedup)", ticker)
             return
         _raw_data = _dict_or_empty(result.get("raw_data"))

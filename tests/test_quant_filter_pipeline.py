@@ -35,6 +35,7 @@ def _analysis_cfg() -> dict:
         {
             "min_adt_20d": 0,
             "min_rs_vs_ihsg_1m": 0.0,
+            "max_atr_pct": 1.0,
         }
     )
     return cfg

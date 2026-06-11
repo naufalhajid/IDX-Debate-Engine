@@ -100,19 +100,19 @@ def test_same_day_target_and_stop_is_conservative_loss() -> None:
 
 
 def test_horizon_close_above_entry_is_win() -> None:
-    bars = [_bar(day, high=105, low=99, close=101) for day in range(1, 64)]
+    bars = [_bar(day, high=108, low=99, close=105) for day in range(1, 64)]
 
     evaluated = evaluate_trade_outcome(_record(), bars, horizon_trading_days=63)
 
     assert evaluated is not None
     assert evaluated.outcome == "win"
-    assert evaluated.exit_price == 101
+    assert evaluated.exit_price == 105
     assert evaluated.holding_period_days == 63
     assert evaluated.evaluation_reason == "horizon_close_above_entry"
 
 
 def test_horizon_close_at_or_below_entry_is_loss() -> None:
-    bars = [_bar(day, high=105, low=99, close=100) for day in range(1, 64)]
+    bars = [_bar(day, high=100, low=96, close=97) for day in range(1, 64)]
 
     evaluated = evaluate_trade_outcome(_record(), bars, horizon_trading_days=63)
 
