@@ -569,8 +569,9 @@ class FairValueCalculator:
         "default": "default",
     }
 
-    def __init__(self, stats: KeyStats, sector: str | None = None):
+    def __init__(self, stats: KeyStats, sector: str | None = None, eps_derived: bool = False):
         self.stats = stats
+        self.eps_derived = eps_derived
         self.raw_sector = (
             str(sector).strip().lower()
             if sector
@@ -639,7 +640,7 @@ class FairValueCalculator:
     # ── Weighted Average ─────────────────────────────────────────────────────
 
     def fair_value_weighted(self) -> dict:
-        pe_fv = self.fair_value_pe()
+        pe_fv = None if self.eps_derived else self.fair_value_pe()
         pb_fv = self.fair_value_pb()
         ddm_fv = self.fair_value_ddm()
 
@@ -1014,19 +1015,24 @@ def build_fair_value_payload(
     # The Stockbit closure_fin_items endpoint often includes PE but not EPS
     # directly in the visible section.  If EPS is still 0 but we have PE
     # and the live price, we can back-calculate a reasonable EPS estimate.
+    eps_derived = False
     if stats.eps_ttm == 0.0 and stats.raw_pe_current > 0 and current_price > 0:
         stats.eps_ttm = round(current_price / stats.raw_pe_current, 2)
+        eps_derived = True
         logger.info(
-            "[FairValue] {}: EPS back-calculated from PE ({} / {} = {})",
+            "[FairValue] {}: EPS back-calculated from PE (derived, circular): {} / {} = {}",
             ticker,
             current_price,
             stats.raw_pe_current,
             stats.eps_ttm,
         )
 
-    calc = FairValueCalculator(stats)
+    calc = FairValueCalculator(stats, eps_derived=eps_derived)
     result = calc.fair_value_weighted()
     report = calc.build_report(current_price=current_price)
+
+    if eps_derived:
+        result["eps_source"] = "derived_from_pe"
 
     fv = result["fair_value"]
     if fv is None:

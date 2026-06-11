@@ -1,5 +1,5 @@
 {
-  "prompt_version": "2026-06-03-momentum-rr-override-v2",
+  "prompt_version": "2026-06-12-exdate-gate-precomputed-v1",
   "prompts": {
     "FUNDAMENTAL_SCOUT_PROMPT": "fundamental_scout.txt",
     "CHARTIST_PROMPT": "chartist.txt",

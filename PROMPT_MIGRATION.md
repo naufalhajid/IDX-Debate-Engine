@@ -387,3 +387,52 @@ visible via the `unverified` marker instead of silent.
 - `test_voting_override_preserves_zero_confidence_on_clamp`
 - `test_trade_envelope_tick_fallback_preserves_ceiling_provenance`
 - `test_fundamental_node_propagates_quality_rejection_to_metadata`
+
+---
+
+## 2026-06-12 — `rr-implausible-cleanup-v1` (PROMPT-LEVEL)
+
+**File changed:** `services/debate_prompts/cio_judge.txt`
+
+### Problem
+`cio_judge.txt` STEP 1 and STEP 3 still contained R/R ≥ 5.0 reasoning logic added
+in `momentum-rr-override-v1/v2`. The Python governor hard-rejects R/R ≥ 5.0 as
+implausible data (`RR_IMPLAUSIBLE_CEILING = 5.0`). The code-level v4 fix replaced
+the R/R escalation gate with a momentum gate in `_apply_consensus_override`, but the
+prompt text was left as a known follow-up (see `momentum-rr-override-v4` entry).
+
+### Changes
+**STEP 1** — R/R ≥ 5.0 branch changed from "Proceed to STEP 3" to "IMPLAUSIBLE — rate HOLD".
+
+**STEP 3** — "Fund ❌ + Tech ❌ + R/R ≥ 5.0 → HOLD (Extreme Asymmetry Watchlist)"
+replaced with "Fund ❌ + Tech ❌ → AVOID (R/R ≥ 5.0 is implausible data)".
+
+### Success Criteria
+`grep -n "R/R.*5\.0" services/debate_prompts/cio_judge.txt` → 0 matches
+
+---
+
+## 2026-06-12 — `exdate-gate-precomputed-v1` (PROMPT-LEVEL + CODE-LEVEL)
+
+**Files changed:** `services/debate_prompts/cio_judge.txt`, `services/debate_chamber.py`
+
+### Problem
+STEP 0 of `cio_judge.txt` instructed the LLM to "calculate days since ExDate"
+using the raw ExDate string from the Trade Envelope. LLM date arithmetic is
+unreliable and produces silent failures when the date format is ambiguous or the
+ExDate field is null.
+
+### Changes
+**`debate_chamber.py`** — New `_compute_exdate_gate(exdate_info)` module-level
+function reads the `ExDateInfo` TypedDict (fields: `risk_tier`, `days_until_exdate`)
+and emits a deterministic gate string: `EXDATE_GATE: AVOID`, `EXDATE_GATE: CAP_65`,
+`EXDATE_GATE: MONITOR`, or `EXDATE_GATE: CLEAR`. The gate string is prepended to
+`raw` in `_synthesizer_node` so the CIO sees it at the top of the brief.
+
+**`cio_judge.txt` STEP 0** — Replaced date-arithmetic instructions with:
+"Read the EXDATE_GATE line at the TOP of the brief and apply it exactly."
+LLM no longer calculates days; it only pattern-matches the pre-computed label.
+
+### Success Criteria
+`_compute_exdate_gate({"risk_tier": "CRITICAL", "days_until_exdate": 5})` →
+`"EXDATE_GATE: AVOID (ExDate in 5d — do not enter)"`

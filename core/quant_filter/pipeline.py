@@ -432,11 +432,18 @@ def _analyze_ticker(
     if adt_20 < cfg["min_adt_20d"]:
         logger.debug(f"[{t}] ADT Rp {adt_20:,.0f} < threshold, skip")
         return None
+    atr_pct = atr_14 / float(close.iloc[-1]) if float(close.iloc[-1]) > 0 else 0.0
+    if atr_pct > cfg.get("max_atr_pct", 0.04):
+        logger.debug(f"[{t}] ATR% {atr_pct:.1%} > max, skip")
+        return None
 
     # ── Volume Confirmation ───────────────────────────────────────────────────
     vol_20d_avg: float = float(vol.tail(20).mean())
     curr_vol: float = float(vol.iloc[-1])
     vol_surge_ratio: float = curr_vol / vol_20d_avg if vol_20d_avg > 0 else 0.0
+    if vol_surge_ratio < cfg.get("min_volume_surge_for_candidate", 0.30):
+        logger.debug(f"[{t}] Volume anemia: {vol_surge_ratio:.2f}x < min, skip")
+        return None
 
     # ── Momentum Score ────────────────────────────────────────────────────────
     mom_note: list[str] = []

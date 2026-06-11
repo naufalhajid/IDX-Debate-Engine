@@ -87,6 +87,23 @@ from utils.technicals import compute_atr, compute_rsi, snap_to_tick
 from utils.trade_math import calculate_rr
 
 
+def _compute_exdate_gate(exdate_info: Any) -> str:
+    """Pre-compute exdate gate string from ExDateInfo TypedDict so LLM reads result, not dates."""
+    if not isinstance(exdate_info, dict):
+        return "EXDATE_GATE: CLEAR"
+    risk_tier = exdate_info.get("risk_tier", "CLEAR")
+    if risk_tier == "CLEAR":
+        return "EXDATE_GATE: CLEAR"
+    days = exdate_info.get("days_until_exdate")
+    if days is None:
+        return "EXDATE_GATE: CLEAR"
+    if days <= 7:
+        return f"EXDATE_GATE: AVOID (ExDate in {days}d — do not enter)"
+    if days <= 14:
+        return f"EXDATE_GATE: CAP_65 (ExDate in {days}d — cap confidence at 0.65)"
+    return f"EXDATE_GATE: MONITOR (ExDate in {days}d — no constraint)"
+
+
 # ---------------------------------------------------------------------------
 # Transient-error guard — retry only on genuinely-transient failures
 # ---------------------------------------------------------------------------
@@ -155,6 +172,13 @@ def _ledger_call(operation: str, func, *args, **kwargs) -> None:
 def _state_metadata(state: DebateChamberState) -> dict:
     metadata = state.get("metadata") or {}
     return metadata if isinstance(metadata, dict) else {}
+
+
+def _extract_regime_str(market_regime: Any) -> str:
+    """Extract the regime string ("DEFENSIVE"/"NEUTRAL"/"BULLISH") from a market_regime payload."""
+    if isinstance(market_regime, dict):
+        return str(market_regime.get("regime", "")).upper()
+    return str(market_regime or "").upper()
 
 
 def _exception_message(exc: BaseException) -> str:
@@ -2297,7 +2321,7 @@ Current Date (Asia/Jakarta): {current_date}
                 )
             ),
         ]
-        resp = await self._invoke_llm_for_state(state, self.pro_llm, messages)
+        resp = await self._invoke_llm_for_state(state, self.flash_llm, messages)
         content, signal = self._ensure_signal_footer(resp.content, "chartist")
         self._record_observation(state, "chartist", content, signal)
         if not technical_partial:
@@ -2510,6 +2534,7 @@ Current Date (Asia/Jakarta): {current_date}
             current_price,
         )
         exdate_block = format_exdate_block(ticker, exdate_info)
+        exdate_gate = _compute_exdate_gate(exdate_info)
 
         # Include pre-computed technical indicators in the synthesized data
         tech_block = ""
@@ -2520,6 +2545,7 @@ Current Date (Asia/Jakarta): {current_date}
             )
 
         raw = (
+            f"{exdate_gate}\n\n"
             f"=== FUNDAMENTALS ===\n{f}\n\n"
             f"=== TECHNICALS ===\n{t}\n"
             f"{tech_block}\n"
@@ -3019,6 +3045,9 @@ Current Date (Asia/Jakarta): {current_date}
         ]
         resp = await self._invoke_llm_for_state(state, self.flash_llm, messages)
         content, signal = self._ensure_signal_footer(resp.content, "devils_advocate")
+        if str(signal.get("position", "")).upper() not in ("AVOID", "HOLD"):
+            content += "\n\nPOSITION: AVOID CONFIDENCE: 0.40"
+            signal = {"position": "AVOID", "confidence": 0.40}
         msg = DebateMessage(
             role="devils_advocate",
             content=content,
@@ -3186,7 +3215,7 @@ Current Date (Asia/Jakarta): {current_date}
     #: without a fair-value anchor. Resistance-based targets can run to a recent
     #: pre-crash high (INDO: 52w high Rp 519 vs spot Rp 165) and the FV anchor
     #: itself can sit far above spot; both inflate R/R past anything tradeable.
-    MAX_TARGET_RETURN = 0.15
+    MAX_TARGET_RETURN = 0.10
 
     def _compute_trade_envelope(
         self,
@@ -3218,10 +3247,14 @@ Current Date (Asia/Jakarta): {current_date}
 
         entry_mid = (entry_low + entry_high) / 2
 
-        # Stop loss with buffer and hard floor
+        # Stop loss with buffer and hard floor — ATR multiplier scaled by market regime
+        _regime_atr_multiplier = {"BULLISH": 2.0, "NEUTRAL": 2.5, "DEFENSIVE": 3.0}
+        _regime_key = str(tech.get("regime", "NEUTRAL")).upper()
+        k_atr = _regime_atr_multiplier.get(_regime_key, 2.5)
+
         if atr14 > 0 and sma20 > 0:
             stop_candidate_1 = sma20 - atr14
-            stop_candidate_2 = current_price - (2.0 * atr14)
+            stop_candidate_2 = current_price - (k_atr * atr14)
             stop = max(stop_candidate_1, stop_candidate_2)
 
             # Hard floor: stop tidak boleh lebih dari 8% dari current price
@@ -3235,6 +3268,19 @@ Current Date (Asia/Jakarta): {current_date}
             stop = snap_to_tick(entry_low * 0.96)
         if stop >= entry_low:  # double-check post snap
             stop = self._previous_tick_below(entry_low)
+
+        # Noise rejection: stop inside 1.5x ATR of entry means stop cannot survive
+        # a normal daily candle — return a sentinel so the caller falls back to HOLD
+        if atr14 > 0:
+            _stop_distance = entry_high - stop
+            _noise_floor = 1.5 * atr14
+            if _stop_distance < _noise_floor:
+                return {
+                    "rejected": True,
+                    "reason": (
+                        f"stop_inside_noise: gap {_stop_distance:.0f} < 1.5xATR {_noise_floor:.0f}"
+                    ),
+                }
 
         # Target calculation: seed the target at a 2.0x R/R from entry_high
         # (worst-case fill). This is only the starting point — the resistance
@@ -3630,8 +3676,24 @@ Current Date (Asia/Jakarta): {current_date}
                     "CIO did not override the winner."
                 ),
             )
-            return p
+            return self._apply_defensive_clamp(p, state)
 
+        return self._apply_defensive_clamp(p, state)
+
+    def _apply_defensive_clamp(self, p: dict, state: DebateChamberState) -> dict:
+        """Clamp BUY/STRONG_BUY to HOLD when market is in DEFENSIVE regime.
+
+        Applied as the final step of _apply_consensus_override so no downstream
+        override path can re-introduce a long-entry verdict during a crash.
+        """
+        _regime = _extract_regime_str((state.get("metadata") or {}).get("regime", ""))
+        if _regime == "DEFENSIVE" and str(p.get("rating", "")).upper() in ("BUY", "STRONG_BUY"):
+            p["rating"] = "HOLD"
+            p["confidence"] = min(float(p.get("confidence") or 0.0), 0.55)
+            p["weighted_reasoning"] = self._append_reason(
+                p.get("weighted_reasoning"),
+                "DEFENSIVE regime: BUY clamped to HOLD — no new long entries during market correction.",
+            )
         return p
 
     # ── Phase 4 — CIO Judge ──────────────────────────────────────────────────
@@ -3647,7 +3709,13 @@ Current Date (Asia/Jakarta): {current_date}
         """
         ticker = state["ticker"]
         current_price = state.get("current_price", 0.0)
-        tech = state.get("technical_indicators", {})
+        tech = dict(state.get("technical_indicators") or {})
+        # Inject regime so _compute_trade_envelope can scale ATR multiplier correctly.
+        # The regime string is stored in metadata["regime"] by run() from the chamber's
+        # market_regime attribute (set by the orchestrator before calling run()).
+        _meta_regime = _extract_regime_str((state.get("metadata") or {}).get("regime", ""))
+        if _meta_regime:
+            tech["regime"] = _meta_regime
         state_metadata = dict(_state_metadata(state))
         fair_value = (
             0.0
@@ -3727,6 +3795,39 @@ Current Date (Asia/Jakarta): {current_date}
 
         # ── Compute Trade Envelope (deterministic, Python-only) ──────────────
         envelope = self._compute_trade_envelope(current_price, fair_value, tech)
+        if envelope.get("rejected"):
+            logger.info(
+                "[CIO] %s: trade envelope rejected (%s); returning HOLD",
+                ticker,
+                envelope.get("reason", "unknown"),
+            )
+            noise_verdict = CIOVerdict(
+                ticker=ticker,
+                rating="HOLD",
+                confidence=0.40,
+                summary=f"Setup ditolak: {envelope.get('reason', 'stop inside noise')}.",
+                current_price=current_price,
+                fair_value=fair_value if fair_value and fair_value > 0 else None,
+                fair_value_base=fair_value_base,
+                fair_value_low=fair_value_low,
+                fair_value_high=fair_value_high,
+                risk_overvalued=risk_overvalued,
+                entry_price_range=None,
+                target_price=None,
+                target_basis=None,
+                stop_loss=None,
+                consensus_reached=bool(state.get("consensus_reached", False)),
+                consensus_method=state.get("consensus_method"),
+                dissenting_agents=list(state.get("dissenting_agents") or []),
+            )
+            _ledger_stage_success(
+                state,
+                stage="CIO_VERDICT",
+                started_at=started_at,
+                detail={"rating": noise_verdict.rating, "confidence": noise_verdict.confidence},
+            )
+            return {"final_verdict": noise_verdict.model_dump_json()}
+
         envelope["fair_value_base"] = fair_value_base
         envelope["fair_value_low"] = fair_value_low
         envelope["fair_value_high"] = fair_value_high
@@ -4460,6 +4561,7 @@ Start your response with '{' and end with '}'. Nothing else."""
             "metadata": {
                 "prompt_version": getattr(self, "prompt_version", PROMPT_VERSION),
                 "run_id": getattr(self, "run_id", "unknown"),
+                "regime": _extract_regime_str(getattr(self, "market_regime", None)),
                 "market_data_source": market_data.get("source", "unknown"),
                 "market_data_fetched_at": _market_data_timestamp(market_data),
                 "market_data_cached": True,

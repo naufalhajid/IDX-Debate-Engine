@@ -2,9 +2,13 @@
 
 import glob
 import os
+import warnings
+from datetime import datetime
 from pathlib import Path
 
 from core.settings import settings
+
+MAX_XLSX_AGE_TRADING_DAYS = 3
 
 
 def _find_latest_xlsx(output_dir: str = "output") -> str:
@@ -27,7 +31,15 @@ def _find_latest_xlsx(output_dir: str = "output") -> str:
             f"\nPastikan file xlsx hasil scraping sudah ada di folder tersebut."
         )
     # Ambil yang terbaru (sort by nama file — tanggal ada di nama)
-    return str(Path(sorted(found, reverse=True)[0]))
+    latest = Path(sorted(found, reverse=True)[0])
+    age_days = (datetime.now() - datetime.fromtimestamp(latest.stat().st_mtime)).days
+    if age_days > MAX_XLSX_AGE_TRADING_DAYS:
+        warnings.warn(
+            f"[Screener] XLSX is {age_days} days old (>{MAX_XLSX_AGE_TRADING_DAYS}d threshold). "
+            f"Fundamental data may be stale. File: {latest.name}",
+            stacklevel=2,
+        )
+    return str(latest)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -84,7 +96,8 @@ CONFIG = {
     "yf_retries": 3,
     "yf_retry_delay": 5,
     # ── Liquidity Gate
-    "min_adt_20d": 5_000_000_000,
+    "min_adt_20d": 20_000_000_000,
+    "max_atr_pct": 0.04,
     "min_bars": 60,
     # ── Volume Filter
     # Volume Surge Scoring Tiers (masuk ke scoring, bukan sekadar gate)
@@ -92,10 +105,11 @@ CONFIG = {
     "vol_surge_tier2": 1.5,  # volume 1.5–2x          -> 70%
     "vol_surge_tier3": 1.1,  # volume 1.1–1.5x        -> 40%
     # volume <1.1x           -> 10%
+    "min_volume_surge_for_candidate": 0.30,  # hard gate: below this, no momentum
     # ── Suspended/FCA Heuristic
     "max_zero_vol_days": 3,
     # ── RSI Scoring
-    "rsi_hard_reject": 80,
+    "rsi_hard_reject": 70,
     "rsi_accum_lo": 45,
     "rsi_accum_hi": 55,
     "rsi_strong_hi": 70,
