@@ -3853,6 +3853,15 @@ def _record_backtest_memory(
                 _min_adt,
             )
             return
+        if verdict_rating in ("BUY", "STRONG_BUY") and _mem_path:
+            from core.portfolio_guard import check_portfolio_allows_new_entry
+            _stop_dist_pct = (entry_price - stop_loss) / entry_price if entry_price > 0 else 0.0
+            _allowed, _guard_reason = check_portfolio_allows_new_entry(
+                Path(_mem_path), _stop_dist_pct
+            )
+            if not _allowed:
+                logger.warning("[PortfolioGuard] %s: entry blocked — %s", ticker, _guard_reason)
+                return
         today = datetime.now(timezone.utc).date().isoformat()
         memory.record(
             TradeOutcome(
