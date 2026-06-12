@@ -163,6 +163,10 @@ def replay_ticker(ticker: str, years: int) -> list[TradeResult]:
         print(f"  [{ticker}] insufficient data ({len(df) if df is not None else 0} bars)")
         return []
 
+    # yfinance >=0.2.x returns MultiIndex columns for single-ticker downloads
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.droplevel(1)
+
     close = df["Close"].squeeze()
     high  = df["High"].squeeze()
     low   = df["Low"].squeeze()
