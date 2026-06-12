@@ -5,14 +5,14 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+from typer.testing import CliRunner
+
+from app.cli.commands.pipeline import run_pipeline_cli
+from app.cli.main import app
+
 
 def _strip_ansi(text: str) -> str:
     return re.sub(r"\[[0-9;]*m", "", text)
-
-from typer.testing import CliRunner
-
-from app.cli.main import app
-from app.cli.commands.pipeline import run_pipeline_cli
 
 runner = CliRunner()
 
