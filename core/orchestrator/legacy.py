@@ -3832,6 +3832,26 @@ def _record_backtest_memory(
         if _backtest_record_exists(memory.path, ticker, entry_price, target_price, stop_loss):
             logger.info("[BacktestMemory] %s: duplicate open record skipped (dedup)", ticker)
             return
+        _raw_data = _dict_or_empty(result.get("raw_data"))
+        _metadata = _dict_or_empty(result.get("metadata"))
+        _technicals = _dict_or_empty(result.get("technical_indicators"))
+        _avg_vol = (
+            _raw_data.get("avg_volume_20d")
+            or _metadata.get("avg_volume_20d")
+            or _technicals.get("avg_volume_20d")
+            or 0
+        )
+        _min_adt = ORCHESTRATOR_CONFIG.get("min_adt_20d", 20_000_000_000)
+        _adt_est = float(_avg_vol) * float(entry_price)
+        if _adt_est > 0 and _adt_est < _min_adt:
+            logger.warning(
+                "[BacktestMemory] %s: estimated ADT Rp %.0f < min Rp %.0f"
+                " — recording skipped (fill impossible)",
+                ticker,
+                _adt_est,
+                _min_adt,
+            )
+            return
         today = datetime.now(timezone.utc).date().isoformat()
         memory.record(
             TradeOutcome(

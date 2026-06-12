@@ -83,7 +83,7 @@ from utils.market_data_cache import (
     prefetch_market_data,
     scan_exdate_from_market_data,
 )
-from utils.technicals import compute_atr, compute_rsi, snap_to_tick
+from utils.technicals import compute_atr, compute_rsi, compute_swing_low, snap_to_tick
 from utils.trade_math import calculate_rr
 
 
@@ -2153,6 +2153,8 @@ Current Date (Asia/Jakarta): {current_date}
                 high_50d = (
                     float(high.tail(50).max()) if len(high) >= 50 else float(high.max())
                 )
+                low_20d = compute_swing_low(low, window=20)
+                low_50d = compute_swing_low(low, window=50)
 
                 # Momentum / volume-breakout signals — feed the asymmetry watchlist gate
                 # in _apply_consensus_override. A recent volume-confirmed up-move is what
@@ -2208,6 +2210,8 @@ Current Date (Asia/Jakarta): {current_date}
                     "52w_low": round(float(close.min()), 0),
                     "high_20d": round(high_20d, 0),
                     "high_50d": round(high_50d, 0),
+                    "low_20d": round(low_20d, 0),
+                    "low_50d": round(low_50d, 0),
                     "volume_surge_ratio": round(volume_surge_ratio, 2),
                     "return_5d_pct": round(return_5d_pct, 1),
                 }
@@ -3228,9 +3232,13 @@ Current Date (Asia/Jakarta): {current_date}
         k_atr = _regime_atr_multiplier.get(_regime_key, 2.5)
 
         if atr14 > 0 and sma20 > 0:
-            stop_candidate_1 = sma20 - atr14
-            stop_candidate_2 = current_price - (k_atr * atr14)
-            stop = max(stop_candidate_1, stop_candidate_2)
+            swing_low = min(
+                tech.get("low_20d", current_price * 0.95),
+                tech.get("low_50d", current_price * 0.95),
+            )
+            structural_stop = swing_low - (0.5 * atr14)       # buffer below nearest swing low
+            atr_stop = current_price - (k_atr * atr14)        # regime-scaled ATR floor
+            stop = max(structural_stop, atr_stop)
 
             # Hard floor: stop tidak boleh lebih dari 8% dari current price
             hard_floor = current_price * 0.92
