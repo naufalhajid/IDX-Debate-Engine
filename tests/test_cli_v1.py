@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+
+
+def _strip_ansi(text: str) -> str:
+    return re.sub(r"\[[0-9;]*m", "", text)
 
 from typer.testing import CliRunner
 
@@ -89,7 +94,7 @@ def test_model_codex_rejects_extra_high_reasoning(monkeypatch, tmp_path):
     result = runner.invoke(app, ["model", "codex", "--pro-reasoning", "extra-high"])
 
     assert result.exit_code != 0
-    assert "Use 'xhigh' for Extra High" in result.output
+    assert "Use 'xhigh' for Extra High" in _strip_ansi(result.output)
 
 
 def test_scan_maps_options_without_running_etl(monkeypatch):
