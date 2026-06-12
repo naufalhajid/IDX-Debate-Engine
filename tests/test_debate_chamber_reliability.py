@@ -1649,3 +1649,37 @@ def test_atr_noise_gate_rejects_stop_inside_noise():
     assert result.get("rejected") is True, (
         f"Expected rejected=True when stop is inside noise floor, got: {result}"
     )
+
+
+def test_trade_envelope_rejects_momentum_mode_with_negative_5d_return():
+    """Momentum mode (RSI > 40) + negative 5d return must be rejected (F12 fix)."""
+    chamber = _chamber()
+    tech = {
+        "ma50": 1000.0, "sma20": 980.0, "atr14": 20.0,
+        "rsi14": 55.0, "return_5d_pct": -3.0,
+    }
+    result = chamber._compute_trade_envelope(1000.0, 1100.0, tech)
+    assert result.get("rejected") is True, f"Expected rejected=True, got: {result}"
+    assert "no_momentum_confirmation" in result.get("reason", "")
+
+
+def test_trade_envelope_allows_mean_reversion_with_negative_5d_return():
+    """Mean-reversion mode (RSI <= 40) must not be blocked by the 5d-return gate."""
+    chamber = _chamber()
+    tech = {
+        "ma50": 1100.0, "sma20": 1050.0, "atr14": 20.0,
+        "rsi14": 35.0, "return_5d_pct": -5.0,
+    }
+    result = chamber._compute_trade_envelope(1000.0, 1100.0, tech)
+    assert not result.get("rejected"), f"Mean-reversion envelope wrongly rejected: {result}"
+
+
+def test_trade_envelope_allows_positive_5d_return_in_momentum_mode():
+    """Momentum mode with flat/positive 5d return must pass the gate."""
+    chamber = _chamber()
+    tech = {
+        "ma50": 1000.0, "sma20": 980.0, "atr14": 20.0,
+        "rsi14": 55.0, "return_5d_pct": 1.5,
+    }
+    result = chamber._compute_trade_envelope(1000.0, 1100.0, tech)
+    assert not result.get("rejected"), f"Positive 5d return wrongly rejected: {result}"

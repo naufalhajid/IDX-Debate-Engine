@@ -3231,6 +3231,22 @@ Current Date (Asia/Jakarta): {current_date}
         sma20 = tech.get("sma20", current_price)
         ma50 = tech.get("ma50")
         atr14 = tech.get("atr14", 0)
+        rsi14 = tech.get("rsi14")
+        return_5d = tech.get("return_5d_pct")
+
+        # Momentum confirmation (F12): in momentum mode (RSI > 40) the pullback must
+        # have stabilised — require flat-to-positive 5-day return before entry.
+        # Skipped when RSI <= 40 (mean-reversion setups) where the oversold level
+        # itself is the entry signal and a negative recent return is expected.
+        if rsi14 is not None and return_5d is not None:
+            if rsi14 > 40.0 and return_5d < 0.0:
+                return {
+                    "rejected": True,
+                    "reason": (
+                        f"no_momentum_confirmation: return_5d {return_5d:.1f}%"
+                        f" < 0 at RSI {rsi14:.1f}"
+                    ),
+                }
 
         # Entry zone: near MA50 support (pullback entry for swing)
         if ma50 and ma50 > 0 and current_price > 0:
