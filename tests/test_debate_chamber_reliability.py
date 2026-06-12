@@ -1560,3 +1560,51 @@ async def test_devils_advocate_appends_vote_to_agent_votes(monkeypatch):
     # Original 5 votes must be preserved unchanged
     original_agents = {v["agent"] for v in votes[:5]}
     assert original_agents == {"bull", "bear", "fundamental_scout", "chartist", "sentiment_specialist"}
+
+
+# ---------------------------------------------------------------------------
+# compute_swing_low — unit tests
+# ---------------------------------------------------------------------------
+
+
+def test_compute_swing_low_returns_minimum_of_window() -> None:
+    series = pd.Series([100.0, 90.0, 80.0, 95.0, 105.0])
+    result = dc.compute_swing_low(series, window=3)
+    assert result == 80.0, f"Expected 80.0, got {result}"
+
+
+def test_compute_swing_low_window_larger_than_series_uses_all() -> None:
+    series = pd.Series([100.0, 90.0])
+    result = dc.compute_swing_low(series, window=20)
+    assert result == 90.0, f"Expected 90.0, got {result}"
+
+
+# ---------------------------------------------------------------------------
+# Structural stop geometry — pure arithmetic assertions
+# ---------------------------------------------------------------------------
+
+
+def test_structural_stop_uses_swing_low_not_just_atr() -> None:
+    atr14 = 50.0
+    current_price = 1000.0
+    swing_low = 850.0
+    k_atr = 2.5
+
+    structural_stop = swing_low - (0.5 * atr14)   # 825
+    atr_stop = current_price - (k_atr * atr14)     # 875
+    stop = max(structural_stop, atr_stop)
+
+    assert stop == 875.0, f"atr_stop should win when swing_low is far: {stop}"
+
+
+def test_structural_stop_uses_swing_low_when_closer_than_atr() -> None:
+    atr14 = 20.0
+    current_price = 1000.0
+    swing_low = 970.0
+    k_atr = 2.5
+
+    structural_stop = swing_low - (0.5 * atr14)   # 960
+    atr_stop = current_price - (k_atr * atr14)     # 950
+    stop = max(structural_stop, atr_stop)
+
+    assert stop == 960.0, f"structural_stop should win when swing_low is close: {stop}"
