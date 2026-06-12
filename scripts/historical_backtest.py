@@ -154,7 +154,7 @@ def _evaluate_trade(
 def replay_ticker(ticker: str, years: int) -> list[TradeResult]:
     symbol = ticker if ticker.endswith(".JK") else f"{ticker}.JK"
     try:
-        df = yf.download(symbol, period=f"{years + 1}y", auto_adjust=True, progress=False, multi_level_col=False)
+        df = yf.download(symbol, period=f"{years + 1}y", auto_adjust=True, progress=False)
     except Exception as exc:
         print(f"  [{ticker}] download failed: {exc}")
         return []
