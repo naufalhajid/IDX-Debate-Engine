@@ -96,8 +96,8 @@ CONFIG = {
     "yf_retries": 3,
     "yf_retry_delay": 5,
     # ── Liquidity Gate
-    "min_adt_20d": 20_000_000_000,
-    "max_atr_pct": 0.04,
+    "min_adt_20d": 10_000_000_000,   # Rp 10B — still 2x original, opens mid-caps
+    "max_atr_pct": 0.05,             # 5% — IDX mid-caps naturally more volatile
     "min_bars": 60,
     # ── Volume Filter
     # Volume Surge Scoring Tiers (masuk ke scoring, bukan sekadar gate)
