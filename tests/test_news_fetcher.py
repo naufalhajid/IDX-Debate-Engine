@@ -193,6 +193,32 @@ def test_build_bundle_breaking_negative_news_penalizes_more() -> None:
     assert bundle.confidence_adjustment <= -0.20
 
 
+def test_build_bundle_breaking_positive_news_amplifies_more() -> None:
+    patcher, _ = _mock_ticker([_raw("BBCA laba naik profit above growth strong", hours_ago=2)])
+    try:
+        bundle = NewsFetcher().build_bundle("BBCA")
+    finally:
+        patcher.stop()
+
+    assert bundle.has_breaking_news is True
+    assert bundle.confidence_adjustment == 0.10
+    assert f"{BREAKING_NEWS_HOURS}h" in bundle.confidence_adjustment_reason
+
+
+def test_breaking_negative_wins_over_breaking_positive() -> None:
+    patcher, _ = _mock_ticker([
+        _raw("BBCA laba naik profit strong", hours_ago=2),
+        _raw("BBCA rugi turun below", hours_ago=1),
+    ])
+    try:
+        bundle = NewsFetcher().build_bundle("BBCA")
+    finally:
+        patcher.stop()
+
+    assert bundle.has_breaking_news is True
+    assert bundle.confidence_adjustment <= -0.20
+
+
 def test_breaking_negative_corporate_action_gets_negative_adjustment() -> None:
     patcher, _ = _mock_ticker([_raw("BBCA rights issue rugi turun below", hours_ago=2)])
     try:
@@ -334,9 +360,9 @@ def test_dividend_or_buyback_past_does_not_neutralize_adjustment() -> None:
 
     assert bundle.has_corporate_action is True
     assert bundle.overall_sentiment is NewsSentiment.POSITIVE
-    assert bundle.confidence_adjustment == 0.05
-    assert "Positive news sentiment" in bundle.confidence_adjustment_reason
-    assert "Reason: Positive news sentiment" in prompt
+    assert bundle.confidence_adjustment == 0.10
+    assert "Breaking positive news" in bundle.confidence_adjustment_reason
+    assert "Reason: Breaking positive news" in prompt
 
 
 def test_confidence_reason_matches_configured_constants() -> None:

@@ -400,6 +400,8 @@ def _news_adjustment_from_sentiment(
             return -0.20, "LLM-judged negative breaking news"
         return -0.10, "LLM-judged negative news sentiment"
     if label == "POSITIVE":
+        if has_breaking:
+            return 0.10, "LLM-judged positive breaking news"
         return 0.05, "LLM-judged positive news sentiment"
     return 0.0, "LLM-judged neutral news sentiment"
 
