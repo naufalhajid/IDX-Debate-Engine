@@ -1081,6 +1081,9 @@ def _confidence_adjustment(
     has_breaking_negative_news = any(
         item.is_breaking and item.sentiment_score < -0.2 for item in items
     )
+    has_breaking_positive_news = any(
+        item.is_breaking and item.sentiment_score > 0.2 for item in items
+    )
     has_negative_corporate_action = any(
         item.is_corporate_action and item.sentiment_score < -0.2 for item in items
     )
@@ -1100,6 +1103,11 @@ def _confidence_adjustment(
         return (
             0.0,
             "Upcoming corporate action detected - validate trade plan against corporate event",
+        )
+    if has_breaking_positive_news:
+        return (
+            0.10,
+            f"Breaking positive news in last {BREAKING_NEWS_HOURS}h - significant opportunity detected",
         )
     if sentiment is NewsSentiment.POSITIVE:
         return 0.05, "Positive news sentiment supports trade"
