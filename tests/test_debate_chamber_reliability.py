@@ -1516,3 +1516,47 @@ def test_trade_envelope_allows_positive_5d_return_in_momentum_mode():
     }
     result = chamber._compute_trade_envelope(1000.0, 1100.0, tech)
     assert not result.get("rejected"), f"Positive 5d return wrongly rejected: {result}"
+
+
+@pytest.mark.asyncio
+async def test_devils_advocate_appends_vote_to_agent_votes(monkeypatch):
+    """_devils_advocate_node must append its AVOID/HOLD vote to agent_votes (6th entry)."""
+    chamber = _chamber()
+
+    async def fake_invoke_for_state(state, llm, messages, inject_rules=True):
+        return SimpleNamespace(
+            content="Worst-case macro challenge.\nPOSITION: AVOID\nCONFIDENCE: 0.40"
+        )
+
+    chamber.flash_llm = FakeLLM(model="gemini-2.5-flash")
+    monkeypatch.setattr(chamber, "_invoke_llm_for_state", fake_invoke_for_state)
+    monkeypatch.setattr(dc, "DEFAULT_STORE", SimpleNamespace(append=lambda *_: None))
+
+    prior_votes = [
+        {"agent": "bull", "position": "BUY", "confidence": 0.70, "round": 1},
+        {"agent": "bear", "position": "AVOID", "confidence": 0.60, "round": 1},
+        {"agent": "fundamental_scout", "position": "BUY", "confidence": 0.65, "round": 1},
+        {"agent": "chartist", "position": "BUY", "confidence": 0.68, "round": 1},
+        {"agent": "sentiment_specialist", "position": "HOLD", "confidence": 0.55, "round": 1},
+    ]
+
+    result = await chamber._devils_advocate_node(
+        {
+            "ticker": "BBCA",
+            "debate_history": [],
+            "decision_brief": "Test brief.",
+            "agent_votes": prior_votes,
+            "round_count": 3,
+            "metadata": {"run_id": "test_run"},
+        }
+    )
+
+    votes = result["agent_votes"]
+    assert len(votes) == 6, f"Expected 6 agent_votes, got {len(votes)}"
+    da_vote = next((v for v in votes if v["agent"] == "devils_advocate"), None)
+    assert da_vote is not None, "devils_advocate vote missing from agent_votes"
+    assert da_vote["position"] in ("AVOID", "HOLD"), f"Unexpected DA position: {da_vote['position']}"
+    assert 0.0 <= da_vote["confidence"] <= 1.0
+    # Original 5 votes must be preserved unchanged
+    original_agents = {v["agent"] for v in votes[:5]}
+    assert original_agents == {"bull", "bear", "fundamental_scout", "chartist", "sentiment_specialist"}

@@ -1150,6 +1150,13 @@ class RichFormatter:
             arg_table.add_row(
                 Text("🔴 Bear (Pessimistic)", style="red"), Text(bear_arg)
             )
+            da_arg = _key_argument_summary(data, packet, "devils_advocate", limit=800)
+            if da_arg and da_arg != "Data unavailable":
+                arg_table.add_row("", "")
+                arg_table.add_row(
+                    Text("⚔️  Devil's Advocate", style="dim"),
+                    Text(da_arg, style="dim"),
+                )
             arg_table.add_row("", "")
             arg_table.add_row(
                 Text("Decision Summary", style="yellow"), Text(decision_summary)
@@ -1177,7 +1184,7 @@ class RichFormatter:
 
             # 5. System & Risk Management
             risks = _key_risks(data)[:3]
-            catalysts = _catalysts(data)[:2] if rating == "BUY" else []
+            catalysts = _catalysts(data)[:2] if rating in ("BUY", "STRONG_BUY") else []
 
             sys_table = Table.grid(padding=(0, 2))
             sys_table.add_column(style="bold cyan", no_wrap=True, width=18)

@@ -3036,9 +3036,19 @@ Current Date (Asia/Jakarta): {current_date}
             confidence=signal.get("confidence"),
         )
         self._record_observation(state, "devils_advocate", content, signal)
+        existing_votes = list(state.get("agent_votes") or [])
+        existing_votes.append({
+            "agent": "devils_advocate",
+            "position": str(signal.get("position", "UNKNOWN")),
+            "confidence": float(signal.get("confidence") or 0.0),
+            "calibration_weight": 1.0,
+            "effective_confidence": float(signal.get("confidence") or 0.0),
+            "round": state["round_count"] + 1,
+        })
         return {
             "debate_history": [msg],
             "devils_advocate_question": content,
+            "agent_votes": existing_votes,
         }
 
     # ── Signal Classifier (pure Python — deterministic) ─────────────────────
