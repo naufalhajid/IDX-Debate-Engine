@@ -176,8 +176,10 @@ def replay_ticker(ticker: str, years: int) -> list[TradeResult]:
         return []
 
     # Precompute all indicator series once — O(N) instead of O(N²) per bar
-    rsi_series      = compute_rsi(close)
-    atr_series      = compute_atr(high, low, close, 14)
+    # Reindex to df.index: compute_rsi/atr internally drop the first row, making
+    # them one element shorter; reindex restores alignment with NaN at [0].
+    rsi_series      = compute_rsi(close).reindex(df.index)
+    atr_series      = compute_atr(high, low, close, 14).reindex(df.index)
     ma50_series     = close.rolling(50).mean()
     sma20_series    = close.rolling(20).mean()
     high20_series   = high.rolling(20).max()
