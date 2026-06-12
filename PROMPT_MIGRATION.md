@@ -436,3 +436,29 @@ LLM no longer calculates days; it only pattern-matches the pre-computed label.
 ### Success Criteria
 `_compute_exdate_gate({"risk_tier": "CRITICAL", "days_until_exdate": 5})` →
 `"EXDATE_GATE: AVOID (ExDate in 5d — do not enter)"`
+
+---
+
+## 2026-06-12 — `bull-bear-citation-requirement-v1` (PROMPT-LEVEL)
+
+**Files changed:** `services/debate_prompts/bull_r1.txt`, `services/debate_prompts/bear_r1.txt`
+
+### Problem
+Both R1 prompts required citing exact prices but had no structured minimum-citation floor.
+Without it, analysts could repeat the same qualitative argument across R1/R2/R3 and the
+multi-round debate would not converge on new evidence. Audit finding C3-F02.
+
+### Changes
+Both files: inserted a REQUIRED DATA CITATIONS block at the top (before ROUND 1 OBJECTIVE)
+mandating 3 structured citations per round:
+  1. One fundamental metric with its actual number
+  2. One technical metric with its actual number
+  3. One company-specific catalyst or risk factor (not generic market commentary)
+
+PROHIBITED clauses added to block data-free assertions. Fallback: if brief lacks data for
+3 citations, cap confidence <= 0.50 and declare HOLD/AVOID respectively.
+
+R2 prompts (bull_r2.txt, bear_r2.txt) are unchanged.
+
+### Success Criteria
+Bull/Bear R1 LLM output cites at least 3 specific numbers from the brief before paragraphs.

@@ -3833,6 +3833,38 @@ def _record_backtest_memory(
         if _mem_path and _backtest_record_exists(_mem_path, ticker, entry_price, target_price, stop_loss):
             logger.info("[BacktestMemory] %s: duplicate open record skipped (dedup)", ticker)
             return
+        _raw_data = _dict_or_empty(result.get("raw_data"))
+        _metadata = _dict_or_empty(result.get("metadata"))
+        _technicals = _dict_or_empty(result.get("technical_indicators"))
+        # Use explicit None-check so avg_volume_20d=0.0 (genuine zero volume) blocks recording
+        _avg_vol = next(
+            (v for v in [
+                _raw_data.get("avg_volume_20d"),
+                _metadata.get("avg_volume_20d"),
+                _technicals.get("avg_volume_20d"),
+            ] if v is not None),
+            None,
+        )
+        _min_adt = ORCHESTRATOR_CONFIG.get("min_adt_20d", 20_000_000_000)
+        _adt_est = float(_avg_vol) * float(entry_price) if _avg_vol is not None else 0.0
+        if _avg_vol is not None and _adt_est < _min_adt:
+            logger.warning(
+                "[BacktestMemory] %s: estimated ADT Rp %.0f < min Rp %.0f"
+                " — recording skipped (fill impossible)",
+                ticker,
+                _adt_est,
+                _min_adt,
+            )
+            return
+        if verdict_rating in ("BUY", "STRONG_BUY") and _mem_path:
+            from core.portfolio_guard import check_portfolio_allows_new_entry
+            _stop_dist_pct = (entry_price - stop_loss) / entry_price if entry_price > 0 else 0.0
+            _allowed, _guard_reason = check_portfolio_allows_new_entry(
+                Path(_mem_path), _stop_dist_pct
+            )
+            if not _allowed:
+                logger.warning("[PortfolioGuard] %s: entry blocked — %s", ticker, _guard_reason)
+                return
         today = datetime.now(timezone.utc).date().isoformat()
         memory.record(
             TradeOutcome(

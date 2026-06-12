@@ -32,6 +32,27 @@ def test_record_skips_insufficient_data_without_writing() -> None:
     assert memory.records == []
 
 
+def test_record_skips_low_volume_trade() -> None:
+    """P2.6: Recording is skipped when estimated ADT is below the screener floor."""
+    memory = RecordingMemory()
+    result = {
+        "ticker": "MICRO",
+        "verdict": {
+            "rating": "BUY",
+            "confidence": 0.70,
+            "entry_price_range": "500 - 510",
+            "target_price": 600,
+            "stop_loss": 470,
+        },
+        # avg_volume_20d=1000 shares × entry=500 → ADT Rp 500k < Rp 20B threshold
+        "raw_data": {"avg_volume_20d": 1000},
+    }
+
+    _record_backtest_memory(result=result, run_id="run-vol-test", memory=memory)
+
+    assert memory.records == [], "low-ADT trade should be skipped"
+
+
 def test_record_writes_valid_result() -> None:
     memory = RecordingMemory()
     result = {

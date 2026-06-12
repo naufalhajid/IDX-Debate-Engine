@@ -63,3 +63,13 @@ def snap_to_tick(price: float) -> float:
         return float(round(price / 10) * 10)
     else:
         return float(round(price / 25) * 25)
+
+
+def compute_swing_low(low: pd.Series, window: int = 20) -> float:
+    """Minimum of the low series over the last `window` bars — structural support proxy.
+
+    Used as the anchor for stop-loss placement. Taking the minimum (most conservative)
+    ensures the stop sits below all recent lows, not just near a moving average.
+    """
+    tail = low.tail(window) if len(low) >= window else low
+    return float(tail.min())
