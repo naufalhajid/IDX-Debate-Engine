@@ -172,15 +172,16 @@ def replay_ticker(ticker: str, years: int) -> list[TradeResult]:
         return []
 
     # Precompute all indicator series once — O(N) instead of O(N²) per bar
-    rsi_series   = compute_rsi(close)
-    atr_series   = compute_atr(high, low, close, 14)
-    ma50_series  = close.rolling(50).mean()
-    sma20_series = close.rolling(20).mean()
-    high20_series = high.rolling(20).max()
-    high50_series = high.rolling(50).max()
-    high52w_series = high.rolling(252).max()
-    low20_series  = low.rolling(20).min()
-    low50_series  = low.rolling(50).min()
+    rsi_series      = compute_rsi(close)
+    atr_series      = compute_atr(high, low, close, 14)
+    ma50_series     = close.rolling(50).mean()
+    sma20_series    = close.rolling(20).mean()
+    high20_series   = high.rolling(20).max()
+    high50_series   = high.rolling(50).max()
+    high52w_series  = high.rolling(252).max()
+    low20_series    = low.rolling(20).min()
+    low50_series    = low.rolling(50).min()
+    return_5d_series = close.pct_change(5) * 100  # mirrors tech["return_5d_pct"]
 
     trades: list[TradeResult] = []
     occupied: set[int] = set()
@@ -202,6 +203,11 @@ def replay_ticker(ticker: str, years: int) -> list[TradeResult]:
         if ma50 and price < ma50 * (1 - MA50_ENTRY_DISCOUNT):
             continue
         if ma50 and price > ma50 * 1.05:
+            continue
+
+        # Momentum confirmation (F12 mirror): momentum mode only (RSI > 40)
+        ret5d = float(return_5d_series.iloc[i]) if pd.notna(return_5d_series.iloc[i]) else 0.0
+        if rsi_val > 40.0 and ret5d < 0.0:
             continue
 
         high_20d = float(high20_series.iloc[i]) if pd.notna(high20_series.iloc[i]) else price

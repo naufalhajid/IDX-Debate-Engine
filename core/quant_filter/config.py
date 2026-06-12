@@ -167,12 +167,15 @@ CONFIG = {
     # ── Penalties & Bonuses
     "over_extended_penalty": -15,
     "fresh_breakout_bonus": +15,
-    # ── Turnaround Momentum Penalties (v3.2)
-    # Fundamental yang buruk tidak lagi langsung dibuang, tapi diberi penalti berat.
-    # Hanya saham dengan skor teknikal/momentum sempurna yang bisa lolos Top 10.
-    "penalty_roe_fail": -15,
-    "penalty_piotroski_fail": -15,
-    "penalty_altman_z_fail": -20,
+    # ── Turnaround Momentum Penalties (v3.3 — raised per audit C1-F01)
+    # Combined -100 floors composite score to 0 for triple-fail stocks, making it
+    # extremely hard to rank in the top-10 except in universally weak markets.
+    # Caveat: without an absolute score floor, a 0-score stock can still appear in
+    # top_n when the whole universe scores poorly (Option A — hard rejects — would
+    # guarantee exclusion but was deferred).
+    "penalty_roe_fail": -30,
+    "penalty_piotroski_fail": -30,
+    "penalty_altman_z_fail": -40,
     # ── Mean-Reversion Mode (v3.3) ────────────────────────────────────────────
     # screener_mode = "momentum" (default, trend-following) | "mean_reversion".
     # Mean-reversion looks for a pullback in an intact uptrend: price has dipped

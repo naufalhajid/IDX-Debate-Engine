@@ -543,32 +543,32 @@ def _analyze_ticker(
         total_score += cfg["piotroski_strong_bonus"]
         mom_note.append(f"F-Score Kuat ({piotroski}/9)")
     elif piotroski < cfg["min_piotroski"]:
-        total_score += cfg.get("penalty_piotroski_fail", -15)
+        total_score += cfg.get("penalty_piotroski_fail", -30)
         mom_note.append(
-            f"Penalty: F-Score Buruk ({piotroski}/9) ({cfg.get('penalty_piotroski_fail', -15)})"
+            f"Penalty: F-Score Buruk ({piotroski}/9) ({cfg.get('penalty_piotroski_fail', -30)})"
         )
     elif piotroski <= cfg["piotroski_weak_max"]:
         total_score += cfg["piotroski_weak_penalty"]
         mom_note.append(f"F-Score Lemah ({piotroski}/9)")
 
-    # [v3.2 FIX] Altman Z-Score Turnaround Penalty
+    # [v3.3 FIX] Altman Z-Score Turnaround Penalty (raised from -20)
     altman_z_raw = row.get("Altman Z-Score (Modified)", 0)
     altman_z_val = (
         float(altman_z_raw) if not pd.isna(altman_z_raw) and altman_z_raw else 0.0
     )
     if 0 < altman_z_val < cfg["min_altman_z"]:
-        total_score += cfg.get("penalty_altman_z_fail", -20)
+        total_score += cfg.get("penalty_altman_z_fail", -40)
         mom_note.append(
-            f"Penalty: Altman-Z Distress ({altman_z_val:.2f}) ({cfg.get('penalty_altman_z_fail', -20)})"
+            f"Penalty: Altman-Z Distress ({altman_z_val:.2f}) ({cfg.get('penalty_altman_z_fail', -40)})"
         )
 
-    # [v3.2 FIX] ROE Turnaround Penalty
+    # [v3.3 FIX] ROE Turnaround Penalty (raised from -15)
     roe_raw = row.get("Return on Equity (TTM)", 0)
     roe_val = float(roe_raw) if not pd.isna(roe_raw) and roe_raw else 0.0
     if roe_val < cfg["min_roe"]:
-        total_score += cfg.get("penalty_roe_fail", -15)
+        total_score += cfg.get("penalty_roe_fail", -30)
         mom_note.append(
-            f"Penalty: ROE Buruk ({roe_val * 100:.1f}%) ({cfg.get('penalty_roe_fail', -15)})"
+            f"Penalty: ROE Buruk ({roe_val * 100:.1f}%) ({cfg.get('penalty_roe_fail', -30)})"
         )
 
     # Penalti jika tidak ada margin of safety (Valuation gap == 0)
