@@ -58,18 +58,18 @@ def test_drawdown_averages_recent_closed_pnl(tmp_path: Path) -> None:
     _write_jsonl(
         bt,
         [
-            {"outcome": "loss", "exit_date": _days_ago(5),  "pnl_pct": -0.08},
-            {"outcome": "loss", "exit_date": _days_ago(10), "pnl_pct": -0.12},
+            {"outcome": "loss", "exit_date": _days_ago(5),  "pnl_pct": -8.0},   # -8%
+            {"outcome": "loss", "exit_date": _days_ago(10), "pnl_pct": -12.0},  # -12%
             {"outcome": "open", "exit_date": None,          "pnl_pct": None},
         ],
     )
     dd = compute_30d_drawdown(bt)
-    assert abs(dd - (-0.10)) < 1e-9
+    assert abs(dd - (-10.0)) < 1e-9
 
 
 def test_drawdown_ignores_old_closed_records(tmp_path: Path) -> None:
     bt = tmp_path / "bt.jsonl"
-    _write_jsonl(bt, [{"outcome": "loss", "exit_date": _days_ago(45), "pnl_pct": -0.20}])
+    _write_jsonl(bt, [{"outcome": "loss", "exit_date": _days_ago(45), "pnl_pct": -20.0}])
     assert compute_30d_drawdown(bt) == 0.0
 
 
@@ -97,7 +97,7 @@ def test_drawdown_kill_switch_fires(tmp_path: Path) -> None:
     _write_jsonl(
         bt,
         [
-            {"outcome": "loss", "exit_date": _days_ago(i + 1), "pnl_pct": -0.16}
+            {"outcome": "loss", "exit_date": _days_ago(i + 1), "pnl_pct": -16.0}  # -16%
             for i in range(5)
         ],
     )

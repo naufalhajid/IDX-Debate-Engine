@@ -3836,15 +3836,18 @@ def _record_backtest_memory(
         _raw_data = _dict_or_empty(result.get("raw_data"))
         _metadata = _dict_or_empty(result.get("metadata"))
         _technicals = _dict_or_empty(result.get("technical_indicators"))
-        _avg_vol = (
-            _raw_data.get("avg_volume_20d")
-            or _metadata.get("avg_volume_20d")
-            or _technicals.get("avg_volume_20d")
-            or 0
+        # Use explicit None-check so avg_volume_20d=0.0 (genuine zero volume) blocks recording
+        _avg_vol = next(
+            (v for v in [
+                _raw_data.get("avg_volume_20d"),
+                _metadata.get("avg_volume_20d"),
+                _technicals.get("avg_volume_20d"),
+            ] if v is not None),
+            None,
         )
         _min_adt = ORCHESTRATOR_CONFIG.get("min_adt_20d", 20_000_000_000)
-        _adt_est = float(_avg_vol) * float(entry_price)
-        if _adt_est > 0 and _adt_est < _min_adt:
+        _adt_est = float(_avg_vol) * float(entry_price) if _avg_vol is not None else 0.0
+        if _avg_vol is not None and _adt_est < _min_adt:
             logger.warning(
                 "[BacktestMemory] %s: estimated ADT Rp %.0f < min Rp %.0f"
                 " — recording skipped (fill impossible)",

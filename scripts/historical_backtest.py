@@ -12,6 +12,9 @@ Usage:
   python scripts/historical_backtest.py --tickers BBCA --years 2 --output results.json
 
 Reuses: compute_rsi, compute_atr, compute_swing_low, snap_to_tick from utils/technicals.
+
+WARNING: Envelope constants below mirror production debate_chamber.py. When production
+constants are retuned, update these values to keep backtest results representative.
 """
 
 from __future__ import annotations
@@ -26,18 +29,18 @@ import pandas as pd
 import yfinance as yf
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from utils.technicals import compute_atr, compute_rsi, compute_swing_low, snap_to_tick
+from utils.technicals import compute_atr, compute_rsi, snap_to_tick
 
-# ── Envelope parameters (mirroring production debate_chamber.py) ─────────────
-MAX_TARGET_RETURN_NO_FV = 0.10   # P2.1: 10% cap (no fair-value anchor)
-NOISE_GATE_MULTIPLIER   = 1.5    # noise gate: stop_distance >= 1.5 * ATR14
-REGIME_ATR_MULTIPLIER   = 2.5    # neutral regime multiplier (no live regime signal in replay)
+# ── Envelope parameters (mirror production debate_chamber.py — keep in sync) ─
+MAX_TARGET_RETURN_NO_FV = 0.10   # 10% cap without fair-value anchor
+NOISE_GATE_MULTIPLIER   = 1.5    # stop_distance >= 1.5 × ATR14 required
+REGIME_ATR_MULTIPLIER   = 2.5    # neutral regime multiplier (no live regime in replay)
 ATR_SWING_LOW_BUFFER    = 0.5    # buffer below swing low for structural stop
 
-# ── Screener gates (mirroring production config.py) ──────────────────────────
+# ── Screener gates (mirror production config.py) ──────────────────────────────
 RSI_MAX             = 70
 ATR_PCT_MAX         = 0.04
-MA50_ENTRY_DISCOUNT = 0.03   # price must be within 3% below MA50
+MA50_ENTRY_DISCOUNT = 0.03
 
 # ── Evaluation ────────────────────────────────────────────────────────────────
 HORIZON_TRADING_DAYS = 45
@@ -52,7 +55,7 @@ class TradeResult:
     stop_loss: float
     exit_date: str | None = None
     exit_price: float | None = None
-    outcome: str = "open"   # win | loss | timeout_flat | timeout_loss | open
+    outcome: str = "open"   # win | loss | timeout_flat | open
     pnl_pct: float | None = None
     holding_days: int | None = None
 
@@ -64,6 +67,7 @@ def _compute_envelope(
     atr14: float,
     high_20d: float,
     high_50d: float,
+    high_52w: float,
     low_20d: float,
     low_50d: float,
 ) -> dict | None:
@@ -97,15 +101,16 @@ def _compute_envelope(
         return None
 
     if atr14 > 0 and (entry_high - stop) < NOISE_GATE_MULTIPLIER * atr14:
-        return None  # stop inside noise
+        return None
 
     risk = entry_high - stop
     target_candidate = max(entry_high + risk * 2.0, entry_mid * 1.04)
 
-    if high_20d >= target_candidate:
-        target_candidate = high_20d
-    elif high_50d >= target_candidate:
-        target_candidate = high_50d
+    # Three resistance tiers: 20d high → 50d high → 52w high (matching production)
+    for resistance in (high_20d, high_50d, high_52w):
+        if resistance >= target_candidate:
+            target_candidate = resistance
+            break
 
     target = snap_to_tick(target_candidate)
     capped  = snap_to_tick(entry_high * (1 + MAX_TARGET_RETURN_NO_FV))
@@ -115,7 +120,7 @@ def _compute_envelope(
     if target <= entry_high:
         return None
 
-    return {"entry": entry_high, "target": target, "stop": stop, "entry_mid": entry_mid}
+    return {"entry": entry_high, "target": target, "stop": stop}
 
 
 def _evaluate_trade(
@@ -142,40 +147,53 @@ def _evaluate_trade(
     last_close = float(bars["Close"].iloc[-1])
     last_date  = str(bars.index[-1].date())
     within_2pct = abs(last_close - entry_price) / entry_price <= 0.02
-    outcome = "timeout_flat" if within_2pct else (
-        "win" if last_close > entry_price else "loss"
-    )
+    outcome = "timeout_flat" if within_2pct else ("win" if last_close > entry_price else "loss")
     return {"outcome": outcome, "exit_date": last_date, "exit_price": last_close, "days": HORIZON_TRADING_DAYS}
 
 
 def replay_ticker(ticker: str, years: int) -> list[TradeResult]:
     symbol = ticker if ticker.endswith(".JK") else f"{ticker}.JK"
-    df = yf.download(symbol, period=f"{years + 1}y", auto_adjust=True, progress=False, multi_level_col=False)
+    try:
+        df = yf.download(symbol, period=f"{years + 1}y", auto_adjust=True, progress=False, multi_level_col=False)
+    except Exception as exc:
+        print(f"  [{ticker}] download failed: {exc}")
+        return []
+
     if df is None or len(df) < 120:
         print(f"  [{ticker}] insufficient data ({len(df) if df is not None else 0} bars)")
         return []
 
-    close  = df["Close"].squeeze()
-    high   = df["High"].squeeze()
-    low    = df["Low"].squeeze()
+    close = df["Close"].squeeze()
+    high  = df["High"].squeeze()
+    low   = df["Low"].squeeze()
+
+    if not isinstance(close, pd.Series):
+        print(f"  [{ticker}] unexpected DataFrame shape after squeeze — skipping")
+        return []
+
+    # Precompute all indicator series once — O(N) instead of O(N²) per bar
+    rsi_series   = compute_rsi(close)
+    atr_series   = compute_atr(high, low, close, 14)
+    ma50_series  = close.rolling(50).mean()
+    sma20_series = close.rolling(20).mean()
+    high20_series = high.rolling(20).max()
+    high50_series = high.rolling(50).max()
+    high52w_series = high.rolling(252).max()
+    low20_series  = low.rolling(20).min()
+    low50_series  = low.rolling(50).min()
 
     trades: list[TradeResult] = []
-    occupied: set[int] = set()  # bar indices occupied by an open trade's horizon
+    occupied: set[int] = set()
 
     for i in range(120, len(df)):
         if i in occupied:
             continue
 
-        c_slice = close.iloc[:i + 1]
-        h_slice = high.iloc[:i + 1]
-        l_slice = low.iloc[:i + 1]
-
-        rsi_val = float(compute_rsi(c_slice).iloc[-1]) if len(c_slice) >= 14 else 50.0
-        atr_ser = compute_atr(h_slice, l_slice, c_slice, 14)
-        atr14   = float(atr_ser.iloc[-1]) if not atr_ser.empty and pd.notna(atr_ser.iloc[-1]) else 0.0
-        ma50    = float(c_slice.rolling(50).mean().iloc[-1]) if len(c_slice) >= 50 else None
-        sma20   = float(c_slice.rolling(20).mean().iloc[-1]) if len(c_slice) >= 20 else float(c_slice.mean())
-        price   = float(c_slice.iloc[-1])
+        price   = float(close.iloc[i])
+        rsi_val = float(rsi_series.iloc[i]) if pd.notna(rsi_series.iloc[i]) else 50.0
+        atr14   = float(atr_series.iloc[i]) if pd.notna(atr_series.iloc[i]) else 0.0
+        ma50    = float(ma50_series.iloc[i]) if pd.notna(ma50_series.iloc[i]) else None
+        sma20   = float(sma20_series.iloc[i]) if pd.notna(sma20_series.iloc[i]) else price
 
         if rsi_val > RSI_MAX:
             continue
@@ -186,12 +204,13 @@ def replay_ticker(ticker: str, years: int) -> list[TradeResult]:
         if ma50 and price > ma50 * 1.05:
             continue
 
-        high_20d = float(h_slice.tail(20).max())
-        high_50d = float(h_slice.tail(50).max())
-        low_20d  = compute_swing_low(l_slice, window=20)
-        low_50d  = compute_swing_low(l_slice, window=50)
+        high_20d = float(high20_series.iloc[i]) if pd.notna(high20_series.iloc[i]) else price
+        high_50d = float(high50_series.iloc[i]) if pd.notna(high50_series.iloc[i]) else price
+        high_52w = float(high52w_series.iloc[i]) if pd.notna(high52w_series.iloc[i]) else price
+        low_20d  = float(low20_series.iloc[i]) if pd.notna(low20_series.iloc[i]) else price * 0.95
+        low_50d  = float(low50_series.iloc[i]) if pd.notna(low50_series.iloc[i]) else price * 0.95
 
-        env = _compute_envelope(price, sma20, ma50, atr14, high_20d, high_50d, low_20d, low_50d)
+        env = _compute_envelope(price, sma20, ma50, atr14, high_20d, high_50d, high_52w, low_20d, low_50d)
         if env is None:
             continue
 

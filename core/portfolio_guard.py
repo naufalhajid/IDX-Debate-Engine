@@ -19,22 +19,26 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 MAX_PORTFOLIO_HEAT = 0.06   # 6% total open risk (sum of stop-distance pcts)
-MAX_30D_DRAWDOWN   = 0.15   # 15% avg realized loss in last 30 days triggers kill-switch
+MAX_30D_DRAWDOWN   = 15.0   # 15% avg realized loss in last 30 days triggers kill-switch
+                             # NOTE: pnl_pct is stored as percent (e.g. -5.0 for 5% loss)
 
 
-def compute_portfolio_heat(backtest_path: Path) -> float:
-    """Sum of (entry_price - stop_loss) / entry_price across all 'open' trade records.
-
-    Returns 0.0 if the file does not exist or no open records are present.
-    """
+def _load_records(backtest_path: Path) -> list[dict]:
+    """Read and parse all JSONL records from the backtest file (single I/O pass)."""
     if not backtest_path.exists():
-        return 0.0
-    total = 0.0
+        return []
+    records: list[dict] = []
     for line in backtest_path.read_text(encoding="utf-8").splitlines():
         try:
-            r = json.loads(line)
+            records.append(json.loads(line))
         except json.JSONDecodeError:
             continue
+    return records
+
+
+def _heat_from_records(records: list[dict]) -> float:
+    total = 0.0
+    for r in records:
         if r.get("outcome") != "open":
             continue
         entry = float(r.get("entry_price") or 0)
@@ -44,21 +48,10 @@ def compute_portfolio_heat(backtest_path: Path) -> float:
     return total
 
 
-def compute_30d_drawdown(backtest_path: Path) -> float:
-    """Average pnl_pct of trades closed in the last 30 calendar days.
-
-    Returns 0.0 if no qualifying records exist (treated as no drawdown).
-    Negative value means net loss over the period.
-    """
-    if not backtest_path.exists():
-        return 0.0
+def _drawdown_from_records(records: list[dict]) -> float:
     cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).date().isoformat()
     pnls: list[float] = []
-    for line in backtest_path.read_text(encoding="utf-8").splitlines():
-        try:
-            r = json.loads(line)
-        except json.JSONDecodeError:
-            continue
+    for r in records:
         if r.get("outcome") in ("open", None):
             continue
         exit_date = r.get("exit_date") or ""
@@ -69,11 +62,31 @@ def compute_30d_drawdown(backtest_path: Path) -> float:
     return sum(pnls) / len(pnls) if pnls else 0.0
 
 
+def compute_portfolio_heat(backtest_path: Path) -> float:
+    """Sum of (entry_price - stop_loss) / entry_price across all 'open' trade records.
+
+    Returns 0.0 if the file does not exist or no open records are present.
+    """
+    return _heat_from_records(_load_records(backtest_path))
+
+
+def compute_30d_drawdown(backtest_path: Path) -> float:
+    """Average pnl_pct of trades closed in the last 30 calendar days.
+
+    pnl_pct is stored as percent (e.g. -5.0 for a 5% loss).
+    Returns 0.0 if no qualifying records exist (treated as no drawdown).
+    Negative value means net loss over the period.
+    """
+    return _drawdown_from_records(_load_records(backtest_path))
+
+
 def check_portfolio_allows_new_entry(
     backtest_path: Path,
     new_stop_dist_pct: float,
 ) -> tuple[bool, str]:
     """Return (allowed, reason_code) before recording a new BUY/STRONG_BUY trade.
+
+    Reads backtest_memory.jsonl exactly once for both checks.
 
     Args:
         backtest_path: Path to backtest_memory.jsonl
@@ -83,15 +96,19 @@ def check_portfolio_allows_new_entry(
         (True, "ok") if both guards pass
         (False, reason_code) if either guard fires
     """
-    heat = compute_portfolio_heat(backtest_path)
+    records = _load_records(backtest_path)
+
+    heat = _heat_from_records(records)
     if heat + new_stop_dist_pct > MAX_PORTFOLIO_HEAT:
         return False, (
             f"portfolio_heat: {heat:.1%} open + {new_stop_dist_pct:.1%} new"
             f" > {MAX_PORTFOLIO_HEAT:.0%} cap"
         )
-    drawdown = compute_30d_drawdown(backtest_path)
+
+    drawdown = _drawdown_from_records(records)
     if drawdown < -MAX_30D_DRAWDOWN:
         return False, (
-            f"drawdown_kill_switch: 30d avg pnl {drawdown:.1%} < -{MAX_30D_DRAWDOWN:.0%}"
+            f"drawdown_kill_switch: 30d avg pnl {drawdown:.1f}% < -{MAX_30D_DRAWDOWN:.0f}%"
         )
+
     return True, "ok"
