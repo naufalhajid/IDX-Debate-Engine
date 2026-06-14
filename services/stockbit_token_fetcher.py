@@ -57,13 +57,26 @@ class StockbitTokenFetcher:
         tmp_dir = tempfile.gettempdir()
         self.token_path = os.path.join(tmp_dir, "stockbit_token.tmp")
 
+    def _is_already_logged_in(self) -> bool:
+        """Return True if the saved Chrome profile already has an active session."""
+        try:
+            import time
+            self.driver.get("https://stockbit.com/#/")
+            time.sleep(3)
+            return "login" not in self.driver.current_url.lower()
+        except Exception:
+            return False
+
     def fetch_tokens(self):
         driver = self.driver
         logger.info("Navigating to Stockbit login page...")
         driver.get(self.login_url)
 
-        logger.info("Please log in to Stockbit in the opened browser.")
-        input("Press Enter here AFTER login succeeds and the dashboard loads... ")
+        if self._is_already_logged_in():
+            logger.info("Saved session detected — skipping manual login prompt.")
+        else:
+            logger.info("Please log in to Stockbit in the opened browser.")
+            input("Press Enter here AFTER login succeeds and the dashboard loads... ")
 
         # Scan performance logs for the sample request
         logs = driver.get_log("performance")

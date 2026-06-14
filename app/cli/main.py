@@ -22,7 +22,7 @@ import typer
 from rich.panel import Panel
 from rich.table import Table
 
-from app.cli.commands import debate, filter, pipeline, scan, sector, model, auth
+from app.cli.commands import debate, filter, pipeline, scan, sector, model, auth, backtest
 from app.cli.ui.console import console
 
 
@@ -70,6 +70,10 @@ def _print_workflow_panel() -> None:
     )
     body.add_row(
         "[dim]idx model[/dim]", "[dim]Switch LLM provider and model variants[/dim]"
+    )
+    body.add_row(
+        "[dim]idx backtest[/dim]",
+        "[dim]Score historical CIO verdicts against actual IDX prices[/dim]",
     )
     body.add_row(
         "[dim]idx scan[/dim]", "[dim]Refresh IDX stock data from providers (ETL)[/dim]"
@@ -132,6 +136,7 @@ app.command(
     epilog=_PIPELINE_EPILOG,
 )(pipeline.pipeline_command)
 app.command(name="model")(model.model_command)
+app.command(name="backtest")(backtest.backtest_command)
 app.add_typer(sector.app, name="sector")
 app.add_typer(auth.app, name="auth")
 

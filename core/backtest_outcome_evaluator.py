@@ -91,8 +91,14 @@ def evaluate_trade_outcome(
     *,
     horizon_trading_days: int = DEFAULT_HORIZON_TRADING_DAYS,
     evaluation_date: date | None = None,
+    entry_check: bool = False,
 ) -> TradeOutcome | None:
-    """Return an updated win/loss record, or None when it is too early to score."""
+    """Return an updated win/loss record, or None when it is too early to score.
+
+    When entry_check=True, simulation only starts after the first bar where
+    bar.low <= record.entry_price (limit order filled). If entry never triggers
+    within the horizon, returns None (trade not counted).
+    """
     sorted_bars = sorted(
         (bar for bar in bars if bar.trade_date > _parse_date(record.entry_date)),
         key=lambda bar: bar.trade_date,
@@ -101,7 +107,17 @@ def evaluate_trade_outcome(
         return None
 
     bounded_bars = sorted_bars[:horizon_trading_days]
-    for index, bar in enumerate(bounded_bars, start=1):
+
+    start_idx = 0
+    if entry_check:
+        for idx, bar in enumerate(bounded_bars):
+            if bar.low <= record.entry_price:
+                start_idx = idx
+                break
+        else:
+            return None
+
+    for index, bar in enumerate(bounded_bars[start_idx:], start=start_idx + 1):
         stop_hit = bar.low <= record.stop_loss
         target_hit = bar.high >= record.target_price
         if stop_hit:
@@ -170,6 +186,7 @@ def evaluate_memory(
     horizon_trading_days: int = DEFAULT_HORIZON_TRADING_DAYS,
     price_fetcher: PriceFetcher | None = None,
     today: date | None = None,
+    entry_check: bool = False,
 ) -> EvaluationSummary:
     """Evaluate eligible open BUY/STRONG_BUY records and optionally rewrite memory."""
     memory = BacktestMemory(memory_path)
@@ -254,9 +271,11 @@ def evaluate_memory(
             bars,
             horizon_trading_days=horizon_trading_days,
             evaluation_date=evaluation_day,
+            entry_check=entry_check,
         )
         if evaluated is None:
-            details.append(_detail(record, "skipped", "insufficient_horizon"))
+            reason = "entry_not_triggered" if entry_check else "insufficient_horizon"
+            details.append(_detail(record, "skipped", reason))
             continue
 
         updated_records[-1] = evaluated
