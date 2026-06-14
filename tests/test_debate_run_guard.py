@@ -39,6 +39,25 @@ async def test_run_with_guard_returns_failed_result_on_exception() -> None:
 
 
 @pytest.mark.asyncio
+async def test_run_with_guard_classifies_provider_read_timeout() -> None:
+    class ReadTimeout(Exception):
+        pass
+
+    async def failed_run() -> dict[str, str]:
+        raise ReadTimeout()
+
+    result = await run_with_guard("CUAN", failed_run())
+
+    assert result == {
+        "ticker": "CUAN",
+        "status": "timeout",
+        "error": "ReadTimeout",
+        "result": None,
+    }
+    assert GuardResult.model_validate(result).status == "timeout"
+
+
+@pytest.mark.asyncio
 async def test_run_with_guard_names_empty_exception() -> None:
     async def failed_run() -> dict[str, str]:
         raise RuntimeError()

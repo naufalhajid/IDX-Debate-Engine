@@ -285,6 +285,7 @@ class TestCodexAdapter:
             MagicMock(
                 CODEX_FLASH_MODEL="gpt-5.4-mini",
                 CODEX_FLASH_REASONING_EFFORT="medium",
+                CODEX_FLASH_REQUEST_TIMEOUT_SECONDS=120,
             ),
         )
         monkeypatch.setattr(
@@ -298,6 +299,7 @@ class TestCodexAdapter:
 
         assert calls[0]["model"] == "gpt-5.4-mini"
         assert calls[0]["reasoning_effort"] == "medium"
+        assert calls[0]["request_timeout"] == 120
         assert calls[0]["max_tokens"] == 4000
 
     def test_codex_pro_uses_xhigh_reasoning(self, monkeypatch: pytest.MonkeyPatch):
@@ -313,6 +315,7 @@ class TestCodexAdapter:
             MagicMock(
                 CODEX_PRO_MODEL="gpt-5.5",
                 CODEX_PRO_REASONING_EFFORT="xhigh",
+                CODEX_PRO_REQUEST_TIMEOUT_SECONDS=180,
             ),
         )
         monkeypatch.setattr(
@@ -326,6 +329,7 @@ class TestCodexAdapter:
 
         assert calls[0]["model"] == "gpt-5.5"
         assert calls[0]["reasoning_effort"] == "xhigh"
+        assert calls[0]["request_timeout"] == 180
         assert calls[0]["max_tokens"] == 10000
 
     def test_codex_reasoning_override_disables_reasoning(

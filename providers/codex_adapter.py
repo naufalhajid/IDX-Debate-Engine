@@ -64,6 +64,23 @@ def _codex_reasoning_effort(tier: str) -> str | None:
     return settings.CODEX_PRO_REASONING_EFFORT
 
 
+def _settings_positive_int(name: str, default: int) -> int:
+    value = getattr(settings, name, default)
+    if not isinstance(value, (int, float, str)):
+        return default
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed > 0 else default
+
+
+def _codex_request_timeout(tier: str) -> int:
+    if tier == "flash":
+        return _settings_positive_int("CODEX_FLASH_REQUEST_TIMEOUT_SECONDS", 120)
+    return _settings_positive_int("CODEX_PRO_REQUEST_TIMEOUT_SECONDS", 180)
+
+
 def get_codex_flash_llm() -> "ChatCodexResponses":
     """Create a Codex Flash-tier instance.
 
@@ -80,7 +97,7 @@ def get_codex_flash_llm() -> "ChatCodexResponses":
         kwargs = {
             "model": model_name,
             "api_key": SecretStr(access_token),
-            "request_timeout": 60,
+            "request_timeout": _codex_request_timeout("flash"),
             "reasoning_effort": _codex_reasoning_effort("flash"),
         }
 
@@ -117,7 +134,7 @@ def get_codex_pro_llm() -> "ChatCodexResponses":
         kwargs = {
             "model": model_name,
             "api_key": SecretStr(access_token),
-            "request_timeout": 90,
+            "request_timeout": _codex_request_timeout("pro"),
             "reasoning_effort": _codex_reasoning_effort("pro"),
         }
 

@@ -82,6 +82,8 @@ class Settings(BaseSettings):
     CODEX_PRO_MODEL: str = "gpt-5.5"
     CODEX_FLASH_REASONING_EFFORT: str = "medium"
     CODEX_PRO_REASONING_EFFORT: str = "xhigh"
+    CODEX_FLASH_REQUEST_TIMEOUT_SECONDS: int = 120
+    CODEX_PRO_REQUEST_TIMEOUT_SECONDS: int = 180
 
     # Token storage directory for OAuth credentials
     TOKEN_STORAGE_DIR: str = "output/tokens"

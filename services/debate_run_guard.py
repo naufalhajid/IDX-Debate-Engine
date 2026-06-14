@@ -26,6 +26,19 @@ def _exception_message(exc: Exception) -> str:
     return type(exc).__name__
 
 
+def _is_timeout_exception(exc: Exception) -> bool:
+    if isinstance(exc, (asyncio.TimeoutError, TimeoutError)):
+        return True
+
+    exc_name = type(exc).__name__.lower()
+    message = str(exc).lower()
+    return (
+        "timeout" in exc_name
+        or "timed out" in message
+        or "deadline exceeded" in message
+    )
+
+
 async def run_with_guard(
     ticker: str,
     coro: Awaitable[Any],
@@ -42,6 +55,13 @@ async def run_with_guard(
             result=None,
         ).model_dump()
     except Exception as exc:
+        if _is_timeout_exception(exc):
+            return GuardResult(
+                ticker=ticker,
+                status="timeout",
+                error=_exception_message(exc),
+                result=None,
+            ).model_dump()
         return GuardResult(
             ticker=ticker,
             status="failed",
