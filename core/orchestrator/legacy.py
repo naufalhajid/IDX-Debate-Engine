@@ -3845,7 +3845,7 @@ def _record_backtest_memory(
             ] if v is not None),
             None,
         )
-        _min_adt = ORCHESTRATOR_CONFIG.get("min_adt_20d", 20_000_000_000)
+        _min_adt = ORCHESTRATOR_CONFIG.get("min_adt_20d", 10_000_000_000)
         _adt_est = float(_avg_vol) * float(entry_price) if _avg_vol is not None else 0.0
         if _avg_vol is not None and _adt_est < _min_adt:
             logger.warning(

@@ -98,6 +98,8 @@ CONFIG = {
     # ── Liquidity Gate
     "min_adt_20d": 10_000_000_000,   # Rp 10B — still 2x original, opens mid-caps
     "max_atr_pct": 0.05,             # 5% — IDX mid-caps naturally more volatile
+    "max_ma50_distance_pct": 0.12,  # reject if price >12% away from MA50 (momentum mode only)
+    "max_price_to_fv_ratio": 1.20,  # reject if price > 120% of Graham FV
     "min_bars": 60,
     # ── Volume Filter
     # Volume Surge Scoring Tiers (masuk ke scoring, bukan sekadar gate)

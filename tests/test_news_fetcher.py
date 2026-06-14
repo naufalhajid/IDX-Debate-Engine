@@ -299,8 +299,10 @@ def test_duplicate_news_items_are_removed() -> None:
 
 
 def test_dividend_or_buyback_upcoming_neutralizes_adjustment() -> None:
+    # hours_ago=72 > BREAKING_NEWS_HOURS (48) so is_breaking=False.
+    # Non-breaking positive news should still be neutralized by upcoming ex-date.
     patcher_ticker, _ = _mock_ticker(
-        [_raw("BBCA umumkan dividen dan buyback setelah laba naik", hours_ago=4)]
+        [_raw("BBCA umumkan dividen dan buyback setelah laba naik", hours_ago=72)]
     )
 
     async def mock_prefetch(ticker: str):

@@ -437,6 +437,19 @@ def _analyze_ticker(
         logger.debug(f"[{t}] ATR% {atr_pct:.1%} > max, skip")
         return None
 
+    # ── MA50 Proximity Gate (momentum mode only) ──────────────────────────────
+    max_ma50_dist = cfg.get("max_ma50_distance_pct", 0.12)
+    if mode == "momentum":
+        _ma50: float | None = None
+        if len(close) >= 50:
+            _ma50 = float(close.rolling(50).mean().iloc[-1])
+        if _ma50 is not None and _ma50 > 0 and current_px > 0:
+            if abs(current_px - _ma50) / _ma50 > max_ma50_dist:
+                logger.debug(
+                    f"[{t}] MA50 distance {abs(current_px - _ma50) / _ma50:.1%} > {max_ma50_dist:.1%}, skip"
+                )
+                return None
+
     # ── Volume Confirmation ───────────────────────────────────────────────────
     vol_20d_avg: float = float(vol.tail(20).mean())
     curr_vol: float = float(vol.iloc[-1])
@@ -444,6 +457,19 @@ def _analyze_ticker(
     if vol_surge_ratio < cfg.get("min_volume_surge_for_candidate", 0.30):
         logger.debug(f"[{t}] Volume anemia: {vol_surge_ratio:.2f}x < min, skip")
         return None
+
+    # ── Graham FV Overvalued Gate ─────────────────────────────────────────────
+    # Skip when FV was sanity-capped (sets FV = 5×price → ratio always 0.20)
+    # or when FV is 0 (bank/finance with non-positive EPS/BVPS — not applicable).
+    max_fv_ratio = cfg.get("max_price_to_fv_ratio", 1.20)
+    _graham_fv = float(row.get("Graham_Number", 0) or 0)
+    _fv_is_capped = bool(row.get("graham_fv_capped", False))
+    if not _fv_is_capped and _graham_fv > 0 and current_px > 0:
+        if current_px / _graham_fv > max_fv_ratio:
+            logger.debug(
+                f"[{t}] Price/FV {current_px / _graham_fv:.2f} > {max_fv_ratio:.2f}, skip (overvalued)"
+            )
+            return None
 
     # ── Momentum Score ────────────────────────────────────────────────────────
     mom_note: list[str] = []
