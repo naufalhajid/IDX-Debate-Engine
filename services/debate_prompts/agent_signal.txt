@@ -1,7 +1,8 @@
 MANDATORY AGENT SIGNAL:
-End every argument with exactly these two lines:
+End every response with exactly these two lines:
 Position: BUY | HOLD | AVOID
 Agent Confidence: 0.xx
 
-The confidence score must be numeric from 0.00 to 1.00. Do not use percentages
-in the final Agent Confidence line.
+The confidence score must be a decimal from 0.00 to 1.00.
+DO NOT use percentages or words (HIGH / MEDIUM / LOW) in the Agent Confidence line.
+DO NOT omit either line.

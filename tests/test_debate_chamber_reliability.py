@@ -977,7 +977,7 @@ async def test_debate_run_derives_current_price_and_adds_prompt_metadata(monkeyp
 def test_prompt_registry_loads_required_prompts_and_version():
     registry = debate_prompt_registry.PROMPT_REGISTRY
 
-    assert registry.prompt_version == "2026-06-15-p0-fix-v2"
+    assert registry.prompt_version == "2026-06-16-p2-english-v5"
     assert set(debate_prompt_registry.REQUIRED_PROMPTS).issubset(registry.prompts)
     assert "CONFIDENCE CALIBRATION" in registry.prompts["CIO_SYSTEM_PROMPT"]
 
@@ -1395,13 +1395,12 @@ def test_cio_prompt_contains_confidence_calibration_rubric():
     assert "CONFIDENCE CALIBRATION" in prompt
     assert "0.82" in prompt
     assert "0.78" in prompt
-    assert "Caps tidak additive" in prompt
-    assert "0.80-0.89" in prompt
-    assert "Angka bulat" in prompt
+    assert "Caps are not additive" in prompt
+    assert "0.80" in prompt
+    assert 'Round or "nice" numbers' in prompt
     assert "0.70" in prompt
     assert "0.75" in prompt
-    assert "0.80" in prompt
-    assert "kurangi 0.10" in prompt
+    assert "deduct 0.10" in prompt
     assert "0.10" in prompt
 
 

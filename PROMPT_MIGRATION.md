@@ -1,5 +1,46 @@
 # Prompt Migration Log
 
+## 2026-06-16 — `2026-06-16-p2-english-v5`
+
+**Files changed:** All 12 prompt files in `services/debate_prompts/`
+
+### P2 — Full English Rewrite + 10 Prompt-Writing Principles
+
+**Scope:** Complete translation to English and structural rewrite of all 12 prompts applying:
+1. Execution Order — explicit STEP-by-STEP GPS sequence in every file
+2. No Forward Reference — ROLE and DATA SOURCE defined before tasks
+3. Single Source of Truth — OUTPUT FORMAT at bottom; each constraint has one home
+4. Explicit Conditional — IF/THEN/ELSE replacing implied branching throughout
+5. Repeat Hard Constraints — DO NOT rules repeated at point of use
+6. Explicit DO NOT — prohibitions stated explicitly, not implied
+7. Consistent Notation — `->` for conditionals, `Rp` for prices, `0.xx` for numeric confidence
+8. Output Format at Bottom — moved to last section in every file
+9. Meta-Instructions Separate — CONSTRAINTS block grouped before OUTPUT FORMAT
+10. Proportional — removed padding, duplicate rules, mixed-language comments
+
+**File-specific changes:**
+- `fundamental_scout.txt`: Translated FALLBACK and QUALITY CHECK from Indonesian;
+  restructured as STEP 1-5 with explicit IF/THEN conditionals.
+- `chartist.txt`: Translated MA200 matrix strings from Indonesian; explicit IF/THEN for
+  all four ma200_context values; BELOW constraint repeated in TARGET PRICE step.
+- `sentiment.txt`: Translated PRE-CHECK and RULES from Indonesian; STEP 1/2 structure
+  with explicit data availability gate; OUTPUT FORMAT (JSON schema) at bottom.
+- `devils_advocate.txt`: Translated full transaction cost section from Indonesian;
+  CHALLENGE 1/2 structure with explicit IF/THEN cost verdicts.
+- `bull_r1.txt`, `bear_r1.txt`: STEP 1 audit gate (IF/THEN) before STEP 2 thesis.
+- `bull_r2.txt`, `bear_r2.txt`: STEP 1 DO NOT REPEAT gate before STEP 2 counter-argument.
+- `consensus.txt`, `state_cleaner.txt`, `agent_signal.txt`: ROLE/TASK/CONSTRAINTS/OUTPUT
+  structure applied; explicit DO NOT constraints added.
+- `cio_judge.txt`: Renamed confidence sub-steps STEP A/B/C -> PHASE A/B/C (avoids
+  numbering conflict with main STEP 0-6); added section separators; removed leftover
+  `Position: NEUTRAL / Agent Confidence: HIGH|MEDIUM|LOW` footer (CIO is JSON-only);
+  corrected CAP APPLICATION ORDER — prior version placed DA penalty after hard caps but
+  said "(before hard caps)" — contradiction fixed: order is now base -> disagreement
+  penalty -> DA penalty -> ordered caps -> hard caps -> anti-anchor check.
+
+### Tests
+`tests/test_debate_chamber_reliability.py`: version assertion updated to `2026-06-16-p2-english-v5`.
+
 ## 2026-06-03 — `momentum-rr-override-v1`
 
 **File changed:** `services/debate_prompts/cio_judge.txt`
@@ -583,3 +624,48 @@ only. Separating qualitative debate confidence from numeric scout confidence wou
 `test_consensus_round_three_uses_confidence_winner` → updated to assert `deadlock_hold`.
 `test_confidence_winner_uses_effective_calibrated_confidence` → bull fixture changed to
 `Position: HOLD` to avoid triggering deadlock_hold path.
+
+---
+
+## 2026-06-15 — `p1-fix-v3` (PROMPT-LEVEL)
+
+**Files changed:**
+- `services/debate_prompts/sentiment.txt` (P1-A: 3 edits)
+- `services/debate_prompts/cio_judge.txt` (P1-A: 4 edits)
+- `services/debate_prompts/fundamental_scout.txt` (P1-B: 1 edit)
+- `services/debate_prompts/bear_r2.txt` (P1-C: 1 edit)
+- `services/debate_prompts/bull_r2.txt` (P1-C: 1 edit)
+
+### P1-A — Sentiment EXTREME Dead Code Fix
+
+**Root cause:** `cio_judge.txt` Step 3 had a trigger `Any ✅ + Sentiment EXTREME → -0.10
+confidence` but `sentiment.txt` never produced a field or value called "EXTREME" — the
+condition could never fire. Three changes in `sentiment.txt` + four in `cio_judge.txt`:
+
+- `sentiment.txt`: Added `"sentiment_intensity": null` to the insufficient-data short-circuit
+  JSON response (A1).
+- `sentiment.txt`: Expanded swing_signal bullet with enum definition for `sentiment_intensity`
+  — five values: EXTREME_BULLISH, BULLISH, NEUTRAL, BEARISH, EXTREME_BEARISH (A2).
+- `sentiment.txt`: Changed `% confidence estimate` to `decimal confidence 0.0–1.0` to match
+  the CIO threshold check `>= 0.7` (A3).
+- `cio_judge.txt`: Updated Step 3 EXTREME trigger to read `sentiment_intensity = "EXTREME_BULLISH"
+  atau "EXTREME_BEARISH"` (A4).
+- `cio_judge.txt`: Updated three "Sentiment X" references in Step B and ORDERED CAPS section
+  to explicit field notation `sentiment.sentiment = "..."` (A5).
+
+### P1-B — Fundamental Scout Fair Value Injection Fallback
+
+**Root cause:** FAIR VALUE item assumed Python always injects "FAIR VALUE REPORT". No fallback
+meant the scout would hallucinate numbers if the injection silently failed. Added an explicit
+fallback: declare "DATA TIDAK TERSEDIA", cap confidence to 0.40, declare HOLD, and continue
+items 2–5 with available data.
+
+### P1-C — R2 Prompts Input Schema Declaration
+
+**Root cause:** bear_r2.txt and bull_r2.txt instructed agents to attack the opponent's R1
+argument but never declared which context variables hold that argument — silent failure if
+pipeline wiring changes. Added INPUT CONTEXT block to both R2 prompts naming BULL_R1_OUTPUT,
+BEAR_R1_OUTPUT, and TECHNICAL_SUMMARY, with explicit LOW confidence cap if any is missing.
+
+### Tests
+`tests/test_debate_chamber_reliability.py`: 79 passed, 0 failed.
