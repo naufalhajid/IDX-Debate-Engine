@@ -465,6 +465,48 @@ Bull/Bear R1 LLM output cites at least 3 specific numbers from the brief before 
 
 ---
 
+## 2026-06-15 — `cio-rr-floor-and-hold-guard-v1` (PROMPT-LEVEL)
+
+**File changed:** `services/debate_prompts/cio_judge.txt`
+
+### Problem
+`diag_consensus.py` (272 debates, 15 days) revealed two CIO bias bugs:
+
+1. **R/R ≥ 5.0 IMPLAUSIBLE rule:** STEP 1 claimed "this value should not appear" and
+   forced HOLD. But tight-stop setups (e.g. TPIA entry 1250, stop 1215, target 1437)
+   produce R/R > 5.0 even after the swing cap. The governor hard-rejects these anyway —
+   the prompt assertion was factually wrong and incorrectly rate-blocked the CIO.
+
+2. **HOLD downgrade guard missing:** `voting HOLD → CIO AVOID = 46%` (124/272 debates).
+   AVOID conditions (R/R < 2.0 alone, no clear catalyst) were triggering freely even when
+   the full debate consensus reached HOLD. No guard prevented CIO from overriding HOLD.
+
+### Changes
+
+**STEP 1** — R/R ≥ 5.0 branch changed from "IMPLAUSIBLE — rate HOLD" to:
+"High R/R setup. Verify consistency. Apply normal BUY/HOLD/AVOID rules. Do NOT auto-rate
+HOLD solely based on R/R magnitude."
+
+**STEP 3** — "(R/R ≥ 5.0 is treated as implausible data...)" changed to:
+"(High R/R alone does not override two failing signals — check fundamentals independently)"
+
+**STEP 4** — New `HOLD (downgrade guard)` bullet added before AVOID:
+"IF debate consensus = HOLD AND R/R ≥ 1.5 AND no hard disqualifier → Preserve HOLD.
+Do NOT downgrade to AVOID based on R/R < 2.0 alone.
+Hard disqualifiers: EXDATE=AVOID, R/R < 1.0, price > 1.5× fair value."
+
+### Note on governor interaction
+R/R ≥ 5.0 setups are still hard-rejected by `core/risk_governor.py`
+(`RR_IMPLAUSIBLE_CEILING = 5.0`). Fix 1 only affects the CIO rating text — these setups
+do not reach portfolio sizing regardless of CIO rating.
+
+### Success Criteria
+- CIO downgrade rate (`voting HOLD → CIO AVOID`) drops from 46% toward ≤20%
+- High-R/R setups (TPIA, INDO, MPOW) receive proper BUY/AVOID ratings instead of
+  force-HOLD from IMPLAUSIBLE rule
+
+---
+
 ## 2026-06-15 — `bear-hold-option-v1` (PROMPT-LEVEL)
 
 **Files changed:** `services/debate_prompts/bear_r1.txt`, `services/debate_prompts/bear_r2.txt`
@@ -489,3 +531,55 @@ Position: BEARISH | HOLD
 ### Success Criteria
 Bear agent occasionally outputs `Position: HOLD` for stocks where data quality is too poor
 to build a credible AVOID case. 100% AVOID rate should drop below 90%.
+
+---
+
+## 2026-06-15 — `p0-fix-v2` (PROMPT + CODE)
+
+**Files changed:**
+- `services/debate_prompts/sentiment.txt` (P0-1)
+- `services/debate_prompts/bull_r1.txt`, `bull_r2.txt`, `bear_r1.txt`, `bear_r2.txt` (P0-2)
+- `services/debate_prompts/devils_advocate.txt` (P0-3)
+- `services/debate_prompts/agent_signal.txt` (scope comment added then removed in review)
+- `services/debate_chamber.py` (deadlock_hold fix + review doc comment)
+
+### Problems
+
+**P0-1 (sentiment.txt):** RULES footer had prose instructions inconsistent with JSON schema
+output, plus a trailing `Position: NEUTRAL / Agent Confidence` footer that doesn't belong in
+a JSON-output agent.
+
+**P0-2 (bull/bear debate prompts):** `bear_r1/r2.txt` still used `BEARISH | HOLD`. Aligned to
+`BEARISH | NEUTRAL` so bear's non-AVOID position maps to HOLD via `_normalise_position`. Bull
+updated to `BULLISH | NEUTRAL`. Footer label renamed "Agent Confidence" → "Debate Confidence".
+
+**P0-3 (devils_advocate.txt):** DA `Position: BEARISH` made it a de-facto AVOID voter. Changed
+to `Position: STRESS_TEST` (→ UNKNOWN in `_normalise_position`). DA is not in
+`_collect_agent_votes` so this has no consensus impact. Numeric `Agent Confidence: 0.xx`
+replaces `HIGH | MEDIUM | LOW`.
+
+**Deadlock_hold (code):** `_evaluate_consensus_votes()` — genuine bull=BUY / bear=AVOID
+deadlocks after MAX_DEBATE_ROUNDS now return `consensus_method="deadlock_hold"` with
+HOLD starting point instead of letting bear win the confidence race (bear avg 0.74 effective
+vs bull avg 0.64). `_apply_consensus_override` and `_format_consensus_directive` updated.
+
+### Review findings (2026-06-15 post-session)
+
+**Scope comment regression (fixed):** SCOPE RESTRICTION task added 19 `#` lines to
+`agent_signal.txt`. `load_prompt_registry()` reads `.txt` files verbatim — no comment
+stripping — so these lines shipped to the LLM inside bull/bear system messages, creating
+contradictory instructions. Block removed; accurate Python comment added in
+`debate_chamber.py` at the injection sites instead.
+
+**P0-2 footer is overridden at runtime:** `AGENT_SIGNAL_PROMPT` is appended to debate nodes
+(lines 3007/3052) and its MANDATORY instruction takes precedence over the `Debate Confidence`
+footer in bull/bear prompts. LLMs output numeric `Agent Confidence: 0.xx` (required for
+effective_confidence). The `Debate Confidence` label in debate prompt footers is informational
+only. Separating qualitative debate confidence from numeric scout confidence would require
+`_CONFIDENCE_RE` changes and is deferred as a design decision.
+
+### Tests
+`tests/test_debate_chamber_reliability.py`: 79 passed, 0 failed.
+`test_consensus_round_three_uses_confidence_winner` → updated to assert `deadlock_hold`.
+`test_confidence_winner_uses_effective_calibrated_confidence` → bull fixture changed to
+`Position: HOLD` to avoid triggering deadlock_hold path.

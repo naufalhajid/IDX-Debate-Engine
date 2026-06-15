@@ -34,5 +34,5 @@ Format:
   (INSUFFICIENT NET RETURN / MARGINAL / VIABLE). Tidak ada batasan kata untuk question 2.
   Setiap harga yang dipakai dalam kalkulasi harus disebutkan eksplisit.
 
-Position: BEARISH
-Agent Confidence: HIGH | MEDIUM | LOW
+Position: STRESS_TEST
+Agent Confidence: 0.xx

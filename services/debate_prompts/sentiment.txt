@@ -29,7 +29,4 @@ Analyze the raw stream/social JSON and extract:
   • Swing-trade timing signal: Is sentiment at EXTREME (contrarian opportunity) or trending with price?
   • Red flags: Any coordinated pump signals, insider-leak language, or panic patterns?
 
-RULES: Max 2500 tokens. Write 3-4 compact technical paragraphs. Be specific — note if sentiment is diverging from price action.
-
-Position: NEUTRAL
-Agent Confidence: HIGH | MEDIUM | LOW
+RULES: Output WAJIB berupa valid JSON object sesuai schema di atas — tidak ada teks prosa, preamble, atau markdown di luar JSON object. Semua field harus terisi; gunakan null jika data tidak tersedia.

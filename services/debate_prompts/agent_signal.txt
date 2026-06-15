@@ -1,4 +1,3 @@
-
 MANDATORY AGENT SIGNAL:
 End every argument with exactly these two lines:
 Position: BUY | HOLD | AVOID

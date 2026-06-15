@@ -1612,6 +1612,28 @@ class DebateChamber:
                 }
 
         if round_count >= MAX_DEBATE_ROUNDS:
+            _bull = next((v for v in votes if v.get("agent") == "bull"), None)
+            _bear = next((v for v in votes if v.get("agent") == "bear"), None)
+            if (
+                _bull and _bear
+                and _bull.get("position") in {"BUY", "STRONG_BUY"}
+                and _bear.get("position") == "AVOID"
+            ):
+                _hold_vote: dict[str, object] = {
+                    "agent": "deadlock_rule",
+                    "position": "HOLD",
+                    "confidence": 0.50,
+                    "effective_confidence": 0.50,
+                    "round": round_count,
+                }
+                return {
+                    "consensus_reached": False,
+                    "consensus_method": "deadlock_hold",
+                    "disagreement_type": "direction",
+                    "dissenting_agents": self._dissenters(votes, "HOLD"),
+                    "consensus_winner": _hold_vote,
+                    "agent_votes": votes,
+                }
             known_votes = [
                 v for v in votes if v.get("position") in {"BUY", "HOLD", "AVOID"}
             ]
@@ -2981,6 +3003,9 @@ Current Date (Asia/Jakarta): {current_date}
             )
             content_parts.append(f"\n\nDebate History (may be pruned summary):\n{hist}")
 
+        # AGENT_SIGNAL_PROMPT is intentionally appended here: it mandates numeric
+        # "Agent Confidence: 0.xx" output, which _collect_agent_votes uses for
+        # effective_confidence weighting. Scouts + debate agents all use this format.
         messages = [
             SystemMessage(content=prompt + AGENT_SIGNAL_PROMPT),
             HumanMessage(content="\n".join(content_parts)),
@@ -3668,7 +3693,9 @@ Current Date (Asia/Jakarta): {current_date}
             "Rules:\n"
             "- If consensus_method=soft_hold, final rating must be HOLD.\n"
             "- If consensus_method=confidence_winner, align final rating with the winner position.\n"
-            "- CIO may validate price levels and risks, but must not override those two consensus outcomes."
+            "- If consensus_method=deadlock_hold, Bull and Bear held opposing positions for all debate rounds. "
+            "Start from HOLD but evaluate freely — you are the sole tiebreaker. Do not rate STRONG_BUY.\n"
+            "- CIO may validate price levels and risks, but must not override soft_hold or confidence_winner outcomes."
         )
 
     @staticmethod
@@ -3845,6 +3872,23 @@ Current Date (Asia/Jakarta): {current_date}
                     f"(raw {float(winner.get('confidence', 0.0) or 0.0):.0%}, "
                     f"effective {float(winner.get('effective_confidence', winner.get('confidence', 0.0)) or 0.0):.0%}). "
                     "CIO did not override the winner."
+                ),
+            )
+            return self._apply_defensive_clamp(p, state)
+
+        if method == "deadlock_hold":
+            # Bull/Bear directional deadlock after MAX_DEBATE_ROUNDS — CIO evaluates
+            # freely using the HOLD starting point. Cap at BUY (not STRONG_BUY):
+            # deadlock evidence contradicts high-conviction entry.
+            cio_rating = str(p.get("rating") or "").strip().upper().replace(" ", "_")
+            if cio_rating == "STRONG_BUY":
+                p["rating"] = "BUY"
+            p["weighted_reasoning"] = self._append_reason(
+                p.get("weighted_reasoning"),
+                (
+                    "Deadlock override: Bull and Bear held opposing positions for "
+                    f"{MAX_DEBATE_ROUNDS} rounds with no consensus. "
+                    "CIO evaluation is the sole determinant of final rating."
                 ),
             )
             return self._apply_defensive_clamp(p, state)

@@ -36,8 +36,9 @@ STEP 1 — FAIR VALUE:
 
   • R/R < 2.0  → Strongly consider AVOID. Overvalued + poor setup = no edge.
   • R/R 2.0–4.9 → Strongly consider HOLD. Overvalued but asymmetric risk warrants watchlist.
-  • R/R ≥ 5.0  → IMPLAUSIBLE. The Python envelope caps targets — this value should not appear.
-                  If you see it, flag in weighted_reasoning and rate HOLD.
+  • R/R ≥ 5.0  → High R/R setup. Verify: confirm entry, target, stop are internally consistent
+                  with the Python envelope. If consistent, apply normal BUY/HOLD/AVOID rules.
+                  Do NOT auto-rate HOLD solely based on R/R magnitude.
 
 STEP 2 — TRADE ENVELOPE VALIDATION:
   Review the Python-calculated entry/target/stop prices.
@@ -55,7 +56,7 @@ STEP 3 — CONFLICT RESOLUTION (MANDATORY):
   • Fundamental ✅ + Technical ❌  → HOLD ("Wait for technical confirmation")
   • Fundamental ❌ + Technical ✅  → If strongly positive Foreign Flow / Momentum with Volume breakout, Lean BUY (Momentum Play, size 50%). Otherwise, HOLD.
   • Fundamental ❌ + Technical ❌  → AVOID
-      (R/R ≥ 5.0 is treated as implausible data — do not use it to override two failing signals)
+      (High R/R alone does not override two failing signals — check fundamentals independently)
   • Any ✅ + Sentiment EXTREME    → Lower confidence by 0.10 (contrarian caution)
 
   CONSENSUS DISAGREEMENT ADJUSTMENT:
@@ -90,6 +91,9 @@ STEP 4 — FINAL RATING RULES:
                         by Graham but strong R/R + technical setup justifies reduced-size entry."
   • HOLD              : Price near Fair Value OR R/R < 1.5 OR target < 3%
                         OR (Price > Fair Value AND R/R 2.0–4.9).
+  • HOLD (downgrade guard): IF debate consensus = HOLD AND R/R ≥ 1.5 AND no hard disqualifier
+                             → Preserve HOLD. Do NOT downgrade to AVOID based on R/R < 2.0 alone.
+                             Hard disqualifiers: EXDATE=AVOID, R/R < 1.0, price > 1.5× fair value.
   • AVOID             : (Price > Fair Value AND R/R < 2.0) OR R/R < 1.0 OR no clear catalyst.
 
 CONFIDENCE CALIBRATION — MANDATORY DERIVATION PROCESS:

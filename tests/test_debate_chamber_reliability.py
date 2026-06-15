@@ -358,8 +358,10 @@ async def test_consensus_round_three_uses_confidence_winner(monkeypatch):
     )
 
     assert result["consensus_reached"] is False
-    assert result["consensus_method"] == "confidence_winner"
-    assert result["consensus_winner"]["agent"] == "bear"
+    assert result["consensus_method"] == "deadlock_hold"
+    assert result["consensus_winner"]["agent"] == "deadlock_rule"
+    assert result["consensus_winner"]["position"] == "HOLD"
+    assert result["consensus_winner"]["confidence"] == 0.50
 
 
 @pytest.mark.asyncio
@@ -379,13 +381,16 @@ async def test_confidence_winner_uses_effective_calibrated_confidence(monkeypatc
         {
             "round_count": 3,
             "metadata": {"run_id": "run-1"},
-            "fundamental_data": "Position: HOLD\nAgent Confidence: 0.10",
+            # fundamental=AVOID + technical=BUY + sentiment=HOLD + bull=HOLD + bear=AVOID
+            # → AVOID(2), BUY(1), HOLD(2) — no 60% majority → confidence_winner fires.
+            # bull=HOLD (not BUY) avoids the deadlock_hold shortcut (bull vs bear direction lock).
+            "fundamental_data": "Position: AVOID\nAgent Confidence: 0.10",
             "technical_data": "Position: BUY\nAgent Confidence: 0.11",
             "sentiment_data": "Position: HOLD\nAgent Confidence: 0.12",
             "debate_history": [
                 DebateMessage(
                     role="bull",
-                    content="Position: BUY\nAgent Confidence: 0.64",
+                    content="Position: HOLD\nAgent Confidence: 0.64",
                     round_num=3,
                 ),
                 DebateMessage(
@@ -972,7 +977,7 @@ async def test_debate_run_derives_current_price_and_adds_prompt_metadata(monkeyp
 def test_prompt_registry_loads_required_prompts_and_version():
     registry = debate_prompt_registry.PROMPT_REGISTRY
 
-    assert registry.prompt_version == "2026-06-15-bear-hold-option-v1"
+    assert registry.prompt_version == "2026-06-15-p0-fix-v2"
     assert set(debate_prompt_registry.REQUIRED_PROMPTS).issubset(registry.prompts)
     assert "CONFIDENCE CALIBRATION" in registry.prompts["CIO_SYSTEM_PROMPT"]
 

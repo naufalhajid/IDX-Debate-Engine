@@ -9,5 +9,5 @@ ROUND 2 OBJECTIVE — Defend Entry Timing Against the Bear:
 
 RULES: No repeated data. Attack specific Bear arguments. Max 2500 tokens. Write 3-4 compact technical paragraphs.
 
-Position: BULLISH
-Agent Confidence: HIGH | MEDIUM | LOW
+Position: BULLISH | NEUTRAL
+Debate Confidence: HIGH | MEDIUM | LOW
