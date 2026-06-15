@@ -4,10 +4,12 @@ core/regime.py — Market Regime Detector berbasis IHSG realized volatility.
 Menggunakan ^JKSE 20-day realized volatility (daily std of returns) sebagai
 proxy VIX — karena IHSG tidak memiliki volatility index resmi.
 
-Regime classification:
-  HIGH   : daily_std >= REGIME_VOLATILITY_HIGH_THRESHOLD (default 2%)
-  NORMAL : 1% <= daily_std < 2%
-  LOW    : daily_std < REGIME_VOLATILITY_LOW_THRESHOLD (default 1%)
+Regime classification (urutan prioritas):
+  DEFENSIVE : 5d drop <= -5% ATAU close < MA20+MA50+MA200
+  RECOVERY  : vol HIGH + NOT defensive + 5d return >= +10% (bounce pasca-koreksi)
+  HIGH      : daily_std >= REGIME_VOLATILITY_HIGH_THRESHOLD (default 2%)
+  NORMAL    : 1% <= daily_std < 2%
+  LOW       : daily_std < REGIME_VOLATILITY_LOW_THRESHOLD (default 1%)
 
 Failure mode:
   Jika fetch_ihsg_volatility() gagal (timeout, rate-limit, dll.),
@@ -15,10 +17,12 @@ Failure mode:
   sebagai safe fallback. Pipeline tidak dihentikan.
 
 Regime effects (via get_regime_params()) — nilai di bawah adalah default,
-bisa di-override lewat env/settings (REGIME_HIGH_* / REGIME_LOW_*):
-  HIGH   → top_n=2, rpm_limit=5,  rr_cap=4.0, min_conviction=0.45
-  NORMAL → defaults (tidak ada override)
-  LOW    → top_n=5, rpm_limit=15, rr_cap=6.0, min_conviction=0.20
+bisa di-override lewat env/settings:
+  DEFENSIVE → top_n=3, rpm_limit=5,  rr_cap=4.0, min_conviction=0.70
+  HIGH      → top_n=2, rpm_limit=5,  rr_cap=4.0, min_conviction=0.45
+  RECOVERY  → top_n=4, rpm_limit=8,  rr_cap=4.0, min_conviction=0.40
+  NORMAL    → defaults (tidak ada override)
+  LOW       → top_n=5, rpm_limit=15, rr_cap=6.0, min_conviction=0.20
 """
 
 from __future__ import annotations
@@ -31,7 +35,7 @@ from core.settings import settings
 from utils.logger_config import logger
 
 VolatilityRegimeType = Literal["HIGH", "NORMAL", "LOW"]
-RegimeType = Literal["DEFENSIVE", "HIGH", "NORMAL", "LOW"]
+RegimeType = Literal["DEFENSIVE", "RECOVERY", "HIGH", "NORMAL", "LOW"]
 
 
 @dataclass
@@ -106,6 +110,7 @@ def compute_ihsg_snapshot(
     high_threshold: float = 0.02,
     low_threshold: float = 0.01,
     defensive_weekly_drop_threshold: float = 0.05,
+    recovery_weekly_threshold: float = 0.10,
 ) -> RegimeSnapshot:
     """Compute direction-aware market regime from an IHSG price frame."""
     close = _close_series(df)
@@ -157,8 +162,24 @@ def compute_ihsg_snapshot(
     ):
         reasons.append("ihsg_data_unavailable_fallback_to_volatility")
 
+    recovery_triggered = (
+        not defensive_triggered
+        and volatility_regime == "HIGH"
+        and weekly_return is not None
+        and weekly_return >= recovery_weekly_threshold
+    )
+    if recovery_triggered:
+        reasons.append("recovery_bounce_detected")
+
+    if defensive_triggered:
+        final_regime: RegimeType = "DEFENSIVE"
+    elif recovery_triggered:
+        final_regime = "RECOVERY"
+    else:
+        final_regime = volatility_regime
+
     return RegimeSnapshot(
-        regime="DEFENSIVE" if defensive_triggered else volatility_regime,
+        regime=final_regime,
         volatility_regime=volatility_regime,
         volatility=volatility,
         weekly_return=weekly_return,
@@ -179,9 +200,8 @@ async def detect_market_regime() -> RegimeSnapshot:
         lookback_days=settings.REGIME_VOLATILITY_LOOKBACK_DAYS,
         high_threshold=settings.REGIME_VOLATILITY_HIGH_THRESHOLD,
         low_threshold=settings.REGIME_VOLATILITY_LOW_THRESHOLD,
-        defensive_weekly_drop_threshold=(
-            settings.REGIME_DEFENSIVE_WEEKLY_DROP_THRESHOLD
-        ),
+        defensive_weekly_drop_threshold=settings.REGIME_DEFENSIVE_WEEKLY_DROP_THRESHOLD,
+        recovery_weekly_threshold=settings.REGIME_HIGH_RECOVERY_WEEKLY_THRESHOLD,
     )
     logger.info(
         f"[Regime] IHSG regime={snapshot.regime} "
@@ -303,6 +323,14 @@ def get_regime_params(regime: RegimeType) -> dict:
             "rpm_limit": settings.REGIME_HIGH_RPM_LIMIT,
             "rr_normalization_cap": settings.REGIME_HIGH_RR_CAP,
             "min_conviction_override": settings.REGIME_HIGH_MIN_CONVICTION,
+        }
+
+    if regime == "RECOVERY":
+        return {
+            "top_n_selection": settings.REGIME_RECOVERY_TOP_N,
+            "rpm_limit": settings.REGIME_RECOVERY_RPM_LIMIT,
+            "rr_normalization_cap": settings.REGIME_RECOVERY_RR_CAP,
+            "min_conviction_override": settings.REGIME_RECOVERY_MIN_CONVICTION,
         }
 
     if regime == "LOW":

@@ -462,3 +462,30 @@ R2 prompts (bull_r2.txt, bear_r2.txt) are unchanged.
 
 ### Success Criteria
 Bull/Bear R1 LLM output cites at least 3 specific numbers from the brief before paragraphs.
+
+---
+
+## 2026-06-15 — `bear-hold-option-v1` (PROMPT-LEVEL)
+
+**Files changed:** `services/debate_prompts/bear_r1.txt`, `services/debate_prompts/bear_r2.txt`
+
+### Problem
+Diagnostic showed bear agent voted AVOID in 100% of 378 debate records. Root cause:
+footer line `Position: BEARISH` was a hardcoded literal, so LLM always echoed it verbatim.
+Parser `_normalise_position("BEARISH")` maps to `"AVOID"`. bear_r1.txt:13 already had the
+correct instruction ("declare HOLD, not AVOID" when data is insufficient) but that instruction
+was overridden by the hardcoded footer.
+
+### Changes
+`bear_r1.txt:27` and `bear_r2.txt:17`:
+```
+# Before:
+Position: BEARISH
+
+# After:
+Position: BEARISH | HOLD
+```
+
+### Success Criteria
+Bear agent occasionally outputs `Position: HOLD` for stocks where data quality is too poor
+to build a credible AVOID case. 100% AVOID rate should drop below 90%.

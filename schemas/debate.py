@@ -307,18 +307,20 @@ class CIOVerdict(BaseDataClass):
                 self.rating = "HOLD"
 
         # 6. Wait-and-see gate — caution banner in Svelte UI.
-        #    Triggered by: low confidence, bad R/R, or missing fair value.
-        #    Missing fair value adds caution but prices are NOT erased (BUG C fix).
+        #    Triggered only by low confidence or bad R/R (BUG C completion: missing
+        #    fair_value no longer forces this flag — it was causing 80%+ of non-BUY
+        #    verdicts to show the caution banner because many IHSG stocks lack
+        #    Stockbit fair-value data).  Missing FV still appends a key_risk note.
         missing_fv = self.fair_value is None or self.fair_value <= 0
-        if self.confidence < 0.60 or bad_rr or missing_fv:
+        if self.confidence < 0.60 or bad_rr:
             self.wait_and_see = True
-            if missing_fv and not any(
-                "fundamental" in s.lower() for s in self.key_risks
-            ):
-                self.key_risks = list(self.key_risks) + [
-                    "Fair value tidak tersedia — validasi fundamental "
-                    "secara manual sebelum entry."
-                ]
+        if missing_fv and not any(
+            "fundamental" in s.lower() for s in self.key_risks
+        ):
+            self.key_risks = list(self.key_risks) + [
+                "Fair value tidak tersedia — validasi fundamental "
+                "secara manual sebelum entry."
+            ]
 
         # 7. ── PRICES ARE ALWAYS PRESERVED ──────────────────────────────────
         #    The old code erased target_price / stop_loss / entry_price_range

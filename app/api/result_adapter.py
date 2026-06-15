@@ -216,9 +216,7 @@ def normalize_result(entry: dict[str, Any]) -> dict[str, Any]:
         "rating": rating
         if rating in {"STRONG_BUY", "BUY", "HOLD", "AVOID"}
         else "HOLD",
-        "actionable": bool(
-            risk.get("sizing_allowed", not verdict.get("wait_and_see", False))
-        ),
+        "actionable": bool(risk.get("sizing_allowed", True)),
         "target_price": _as_float(
             risk.get("target_price") or verdict.get("target_price")
         ),

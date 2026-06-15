@@ -3030,14 +3030,15 @@ def _empty_result(
     error: str,
     sector_key: str = "unknown",
     *,
+    status: str = "failed",
     failure_stage: str | None = None,
     failure_type: str | None = None,
 ) -> dict:
     """
     Bentuk seragam untuk debate yang gagal atau di-abort.
 
-    [FIX-10] Status selalu FAILED â€" fungsi ini tidak pernah dipanggil
-    untuk kondisi sukses, jadi tidak ada dead code `else "SUCCESS"`.
+    [FIX-10] Status default "failed". Pass status="timeout" agar telemetry
+    dapat membedakan timeout dari genuine failure.
     """
     metadata: dict[str, Any] = {}
     if failure_stage:
@@ -3058,7 +3059,7 @@ def _empty_result(
         "raw_data_summary": "",
         "metadata": metadata,
         "error": error,
-        "status": "failed",
+        "status": status,
         "conviction_score": 0.0,
         "sector_key": sector_key,
     }
@@ -3646,7 +3647,11 @@ def _record_ticker_telemetry(
             rag_chunks_selected=_metadata_int(metadata, "rag_chunks_selected"),
             rag_chunks_considered=_metadata_int(metadata, "rag_chunks_considered"),
             rag_token_estimate=_metadata_int(metadata, "rag_token_estimate"),
-            provider_errors=[],
+            provider_errors=(
+                [result.get("failure_type") or status]
+                if status not in {"success"} and result.get("error")
+                else []
+            ),
             has_stale_data=False,
             timestamp=datetime.now(timezone.utc).isoformat(),
         )
@@ -3994,11 +3999,16 @@ async def _run_single_debate(ticker: str, chamber: Any) -> dict:
         result = await chamber.run(ticker)
         if result.get("error") is not None:
             error = str(result["error"])
+            _guard_status = (result.get("metadata") or {}).get("guard_status", "")
+            _is_timeout = _guard_status == "timeout" or any(
+                kw in error.lower() for kw in ("timeout", "timed out", "deadline exceeded")
+            )
             return _empty_result(
                 ticker,
                 f"Chamber reported error: {error}",
+                status="timeout" if _is_timeout else "failed",
                 failure_stage="debate_chamber",
-                failure_type="ChamberReportedError",
+                failure_type="Timeout" if _is_timeout else "ChamberReportedError",
             )
 
         verdict_dict: dict = {}
@@ -5566,12 +5576,22 @@ async def main(
                 if not maybe_rerun_quant_filter(
                     output_dir=OUTPUT_DIR, mode=run_screener_mode
                 ):
-                    logger.warning(f"[Validator] {validation.message}")
-                    logger.error("[Validator] Auto-rerun gagal. Pipeline dihentikan.")
-                    _cli_renderer.flush_buffered_alerts()
-                    if raise_on_error:
-                        raise RuntimeError("Candidate validation auto-rerun failed.")
-                    return
+                    revalidation = check_candidates_file(
+                        JSON_PATH, settings.CANDIDATES_MAX_AGE_HOURS
+                    )
+                    if not force_rerun and revalidation.is_valid:
+                        logger.warning(
+                            f"[Validator] Auto-rerun gagal (OOM/timeout) tapi file "
+                            f"masih valid: {revalidation.message}. "
+                            "Pipeline dilanjutkan dengan kandidat existing."
+                        )
+                    else:
+                        logger.warning(f"[Validator] {validation.message}")
+                        logger.error("[Validator] Auto-rerun gagal. Pipeline dihentikan.")
+                        _cli_renderer.flush_buffered_alerts()
+                        if raise_on_error:
+                            raise RuntimeError("Candidate validation auto-rerun failed.")
+                        return
             else:
                 logger.warning(f"[Validator] {validation.message}")
                 logger.error(

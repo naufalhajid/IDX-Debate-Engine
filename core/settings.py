@@ -131,12 +131,30 @@ class Settings(BaseSettings):
     REGIME_LOW_RPM_LIMIT: int = 15
     REGIME_LOW_RR_CAP: float = 6.0  # lebih toleran ke R/R tinggi
     REGIME_LOW_MIN_CONVICTION: float = 0.20
+    # RECOVERY: vol HIGH tapi 5d return >= threshold → bounce setelah koreksi
+    # top_n lebih besar dari HIGH (2) karena momentum berbalik positif
+    REGIME_HIGH_RECOVERY_WEEKLY_THRESHOLD: float = 0.10
+    REGIME_RECOVERY_TOP_N: int = 4
+    REGIME_RECOVERY_RPM_LIMIT: int = 8
+    REGIME_RECOVERY_RR_CAP: float = 4.0
+    REGIME_RECOVERY_MIN_CONVICTION: float = 0.40
 
     # ── Portfolio Diversification ────────────────────────────────────────────
     # PORTFOLIO_MAX_PER_SECTOR: max saham per sektor dalam top N
     # PORTFOLIO_MIN_CONVICTION: minimum conviction score agar eligible masuk top N
     PORTFOLIO_MAX_PER_SECTOR: int = 2
     PORTFOLIO_MIN_CONVICTION: float = 0.30
+
+    # ── Trade Envelope ────────────────────────────────────────────────────────
+    # Hard floor: stop tidak boleh lebih dari X% dari current price
+    TRADE_ENVELOPE_MAX_STOP_LOSS_PCT: float = 0.10
+    # Noise gate thresholds (ATR multiplier):
+    #   < HARD → hard reject (HOLD 0.40, no entry/target/stop)
+    #   HARD–CLEAN → conditional BUY (confidence capped, stop_near_noise flagged)
+    #   >= CLEAN → clean setup
+    TRADE_ENVELOPE_HARD_NOISE_ATR_MULTIPLIER: float = 1.00
+    TRADE_ENVELOPE_CLEAN_NOISE_ATR_MULTIPLIER: float = 1.50
+    TRADE_ENVELOPE_CONDITIONAL_CONFIDENCE_CAP: float = 0.60
 
     @property
     def database_path(self) -> Path:
@@ -202,6 +220,8 @@ class Settings(BaseSettings):
             "REGIME_HIGH_RPM_LIMIT",
             "REGIME_LOW_TOP_N",
             "REGIME_LOW_RPM_LIMIT",
+            "REGIME_RECOVERY_TOP_N",
+            "REGIME_RECOVERY_RPM_LIMIT",
         )
         for field_name in positive_int_fields:
             if getattr(self, field_name) <= 0:
@@ -211,6 +231,7 @@ class Settings(BaseSettings):
             "REGIME_DEFENSIVE_MAX_RR_FOR_SCORING",
             "REGIME_HIGH_RR_CAP",
             "REGIME_LOW_RR_CAP",
+            "REGIME_RECOVERY_RR_CAP",
         )
         for field_name in positive_float_fields:
             if getattr(self, field_name) <= 0:
@@ -220,6 +241,7 @@ class Settings(BaseSettings):
             "REGIME_DEFENSIVE_MIN_CONVICTION",
             "REGIME_HIGH_MIN_CONVICTION",
             "REGIME_LOW_MIN_CONVICTION",
+            "REGIME_RECOVERY_MIN_CONVICTION",
         )
         for field_name in conviction_fields:
             value = getattr(self, field_name)

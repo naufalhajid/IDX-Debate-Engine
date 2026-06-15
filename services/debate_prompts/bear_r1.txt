@@ -24,5 +24,5 @@ ROUND 1 OBJECTIVE — Challenge the Trade Setup:
 
 RULES: Cite exact prices to counter every Bull price level. Max 2500 tokens. Write 3-4 compact technical paragraphs.
 
-Position: BEARISH
+Position: BEARISH | HOLD
 Agent Confidence: HIGH | MEDIUM | LOW

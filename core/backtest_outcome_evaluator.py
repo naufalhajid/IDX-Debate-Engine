@@ -18,7 +18,7 @@ from utils.logger_config import logger
 
 
 DEFAULT_HORIZON_TRADING_DAYS = 45
-EVALUATED_RATINGS = {"BUY", "STRONG_BUY", "HOLD"}
+EVALUATED_RATINGS = {"BUY", "STRONG_BUY"}
 Outcome = Literal["win", "loss", "timeout_flat"]
 
 # Per-request network timeout (seconds) for yfinance. Without it, a single

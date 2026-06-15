@@ -144,14 +144,21 @@ def _is_transient_error(exc: BaseException) -> bool:
     Budget exhaustion is never transient — the caller should propagate
     it and abort.  Permanent errors (bad key, billing, safety blocks)
     are likewise never retried to prevent wasted calls.
+
+    Checks type name, str(), and repr(args) so that exceptions with no
+    message (e.g. ReadTimeout()) are still classified correctly.
     """
 
     if isinstance(exc, BudgetExhaustedError):
         return False
-    s = str(exc).lower()
-    if any(p in s for p in _PERMANENT_ERROR_PATTERNS):
+    combined = " ".join([
+        str(exc).lower(),
+        type(exc).__name__.lower(),
+        repr(exc.args).lower(),
+    ])
+    if any(p in combined for p in _PERMANENT_ERROR_PATTERNS):
         return False
-    return any(t in s for t in _TRANSIENT_ERROR_PATTERNS)
+    return any(t in combined for t in _TRANSIENT_ERROR_PATTERNS)
 
 
 def _as_debate_message(m):
@@ -1771,6 +1778,7 @@ class DebateChamber:
             "metadata": {
                 "prompt_version": getattr(self, "prompt_version", PROMPT_VERSION),
                 "run_id": run_id,
+                "regime": _extract_regime_str(getattr(self, "market_regime", None)),
                 "market_data_source": market_data.get("source", "unknown"),
                 "market_data_fetched_at": _market_data_timestamp(market_data),
                 "market_data_cached": True,
@@ -2129,6 +2137,125 @@ Current Date (Asia/Jakarta): {current_date}
                     "metadata": _metadata_with_planner_note(state, decision),
                 }
             return {"fundamental_data": content}
+
+    @staticmethod
+    def _compute_technical_indicators(df_yf) -> "dict | None":
+        """Compute swing-trade technicals from a yfinance OHLCV DataFrame.
+
+        Returns None when df_yf is None or has fewer than 20 bars.
+        Shared by the early preflight in run() and _chartist_node().
+        """
+        if df_yf is None or len(df_yf) < 20:
+            return None
+        if isinstance(df_yf.columns, pd.MultiIndex):
+            df_yf.columns = df_yf.columns.get_level_values(0)
+
+        close = df_yf["Close"].squeeze()
+        high = df_yf["High"].squeeze()
+        low = df_yf["Low"].squeeze()
+        volume = df_yf["Volume"].squeeze()
+
+        sma20_val = float(close.rolling(20).mean().iloc[-1])
+        ema20_val = float(close.ewm(span=20, adjust=False).mean().iloc[-1])
+        ma50_raw = close.rolling(50).mean().iloc[-1] if len(close) >= 50 else None
+        ma200_series = close.rolling(window=200, min_periods=50).mean()
+        ma200_raw = ma200_series.iloc[-1] if len(close) >= 50 else None
+        rsi_val = float(compute_rsi(close).iloc[-1])
+        atr_val = float(compute_atr(high, low, close).iloc[-1])
+        if pd.isna(atr_val) or atr_val <= 0:
+            atr_val = float((high - low).tail(14).mean())
+        current_price = float(close.iloc[-1])
+
+        high_20d = float(high.tail(20).max()) if len(high) >= 20 else float(high.max())
+        high_50d = float(high.tail(50).max()) if len(high) >= 50 else float(high.max())
+        low_20d = compute_swing_low(low, window=20)
+        low_50d = compute_swing_low(low, window=50)
+
+        last_volume = float(volume.iloc[-1]) if len(volume) else 0.0
+        avg_volume_20d = float(volume.tail(20).mean()) if len(volume) else 0.0
+        volume_surge_ratio = (last_volume / avg_volume_20d) if avg_volume_20d > 0 else 0.0
+        return_5d_pct = (
+            (current_price / float(close.iloc[-6]) - 1.0) * 100.0
+            if len(close) >= 6 and float(close.iloc[-6]) > 0
+            else 0.0
+        )
+
+        if ma200_raw is None or pd.isna(ma200_raw):
+            ma200_context = "INSUFFICIENT_DATA"
+        else:
+            ma200_value = float(ma200_raw)
+            if current_price > ma200_value * 1.02:
+                ma200_context = "ABOVE"
+            elif current_price < ma200_value * 0.98:
+                ma200_context = "BELOW"
+            else:
+                prev5 = close.iloc[-6:-1]
+                if (
+                    len(prev5) == 5
+                    and float(prev5.mean()) < ma200_value
+                    and current_price > ma200_value
+                ):
+                    ma200_context = "CROSSOVER_RECENT"
+                else:
+                    ma200_context = "ABOVE" if current_price >= ma200_value else "BELOW"
+
+        return {
+            "current_price": round(current_price, 0),
+            "sma20": round(sma20_val, 0),
+            "ema20": round(ema20_val, 0),
+            "ma50": round(float(ma50_raw), 0) if ma50_raw is not None and not pd.isna(ma50_raw) else None,
+            "ma200": round(float(ma200_raw), 0) if ma200_raw is not None and not pd.isna(ma200_raw) else None,
+            "ma200_context": ma200_context,
+            "rsi14": round(rsi_val, 1),
+            "atr14": round(atr_val, 0) if not pd.isna(atr_val) else None,
+            "avg_volume_20d": round(avg_volume_20d, 0),
+            "52w_high": round(float(close.max()), 0),
+            "52w_low": round(float(close.min()), 0),
+            "high_20d": round(high_20d, 0),
+            "high_50d": round(high_50d, 0),
+            "low_20d": round(low_20d, 0),
+            "low_50d": round(low_50d, 0),
+            "volume_surge_ratio": round(volume_surge_ratio, 2),
+            "return_5d_pct": round(return_5d_pct, 1),
+        }
+
+    @staticmethod
+    def _run_tradeability_preflight(tech: "dict | None", current_price: float) -> dict:
+        """Deterministic noise gate before LangGraph ainvoke().
+
+        Uses current_price vs low_20d (surrogate stop) to detect hard-reject setups
+        without LLM calls. Returns status 'reject'|'conditional'|'clean'|'skip'.
+        """
+        if not tech:
+            return {"status": "skip", "reason": "no_technical_data"}
+        atr14 = tech.get("atr14") or 0.0
+        cp = tech.get("current_price") or current_price
+        low_20d = tech.get("low_20d") or 0.0
+        if atr14 <= 0 or cp <= 0 or low_20d <= 0:
+            return {"status": "skip", "reason": "insufficient_data"}
+        surrogate_gap = cp - low_20d
+        if surrogate_gap <= 0:
+            return {"status": "skip", "reason": "invalid_swing_low"}
+        hard_floor = settings.TRADE_ENVELOPE_HARD_NOISE_ATR_MULTIPLIER * atr14
+        clean_floor = settings.TRADE_ENVELOPE_CLEAN_NOISE_ATR_MULTIPLIER * atr14
+        if surrogate_gap < hard_floor:
+            return {
+                "status": "reject",
+                "reason": (
+                    f"preflight_noise: price-swing_low gap {surrogate_gap:.0f}"
+                    f" < {settings.TRADE_ENVELOPE_HARD_NOISE_ATR_MULTIPLIER:.1f}xATR {hard_floor:.0f}"
+                ),
+                "atr14": atr14,
+                "surrogate_gap": surrogate_gap,
+            }
+        if surrogate_gap < clean_floor:
+            return {
+                "status": "conditional",
+                "reason": "borderline_noise",
+                "atr14": atr14,
+                "surrogate_gap": surrogate_gap,
+            }
+        return {"status": "clean", "atr14": atr14, "surrogate_gap": surrogate_gap}
 
     async def _chartist_node(self, state: DebateChamberState) -> dict:
         """Chartist with real OHLCV from yfinance — pre-computes all technicals in Python."""
@@ -3293,8 +3420,8 @@ Current Date (Asia/Jakarta): {current_date}
             atr_stop = current_price - (k_atr * atr14)        # regime-scaled ATR floor
             stop = max(structural_stop, atr_stop)
 
-            # Hard floor: stop tidak boleh lebih dari 8% dari current price
-            hard_floor = current_price * 0.92
+            # Hard floor: stop tidak boleh lebih dari MAX_STOP_LOSS_PCT dari current price
+            hard_floor = current_price * (1 - settings.TRADE_ENVELOPE_MAX_STOP_LOSS_PCT)
             stop = snap_to_tick(max(stop, hard_floor))
         else:
             stop = snap_to_tick(entry_mid * 0.96)
@@ -3305,18 +3432,25 @@ Current Date (Asia/Jakarta): {current_date}
         if stop >= entry_low:  # double-check post snap
             stop = self._previous_tick_below(entry_low)
 
-        # Noise rejection: stop inside 1.5x ATR of entry means stop cannot survive
-        # a normal daily candle — return a sentinel so the caller falls back to HOLD
+        # 3-tier noise gate:
+        #   < HARD_MULTIPLIER * ATR  → hard reject (caller returns HOLD 0.40)
+        #   HARD – CLEAN             → conditional (proceed, flag stop_near_noise)
+        #   >= CLEAN_MULTIPLIER * ATR → clean setup
+        _stop_near_noise = False
         if atr14 > 0:
             _stop_distance = entry_high - stop
-            _noise_floor = 1.5 * atr14
-            if _stop_distance < _noise_floor:
+            _hard_floor_atr = settings.TRADE_ENVELOPE_HARD_NOISE_ATR_MULTIPLIER * atr14
+            _clean_floor_atr = settings.TRADE_ENVELOPE_CLEAN_NOISE_ATR_MULTIPLIER * atr14
+            if _stop_distance < _hard_floor_atr:
                 return {
                     "rejected": True,
                     "reason": (
-                        f"stop_inside_noise: gap {_stop_distance:.0f} < 1.5xATR {_noise_floor:.0f}"
+                        f"stop_inside_noise: gap {_stop_distance:.0f}"
+                        f" < {settings.TRADE_ENVELOPE_HARD_NOISE_ATR_MULTIPLIER:.1f}xATR"
+                        f" {_hard_floor_atr:.0f}"
                     ),
                 }
+            _stop_near_noise = _stop_distance < _clean_floor_atr
 
         # Target calculation: seed the target at a 2.0x R/R from entry_high
         # (worst-case fill). This is only the starting point — the resistance
@@ -3393,6 +3527,7 @@ Current Date (Asia/Jakarta): {current_date}
             "risk_reward_ratio": rr_ratio,
             "fair_value": fair_value if (fair_value and fair_value > 0) else None,
             "atr14": atr14,
+            "stop_near_noise": _stop_near_noise,
         }
 
     def _format_trade_envelope(self, envelope: dict) -> str:
@@ -4077,6 +4212,27 @@ Start your response with '{' and end with '}'. Nothing else."""
                 )
             return p
 
+        def _apply_noise_cap(parsed: dict) -> dict:
+            if not envelope.get("stop_near_noise"):
+                return parsed
+            p = dict(parsed)
+            cap = settings.TRADE_ENVELOPE_CONDITIONAL_CONFIDENCE_CAP
+            try:
+                original = float(p.get("confidence") or 0.0)
+            except (TypeError, ValueError):
+                original = 0.0
+            p["confidence"] = min(original, cap)
+            if p.get("rating") == "STRONG_BUY":
+                p["rating"] = "BUY"
+            p["weighted_reasoning"] = self._append_reason(
+                p.get("weighted_reasoning"),
+                f"Stop distance borderline noise zone: confidence capped at {cap:.0%}, STRONG_BUY not permitted.",
+            )
+            metadata = dict(_state_metadata(state))
+            metadata["stop_near_noise"] = True
+            state["metadata"] = metadata
+            return p
+
         def _apply_news_adjustment(parsed: dict) -> dict:
             news_adj = _news_adjustment_from_state(state)
             if news_adj == 0:
@@ -4217,6 +4373,7 @@ Start your response with '{' and end with '}'. Nothing else."""
             parsed = _apply_news_adjustment(parsed)
             parsed = _apply_staleness_adjustment(parsed)
             parsed = _apply_citation_guard(parsed)
+            parsed = _apply_noise_cap(parsed)  # must be last — enforces hard ceiling on confidence/rating
             verdict_json = CIOVerdict(**parsed).model_dump_json()
             logger.info(f"[CIO] JSON parsed successfully for {ticker}")
         except (
@@ -4607,6 +4764,48 @@ Start your response with '{' and end with '}'. Nothing else."""
             "error": None,
         }
         self._reset_llm_counters(initial_state)
+
+        # ── Early preflight: hard-reject noise setups before any LLM call ───────
+        _preflight_df = (market_data or {}).get("history")
+        _preflight_tech = self._compute_technical_indicators(_preflight_df)
+        _preflight = self._run_tradeability_preflight(_preflight_tech, current_price)
+        initial_state["metadata"]["tradeability_preflight"] = _preflight
+        initial_state["metadata"]["preflight_skipped"] = _preflight["status"] == "skip"
+        if _preflight["status"] == "reject":
+            logger.info(
+                f"[DebateChamber] Preflight HOLD {ticker}: {_preflight['reason']}"
+            )
+            _pf_verdict = json.dumps({
+                "rating": "HOLD",
+                "confidence": 0.40,
+                "ticker": ticker,
+                "current_price": current_price,
+                "risk_flags": ["PREFLIGHT_NOISE_REJECT"],
+                "reasoning": _preflight["reason"],
+                "weighted_reasoning": (
+                    f"Preflight noise gate: {_preflight['reason']}. "
+                    "Setup rejected deterministically — no LLM evaluation performed."
+                ),
+                "entry_price_range": None,
+                "target_price": None,
+                "stop_loss": None,
+                "fair_value": None,
+                "r_r_ratio": None,
+                "consensus_reached": False,
+                "consensus_method": "preflight",
+                "dissenting_agents": [],
+            })
+            return {
+                **initial_state,
+                "final_verdict": _pf_verdict,
+                "metadata": {
+                    **initial_state["metadata"],
+                    "guard_status": "ok",
+                    "preflight_skipped": False,
+                },
+                "error": None,
+            }
+
         logger.info(
             f"[DebateChamber] ▶ Starting swing-trade pipeline for {ticker} @ Rp {current_price:,.0f}"
         )

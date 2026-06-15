@@ -972,7 +972,7 @@ async def test_debate_run_derives_current_price_and_adds_prompt_metadata(monkeyp
 def test_prompt_registry_loads_required_prompts_and_version():
     registry = debate_prompt_registry.PROMPT_REGISTRY
 
-    assert registry.prompt_version == "2026-06-12-bull-bear-citation-requirement-v1"
+    assert registry.prompt_version == "2026-06-15-bear-hold-option-v1"
     assert set(debate_prompt_registry.REQUIRED_PROMPTS).issubset(registry.prompts)
     assert "CONFIDENCE CALIBRATION" in registry.prompts["CIO_SYSTEM_PROMPT"]
 
@@ -1775,3 +1775,68 @@ def test_structural_stop_uses_swing_low_when_closer_than_atr() -> None:
     stop = max(structural_stop, atr_stop)
 
     assert stop == 960.0, f"structural_stop should win when swing_low is close: {stop}"
+
+
+# ── Slice A: _is_transient_error with empty ReadTimeout ──────────────────────
+
+def test_is_transient_error_readtimeout_no_args_returns_true():
+    """ReadTimeout() with no message string must be classified as transient."""
+    from requests.exceptions import ReadTimeout
+    assert dc._is_transient_error(ReadTimeout()) is True
+
+
+def test_is_transient_error_auth_error_returns_false():
+    """An API key / auth error string must NOT be classified as transient."""
+    err = Exception("invalid api key: billing not enabled")
+    assert dc._is_transient_error(err) is False
+
+
+# ── Slice C: 3-tier noise gate (preflight) ────────────────────────────────────
+
+def test_preflight_hard_reject_when_gap_below_1x_atr():
+    """price-swing_low gap < 1.0xATR → hard reject status."""
+    chamber = _chamber()
+    # atr14=200, gap=100 (<200) → hard reject
+    tech = {"current_price": 1000.0, "atr14": 200.0, "low_20d": 900.0}
+    result = chamber._run_tradeability_preflight(tech, 1000.0)
+    assert result["status"] == "reject", f"Expected reject, got: {result}"
+    assert "preflight_noise" in result["reason"]
+
+
+def test_preflight_conditional_when_gap_between_1x_and_1p5x_atr():
+    """price-swing_low gap in 1.0–1.5xATR band → conditional status."""
+    chamber = _chamber()
+    # atr14=100, gap=120 (between 100 and 150) → conditional
+    tech = {"current_price": 1000.0, "atr14": 100.0, "low_20d": 880.0}
+    result = chamber._run_tradeability_preflight(tech, 1000.0)
+    assert result["status"] == "conditional", f"Expected conditional, got: {result}"
+
+
+def test_preflight_clean_when_gap_above_1p5x_atr():
+    """price-swing_low gap >= 1.5xATR → clean status."""
+    chamber = _chamber()
+    # atr14=100, gap=200 (>= 150) → clean
+    tech = {"current_price": 1000.0, "atr14": 100.0, "low_20d": 800.0}
+    result = chamber._run_tradeability_preflight(tech, 1000.0)
+    assert result["status"] == "clean", f"Expected clean, got: {result}"
+
+
+def test_preflight_skip_when_no_tech_data():
+    """None tech_indicators → skip (insufficient data, proceed normally)."""
+    chamber = _chamber()
+    result = chamber._run_tradeability_preflight(None, 1000.0)
+    assert result["status"] == "skip"
+
+
+def test_noise_gate_hard_floor_is_1x_atr_not_1p5x():
+    """Hard reject threshold must be 1.0xATR, NOT the old 1.5xATR floor.
+
+    A stop_distance of exactly 1.1xATR should NOT be hard-rejected.
+    """
+    chamber = _chamber()
+    # atr14=100, gap=110 → between 1.0x and 1.5x → conditional, not reject
+    tech = {"current_price": 1000.0, "atr14": 100.0, "low_20d": 890.0}
+    result = chamber._run_tradeability_preflight(tech, 1000.0)
+    assert result["status"] == "conditional", (
+        f"1.1xATR gap should be conditional (not hard reject): {result}"
+    )
