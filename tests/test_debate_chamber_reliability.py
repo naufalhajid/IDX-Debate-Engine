@@ -108,6 +108,15 @@ async def test_cancelled_error_is_not_wrapped_or_retried():
     assert llm.calls == 1
 
 
+def test_peer_closed_chunked_read_is_retryable():
+    exc = RuntimeError(
+        "peer closed connection without sending complete message body "
+        "(incomplete chunked read)"
+    )
+
+    assert dc._is_transient_error(exc) is True
+
+
 @pytest.mark.asyncio
 async def test_consensus_round_one_soft_hold_waits_for_more_debate(monkeypatch):
     chamber = _chamber()
@@ -362,6 +371,12 @@ async def test_consensus_round_three_uses_confidence_winner(monkeypatch):
     assert result["consensus_winner"]["agent"] == "deadlock_rule"
     assert result["consensus_winner"]["position"] == "HOLD"
     assert result["consensus_winner"]["confidence"] == 0.50
+
+
+def test_cio_verdict_accepts_deadlock_hold_consensus_method():
+    verdict = CIOVerdict(ticker="TEST", consensus_method="deadlock_hold")
+
+    assert verdict.consensus_method == "deadlock_hold"
 
 
 @pytest.mark.asyncio
@@ -977,7 +992,7 @@ async def test_debate_run_derives_current_price_and_adds_prompt_metadata(monkeyp
 def test_prompt_registry_loads_required_prompts_and_version():
     registry = debate_prompt_registry.PROMPT_REGISTRY
 
-    assert registry.prompt_version == "2026-06-16-p2-english-v5"
+    assert registry.prompt_version == "2026-06-16-d2-sentiment-priority-fix-v7"
     assert set(debate_prompt_registry.REQUIRED_PROMPTS).issubset(registry.prompts)
     assert "CONFIDENCE CALIBRATION" in registry.prompts["CIO_SYSTEM_PROMPT"]
 
@@ -1738,6 +1753,56 @@ async def test_devils_advocate_appends_vote_to_agent_votes(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.asyncio
+async def test_devils_advocate_prompt_uses_python_trade_envelope(monkeypatch):
+    """Devil's Advocate must stress-test costs against the Python trade target."""
+    chamber = _chamber()
+    captured: dict[str, str] = {}
+
+    async def fake_invoke_for_state(state, llm, messages, inject_rules=True):
+        captured["human"] = messages[-1].content
+        return SimpleNamespace(
+            content="Cost challenge.\nPOSITION: HOLD\nCONFIDENCE: 0.40"
+        )
+
+    chamber.flash_llm = FakeLLM(model="gemini-2.5-flash")
+    monkeypatch.setattr(chamber, "_invoke_llm_for_state", fake_invoke_for_state)
+    monkeypatch.setattr(dc, "DEFAULT_STORE", SimpleNamespace(append=lambda *_: None))
+
+    await chamber._devils_advocate_node(
+        {
+            "ticker": "BMRI",
+            "current_price": 4500.0,
+            "fair_value_estimate": 6872.0,
+            "technical_indicators": {
+                "ma50": 4174.0,
+                "sma20": 4126.0,
+                "atr14": 160.0,
+                "low_20d": 3650.0,
+                "low_50d": 3650.0,
+                "high_20d": 4500.0,
+                "high_50d": 4500.0,
+                "52w_high": 4937.0,
+                "rsi14": 63.0,
+                "return_5d_pct": 21.3,
+            },
+            "debate_history": [],
+            "decision_brief": "Test brief.",
+            "agent_votes": [],
+            "round_count": 2,
+            "metadata": {"run_id": "test_run", "regime": "DEFENSIVE"},
+        }
+    )
+
+    human_prompt = captured["human"]
+    assert "TRADE ENVELOPE FOR TRANSACTION-COST TEST" in human_prompt
+    assert "Python Ground Truth" in human_prompt
+    assert "Entry Midpoint" in human_prompt
+    assert "Target Price" in human_prompt
+    assert "Expected Return From Entry Midpoint" in human_prompt
+    assert "Do NOT use fair value upside" in human_prompt
+
+
 def test_compute_swing_low_returns_minimum_of_window() -> None:
     series = pd.Series([100.0, 90.0, 80.0, 95.0, 105.0])
     result = dc.compute_swing_low(series, window=3)
@@ -1805,6 +1870,33 @@ def test_preflight_hard_reject_when_gap_below_1x_atr():
     result = chamber._run_tradeability_preflight(tech, 1000.0)
     assert result["status"] == "reject", f"Expected reject, got: {result}"
     assert "preflight_noise" in result["reason"]
+
+
+@pytest.mark.asyncio
+async def test_preflight_reject_verdict_keeps_consensus_method_null(monkeypatch):
+    chamber = _chamber()
+    chamber._llm_call_counts = {}
+
+    async def fake_fetch_market_data(ticker):
+        return {"history": pd.DataFrame(), "source": "test"}
+
+    monkeypatch.setattr(chamber, "_fetch_market_data", fake_fetch_market_data)
+    monkeypatch.setattr(chamber, "_compute_technical_indicators", lambda history: {})
+    monkeypatch.setattr(
+        chamber,
+        "_run_tradeability_preflight",
+        lambda tech, current_price: {
+            "status": "reject",
+            "reason": "preflight_noise: test gap below ATR",
+        },
+    )
+
+    result = await chamber.run("MAPI", current_price=1000.0)
+    verdict = CIOVerdict(**json.loads(result["final_verdict"]))
+
+    assert verdict.rating == "HOLD"
+    assert verdict.consensus_method is None
+    assert result["metadata"]["tradeability_preflight"]["status"] == "reject"
 
 
 def test_preflight_conditional_when_gap_between_1x_and_1p5x_atr():

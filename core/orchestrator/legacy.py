@@ -2071,6 +2071,7 @@ _REASON_LABELS = {
     "deployable": "deployable",
     "reject": "reject",
     "market_regime_defensive": "defensive market",
+    "preflight_noise_reject": "preflight noise",
     "weekly_return_below_threshold": "IHSG 5d drop",
     "close_below_ma20_ma50_ma200": "below MA20/50/200",
     "ihsg_data_unavailable_fallback_to_volatility": "IHSG data fallback",
@@ -3868,7 +3869,7 @@ def _record_backtest_memory(
                 Path(_mem_path), _stop_dist_pct
             )
             if not _allowed:
-                logger.warning("[PortfolioGuard] %s: entry blocked — %s", ticker, _guard_reason)
+                logger.warning(f"[PortfolioGuard] {ticker}: entry blocked - {_guard_reason}")
                 return
         today = datetime.now(timezone.utc).date().isoformat()
         memory.record(

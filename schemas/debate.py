@@ -51,6 +51,9 @@ class DebateMessage(BaseDataClass):
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
+ConsensusMethod = Literal["voting", "confidence_winner", "soft_hold", "deadlock_hold"]
+
+
 # ---------------------------------------------------------------------------
 # CIO Verdict — Swing Trade edition, Pydantic-validated, Svelte-ready
 # ---------------------------------------------------------------------------
@@ -207,11 +210,9 @@ class CIOVerdict(BaseDataClass):
         description="Whether the debate agents reached consensus before the CIO formatter.",
     )
 
-    consensus_method: Literal["voting", "confidence_winner", "soft_hold"] | None = (
-        Field(
-            default=None,
-            description="Consensus path used by the debate chamber.",
-        )
+    consensus_method: ConsensusMethod | None = Field(
+        default=None,
+        description="Consensus path used by the debate chamber.",
     )
 
     dissenting_agents: list[str] = Field(
@@ -629,7 +630,7 @@ class DebateChamberState(TypedDict):
     debate_history: Annotated[list[DebateMessage], history_updater]
     round_count: int
     consensus_reached: bool
-    consensus_method: Literal["voting", "confidence_winner", "soft_hold"] | None
+    consensus_method: ConsensusMethod | None
     dissenting_agents: list[str]
     agent_votes: list[dict]
     consensus_winner: dict | None

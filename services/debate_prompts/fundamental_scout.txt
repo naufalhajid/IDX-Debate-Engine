@@ -53,5 +53,9 @@ CONSTRAINTS:
   • Max 2500 tokens. Write 3-4 compact technical paragraphs -- DO NOT pad for length.
 
 OUTPUT FORMAT:
-Position: NEUTRAL
+Position: BULLISH | NEUTRAL | BEARISH
+(Select one that matches your valuation verdict above:
+ BULLISH — current price is UNDERVALUED vs fair value; margin of safety exists.
+ BEARISH — current price is OVERVALUED vs fair value; no margin of safety.
+ NEUTRAL — price is FAIRLY VALUED, or fair value data unavailable (FALLBACK triggered).)
 Agent Confidence: 0.xx

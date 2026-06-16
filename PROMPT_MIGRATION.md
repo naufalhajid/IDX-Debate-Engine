@@ -1,5 +1,120 @@
 # Prompt Migration Log
 
+## 2026-06-16 — `d2-sentiment-priority-fix-v7` (CODE-LEVEL)
+
+**Files changed:**
+- `services/debate_chamber.py` (`_sentiment_signal_from_payload`, `_normalise_position`)
+- `tests/test_debate_chamber_reliability.py` (version assertion, companion to manifest bump)
+
+### Problem (confirmed P1 — follow-up to d1-scout-position-fix-v6)
+
+`_sentiment_signal_from_payload()` derived `raw_position` from an or-chain:
+`payload.get("position") or payload.get("swing_signal") or payload.get("sentiment")`. The
+current `sentiment.txt` schema has no `"position"` key (always None), and `swing_signal` is
+always populated with a descriptive sentence per the prompt's own STEP 2d instruction, so
+`swing_signal` won every time. `_normalise_position()` does an exact-token match against a
+full sentence -> `"UNKNOWN"` -> falls through to the function's catch-all `position = "HOLD"`.
+The real `"sentiment"` field (BULLISH/NEUTRAL/BEARISH/INSUFFICIENT_DATA) was never read.
+
+Proven impact (empirical, direct call to the production function): a payload with
+`sentiment: "BULLISH"` and a calm, non-contrarian `swing_signal` ("Trending with price, no
+extreme bias detected") still returned `position: "HOLD"`. sentiment_specialist's vote in the
+5-agent consensus count was decoupled from its own sentiment classification on effectively
+every successful response.
+
+### Changes
+
+**`_sentiment_signal_from_payload()`** — or-chain reordered to
+`sentiment -> position -> swing_signal`, so the current schema's real field is checked first;
+`position` kept as a fallback for the legacy schema; `swing_signal` demoted to last resort.
+
+**`_normalise_position()`** — added explicit `"INSUFFICIENT_DATA" -> "HOLD"` mapping
+(previously relied on the caller's generic UNKNOWN->HOLD catch-all; now explicit for any
+caller of this shared helper, not just the sentiment path).
+
+**`tests/test_debate_chamber_reliability.py`** — version assertion updated to
+`2026-06-16-d2-sentiment-priority-fix-v7` (companion to the manifest bump).
+
+### Verification
+Re-ran the exact bug-reproduction payload from this fix's investigation: `sentiment: "BULLISH"`
+now resolves to `position: "BUY"` end-to-end through `_collect_agent_votes` (was `"HOLD"`
+before this fix). `_normalise_position` confirmed: BULLISH->BUY, BEARISH->AVOID, NEUTRAL->HOLD,
+INSUFFICIENT_DATA->HOLD.
+
+### Tests
+`tests/test_debate_chamber_reliability.py`: 83 passed, 0 failed. Note: this count includes
+unrelated parallel changes present in the working tree at verification time (see session note
+below) — the 4 additional tests beyond the prior 79-test baseline are not part of this fix.
+
+### Note on parallel working-tree changes (not part of this fix, documented for traceability)
+At verification time, `git status` showed uncommitted changes to files this fix never touched:
+`core/orchestrator/legacy.py`, `core/risk_governor.py`, `schemas/debate.py`,
+`services/debate_prompts/devils_advocate.txt`, `tests/test_cli_renderer_presentation.py`,
+`tests/test_risk_governor.py`. These appear to be coherent, unrelated work (a preflight noise
+gate, a `ConsensusMethod` Literal type fix adding the missing `"deadlock_hold"` value, a
+devils_advocate ground-truth clarification) — not corruption, not reverted by this fix. Flagged
+to the user directly rather than silently absorbed into this entry.
+
+### Known follow-up (NOT done here, flagged)
+This fix only corrects field PRIORITY in `_sentiment_signal_from_payload`. It does not address
+whether `_POSITION_RE`'s `swing_signal` keyword alternation should be reconsidered now that
+`sentiment` is the canonical field name — that regex is shared by every agent's prose-footer
+parsing and was out of scope for this targeted fix.
+
+---
+
+## 2026-06-16 — `d1-scout-position-fix-v6` (PROMPT + CODE, test-only)
+
+**Files changed:**
+- `services/debate_prompts/chartist.txt` (P1 fix)
+- `services/debate_prompts/fundamental_scout.txt` (P1 fix)
+- `tests/test_debate_chamber_reliability.py` (version assertion, companion to manifest bump)
+
+### Problem (confirmed P1 — audit finding D1, escalated from the p2-english-v5 read-only review)
+
+`chartist.txt` and `fundamental_scout.txt` hardcoded a literal `Position: NEUTRAL` footer
+regardless of the scout's actual analysis. `_collect_agent_votes()`
+(`debate_chamber.py:1474-1491`) re-parses that exact text via `_extract_agent_signal()` ->
+`_infer_position_from_text()` -> `_POSITION_RE` (`debate_chamber.py:967-970`, "NEUTRAL" is a
+literal alternation member) -> `_normalise_position()` (`debate_chamber.py:982`, NEUTRAL ->
+HOLD). Both scouts therefore contributed a permanent, content-independent HOLD vote into the
+5-agent consensus count (`CONSENSUS_AGENT_COUNT = 5`, `debate_chamber.py:3086-3088`).
+
+Proven impact: at most 3 of 5 agents (bull, bear, sentiment_specialist) could ever agree on a
+non-HOLD position. Round-1 `ROUND1_CONSENSUS_THRESHOLD = 0.80` needs 4/5 -> BUY/AVOID
+early-consensus at Round 1 was mathematically unreachable, independent of analysis quality.
+
+### Root cause confirmation (Step 0 read before editing)
+
+`_normalise_position()` (`debate_chamber.py:974-984`) already mapped `BULLISH -> BUY` and
+`BEARISH -> AVOID` before this fix. No code change needed there — this is a prompt-only fix
+plus one companion test-assertion update.
+
+### Changes
+
+**`chartist.txt` / `fundamental_scout.txt`** — OUTPUT FORMAT footer changed from hardcoded
+`Position: NEUTRAL` to `Position: BULLISH | NEUTRAL | BEARISH` with explicit selection
+criteria tied to each scout's own analysis above the footer (chartist: ma200_context / RSI /
+price structure; fundamental_scout: valuation verdict UNDERVALUED / FAIRLY VALUED /
+OVERVALUED).
+
+**`tests/test_debate_chamber_reliability.py`** — version assertion updated to
+`2026-06-16-d1-scout-position-fix-v6` (companion to the manifest bump, not a behavioral
+change).
+
+### Tests
+`tests/test_debate_chamber_reliability.py`: 79 passed, 0 failed (same count as the prior
+`p2-english-v5` baseline).
+
+### Known open question (NOT resolved by this fix, flagged for a separate decision)
+Whether `fundamental_scout`/`chartist` should be full voting agents (current design, now
+correctly wired) versus evidence-only inputs excluded from `_collect_agent_votes` — like
+`devils_advocate` already is via its `STRESS_TEST` -> `UNKNOWN` sentinel — is a separate
+architectural question. The existing `calibration_weight` per agent (`debate_chamber.py:773`)
+suggests the original design intent was real per-scout votes, which is what this fix restores.
+
+---
+
 ## 2026-06-16 — `2026-06-16-p2-english-v5`
 
 **Files changed:** All 12 prompt files in `services/debate_prompts/`

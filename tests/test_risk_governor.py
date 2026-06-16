@@ -147,6 +147,26 @@ def test_invalid_or_missing_entry_range_rejects() -> None:
     assert "invalid_entry_range" in decision.reason_codes
 
 
+def test_preflight_noise_reject_does_not_report_missing_trade_levels() -> None:
+    decision = evaluate_risk(
+        _candidate(
+            verdict={
+                "rating": "HOLD",
+                "confidence": 0.40,
+                "entry_price_range": None,
+                "target_price": None,
+                "stop_loss": None,
+                "risk_flags": ["PREFLIGHT_NOISE_REJECT"],
+            }
+        )
+    )
+
+    assert decision.status == "reject"
+    assert decision.sizing_allowed is False
+    assert decision.reason_codes == ["preflight_noise_reject"]
+    assert "entry/target/stop sengaja tidak dibuat" in decision.message
+
+
 def test_defensive_regime_keeps_invalid_setup_rejected() -> None:
     decision = evaluate_risk(
         _candidate(

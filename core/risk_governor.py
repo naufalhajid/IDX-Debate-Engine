@@ -93,6 +93,25 @@ def evaluate_risk(candidate: dict[str, Any]) -> RiskDecision:
         or candidate.get("rr_ratio"),
     )
 
+    if _preflight_noise_reject(candidate, verdict):
+        return _log_decision(
+            RiskDecision(
+                ticker=ticker,
+                status="reject",
+                sizing_allowed=False,
+                reason_codes=["preflight_noise_reject"],
+                message=(
+                    "Setup ditolak oleh preflight noise gate sebelum debat; "
+                    "entry/target/stop sengaja tidak dibuat."
+                ),
+                current_price=current_price,
+                entry_low=entry_low,
+                entry_high=entry_high,
+                target_price=target_price,
+                stop_loss=stop_loss,
+            )
+        )
+
     reason_codes: list[str] = []
     if current_price is None or current_price <= 0:
         reason_codes.append("missing_current_price")
@@ -396,6 +415,19 @@ def _risk_overvalued_flag(candidate: dict[str, Any], verdict: dict[str, Any]) ->
         if value not in (None, ""):
             return _truthy(value)
     return _truthy(verdict.get("is_overvalued") or candidate.get("is_overvalued"))
+
+
+def _preflight_noise_reject(candidate: dict[str, Any], verdict: dict[str, Any]) -> bool:
+    risk_flags = verdict.get("risk_flags")
+    if isinstance(risk_flags, list) and any(
+        str(flag).upper() == "PREFLIGHT_NOISE_REJECT" for flag in risk_flags
+    ):
+        return True
+    metadata = candidate.get("metadata")
+    preflight = metadata.get("tradeability_preflight") if isinstance(metadata, dict) else None
+    if isinstance(preflight, dict) and str(preflight.get("status") or "").lower() == "reject":
+        return True
+    return False
 
 
 def _verdict_reason_codes(

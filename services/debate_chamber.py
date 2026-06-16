@@ -133,6 +133,10 @@ _TRANSIENT_ERROR_PATTERNS = (
     "connection reset",
     "connection aborted",
     "connection dropped",  # wraps asyncio.CancelledError from network timeout
+    "peer closed connection",
+    "incomplete chunked read",
+    "remote protocol error",
+    "server disconnected",
     "timeout",
     "empty response",  # Gemini safety filter / token budget returns empty content
 )
@@ -981,6 +985,8 @@ class DebateChamber:
             return "AVOID"
         if token in {"HOLD", "NEUTRAL", "WAIT", "WAIT_AND_SEE"}:
             return "HOLD"
+        if token in {"INSUFFICIENT_DATA"}:
+            return "HOLD"
         return "UNKNOWN"
 
     @staticmethod
@@ -1252,9 +1258,9 @@ class DebateChamber:
     ) -> dict[str, object]:
         status = str(payload.get("status") or "").strip().upper()
         raw_position = (
-            payload.get("position")
-            or payload.get("swing_signal")
-            or payload.get("sentiment")
+            payload.get("sentiment")          # primary: current schema (BULLISH/NEUTRAL/BEARISH/INSUFFICIENT_DATA)
+            or payload.get("position")        # fallback: legacy schema field
+            or payload.get("swing_signal")    # last resort: descriptive text, normalise will likely -> HOLD
         )
         position = cls._normalise_position(str(raw_position or ""))
         if position == "UNKNOWN" and status in {"INSUFFICIENT_DATA", "PARSE_ERROR"}:
@@ -3195,10 +3201,15 @@ Current Date (Asia/Jakarta): {current_date}
             f"[{m.role.upper()} R{m.round_num}]: {m.content}" for m in debate_history
         )
         decision_context = state.get("decision_brief") or state.get("raw_data", "")
+        trade_envelope_context = self._format_devils_advocate_trade_envelope(state)
         messages = [
             SystemMessage(content=DEVILS_ADVOCATE_PROMPT),
             HumanMessage(
-                content=f"Decision Brief:\n{decision_context}\n\nDebate:\n{hist}"
+                content=(
+                    f"Decision Brief:\n{decision_context}\n\n"
+                    f"{trade_envelope_context}\n\n"
+                    f"Debate:\n{hist}"
+                )
             ),
         ]
         resp = await self._invoke_llm_for_state(state, self.flash_llm, messages)
@@ -3243,6 +3254,53 @@ Current Date (Asia/Jakarta): {current_date}
     MA_LOW_TOL = 0.02  # 2% below MA50 still counts as support test
     MA_HIGH_TOL = 1.08  # 8% above MA50 is the "overextended soft boundary"
     MA_OVEREXT = 1.10  # 10% above MA50 is a hard reject
+
+    def _format_devils_advocate_trade_envelope(
+        self,
+        state: DebateChamberState,
+    ) -> str:
+        """Build the deterministic trade-envelope block used by Devil's Advocate."""
+        current_price = state.get("current_price", 0.0)
+        tech = dict(state.get("technical_indicators") or {})
+        meta_regime = _extract_regime_str((state.get("metadata") or {}).get("regime", ""))
+        if meta_regime:
+            tech["regime"] = meta_regime
+
+        state_metadata = dict(_state_metadata(state))
+        fair_value = (
+            0.0
+            if state_metadata.get("fair_value_rejected")
+            else state.get("fair_value_estimate", 0.0)
+        )
+
+        if not current_price or current_price <= 0:
+            return (
+                "=== TRADE ENVELOPE FOR TRANSACTION-COST TEST (Python Ground Truth) ===\n"
+                "Rejected: invalid current price.\n"
+                "Rule: Do not calculate transaction-cost viability; flag insufficient setup."
+            )
+
+        envelope = self._compute_trade_envelope(current_price, fair_value, tech)
+        if envelope.get("rejected"):
+            return (
+                "=== TRADE ENVELOPE FOR TRANSACTION-COST TEST (Python Ground Truth) ===\n"
+                f"Rejected: {envelope.get('reason', 'trade envelope rejected')}.\n"
+                "Rule: Do not calculate transaction-cost viability; flag insufficient setup."
+            )
+
+        return (
+            "=== TRADE ENVELOPE FOR TRANSACTION-COST TEST (Python Ground Truth) ===\n"
+            f"Entry Low: Rp {envelope['entry_low']:,.0f}\n"
+            f"Entry High: Rp {envelope['entry_high']:,.0f}\n"
+            f"Entry Midpoint: Rp {envelope['entry_mid']:,.0f}\n"
+            f"Target Price: Rp {envelope['target_price']:,.0f}\n"
+            f"Stop Loss: Rp {envelope['stop_loss']:,.0f}\n"
+            f"Expected Return From Entry Midpoint: "
+            f"+{envelope['expected_return_pct']:.1f}%\n"
+            f"Risk/Reward Ratio: {envelope['risk_reward_ratio']:.2f}x\n"
+            "Rule: Use Expected Return From Entry Midpoint as projected target "
+            "return%. Do NOT use fair value upside."
+        )
 
     def _classify_signals(
         self,
@@ -4159,7 +4217,7 @@ no trailing text. The JSON must have exactly these keys:
   "expected_return": "<string e.g. '+6.2%'>",
   "risk_reward_ratio": <float>,
   "consensus_reached": <true | false>,
-  "consensus_method": "<voting | confidence_winner | soft_hold>",
+  "consensus_method": "<voting | confidence_winner | soft_hold | deadlock_hold>",
   "dissenting_agents": ["<agent>", ...]
 }
 
@@ -4836,7 +4894,7 @@ Start your response with '{' and end with '}'. Nothing else."""
                 "fair_value": None,
                 "r_r_ratio": None,
                 "consensus_reached": False,
-                "consensus_method": "preflight",
+                "consensus_method": None,
                 "dissenting_agents": [],
             })
             return {

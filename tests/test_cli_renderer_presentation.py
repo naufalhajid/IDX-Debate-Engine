@@ -153,6 +153,38 @@ def test_final_results_table_explains_price_validation_context() -> None:
     assert "upside exhausted" in output
 
 
+def test_final_results_table_labels_preflight_reject_plainly() -> None:
+    console = _recording_console(width=180)
+    renderer = CliRenderer(con=console)
+    result = {
+        "ticker": "TPIA",
+        "verdict": {
+            "rating": "HOLD",
+            "confidence": 0.40,
+            "current_price": 2100,
+            "entry_price_range": None,
+            "target_price": None,
+            "stop_loss": None,
+            "risk_flags": ["PREFLIGHT_NOISE_REJECT"],
+        },
+        "risk_governor": {
+            "status": "reject",
+            "sizing_allowed": False,
+            "reason_codes": ["preflight_noise_reject"],
+            "message": "Setup ditolak oleh preflight noise gate sebelum debat.",
+            "current_price": 2100,
+        },
+    }
+
+    renderer.render_final_results_table([result], [])
+
+    output = console.export_text()
+    assert "preflight noise" in output
+    assert "invalid entry range" not in output
+    assert "missing target price" not in output
+    assert "missing stop loss" not in output
+
+
 def test_final_results_table_shows_defensive_no_sizing_as_plain_language() -> None:
     console = _recording_console(width=180)
     renderer = CliRenderer(con=console)

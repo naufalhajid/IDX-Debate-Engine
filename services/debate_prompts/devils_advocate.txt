@@ -17,6 +17,13 @@ CHALLENGE 1 — MACRO / COMPANY RISK:
 CHALLENGE 2 — TRANSACTION COST STRESS TEST:
   Using the entry price from the Trade Envelope, calculate total IHSG round-trip costs:
 
+  Required source:
+  • Use the Python Ground Truth trade envelope block.
+  • Use Entry Midpoint as the entry price.
+  • Use Target Price as the target.
+  • Projected target return% MUST equal Expected Return From Entry Midpoint.
+  • DO NOT use fair value upside, valuation gap, or current-to-fair-value return.
+
   Cost components (all as % of position value at entry):
   • Buy commission  : 0.15%
   • Sell commission : 0.25%

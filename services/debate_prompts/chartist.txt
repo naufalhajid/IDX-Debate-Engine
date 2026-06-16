@@ -49,5 +49,11 @@ CONSTRAINTS:
   • Max 2500 tokens. Write 3-4 compact technical paragraphs -- DO NOT pad for length.
 
 OUTPUT FORMAT:
-Position: NEUTRAL
+Position: BULLISH | NEUTRAL | BEARISH
+(Select one that matches your technical conclusion above:
+ BULLISH — ma200_context ABOVE or CROSSOVER_RECENT, price structure constructive,
+            RSI not overbought (< 70), volume confirming.
+ BEARISH — ma200_context BELOW, price making lower highs, momentum deteriorating.
+ NEUTRAL — conflicting signals, ma200_context INSUFFICIENT_DATA, or counter-trend
+            setup where directional bias is unclear.)
 Agent Confidence: 0.xx
