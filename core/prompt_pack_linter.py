@@ -11,7 +11,24 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-EXEMPT_PROMPTS = {"CONSENSUS_PROMPT", "STATE_CLEANER_PROMPT"}
+# JSON-only contracts: never receive AGENT_SIGNAL_PROMPT at the debate_chamber.py
+# call site, so they carry neither a Position: nor an Agent Confidence: footer.
+EXEMPT_PROMPTS = {
+    "CONSENSUS_PROMPT",
+    "STATE_CLEANER_PROMPT",
+    "SENTIMENT_PROMPT",
+    "CIO_SYSTEM_PROMPT",
+}
+
+# Bull/Bear debate rounds keep a static "Debate Confidence:" footer by design and
+# get "Agent Confidence:" appended at runtime via AGENT_SIGNAL_PROMPT — so the
+# static file legitimately lacks the literal marker. Position: is still required.
+EXEMPT_AGENT_CONFIDENCE_MARKER = {
+    "BULL_SYSTEM_PROMPT_R1",
+    "BULL_SYSTEM_PROMPT_R2",
+    "BEAR_SYSTEM_PROMPT_R1",
+    "BEAR_SYSTEM_PROMPT_R2",
+}
 
 
 class LintReport(BaseModel):
@@ -184,7 +201,10 @@ def _lint_prompt_file(
             errors.append(
                 f"Prompt file for {prompt_name} is missing required marker: Position:"
             )
-        if "Agent Confidence:" not in content:
+        if (
+            prompt_name not in EXEMPT_AGENT_CONFIDENCE_MARKER
+            and "Agent Confidence:" not in content
+        ):
             errors.append(
                 f"Prompt file for {prompt_name} is missing required marker: Agent Confidence:"
             )
