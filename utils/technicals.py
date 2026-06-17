@@ -8,6 +8,21 @@ never need to calculate them — they only interpret.
 import math
 import pandas as pd
 
+# Stop-loss ATR multiplier keyed on core.regime.RegimeType ("DEFENSIVE", "RECOVERY",
+# "HIGH", "NORMAL", "LOW"). Values are deliberately unchanged from the pre-fix
+# behavior (DEFENSIVE=3.0, everything else fell through to the 2.5 default) — this
+# only makes the existing fallback explicit and correct for the real regime
+# taxonomy. Differentiating RECOVERY/HIGH/LOW from NORMAL is a separate,
+# evidence-gated calibration decision, not bundled here.
+REGIME_ATR_STOP_MULTIPLIER: dict[str, float] = {
+    "LOW": 2.5,
+    "NORMAL": 2.5,
+    "HIGH": 2.5,
+    "RECOVERY": 2.5,
+    "DEFENSIVE": 3.0,
+}
+REGIME_ATR_STOP_MULTIPLIER_DEFAULT: float = 2.5
+
 
 def compute_rsi(data: pd.Series, window: int = 14) -> pd.Series:
     """Wilder's RSI using Exponential Moving Average.

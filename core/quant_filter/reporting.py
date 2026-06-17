@@ -4,6 +4,7 @@ from datetime import datetime
 
 import pandas as pd
 
+from core.quant_filter.config import FINANCIAL_SECTORS
 from utils.exdate_scanner import ExDateInfo, format_exdate_block
 
 
@@ -94,9 +95,15 @@ def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
     lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
 
     for i, (_, r) in enumerate(final_df.iterrows(), 1):
+        is_financial = r.get("Sektor Key") in FINANCIAL_SECTORS
         graham_bear = r.get("Graham_Bear")
         graham_bull = r.get("Graham_Bull")
-        if (
+        if is_financial:
+            # Val_Score for these sectors comes from PBV-vs-benchmark, not Graham —
+            # showing a Graham FV/gap here would cite a methodology the score
+            # didn't actually use.
+            fv_str = "N/A (PBV-based)"
+        elif (
             r["Est. Fair Value (Graham)"] > 0
             and graham_bear is not None
             and graham_bull is not None
@@ -106,6 +113,7 @@ def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
             fv_str = f"Rp {float(graham_bear):,.0f} – Rp {float(graham_bull):,.0f}"
         else:
             fv_str = "N/A"
+        gap_str = "N/A" if is_financial else f"+{r['Valuation Gap (%)']:.1f}%"
         exdate_icon = " ⚠️" if r["ExDate Risk"] == "WARNING" else ""
         ex_src = f" [{r.get('ExDate Source', '?')}]" if r.get("ExDate Source") else ""
         piotroski_icon = (
@@ -123,7 +131,7 @@ def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
             f"| **Rp {r['Stop Loss Level']:,.0f}** "
             f"| {fv_str} "
             f"| **{r['Composite Score']:.1f}/100** "
-            f"| +{r['Valuation Gap (%)']:.1f}% "
+            f"| {gap_str} "
             f"| {r['RSI (14)']:.1f} "
             f"| {_format_signed_pct(r, 'price_return_1m')} "
             f"| {_format_signed_pct(r, 'rs_vs_ihsg_1m')} "
@@ -185,11 +193,19 @@ def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
             f"berdasarkan multi-factor swing strategy."
         )
         lines.append("")
-        lines.append(
-            f"- **Valuation MoS**: Diskon **{top1['Valuation Gap (%)']:.1f}%** "
-            f"terhadap Graham Fair Value. "
-            f"PBV saat ini {top1['PBV']:.1f}× — **{top1['PBV vs Sektor']}** vs sektor."
-        )
+        if top1.get("Sektor Key") in FINANCIAL_SECTORS:
+            lines.append(
+                f"- **Valuation MoS**: Sektor finansial dinilai relatif terhadap "
+                f"benchmark PBV sektor, bukan Graham Number. PBV saat ini "
+                f"{top1['PBV']:.1f}× — **{top1['PBV vs Sektor']}** vs sektor "
+                f"(persentil sektor {top1.get('PBV Sektor Percentile', 'N/A')}%)."
+            )
+        else:
+            lines.append(
+                f"- **Valuation MoS**: Diskon **{top1['Valuation Gap (%)']:.1f}%** "
+                f"terhadap Graham Fair Value. "
+                f"PBV saat ini {top1['PBV']:.1f}× — **{top1['PBV vs Sektor']}** vs sektor."
+            )
         lines.append(
             f"- **Quality**: Piotroski F-Score **{top1.get('Piotroski F-Score', 'N/A')}/9** | "
             f"Altman Z **{top1.get('Altman Z-Score', 'N/A')}**"

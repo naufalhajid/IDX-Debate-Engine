@@ -83,7 +83,14 @@ from utils.market_data_cache import (
     prefetch_market_data,
     scan_exdate_from_market_data,
 )
-from utils.technicals import compute_atr, compute_rsi, compute_swing_low, snap_to_tick
+from utils.technicals import (
+    REGIME_ATR_STOP_MULTIPLIER,
+    REGIME_ATR_STOP_MULTIPLIER_DEFAULT,
+    compute_atr,
+    compute_rsi,
+    compute_swing_low,
+    snap_to_tick,
+)
 from utils.trade_math import calculate_rr
 
 
@@ -186,7 +193,7 @@ def _state_metadata(state: DebateChamberState) -> dict:
 
 
 def _extract_regime_str(market_regime: Any) -> str:
-    """Extract the regime string ("DEFENSIVE"/"NEUTRAL"/"BULLISH") from a market_regime payload."""
+    """Extract the regime string ("DEFENSIVE"/"RECOVERY"/"HIGH"/"NORMAL"/"LOW") from a market_regime payload."""
     if isinstance(market_regime, dict):
         return str(market_regime.get("regime", "")).upper()
     return str(market_regime or "").upper()
@@ -3490,9 +3497,8 @@ Current Date (Asia/Jakarta): {current_date}
         entry_mid = (entry_low + entry_high) / 2
 
         # Stop loss with buffer and hard floor — ATR multiplier scaled by market regime
-        _regime_atr_multiplier = {"BULLISH": 2.0, "NEUTRAL": 2.5, "DEFENSIVE": 3.0}
-        _regime_key = str(tech.get("regime", "NEUTRAL")).upper()
-        k_atr = _regime_atr_multiplier.get(_regime_key, 2.5)
+        _regime_key = str(tech.get("regime", "NORMAL")).upper()
+        k_atr = REGIME_ATR_STOP_MULTIPLIER.get(_regime_key, REGIME_ATR_STOP_MULTIPLIER_DEFAULT)
 
         if atr14 > 0 and sma20 > 0:
             swing_low = min(

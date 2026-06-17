@@ -8,7 +8,10 @@ from pathlib import Path
 
 from core.settings import settings
 
-MAX_XLSX_AGE_TRADING_DAYS = 3
+# Calendar days, not trading days — over the weekend a Friday file already
+# reads as 2-3 days old, so this fires earlier than "N trading days" would.
+# That's the safe direction (warns sooner, never later), kept as-is.
+MAX_XLSX_AGE_CALENDAR_DAYS = 3
 
 
 def _find_latest_xlsx(output_dir: str = "output") -> str:
@@ -33,9 +36,9 @@ def _find_latest_xlsx(output_dir: str = "output") -> str:
     # Ambil yang terbaru (sort by nama file — tanggal ada di nama)
     latest = Path(sorted(found, reverse=True)[0])
     age_days = (datetime.now() - datetime.fromtimestamp(latest.stat().st_mtime)).days
-    if age_days > MAX_XLSX_AGE_TRADING_DAYS:
+    if age_days > MAX_XLSX_AGE_CALENDAR_DAYS:
         warnings.warn(
-            f"[Screener] XLSX is {age_days} days old (>{MAX_XLSX_AGE_TRADING_DAYS}d threshold). "
+            f"[Screener] XLSX is {age_days} days old (>{MAX_XLSX_AGE_CALENDAR_DAYS}d threshold). "
             f"Fundamental data may be stale. File: {latest.name}",
             stacklevel=2,
         )
@@ -95,6 +98,14 @@ CONFIG = {
     "yf_period": "120d",
     "yf_retries": 3,
     "yf_retry_delay": 5,
+    # IHSG-only lookback for self-computed market regime (needs ~200 trading days
+    # for MA200 — same default core.regime.fetch_ihsg_ohlcv() uses). Does not
+    # affect per-ticker downloads above, which stay at yf_period.
+    "ihsg_regime_period": "320d",
+    # Optional override: set to a RegimeType string ("DEFENSIVE"/"RECOVERY"/"HIGH"/
+    # "NORMAL"/"LOW") to skip self-computation, e.g. when the orchestrator already
+    # has a fresh snapshot. None (default) means the screener computes its own.
+    "regime": None,
     # ── Liquidity Gate
     "min_adt_20d": 10_000_000_000,   # Rp 10B — still 2x original, opens mid-caps
     "max_atr_pct": 0.05,             # 5% — IDX mid-caps naturally more volatile
@@ -114,8 +125,10 @@ CONFIG = {
     "rsi_accum_hi": 55,
     "rsi_strong_hi": 70,
     # ── Stop Loss
+    # ATR multiplier for the price-anchored candidate is now regime-scaled — see
+    # utils.technicals.REGIME_ATR_STOP_MULTIPLIER (shared with debate_chamber's
+    # authoritative trade envelope) instead of a flat value here.
     "stop_atr_from_sma20": 1.0,
-    "stop_atr_from_price": 2.5,
     "stop_hard_floor_pct": 0.88,
     # ── Score Weights (total = 100)
     # [NOTE] Hybrid quant-technical scoring optimized for swing trading:
@@ -211,6 +224,12 @@ def canonical_screener_mode(value: str | None) -> str:
 # ══════════════════════════════════════════════════════════════════════════════
 # ── SECTOR MAP — IDX Industry Classification (IDXIC) ─────────────────────────
 # ══════════════════════════════════════════════════════════════════════════════
+
+# Sectors excluded from Graham Number valuation (the formula assumes a
+# non-financial balance sheet) — scored by PBV-vs-sector-benchmark instead.
+# Shared by pipeline.py's _compute_val_score and reporting.py / CLI tables so
+# Graham FV/gap is never displayed for a ticker whose score didn't come from it.
+FINANCIAL_SECTORS = ("bank", "finance_nonbank")
 
 SECTOR_PBV_BENCHMARK = {
     "energy": {"label": "Energi", "fair_lo": 0.8, "fair_hi": 2.5},
@@ -456,6 +475,7 @@ NAME_SECTOR_KEYWORDS: list[tuple[list[str], str]] = [
 
 __all__ = [
     "CONFIG",
+    "FINANCIAL_SECTORS",
     "NAME_SECTOR_KEYWORDS",
     "SECTOR_PBV_BENCHMARK",
     "TICKER_SECTOR_HARDCODE",

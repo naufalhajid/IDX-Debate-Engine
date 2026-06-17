@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING, Any
 from rich.table import Table
 from rich.text import Text
 
+from core.quant_filter.config import FINANCIAL_SECTORS
+
 if TYPE_CHECKING:
     import pandas as pd
 
@@ -121,6 +123,7 @@ def build_filter_results_table(df: "pd.DataFrame", top_n: int = 10) -> Table:
         strategy = str(row.get("Entry Strategy") or "")[:50]
         piotroski = int(_safe_float(row.get("Piotroski F-Score"), 0))
         sector_label = str(row.get("Sektor Key") or row.get("Sektor") or "")
+        is_financial = row.get("Sektor Key") in FINANCIAL_SECTORS
 
         # Score
         if score >= 70:
@@ -133,14 +136,19 @@ def build_filter_results_table(df: "pd.DataFrame", top_n: int = 10) -> Table:
         # Price
         price_text = f"Rp{price:,.0f}" if price else "—"
 
-        # Graham FV
-        if graham_fv and graham_fv > 0:
+        # Graham FV — bank/finance_nonbank are scored by PBV-vs-benchmark, not
+        # Graham, so showing a Graham number here would cite an unused methodology.
+        if is_financial:
+            graham_text = "PBV-based"
+        elif graham_fv and graham_fv > 0:
             graham_text = f"Rp{graham_fv:,.0f}"
         else:
             graham_text = "—"
 
         # Upside% (always >= 0 — clipped in pipeline)
-        if upside >= 50:
+        if is_financial:
+            upside_text = Text("N/A", style="idx.muted")
+        elif upside >= 50:
             upside_text = Text(f"+{upside:.1f}%", style="idx.bull")
         elif upside >= 20:
             upside_text = Text(f"+{upside:.1f}%", style="bold green")

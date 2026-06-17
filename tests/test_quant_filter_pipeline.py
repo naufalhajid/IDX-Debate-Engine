@@ -9,7 +9,8 @@ import pandas as pd
 import pytest
 
 from core.quant_filter import pipeline
-from core.quant_filter.config import CONFIG
+from core.quant_filter.config import CONFIG, SECTOR_PBV_BENCHMARK
+from core.quant_filter.reporting import _build_markdown_report
 from utils.technicals import snap_to_tick
 
 
@@ -75,6 +76,24 @@ def _stub_indicators(monkeypatch: pytest.MonkeyPatch) -> None:
         pipeline,
         "compute_atr",
         lambda high, low, close: pd.Series([5.0] * len(close), index=close.index),
+    )
+
+
+def _breakout_frame() -> pd.DataFrame:
+    """Flat base then a sharp recent breakout, so price sits far above its own
+    SMA20 — needed so the ATR-price-anchored stop candidate (which scales with
+    regime) dominates the SMA20-anchored candidate (which doesn't), making the
+    regime multiplier actually visible in the final stop-loss value."""
+    base = [100.0] * 40
+    rise = [100 + 6 * i for i in range(1, 21)]  # 106 -> 220 over the last 20 bars
+    close = pd.Series(base + rise, dtype=float)
+    return pd.DataFrame(
+        {
+            "Close": close,
+            "Volume": pd.Series([1_000_000.0] * 60),
+            "High": close + 2,
+            "Low": close - 2,
+        }
     )
 
 
@@ -171,6 +190,42 @@ def test_analyze_ticker_applies_piotroski_bonus_and_penalty(monkeypatch):
     assert strong["Composite Score"] == pytest.approx(weak["Composite Score"] + 10)
     assert "F-Score Kuat (8/9)" in strong["Entry Strategy"]
     assert "F-Score Lemah (4/9)" in weak["Entry Strategy"]
+
+
+def test_analyze_ticker_defensive_regime_widens_stop(monkeypatch):
+    """DEFENSIVE regime (3.0x ATR) must produce a lower (wider-buffer) stop than NORMAL (2.5x)."""
+    _stub_indicators(monkeypatch)
+    cfg = _analysis_cfg()
+    logger = logging.getLogger("test.quant_filter.regime_stop")
+
+    normal_result = pipeline._analyze_ticker(
+        _analysis_row(), _breakout_frame(), cfg, logger, regime="NORMAL"
+    )
+    defensive_result = pipeline._analyze_ticker(
+        _analysis_row(), _breakout_frame(), cfg, logger, regime="DEFENSIVE"
+    )
+
+    assert normal_result is not None
+    assert defensive_result is not None
+    assert defensive_result["Stop Loss Level"] < normal_result["Stop Loss Level"]
+
+
+def test_analyze_ticker_unknown_regime_label_falls_back_to_default(monkeypatch):
+    """An unrecognized regime label falls back to the 2.5x default, not an error."""
+    _stub_indicators(monkeypatch)
+    cfg = _analysis_cfg()
+    logger = logging.getLogger("test.quant_filter.regime_fallback")
+
+    normal_result = pipeline._analyze_ticker(
+        _analysis_row(), _market_frame(), cfg, logger, regime="NORMAL"
+    )
+    unknown_result = pipeline._analyze_ticker(
+        _analysis_row(), _market_frame(), cfg, logger, regime="BULLISH"
+    )
+
+    assert normal_result is not None
+    assert unknown_result is not None
+    assert unknown_result["Stop Loss Level"] == normal_result["Stop Loss Level"]
 
 
 def test_analyze_ticker_preserves_altman_z_score(monkeypatch):
@@ -270,6 +325,88 @@ def test_price_path_records_ticker_analysis_exception(
     assert failures[0]["stage"] == "ticker_analysis"
     assert failures[0]["failure_type"] == "KeyError"
     assert "raw_data" in failures[0]["reason"]
+
+
+def test_markdown_report_shows_pbv_based_for_financial_sector(monkeypatch):
+    """_build_markdown_report must not cite Graham FV/gap for bank/finance_nonbank rows."""
+    _stub_indicators(monkeypatch)
+    cfg = _analysis_cfg()
+    logger = logging.getLogger("test.quant_filter.report_financial")
+
+    bank_result = pipeline._analyze_ticker(
+        _analysis_row(Sector="bank"), _market_frame(), cfg, logger
+    )
+    assert bank_result is not None
+
+    report = _build_markdown_report(pd.DataFrame([bank_result]), cfg)
+
+    assert "PBV-based" in report
+    assert "terhadap Graham Fair Value" not in report
+
+
+def test_compute_val_score_non_financial_gap_tiers():
+    """Non-financial sectors score Val_Score from the absolute Graham gap tiers."""
+    cfg = _analysis_cfg()
+    w = cfg["weight_valuation"]
+
+    tier1 = pipeline._compute_val_score(
+        pd.Series({"Sector": "default", "Valuation_Gap_Pct": 60.0}), cfg
+    )
+    tier2 = pipeline._compute_val_score(
+        pd.Series({"Sector": "default", "Valuation_Gap_Pct": 25.0}), cfg
+    )
+    tier3 = pipeline._compute_val_score(
+        pd.Series({"Sector": "default", "Valuation_Gap_Pct": 10.0}), cfg
+    )
+    tier4 = pipeline._compute_val_score(
+        pd.Series({"Sector": "default", "Valuation_Gap_Pct": 2.0}), cfg
+    )
+
+    assert tier1 == pytest.approx(w * 1.00)
+    assert tier2 == pytest.approx(w * 0.70)
+    assert tier3 == pytest.approx(w * 0.40)
+    assert tier4 == pytest.approx(w * 0.10)
+
+
+def test_compute_val_score_bank_sector_uses_pbv_relative():
+    """Bank/finance_nonbank sectors score Val_Score from PBV vs sector benchmark, not Graham."""
+    cfg = _analysis_cfg()
+    w = cfg["weight_valuation"]
+    fair_lo = SECTOR_PBV_BENCHMARK["bank"]["fair_lo"]
+
+    zero_pbv = pipeline._compute_val_score(
+        pd.Series({"Sector": "bank", "Current Price to Book Value": 0.0}), cfg
+    )
+    very_cheap = pipeline._compute_val_score(
+        pd.Series({"Sector": "bank", "Current Price to Book Value": fair_lo * 0.50}), cfg
+    )
+    cheap = pipeline._compute_val_score(
+        pd.Series({"Sector": "bank", "Current Price to Book Value": fair_lo * 0.80}), cfg
+    )
+    fair = pipeline._compute_val_score(
+        pd.Series({"Sector": "bank", "Current Price to Book Value": fair_lo * 0.95}), cfg
+    )
+    expensive = pipeline._compute_val_score(
+        pd.Series({"Sector": "bank", "Current Price to Book Value": fair_lo * 1.50}), cfg
+    )
+
+    assert zero_pbv == pytest.approx(w * 0.10)
+    assert very_cheap == pytest.approx(w * 1.00)
+    assert cheap == pytest.approx(w * 0.70)
+    assert fair == pytest.approx(w * 0.40)
+    assert expensive == pytest.approx(w * 0.10)
+
+
+def test_compute_prof_score_roe_tiers():
+    """Prof_Score follows the absolute ROE tiers; non-positive ROE scores 0."""
+    cfg = _analysis_cfg()
+    w = cfg["weight_profitability"]
+
+    assert pipeline._compute_prof_score(0.0, cfg) == 0.0
+    assert pipeline._compute_prof_score(-0.05, cfg) == 0.0
+    assert pipeline._compute_prof_score(0.30, cfg) == pytest.approx(w * 1.00)
+    assert pipeline._compute_prof_score(0.20, cfg) == pytest.approx(w * 0.70)
+    assert pipeline._compute_prof_score(0.12, cfg) == pytest.approx(w * 0.40)
 
 
 @pytest.mark.parametrize(

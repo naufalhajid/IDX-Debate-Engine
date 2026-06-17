@@ -4,9 +4,10 @@ import time
 import types
 from pathlib import Path
 
+import pandas as pd
 from rich.console import Console
 
-from app.cli.ui.tables import build_verdict_summary_table
+from app.cli.ui.tables import build_filter_results_table, build_verdict_summary_table
 from core.dependency_validator import DependencyCheck, DependencyCheckResult
 
 sys.modules.setdefault("yfinance", types.SimpleNamespace())
@@ -20,6 +21,49 @@ InteractiveCLI = legacy.InteractiveCLI
 
 def _recording_console(width: int = 120) -> Console:
     return Console(record=True, width=width, theme=legacy._CLI_THEME)
+
+
+def test_filter_results_table_shows_pbv_based_for_financial_sector() -> None:
+    """Bank/finance_nonbank rows must not display a Graham FV/upside they didn't earn."""
+    df = pd.DataFrame(
+        [
+            {
+                "Ticker": "BBCA",
+                "Sektor Key": "bank",
+                "Sektor": "Perbankan",
+                "Composite Score": 65.0,
+                "Current Price": 9000.0,
+                "Est. Fair Value (Graham)": 12000.0,
+                "Valuation Gap (%)": 33.0,
+                "RSI (14)": 55.0,
+                "ExDate Risk": "CLEAR",
+                "Entry Strategy": "RSI Akumulasi",
+                "Piotroski F-Score": 7,
+            },
+            {
+                "Ticker": "TLKM",
+                "Sektor Key": "tech",
+                "Sektor": "Teknologi",
+                "Composite Score": 60.0,
+                "Current Price": 3000.0,
+                "Est. Fair Value (Graham)": 3600.0,
+                "Valuation Gap (%)": 20.0,
+                "RSI (14)": 50.0,
+                "ExDate Risk": "CLEAR",
+                "Entry Strategy": "RSI Uptrend",
+                "Piotroski F-Score": 6,
+            },
+        ]
+    )
+
+    table = build_filter_results_table(df, top_n=10)
+    console = _recording_console(width=160)
+    console.print(table)
+    output = console.export_text()
+
+    assert "PBV-based" in output
+    assert "Rp3,600" in output
+    assert "+33.0%" not in output
 
 
 def test_cli_alerts_are_buffered_until_execution_warning_block() -> None:

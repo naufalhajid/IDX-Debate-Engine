@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 
 from core.quant_filter.config import (
+    FINANCIAL_SECTORS,
     NAME_SECTOR_KEYWORDS,
     SECTOR_PBV_BENCHMARK,
     TICKER_SECTOR_HARDCODE,
@@ -18,6 +19,8 @@ from core.quant_filter.config import (
     canonical_screener_mode,
 )
 from core.quant_filter.reporting import _build_markdown_report
+from core.regime import compute_ihsg_snapshot
+from core.settings import settings
 from utils.exdate_scanner import (
     CRITICAL_WINDOW_DAYS,
     ExDateInfo,
@@ -25,7 +28,13 @@ from utils.exdate_scanner import (
     scan_exdate,
 )
 from utils.logger_config import logger
-from utils.technicals import compute_atr, compute_rsi, snap_to_tick
+from utils.technicals import (
+    REGIME_ATR_STOP_MULTIPLIER,
+    REGIME_ATR_STOP_MULTIPLIER_DEFAULT,
+    compute_atr,
+    compute_rsi,
+    snap_to_tick,
+)
 
 try:
     from utils.xlsx_adapter import XlsxDataAdapter
@@ -280,6 +289,7 @@ def _analyze_ticker(
     cfg: dict,
     logger: logging.Logger,
     ihsg_return_1m: float = 0.0,
+    regime: str = "NORMAL",
     adapter: "XlsxDataAdapter | None" = None,
 ) -> dict | None:
     """
@@ -303,19 +313,13 @@ def _analyze_ticker(
         return None
 
     current_px: float = float(close.iloc[-1])
-    sector_key = str(row.get("sektor_key", row.get("Sector", "default")) or "default")
+    # DER is already enforced by the static filter in run_pipeline() before any
+    # row reaches this function (df["Debt to Equity Ratio (Quarter)"] <=
+    # df["Max_DER_Allowed"]) — max_der is kept here only for the "max_der_allowed"
+    # display field below, not as a second gate.
+    sector_key = str(row.get("Sector", "default") or "default")
     max_der_map = cfg["max_der_by_sector"]
     max_der = float(max_der_map.get(sector_key, max_der_map["default"]))
-    der_raw = row.get("Debt to Equity Ratio (Quarter)")
-    try:
-        der = None if der_raw is None or pd.isna(der_raw) else float(der_raw)
-    except (TypeError, ValueError):
-        der = None
-    if der is not None and der > max_der:
-        logger.debug(
-            f"[{t}] DER {der:.2f} > sector cap {max_der:.2f} ({sector_key}), skip"
-        )
-        return None
 
     price_mom_period = int(cfg.get("price_mom_period_days", 22))
 
@@ -584,7 +588,12 @@ def _analyze_ticker(
     total_score = max(0.0, min(total_score, 100.0))
 
     # ── Stop Loss (ATR-based + BEI tick size) ─────────────────────────────────
-    stop_candidate_2 = current_px - (cfg["stop_atr_from_price"] * atr_14)
+    # Regime-scaled ATR multiplier — same constant debate_chamber's authoritative
+    # trade envelope uses, so the screener's preview matches what actually trades.
+    stop_atr_mult = REGIME_ATR_STOP_MULTIPLIER.get(
+        str(regime).upper(), REGIME_ATR_STOP_MULTIPLIER_DEFAULT
+    )
+    stop_candidate_2 = current_px - (stop_atr_mult * atr_14)
     if mode == "mean_reversion":
         # Mean-reversion candidates are below SMA20 by design, so an
         # SMA20-anchored stop would sit ABOVE entry. Anchor below current price.
@@ -651,6 +660,59 @@ def _analyze_ticker(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# ── SCORING HELPERS ───────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+
+# [v3.1 FIX] Absolute threshold-based Val_Score — tidak lagi rank(pct=True).
+# Rank relatif membuat saham mediocre dapat score tinggi jika universe sedang
+# penuh saham jelek. Score absolut mencerminkan kualitas saham itu sendiri.
+#
+# Sektor bank dan finance_nonbank dikecualikan dari Graham Number karena
+# formula Graham dirancang untuk non-finansial. Untuk bank/finance,
+# digunakan PBV relatif vs benchmark sektor sebagai proxy valuasi.
+def _compute_val_score(row: pd.Series, cfg: dict) -> float:
+    sector = row.get("Sector", "default")
+    w = cfg["weight_valuation"]
+
+    if sector in FINANCIAL_SECTORS:
+        # Untuk sektor finansial: gunakan PBV vs sektor benchmark
+        pbv = float(row.get("Current Price to Book Value", 0) or 0)
+        bench = SECTOR_PBV_BENCHMARK.get(sector, SECTOR_PBV_BENCHMARK["default"])
+        fair_lo = bench["fair_lo"]
+        if pbv <= 0:
+            return w * 0.10
+        if pbv < fair_lo * 0.70:  # sangat murah vs benchmark sektor
+            return w * 1.00
+        if pbv < fair_lo * 0.90:
+            return w * 0.70
+        if pbv <= fair_lo:
+            return w * 0.40
+        return w * 0.10  # di atas fair_lo = tidak menarik
+
+    # Non-finansial: Graham-based gap
+    gap = float(row.get("Valuation_Gap_Pct", 0) or 0)
+    if gap >= cfg["val_tier1_gap"]:
+        return w * 1.00
+    if gap >= cfg["val_tier2_gap"]:
+        return w * 0.70
+    if gap >= cfg["val_tier3_gap"]:
+        return w * 0.40
+    return w * 0.10
+
+
+# [v3.1 FIX] Absolute threshold-based Prof_Score — tidak lagi rank(pct=True).
+def _compute_prof_score(roe: float, cfg: dict) -> float:
+    w = cfg["weight_profitability"]
+    if pd.isna(roe) or roe <= 0:
+        return 0.0
+    if roe >= cfg["prof_roe_tier1"]:
+        return w * 1.00
+    if roe >= cfg["prof_roe_tier2"]:
+        return w * 0.70
+    return w * 0.40  # 10-15% — sudah lolos min_roe gate (10%)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # ── MAIN PIPELINE ─────────────────────────────────────────────────────────────
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -709,6 +771,7 @@ def _safe_analyze_price_candidate(
     ihsg_return_1m: float,
     adapter: "XlsxDataAdapter | None",
     failures: list[dict[str, str]],
+    regime: str = "NORMAL",
 ) -> dict | None:
     ticker = str(row["Ticker"])
     t_yf = f"{ticker}.JK"
@@ -782,6 +845,7 @@ def _safe_analyze_price_candidate(
             cfg,
             logger,
             ihsg_return_1m=ihsg_return_1m,
+            regime=regime,
             adapter=adapter,
         )
     except (KeyError, TypeError, ValueError, IndexError) as exc:
@@ -966,56 +1030,9 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         * 100
     ).clip(lower=0)
 
-    # [v3.1 FIX] Absolute threshold-based Val_Score — tidak lagi rank(pct=True).
-    # Rank relatif membuat saham mediocre dapat score tinggi jika universe sedang
-    # penuh saham jelek. Score absolut mencerminkan kualitas saham itu sendiri.
-    #
-    # Sektor bank dan finance_nonbank dikecualikan dari Graham Number karena
-    # formula Graham dirancang untuk non-finansial. Untuk bank/finance,
-    # digunakan PBV relatif vs benchmark sektor sebagai proxy valuasi.
-    def _compute_val_score(row: pd.Series, cfg: dict) -> float:
-        sector = row.get("Sector", "default")
-        w = cfg["weight_valuation"]
-
-        if sector in ("bank", "finance_nonbank"):
-            # Untuk sektor finansial: gunakan PBV vs sektor benchmark
-            pbv = float(row.get("Current Price to Book Value", 0) or 0)
-            bench = SECTOR_PBV_BENCHMARK.get(sector, SECTOR_PBV_BENCHMARK["default"])
-            fair_lo = bench["fair_lo"]
-            if pbv <= 0:
-                return w * 0.10
-            if pbv < fair_lo * 0.70:  # sangat murah vs benchmark sektor
-                return w * 1.00
-            if pbv < fair_lo * 0.90:
-                return w * 0.70
-            if pbv <= fair_lo:
-                return w * 0.40
-            return w * 0.10  # di atas fair_lo = tidak menarik
-
-        # Non-finansial: Graham-based gap
-        gap = float(row.get("Valuation_Gap_Pct", 0) or 0)
-        if gap >= cfg["val_tier1_gap"]:
-            return w * 1.00
-        if gap >= cfg["val_tier2_gap"]:
-            return w * 0.70
-        if gap >= cfg["val_tier3_gap"]:
-            return w * 0.40
-        return w * 0.10
-
     filtered["Val_Score"] = filtered.apply(lambda r: _compute_val_score(r, cfg), axis=1)
 
     # ── 5. PROFITABILITY SCORING ──────────────────────────────────────────────
-    # [v3.1 FIX] Absolute threshold-based Prof_Score — tidak lagi rank(pct=True).
-    def _compute_prof_score(roe: float, cfg: dict) -> float:
-        w = cfg["weight_profitability"]
-        if pd.isna(roe) or roe <= 0:
-            return 0.0
-        if roe >= cfg["prof_roe_tier1"]:
-            return w * 1.00
-        if roe >= cfg["prof_roe_tier2"]:
-            return w * 0.70
-        return w * 0.40  # 10-15% — sudah lolos min_roe gate (10%)
-
     filtered["Prof_Score"] = filtered["Return on Equity (TTM)"].apply(
         lambda r: _compute_prof_score(r, cfg)
     )
@@ -1035,9 +1052,13 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
     ihsg_close = None
     ihsg_return_1m: float = 0.0
     try:
+        # Wider lookback than cfg["yf_period"] (which only needs to cover the
+        # per-ticker technicals) — compute_ihsg_snapshot() needs ~200 trading days
+        # for its MA200 defensive check. Only this single-symbol IHSG download is
+        # widened; per-ticker downloads above are untouched.
         ihsg_data = _get_yfinance().download(
             "^JKSE",
-            period=cfg["yf_period"],
+            period=cfg.get("ihsg_regime_period", "320d"),
             progress=False,
             auto_adjust=True,
         )
@@ -1068,6 +1089,29 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         logger.warning(f"Gagal ambil return IHSG 1 bulan, fallback 0.0: {e}")
         ihsg_return_1m = 0.0
 
+    # ── Regime — self-computed so the screener works standalone (no orchestrator) ──
+    regime: str = str(cfg.get("regime") or "").upper()
+    if not regime:
+        try:
+            if ihsg_close is None or ihsg_close.empty:
+                raise ValueError("IHSG close series tidak tersedia untuk regime.")
+            regime_snapshot = compute_ihsg_snapshot(
+                pd.DataFrame({"Close": ihsg_close}),
+                lookback_days=settings.REGIME_VOLATILITY_LOOKBACK_DAYS,
+                high_threshold=settings.REGIME_VOLATILITY_HIGH_THRESHOLD,
+                low_threshold=settings.REGIME_VOLATILITY_LOW_THRESHOLD,
+                defensive_weekly_drop_threshold=settings.REGIME_DEFENSIVE_WEEKLY_DROP_THRESHOLD,
+                recovery_weekly_threshold=settings.REGIME_HIGH_RECOVERY_WEEKLY_THRESHOLD,
+            )
+            regime = regime_snapshot.regime
+            logger.info(
+                f"[Regime] Screener self-computed regime: {regime} "
+                f"(reasons={','.join(regime_snapshot.reasons) or '-'})"
+            )
+        except (ValueError, KeyError, IndexError) as e:
+            logger.warning(f"Gagal hitung regime, fallback NORMAL: {e}")
+            regime = "NORMAL"
+
     results = []
     price_failures: list[dict[str, str]] = []
     for _, row in filtered.iterrows():
@@ -1078,6 +1122,7 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
             logger=logger,
             ihsg_close=ihsg_close,
             ihsg_return_1m=ihsg_return_1m,
+            regime=regime,
             adapter=adapter,
             failures=price_failures,
         )
