@@ -22,6 +22,7 @@ def _market_frame() -> pd.DataFrame:
     close = pd.Series([100 + (20 * i / 59) for i in range(60)], dtype=float)
     return pd.DataFrame(
         {
+            "Open": close - 1,
             "Close": close,
             "Volume": pd.Series([1_000_000.0] * 60),
             "High": close + 2,
@@ -89,6 +90,7 @@ def _breakout_frame() -> pd.DataFrame:
     close = pd.Series(base + rise, dtype=float)
     return pd.DataFrame(
         {
+            "Open": close - 1,
             "Close": close,
             "Volume": pd.Series([1_000_000.0] * 60),
             "High": close + 2,
@@ -105,6 +107,7 @@ def _pullback_frame() -> pd.DataFrame:
     close = pd.Series(rise + drop, dtype=float)
     return pd.DataFrame(
         {
+            "Open": close - 1,
             "Close": close,
             "Volume": pd.Series([1_000_000.0] * 60),
             "High": close + 2,
@@ -443,3 +446,113 @@ def test_canonical_screener_mode(value, expected):
     from core.quant_filter.config import canonical_screener_mode
 
     assert canonical_screener_mode(value) == expected
+
+
+# ── Task 28: S1-4 field integration + Task 29: validate_ohlcv ────────────────
+
+
+def test_validate_ohlcv_rejects_none():
+    from utils.technicals import validate_ohlcv
+    ok, reason = validate_ohlcv(None, "BBCA")
+    assert not ok
+    assert "None" in reason
+
+
+def test_validate_ohlcv_rejects_empty_df():
+    from utils.technicals import validate_ohlcv
+    ok, reason = validate_ohlcv(pd.DataFrame(), "BBCA")
+    assert not ok
+
+
+def test_validate_ohlcv_rejects_too_few_rows():
+    from utils.technicals import validate_ohlcv
+    df = pd.DataFrame({
+        "Close": [100.0] * 5,
+        "High": [102.0] * 5,
+        "Low": [98.0] * 5,
+        "Volume": [1_000_000.0] * 5,
+    })
+    ok, reason = validate_ohlcv(df, "TEST", min_rows=30)
+    assert not ok
+    assert "rows" in reason
+
+
+def test_validate_ohlcv_rejects_all_nan_close():
+    from utils.technicals import validate_ohlcv
+    df = pd.DataFrame({
+        "Close": [float("nan")] * 35,
+        "High": [102.0] * 35,
+        "Low": [98.0] * 35,
+        "Volume": [1_000_000.0] * 35,
+    })
+    ok, reason = validate_ohlcv(df, "TEST")
+    assert not ok
+    assert "NaN" in reason
+
+
+def test_validate_ohlcv_rejects_all_zero_volume():
+    from utils.technicals import validate_ohlcv
+    df = pd.DataFrame({
+        "Close": [100.0] * 35,
+        "High": [102.0] * 35,
+        "Low": [98.0] * 35,
+        "Volume": [0.0] * 35,
+    })
+    ok, reason = validate_ohlcv(df, "TEST")
+    assert not ok
+    assert "zero" in reason.lower()
+
+
+def test_validate_ohlcv_accepts_valid_frame():
+    from utils.technicals import validate_ohlcv
+    ok, reason = validate_ohlcv(_market_frame(), "TEST")
+    assert ok
+    assert reason == ""
+
+
+def test_analyze_ticker_returns_s1_s4_fields(monkeypatch):
+    """S1-4 fields (is_lq45, macd, bb, gap, compression) all present in _analyze_ticker output."""
+    _stub_indicators(monkeypatch)
+    result = pipeline._analyze_ticker(
+        _analysis_row(Ticker="BBCA"),
+        _market_frame(),
+        _analysis_cfg(),
+        logging.getLogger("test"),
+    )
+    assert result is not None
+    for field in ("is_lq45", "macd_histogram_state", "bb_position", "gap_type", "compression_type"):
+        assert field in result, f"Missing S1-4 field in _analyze_ticker output: {field}"
+    assert result["is_lq45"] is True  # BBCA is in the LQ45 list
+
+
+def test_analyze_ticker_is_lq45_false_for_unknown(monkeypatch):
+    _stub_indicators(monkeypatch)
+    result = pipeline._analyze_ticker(
+        _analysis_row(Ticker="UNKN"),
+        _market_frame(),
+        _analysis_cfg(),
+        logging.getLogger("test"),
+    )
+    assert result is not None
+    assert result["is_lq45"] is False
+
+
+def test_is_lq45_rendered_in_pack_to_prompt_string():
+    """is_lq45 must survive build_context_pack → pack_to_prompt_string (the consumed surface)."""
+    from services.context_pack_builder import build_context_pack, pack_to_prompt_string
+    raw = {
+        "ticker": "BBCA",
+        "price": 10000.0,
+        "fair_value": 9800.0,
+        "is_lq45": True,
+        "rr": 2.5,
+        "rating": "BUY",
+        "confidence": 0.72,
+        "entry_low": 9900.0,
+        "entry_high": 10050.0,
+        "target": 10500.0,
+        "stop": 9700.0,
+    }
+    pack = build_context_pack("BBCA", raw)
+    rendered = pack_to_prompt_string(pack)
+    assert "is_lq45" in rendered

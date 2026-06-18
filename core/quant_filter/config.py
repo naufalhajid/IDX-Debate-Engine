@@ -469,6 +469,32 @@ NAME_SECTOR_KEYWORDS: list[tuple[list[str], str]] = [
 ]
 
 
+# ── Task 6: Free Float Estimates ─────────────────────────────────────────────
+# Estimates based on public ownership data (KSEI, IDX disclosure, fund filings).
+# Tickers not in this dict are treated as UNKNOWN manipulation risk.
+FREE_FLOAT_ESTIMATES: dict[str, float] = {
+    "BBCA": 0.44,
+    "BBRI": 0.43,
+    "BMRI": 0.40,
+    "TLKM": 0.47,
+    "ASII": 0.50,
+    "UNVR": 0.15,
+    "ICBP": 0.20,
+    "KLBF": 0.40,
+    "ANTM": 0.35,
+    "PTBA": 0.35,
+    "INCO": 0.25,
+    "BREN": 0.05,
+    "DSSA": 0.06,
+    "AMMN": 0.20,
+    "MDKA": 0.30,
+    "GOTO": 0.35,
+}
+
+# Float < 15% → HIGH manipulation risk; < 25% → MEDIUM; else LOW
+FREE_FLOAT_MANIPULATION_THRESHOLD: float = 0.15
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # ── SEKTOR RESOLVER — 4-lapis prioritas ──────────────────────────────────────
 # ══════════════════════════════════════════════════════════════════════════════
@@ -476,6 +502,8 @@ NAME_SECTOR_KEYWORDS: list[tuple[list[str], str]] = [
 __all__ = [
     "CONFIG",
     "FINANCIAL_SECTORS",
+    "FREE_FLOAT_ESTIMATES",
+    "FREE_FLOAT_MANIPULATION_THRESHOLD",
     "NAME_SECTOR_KEYWORDS",
     "SECTOR_PBV_BENCHMARK",
     "TICKER_SECTOR_HARDCODE",

@@ -37,6 +37,7 @@ HARD_REJECT_CODES = {
     "rr_too_low",
     "rr_implausible",
     "insufficient_technical_data",
+    "ara_entry_risk_high",
 }
 
 
@@ -478,6 +479,13 @@ def _verdict_reason_codes(
     if _counter_trend_setup(candidate, verdict):
         reason_codes.append("counter_trend_setup")
 
+    # Task 7: ARA/ARB enforcement
+    arb_code, ara_code = _arb_ara_risk_codes(candidate)
+    if arb_code:
+        reason_codes.append(arb_code)
+    if ara_code:
+        reason_codes.append(ara_code)
+
     return _dedupe(reason_codes)
 
 
@@ -636,6 +644,32 @@ def _counter_trend_setup(
         "DI BAWAH MA200",
     )
     return any(marker in text for marker in counter_trend_markers)
+
+
+def _arb_ara_risk_codes(candidate: dict[str, Any]) -> tuple[str | None, str | None]:
+    """Return (arb_reason_code, ara_reason_code) for ARA/ARB enforcement.
+
+    arb_lock_risk HIGH → soft flag "arb_lock_risk_high" (not a hard reject).
+    ara_entry_risk HIGH → hard reject "ara_entry_risk_high".
+
+    Fields are read from top-level candidate or candidate["metadata"] so the check
+    works both from screener-direct calls and from orchestrator-assembled dicts.
+    Returns (None, None) when the fields are absent (graceful no-op).
+    """
+    metadata = candidate.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        metadata = {}
+
+    arb_lock = str(
+        candidate.get("arb_lock_risk") or metadata.get("arb_lock_risk") or ""
+    ).upper()
+    ara_entry = str(
+        candidate.get("ara_entry_risk") or metadata.get("ara_entry_risk") or ""
+    ).upper()
+
+    arb_code = "arb_lock_risk_high" if arb_lock == "HIGH" else None
+    ara_code = "ara_entry_risk_high" if ara_entry == "HIGH" else None
+    return arb_code, ara_code
 
 
 def _combined_text(candidate: dict[str, Any], verdict: dict[str, Any]) -> str:

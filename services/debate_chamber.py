@@ -87,10 +87,18 @@ from utils.technicals import (
     REGIME_ATR_STOP_MULTIPLIER,
     REGIME_ATR_STOP_MULTIPLIER_DEFAULT,
     compute_atr,
+    compute_bollinger,
+    compute_macd,
     compute_rsi,
     compute_swing_low,
+    detect_candlestick_pattern,
+    detect_gap,
+    detect_rsi_divergence,
+    detect_volatility_compression,
     snap_to_tick,
+    validate_ohlcv,
 )
+from core.quant_filter.pipeline import compute_weekly_trend, fetch_weekly_data
 from utils.trade_math import calculate_rr
 
 
@@ -2309,8 +2317,8 @@ Current Date (Asia/Jakarta): {current_date}
         tech_indicators: dict = {}
         try:
             df_yf = (state.get("market_data") or {}).get("history")
-            if df_yf is not None and len(df_yf) >= 20:
-                # yfinance 1.3.0+ returns MultiIndex columns for single tickers:
+            _ohlcv_ok, _ohlcv_reason = validate_ohlcv(df_yf, ticker=ticker, min_rows=20)
+            if _ohlcv_ok:
                 # ('Close', 'ADRO.JK') — flatten to plain column names
                 if isinstance(df_yf.columns, pd.MultiIndex):
                     df_yf.columns = df_yf.columns.get_level_values(0)
@@ -2403,9 +2411,72 @@ Current Date (Asia/Jakarta): {current_date}
                     "volume_surge_ratio": round(volume_surge_ratio, 2),
                     "return_5d_pct": round(return_5d_pct, 1),
                 }
+
+                # ── Task 9: Weekly Trend (separate yfinance weekly call) ───────
+                try:
+                    weekly_df = fetch_weekly_data(f"{ticker}.JK")
+                    weekly_trend = compute_weekly_trend(weekly_df)
+                    tech_indicators.update(weekly_trend)
+                except Exception as _exc:
+                    logger.debug(f"[Chartist] Weekly fetch failed: {_exc}")
+                    tech_indicators.update({
+                        "weekly_trend": "INSUFFICIENT_DATA",
+                        "weekly_ma13": None,
+                        "weekly_ma26": None,
+                        "weekly_above_ma13": None,
+                    })
+
+                # ── Task 10: MACD ─────────────────────────────────────────────
+                try:
+                    macd = compute_macd(close)
+                    tech_indicators.update({
+                        "macd_histogram": macd["histogram"],
+                        "macd_histogram_state": macd["histogram_state"],
+                        "macd_line": macd["macd_line"],
+                        "macd_signal_line": macd["signal_line"],
+                    })
+                except Exception as _exc:
+                    logger.debug(f"[Chartist] MACD failed: {_exc}")
+
+                # ── Task 11: Candlestick / BB / RSI Divergence ────────────────
+                try:
+                    candle = detect_candlestick_pattern(df_yf)
+                    bb = compute_bollinger(close)
+                    _rsi_series = compute_rsi(close)
+                    rsi_div = detect_rsi_divergence(close, _rsi_series)
+                    tech_indicators.update({
+                        "last_candle_pattern": candle["last_candle_pattern"],
+                        "pattern_type": candle["pattern_type"],
+                        "bb_position": bb["bb_position"],
+                        "bb_squeeze": bb["bb_squeeze"],
+                        "bb_width": bb["bb_width"],
+                        "rsi_divergence": rsi_div["rsi_divergence"],
+                        "divergence_strength": rsi_div["divergence_strength"],
+                    })
+                except Exception as _exc:
+                    logger.debug(f"[Chartist] Pattern/BB/Div failed: {_exc}")
+
+                # ── Task 12: Gap + Volatility Compression ────────────────────
+                try:
+                    gap = detect_gap(df_yf)
+                    compression = detect_volatility_compression(df_yf)
+                    tech_indicators.update({
+                        "gap_type": gap["gap_type"],
+                        "gap_pct": gap["gap_pct"],
+                        "compression_type": compression["compression_type"],
+                        "range_pct": compression["range_pct"],
+                        "is_inside_bar": compression["is_inside_bar"],
+                        "is_nr7": compression["is_nr7"],
+                    })
+                except Exception as _exc:
+                    logger.debug(f"[Chartist] Gap/Compression failed: {_exc}")
+
                 logger.info(
                     f"[Chartist] Technicals computed: MA50={tech_indicators.get('ma50')}, RSI={tech_indicators.get('rsi14')}"
                 )
+            else:
+                logger.warning(f"[Chartist] OHLCV invalid — {_ohlcv_reason}; skipping technicals")
+                technical_partial = True
         except Exception as e:
             logger.warning(f"[Chartist] yfinance download failed for {ticker}: {e}")
             failure_record = classify_exception(e, "yfinance").model_dump(mode="json")

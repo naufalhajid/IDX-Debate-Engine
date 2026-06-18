@@ -6,6 +6,7 @@ from math import floor
 from typing import Any
 
 from utils.logger_config import logger
+from utils.trade_math import compute_trailing_stop
 
 
 LOT_SIZE = 100
@@ -329,6 +330,10 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
             * max(confidence, 0.10)
             * max(min(rr_ratio, 3.0), 0.50)
         )
+        atr14 = _to_float(
+            candidate.get("atr14") or candidate.get("ATR (14)"), None
+        )
+        market_regime = str(candidate.get("market_regime") or "NORMAL").upper()
         eligible.append(
             {
                 "ticker": ticker,
@@ -340,6 +345,8 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
                 "risk_per_share": risk_per_share,
                 "expected_return_pct": expected_return_pct,
                 "weight": weight,
+                "atr14": atr14,
+                "market_regime": market_regime,
             }
         )
 
@@ -375,6 +382,15 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
             "rr_ratio": item["rr_ratio"],
         }
         _recompute_position(position, total_capital)
+
+        # Task 8: Attach trailing stop when ATR is available
+        if item["atr14"] and item["atr14"] > 0:
+            trail = compute_trailing_stop(
+                item["entry_price"], item["atr14"], item["market_regime"]
+            )
+            position["trailing_stop_pct"] = trail["trailing_stop_pct"]
+            position["trailing_stop_trigger_pct"] = trail["trailing_stop_trigger_pct"]
+
         positions.append(position)
 
     positions.sort(key=_position_sort_key)

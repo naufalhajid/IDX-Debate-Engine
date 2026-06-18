@@ -43,6 +43,63 @@ STEP 5 — RSI MOMENTUM:
 STEP 6 — VOLUME SIGNAL:
   State whether current volume confirms or denies the price move.
 
+STEP 7 — MULTI-TIMEFRAME CONTEXT:
+  Read weekly_trend from PRE-COMPUTED TECHNICALS. Apply this matrix exactly:
+
+  IF weekly_trend = "UPTREND"
+    -> "Weekly trend aligned: swing long has tailwind from higher timeframe."
+
+  IF weekly_trend = "WEAK_UPTREND"
+    -> "Weekly trend is weak. Price is above 26-week MA but below 13-week MA.
+       Use tighter target. Do NOT extend position beyond first target."
+
+  IF weekly_trend = "DOWNTREND"
+    -> "Weekly trend is DOWN. Counter-trend trade only. Maximum signal: HOLD.
+       Do NOT issue BULLISH. Reduce position size to 50%."
+
+  IF weekly_trend = "INSUFFICIENT_DATA"
+    -> Skip this step. Do not fabricate a weekly assessment.
+
+STEP 8 — MACD MOMENTUM:
+  Read macd_histogram_state from PRE-COMPUTED TECHNICALS. Apply this matrix:
+
+  POSITIVE_EXPANDING  -> Momentum accelerating higher. Favors continuation entry.
+  POSITIVE_SHRINKING  -> Momentum decelerating. Near-term caution. Take profits early.
+  NEGATIVE_EXPANDING  -> Selling pressure increasing. Avoid new long entries.
+  NEGATIVE_SHRINKING  -> Selling pressure easing. Possible early reversal setup.
+  INSUFFICIENT_DATA   -> Skip MACD assessment.
+
+  Note the state in your analysis. If POSITIVE_EXPANDING and ma200_context is ABOVE,
+  state "MACD confirms breakout." If NEGATIVE_EXPANDING and ma200_context is BELOW,
+  state "MACD confirms downtrend — do not fight."
+
+STEP 9 — SETUP & PATTERN SIGNALS:
+  Read the following keys from PRE-COMPUTED TECHNICALS:
+  last_candle_pattern, pattern_type, bb_position, bb_squeeze, rsi_divergence,
+  gap_type, compression_type, is_nr7, is_inside_bar.
+
+  Candlestick: if pattern_type is BULLISH_REVERSAL (hammer, bullish_engulfing) or
+  BULLISH_CONTINUATION (bullish_marubozu), note it as a setup confirmation.
+  If pattern_type is BEARISH_REVERSAL or BEARISH_CONTINUATION, flag it as a warning.
+
+  Bollinger: if bb_squeeze = true, state "BB squeeze detected — breakout imminent,
+  wait for volume confirmation before entry." If bb_position = ABOVE_UPPER, state
+  "Price extended beyond upper band — avoid chasing." If bb_position = BELOW_LOWER,
+  state "Price below lower band — oversold, watch for reversal catalyst."
+
+  RSI Divergence: if rsi_divergence = BULLISH, note "Bullish RSI divergence — price
+  lower low but RSI higher low, strengthens reversal case." If rsi_divergence = BEARISH,
+  flag "Bearish RSI divergence — momentum weakening despite price highs."
+
+  Gap: if gap_type = GAP_UP, note "Opening gap up — bullish continuation if held."
+  If gap_type = GAP_DOWN, note "Opening gap down — bearish, gap may act as resistance."
+  If gap_type = NONE, skip gap commentary.
+
+  Compression: if compression_type = NR7 or is_nr7 = true, note "NR7 — narrow range
+  accumulation, breakout likely within 1-2 sessions, confirm with volume."
+  If compression_type = INSIDE_BAR or is_inside_bar = true, note "Inside bar —
+  directional resolve pending."
+
 CONSTRAINTS:
   • All prices in Rupiah (Rp).
   • DO NOT fabricate, recalculate, or override any MA, RSI, or ATR value -- use only pre-computed data.

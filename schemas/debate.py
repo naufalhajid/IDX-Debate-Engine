@@ -220,6 +220,24 @@ class CIOVerdict(BaseDataClass):
         description="Agents whose position differed from the consensus or winner position.",
     )
 
+    # ── Task 8: Trailing Stop Fields ─────────────────────────────────────────
+    trailing_stop_pct: float | None = Field(
+        default=None,
+        description="ATR-based trailing stop distance as fraction of entry price.",
+    )
+    trailing_stop_trigger_pct: float | None = Field(
+        default=None,
+        description="Profit activation threshold (fraction) before trailing stop engages.",
+    )
+    partial_exit_t1_pct: float = Field(
+        default=0.50,
+        description="Fraction of position to exit at first target (T1). Default 50%.",
+    )
+    partial_exit_trail_remainder: bool = Field(
+        default=True,
+        description="If True, trail the remaining position after T1 exit.",
+    )
+
     @model_validator(mode="after")
     def _derive_computed_fields(self) -> "CIOVerdict":
         """

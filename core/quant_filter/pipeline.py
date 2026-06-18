@@ -1016,6 +1016,16 @@ def _safe_analyze_price_candidate(
         )
         return None
 
+    if df_t["Close"].isna().all():
+        _record_price_failure(
+            failures,
+            ticker,
+            stage="price_data",
+            reason="Close is all-NaN (price feed gap)",
+            logger=logger,
+        )
+        return None
+
     if ihsg_close is not None and not ihsg_close.empty:
         df_t = df_t.reindex(ihsg_close.index).dropna(how="all")
 
