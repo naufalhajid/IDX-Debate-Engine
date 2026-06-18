@@ -9,12 +9,14 @@ from services.news_fetcher import (
     BREAKING_NEWS_HOURS,
     NEWS_LOOKBACK_DAYS,
     STALE_NEWS_HOURS,
+    NewsBundle,
     NewsEventTag,
     NewsFetcher,
     NewsSentiment,
     _parse_rss_items,
     fetch_news_rss,
 )
+from services.context_pack_builder import build_context_pack, pack_to_prompt_string
 
 
 def _ts(hours_ago: int = 1) -> int:
@@ -594,3 +596,85 @@ def test_parse_rss_items_uses_kontan_default_source() -> None:
     parsed = _parse_rss_items(xml_text, default_source="Kontan")
 
     assert parsed[0]["source"] == "Kontan"
+
+
+# ── Task 17 & 18: insider selling / post-earnings consumed-surface tests ─────
+
+def _minimal_bundle(**overrides) -> NewsBundle:
+    defaults = dict(
+        ticker="TEST",
+        fetched_at="2026-06-18T00:00:00+00:00",
+        lookback_days=7,
+        items=[],
+        total_fetched=0,
+        total_relevant=0,
+        overall_sentiment=NewsSentiment.NEUTRAL,
+        sentiment_score=0.0,
+        has_breaking_news=False,
+        has_corporate_action=False,
+        has_macro_event=False,
+        has_insider_selling=False,
+        has_post_earnings=False,
+        confidence_adjustment=0.0,
+        confidence_adjustment_reason="test",
+        staleness_warning=None,
+        data_available=False,
+    )
+    defaults.update(overrides)
+    return NewsBundle(**defaults)
+
+
+def test_classify_item_detects_insider_selling() -> None:
+    item = NewsFetcher().classify_item(
+        _raw("Direktur BBCA menjual saham sebanyak 1 juta lembar"), "BBCA"
+    )
+
+    assert item.is_insider_selling is True
+    assert NewsEventTag.INSIDER_SELL in item.event_tags
+
+
+def test_classify_item_detects_post_earnings() -> None:
+    item = NewsFetcher().classify_item(
+        _raw("BBCA umumkan laba bersih kuartal I naik 12 persen"), "BBCA"
+    )
+
+    assert item.is_post_earnings is True
+    assert NewsEventTag.POST_EARNINGS in item.event_tags
+
+
+def test_bundle_to_prompt_string_renders_insider_selling_flag() -> None:
+    bundle = _minimal_bundle(has_insider_selling=True, data_available=True)
+    output = NewsFetcher().bundle_to_prompt_string(bundle)
+
+    assert "INSIDER SELLING DETECTED" in output
+
+
+def test_bundle_to_prompt_string_renders_post_earnings_flag() -> None:
+    bundle = _minimal_bundle(has_post_earnings=True, data_available=True)
+    output = NewsFetcher().bundle_to_prompt_string(bundle)
+
+    assert "POST-EARNINGS WINDOW" in output
+
+
+def test_insider_selling_flag_rendered_in_pack_to_prompt_string() -> None:
+    raw = {
+        "current_price": 5000.0,
+        "insider_selling_flag": True,
+        "data_sources": ["test"],
+    }
+    pack = build_context_pack("TEST", raw)
+    rendered = pack_to_prompt_string(pack)
+
+    assert "insider_selling_flag" in rendered
+
+
+def test_post_earnings_flag_rendered_in_pack_to_prompt_string() -> None:
+    raw = {
+        "current_price": 5000.0,
+        "post_earnings_flag": True,
+        "data_sources": ["test"],
+    }
+    pack = build_context_pack("TEST", raw)
+    rendered = pack_to_prompt_string(pack)
+
+    assert "post_earnings_flag" in rendered

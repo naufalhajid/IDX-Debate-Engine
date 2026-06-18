@@ -626,6 +626,8 @@ def _fake_news_fetcher(monkeypatch, *, kw_sentiment="POSITIVE", kw_adjustment=0.
         confidence_adjustment=kw_adjustment,
         confidence_adjustment_reason="keyword path",
         has_breaking_news=False,
+        has_insider_selling=False,
+        has_post_earnings=False,
         items=[],
     )
 
@@ -697,6 +699,8 @@ def test_news_context_carries_bundle_fetch_failure(monkeypatch):
         confidence_adjustment=0.0,
         confidence_adjustment_reason="News fetch failed - network failed",
         has_breaking_news=False,
+        has_insider_selling=False,
+        has_post_earnings=False,
         items=[],
         fetch_failure=failure,
     )
@@ -992,7 +996,7 @@ async def test_debate_run_derives_current_price_and_adds_prompt_metadata(monkeyp
 def test_prompt_registry_loads_required_prompts_and_version():
     registry = debate_prompt_registry.PROMPT_REGISTRY
 
-    assert registry.prompt_version == "2026-06-18-s4-lq45-t2-circuit-breaker-anti-avg-down-v9"
+    assert registry.prompt_version == "2026-06-18-s6-insider-sell-post-earnings-v10"
     assert set(debate_prompt_registry.REQUIRED_PROMPTS).issubset(registry.prompts)
     assert "CONFIDENCE CALIBRATION" in registry.prompts["CIO_SYSTEM_PROMPT"]
 

@@ -1,5 +1,32 @@
 # Prompt Migration Log
 
+## 2026-06-18 — `s6-insider-sell-post-earnings-v10`
+
+**Files changed:**
+- `services/debate_prompts/fundamental_scout.txt` (Step 6 added)
+- `services/news_fetcher.py` (`INSIDER_SELL`, `POST_EARNINGS` tags + detection)
+- `services/context_pack_builder.py` (`insider_selling_flag`, `post_earnings_flag` added to tier2)
+- `services/debate_chamber.py` (sentiment_scout threads new flags to metadata + synthesizer)
+
+### Changes
+
+**`fundamental_scout.txt`** — Added STEP 6 (Earnings & Insider Signal):
+- Task 18: POST-EARNINGS WINDOW flag → drift direction assessment + confidence -0.10 if >5% already moved.
+- Task 17: INSIDER SELLING DETECTED flag → mandatory cap at 0.55 confidence + BULLISH block unless independently confirmed.
+- Step fires only when the relevant flag string is present in the news/sentiment context.
+
+**`news_fetcher.py`** — Task 17 + 18 event detection:
+- `INSIDER_SELLING_KEYWORDS` (Indonesian + English): "jual saham", "divestasi", "insider selling", etc.
+- `POST_EARNINGS_KEYWORDS`: "laba bersih", "laporan keuangan", "earnings", "kuartal", etc.
+- `NewsEventTag.INSIDER_SELL` and `NewsEventTag.POST_EARNINGS` added.
+- `NewsItem.is_insider_selling` + `NewsItem.is_post_earnings` boolean fields.
+- `NewsBundle.has_insider_selling` + `NewsBundle.has_post_earnings` aggregate flags.
+- `bundle_to_prompt_string()` renders "INSIDER SELLING DETECTED" / "POST-EARNINGS WINDOW" lines.
+
+**`context_pack_builder.py`** — `insider_selling_flag` and `post_earnings_flag` in tier2 (not droppable).
+
+**`debate_chamber.py`** — Threads `has_insider_selling` and `has_post_earnings` from news_bundle → metadata → synthesizer raw_data.
+
 ## 2026-06-18 — `s4-lq45-t2-circuit-breaker-anti-avg-down-v9`
 
 **Files changed:**

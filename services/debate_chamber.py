@@ -496,6 +496,8 @@ async def _news_context_for_state(
         # FIX: ISSUE 3 — Preserve breaking-news headlines for final report display.
         breaking_headlines = _breaking_news_headlines(news_bundle)
         metadata["has_breaking_news"] = news_bundle.has_breaking_news
+        metadata["has_insider_selling"] = news_bundle.has_insider_selling
+        metadata["has_post_earnings"] = news_bundle.has_post_earnings
         metadata["breaking_news_headlines"] = breaking_headlines
         metadata["news_confidence_adjustment"] = adjustment
         metadata["news_overall_sentiment"] = overall_sentiment
@@ -522,6 +524,8 @@ async def _news_context_for_state(
             "message": _exception_message(exc),
         }
         metadata["has_breaking_news"] = False
+        metadata["has_insider_selling"] = False
+        metadata["has_post_earnings"] = False
         metadata["breaking_news_headlines"] = []
         metadata["news_confidence_adjustment"] = 0.0
         metadata["news_brief"] = ""
@@ -2874,6 +2878,8 @@ Current Date (Asia/Jakarta): {current_date}
                     **(tech or {}),
                 },
                 "sentiment_summary": self._compact_text(s, 800),
+                "insider_selling_flag": bool(metadata.get("has_insider_selling")),
+                "post_earnings_flag": bool(metadata.get("has_post_earnings")),
                 "data_sources": sources,
                 "source_timestamps": source_timestamps,
                 "market_data": market_data,

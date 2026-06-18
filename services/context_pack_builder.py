@@ -36,6 +36,8 @@ CONTEXT_FIELD_TIERS = {
         "pe_ratio",
         "pbv",
         "is_lq45",
+        "insider_selling_flag",
+        "post_earnings_flag",
     ],
     "tier3": [
         "news_summary",
@@ -317,6 +319,12 @@ def _collect_priority_fields(
         "pe_ratio": _first_present(fundamentals, raw_data, "pe_ratio", "pe", "per"),
         "pbv": _first_present(fundamentals, raw_data, "pbv", "pb_ratio", "pb"),
         "is_lq45": _first_present(fundamentals, raw_data, "is_lq45"),
+        "insider_selling_flag": _first_present(
+            raw_data, metadata, "insider_selling_flag", "has_insider_selling"
+        ),
+        "post_earnings_flag": _first_present(
+            raw_data, metadata, "post_earnings_flag", "has_post_earnings"
+        ),
         "news_summary": _first_present(
             raw_data,
             metadata,

@@ -109,6 +109,39 @@ MACRO_KEYWORDS = [
     "export ban",
 ]
 
+INSIDER_SELLING_KEYWORDS = [
+    "jual saham",
+    "menjual saham",
+    "melepas saham",
+    "divestasi",
+    "pelepasan saham",
+    "komisaris jual",
+    "direktur jual",
+    "insider selling",
+    "insider sell",
+    "divestment",
+    "founder sell",
+    "pemegang saham jual",
+]
+
+POST_EARNINGS_KEYWORDS = [
+    "laba bersih",
+    "rugi bersih",
+    "hasil keuangan",
+    "laporan keuangan",
+    "kinerja keuangan",
+    "earnings",
+    "net income",
+    "net profit",
+    "net loss",
+    "quarterly results",
+    "annual results",
+    "kuartal",
+    "semester",
+    "revenue",
+    "pendapatan",
+]
+
 logger = logging.getLogger(__name__)
 
 
@@ -445,6 +478,8 @@ class NewsEventTag(str, Enum):
     CORPORATE_ACTION = "CORPORATE_ACTION"
     MACRO_EVENT = "MACRO_EVENT"
     BREAKING = "BREAKING"
+    INSIDER_SELL = "INSIDER_SELL"
+    POST_EARNINGS = "POST_EARNINGS"
 
 
 class NewsItem(BaseModel):
@@ -461,6 +496,8 @@ class NewsItem(BaseModel):
     is_breaking: bool
     is_corporate_action: bool
     is_macro: bool
+    is_insider_selling: bool
+    is_post_earnings: bool
     event_tags: list[NewsEventTag] = Field(default_factory=list)
     relevance_score: float = Field(ge=0.0, le=1.0)
     summary: str
@@ -482,6 +519,8 @@ class NewsBundle(BaseModel):
     has_breaking_news: bool
     has_corporate_action: bool
     has_macro_event: bool
+    has_insider_selling: bool
+    has_post_earnings: bool
     confidence_adjustment: float
     confidence_adjustment_reason: str
     staleness_warning: str | None
@@ -578,11 +617,15 @@ class NewsFetcher:
 
         is_corporate_action = _contains_keyword(text, CORPORATE_ACTION_KEYWORDS)
         is_macro = _contains_keyword(text, MACRO_KEYWORDS)
+        is_insider_selling = _contains_keyword(text, INSIDER_SELLING_KEYWORDS)
+        is_post_earnings = _contains_keyword(text, POST_EARNINGS_KEYWORDS)
         is_breaking = _is_breaking(published_at_dt)
         event_tags = _event_tags(
             is_breaking=is_breaking,
             is_corporate_action=is_corporate_action,
             is_macro=is_macro,
+            is_insider_selling=is_insider_selling,
+            is_post_earnings=is_post_earnings,
         )
         relevance_score = _relevance_score(
             text=text,
@@ -602,6 +645,8 @@ class NewsFetcher:
             is_breaking=is_breaking,
             is_corporate_action=is_corporate_action,
             is_macro=is_macro,
+            is_insider_selling=is_insider_selling,
+            is_post_earnings=is_post_earnings,
             event_tags=event_tags,
             relevance_score=relevance_score,
             summary=text[:300],
@@ -708,6 +753,10 @@ class NewsFetcher:
             lines.append("CORPORATE ACTION DETECTED")
         if bundle.has_macro_event:
             lines.append("MACRO EVENT DETECTED")
+        if bundle.has_insider_selling:
+            lines.append("INSIDER SELLING DETECTED — management/founder divestment signal")
+        if bundle.has_post_earnings:
+            lines.append("POST-EARNINGS WINDOW — recent financial results published")
         if not bundle.data_available:
             lines.append("No news data available")
 
@@ -757,6 +806,8 @@ class NewsFetcher:
         has_breaking_news = any(item.is_breaking for item in items)
         has_corporate_action = any(item.is_corporate_action for item in items)
         has_macro_event = any(item.is_macro for item in items)
+        has_insider_selling = any(item.is_insider_selling for item in items)
+        has_post_earnings = any(item.is_post_earnings for item in items)
         sentiment_score = _weighted_sentiment(items)
         overall_sentiment = _overall_sentiment(
             sentiment_score,
@@ -781,6 +832,8 @@ class NewsFetcher:
             has_breaking_news=has_breaking_news,
             has_corporate_action=has_corporate_action,
             has_macro_event=has_macro_event,
+            has_insider_selling=has_insider_selling,
+            has_post_earnings=has_post_earnings,
             confidence_adjustment=adjustment,
             confidence_adjustment_reason=reason,
             staleness_warning=staleness_warning,
@@ -822,6 +875,8 @@ def _empty_bundle(
         has_breaking_news=False,
         has_corporate_action=False,
         has_macro_event=False,
+        has_insider_selling=False,
+        has_post_earnings=False,
         confidence_adjustment=-0.05,
         confidence_adjustment_reason=reason,
         staleness_warning=None,
@@ -969,6 +1024,8 @@ def _event_tags(
     is_breaking: bool,
     is_corporate_action: bool,
     is_macro: bool,
+    is_insider_selling: bool = False,
+    is_post_earnings: bool = False,
 ) -> list[NewsEventTag]:
     tags: list[NewsEventTag] = []
     if is_breaking:
@@ -977,6 +1034,10 @@ def _event_tags(
         tags.append(NewsEventTag.CORPORATE_ACTION)
     if is_macro:
         tags.append(NewsEventTag.MACRO_EVENT)
+    if is_insider_selling:
+        tags.append(NewsEventTag.INSIDER_SELL)
+    if is_post_earnings:
+        tags.append(NewsEventTag.POST_EARNINGS)
     return tags
 
 

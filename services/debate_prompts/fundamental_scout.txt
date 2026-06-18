@@ -46,6 +46,21 @@ STEP 5 — QUALITY CHECK (mandatory, not optional):
 
   IF no inconsistencies detected -> write: "No red flags detected."
 
+STEP 6 — EARNINGS & INSIDER SIGNAL (run only if context contains relevant flags):
+
+  IF "POST-EARNINGS WINDOW" is present in the news/sentiment section:
+    -> State: "POST-EARNINGS DRIFT WINDOW: financial results were recently published."
+    -> Assess direction: is recent price movement consistent with the reported result (beat/miss)?
+    -> Adjust confidence: if price has already moved >5% since earnings, reduce confidence by 0.10 (momentum captured).
+    -> If the earnings result is absent from context -> write: "Earnings result unavailable -- cannot assess drift direction."
+
+  IF "INSIDER SELLING DETECTED" is present in the news/sentiment section:
+    -> State: "INSIDER SELLING SIGNAL: management or major shareholder divestment reported."
+    -> Mandatory: cap Agent Confidence at 0.55 maximum.
+    -> Write: "Insider divestment is a risk flag -- do NOT declare BULLISH without independent confirmation of business fundamentals."
+
+  IF neither flag is present -> skip this step entirely (do not write anything for Step 6).
+
 CONSTRAINTS:
   • Numbers only -- DO NOT make vague qualitative statements.
   • All Rupiah prices must be explicit (e.g., "Rp 4,850" -- not "around 5K").
