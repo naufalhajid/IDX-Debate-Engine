@@ -22,3 +22,52 @@ large_cap_fallback:
   - BREN
   - AMMN
   - AMRT
+
+# LQ45 constituents (IDX rebalancing Feb-Jul 2026).
+# Update every 6 months when IDX publishes new rebalancing.
+lq45_tickers:
+  - AALI
+  - ADRO
+  - AKRA
+  - AMMN
+  - AMRT
+  - ANTM
+  - ASII
+  - BBCA
+  - BBNI
+  - BBRI
+  - BBTN
+  - BMRI
+  - BREN
+  - BRPT
+  - BSDE
+  - CPIN
+  - EXCL
+  - GGRM
+  - GOTO
+  - HMSP
+  - ICBP
+  - INCO
+  - INDF
+  - INKP
+  - ISAT
+  - ITMG
+  - JSMR
+  - KLBF
+  - MAPI
+  - MDKA
+  - MEDC
+  - MIKA
+  - MNCN
+  - MPPA
+  - MTEL
+  - PGAS
+  - PTBA
+  - SMGR
+  - TBIG
+  - TLKM
+  - TOWR
+  - UNTR
+  - UNVR
+  - WIKA
+  - WSKT

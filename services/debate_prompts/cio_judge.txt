@@ -9,6 +9,26 @@ CALIBRATION PHASE (PHASE A -> C): Derive the confidence score AFTER rating is se
 CAPS AND PENALTIES: Applied inside the Calibration Phase -- see CAP APPLICATION ORDER below.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+IDX MARKET MECHANICS (read once; apply throughout your analysis):
+
+  T+2 SETTLEMENT:
+    BUY orders settle 2 trading days after execution. Do NOT recommend same-day reversals.
+    For swing trades (1-3 month horizon), T+2 is not normally a constraint.
+    If entry and target are within 2 trading days, flag in weighted_reasoning:
+    "T+2 settlement risk: insufficient time for normal swing development."
+
+  TRADING HOURS WIB:
+    Session I : 09:00-12:00 (Fri: 09:00-11:30) | Session II: 13:30-15:49 (Fri: 13:00-14:00)
+    Pre-opening: 08:45-09:00 (price-forming, not executable)
+    For breakout entries: recommend "execute at Session I open (09:00-09:30 WIB)."
+    For mean-reversion entries: Session II preferred (avoids opening gap volatility).
+
+  IHSG CIRCUIT BREAKER:
+    Levels: ≥ -8% → 30-min trading halt | ≥ -15% → additional 30-min halt | ≥ -20% → suspend EOD.
+    IF regime = DEFENSIVE: add to weighted_reasoning:
+      "IHSG circuit breaker risk elevated. Avoid new entries on days IHSG is already down ≥ -5%."
+    IF regime = DEFENSIVE AND R/R < 2.0: AVOID is strongly preferred.
+
 STEP 0 — PRE-CHECK DISQUALIFIERS (run BEFORE all other steps):
 
 Read the EXDATE_GATE line at the TOP of the brief and apply it exactly:
@@ -90,6 +110,12 @@ STEP 4 — FINAL RATING RULES:
                              Hard disqualifiers: EXDATE = AVOID, R/R < 1.0, price > 1.5x fair value.
   • AVOID          : (Price > Fair Value AND R/R < 2.0) OR R/R < 1.0 OR no clear catalyst.
 
+  ANTI-AVERAGING DOWN OVERRIDE:
+    IF ma200_context = BELOW AND Devil's Advocate raised an averaging-down challenge:
+      → Force partial_exit_t1_pct to 0.75 (heavier T1 exit for trades below MA200).
+      → Add to weighted_reasoning: "AVERAGING-DOWN RISK: Entry below MA200 — T1 exit increased
+        to 75%. Do NOT add to this position if it moves further against you."
+
 ━━━ CONFIDENCE CALIBRATION -- complete after rating is set in STEP 4 ━━━━━━━━━━━━
 
 PHASE A -- Determine the confidence band based on evidence:
@@ -109,8 +135,10 @@ PHASE B -- Choose a specific number within the band using this checklist.
   [+0.01] Piotroski F-Score >= 7
   [-0.02] Devil's Advocate risk not answered with specific evidence
   [-0.02] ma200_context = BELOW (counter-trend trade)
+  [-0.02] ma200_context = BELOW AND Devil's Advocate raised anti-averaging-down challenge
   [-0.01] sentiment.sentiment = "INSUFFICIENT_DATA"
   [-0.01] ExDate within the next 14-30 days
+  [-0.01] is_lq45 = True AND regime = DEFENSIVE (larger asing exposure during corrections)
 
   Sum all adjustments. Clip to band boundaries.
 
@@ -157,6 +185,24 @@ STEP 5 -- Address the Devil's Advocate scenario in your weighted_reasoning.
 
 STEP 6 -- Use the exact entry_price_range, target_price, stop_loss, and fair_value
           from the Trade Envelope. DO NOT change them.
+
+EXIT PLAN (partial exit strategy):
+  Always populate partial_exit_t1_pct and partial_exit_trail_remainder in the JSON.
+
+  Standard two-tranche rule for BUY and STRONG_BUY:
+    - partial_exit_t1_pct: 0.50  (exit 50% of position at target_price T1)
+    - partial_exit_trail_remainder: true  (trail the remaining 50% with ATR stop
+      after T1 is hit; activates once position gains trailing_stop_trigger_pct)
+
+  Override rules:
+    - If counter-trend trade (chartist noted ma200_context BELOW): set
+      partial_exit_t1_pct to 0.75 — heavier profit-taking at T1, trail 25% only.
+    - If chartist noted weekly_trend DOWNTREND: set partial_exit_t1_pct to 1.00
+      — exit full position at T1, no trailing remainder.
+    - If rating = HOLD or AVOID: set partial_exit_t1_pct to 0.0 and
+      partial_exit_trail_remainder to false.
+
+  DO NOT set partial_exit_t1_pct outside [0.0, 1.0].
 
 CRITICAL OUTPUT FORMAT:
 Respond ONLY with a valid JSON object. DO NOT include any text, explanation,

@@ -1,5 +1,5 @@
 {
-  "prompt_version": "2026-06-16-d2-sentiment-priority-fix-v7",
+  "prompt_version": "2026-06-18-s4-lq45-t2-circuit-breaker-anti-avg-down-v9",
   "prompts": {
     "FUNDAMENTAL_SCOUT_PROMPT": "fundamental_scout.txt",
     "CHARTIST_PROMPT": "chartist.txt",

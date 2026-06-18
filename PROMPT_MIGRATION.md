@@ -1,5 +1,62 @@
 # Prompt Migration Log
 
+## 2026-06-18 — `s4-lq45-t2-circuit-breaker-anti-avg-down-v9`
+
+**Files changed:**
+- `services/debate_prompts/devils_advocate.txt` (Challenge 3 anti-averaging down added)
+- `services/debate_prompts/cio_judge.txt` (IDX Market Mechanics header + anti-averaging down override + PHASE B penalties)
+- `config/rr_tiers.yaml` (lq45_tickers list added)
+- `utils/trade_math.py` (`_load_lq45_tickers` + `is_lq45_ticker` added)
+- `core/quant_filter/pipeline.py` (`is_lq45` added to `_analyze_ticker` return dict)
+- `services/context_pack_builder.py` (`is_lq45` added to tier2 + `_collect_priority_fields`)
+
+### Changes
+
+**`cio_judge.txt`** — Added IDX MARKET MECHANICS section before STEP 0:
+- Task 14: T+2 settlement note (swing trades unaffected; intraday flips flagged).
+- Task 14: Trading Hours WIB — breakout = Session I open; mean-reversion = Session II preferred.
+- Task 15: IHSG Circuit Breaker — -8%/-15%/-20% halt levels. If regime=DEFENSIVE, add warning note; if DEFENSIVE + R/R < 2.0, prefer AVOID.
+- Task 22: ANTI-AVERAGING DOWN OVERRIDE in STEP 4 — if ma200_context=BELOW + DA raised averaging-down challenge → force partial_exit_t1_pct=0.75.
+- Task 22: PHASE B penalty [-0.02] for averaging-down setup.
+- Task 21: PHASE B penalty [-0.01] for is_lq45=True + regime=DEFENSIVE.
+
+**`devils_advocate.txt`** — Added CHALLENGE 3 (conditional):
+- Anti-averaging down check: applies when ma200_context=BELOW AND price ≥10% below recent high.
+- Raises: has original thesis changed? If not, recommend waiting for MA200 reclaim.
+
+**`rr_tiers.yaml`** + **`trade_math.py`** + **`pipeline.py`** + **`context_pack_builder.py`** — LQ45 flag:
+- 45-ticker LQ45 list added to YAML (Feb-Jul 2026 composition).
+- `is_lq45_ticker(ticker)` helper in `trade_math.py` (cached).
+- `is_lq45` bool added to `_analyze_ticker` return dict in `pipeline.py`.
+- `is_lq45` added to tier2 in context_pack and extracted in `_collect_priority_fields`.
+
+---
+
+## 2026-06-18 — `s3-chartist-multitf-macd-patterns-exit-plan-v8`
+
+**Files changed:**
+- `services/debate_prompts/chartist.txt` (STEP 7/8/9 added)
+- `services/debate_prompts/cio_judge.txt` (EXIT PLAN section added)
+- `services/debate_chamber.py` (weekly/MACD/BB/candlestick/divergence/gap/compression wired into `tech_indicators`)
+- `core/quant_filter/pipeline.py` (Tasks 10/11/12 wired into `_analyze_ticker` return dict)
+- `utils/trade_math.py` (`compute_exit_plan` function added)
+
+### Changes
+
+**`chartist.txt`** — Added 3 new steps:
+- STEP 7: Multi-Timeframe Context — reads `weekly_trend` (UPTREND/WEAK_UPTREND/DOWNTREND/INSUFFICIENT_DATA). DOWNTREND caps chartist signal at HOLD maximum, forces 50% position reduction.
+- STEP 8: MACD Momentum — reads `macd_histogram_state` (4 states). Guides entry timing.
+- STEP 9: Setup & Pattern Signals — reads `last_candle_pattern`, `pattern_type`, `bb_position`, `bb_squeeze`, `rsi_divergence`, `gap_type`, `compression_type`, `is_nr7`, `is_inside_bar`. All prose-style interpretation, no placeholder substitution.
+
+**`cio_judge.txt`** — Added EXIT PLAN section instructing CIO to populate `partial_exit_t1_pct` and `partial_exit_trail_remainder`. Counter-trend (MA200 BELOW) raises T1 exit to 75%; DOWNTREND weekly forces full 100% T1 exit.
+
+**`debate_chamber.py`** — `_chartist_node` extends `tech_indicators` with: weekly trend (separate `fetch_weekly_data` call), MACD, candlestick pattern, Bollinger bands, RSI divergence, gap type, and volatility compression. Each wrapped in its own try/except.
+
+**`utils/trade_math.py`** — `compute_exit_plan()` computes T1/T2 gain percentages, trail trigger price, and exit note. Guards zero/negative risk and None t2_price.
+
+---
+
+
 ## 2026-06-16 — `d2-sentiment-priority-fix-v7` (CODE-LEVEL)
 
 **Files changed:**

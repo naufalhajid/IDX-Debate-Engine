@@ -35,6 +35,7 @@ CONTEXT_FIELD_TIERS = {
         "eps",
         "pe_ratio",
         "pbv",
+        "is_lq45",
     ],
     "tier3": [
         "news_summary",
@@ -315,6 +316,7 @@ def _collect_priority_fields(
         "eps": _first_present(fundamentals, raw_data, "eps", "eps_ttm"),
         "pe_ratio": _first_present(fundamentals, raw_data, "pe_ratio", "pe", "per"),
         "pbv": _first_present(fundamentals, raw_data, "pbv", "pb_ratio", "pb"),
+        "is_lq45": _first_present(fundamentals, raw_data, "is_lq45"),
         "news_summary": _first_present(
             raw_data,
             metadata,

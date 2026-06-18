@@ -12,6 +12,8 @@ import pandas as pd
 
 from core.quant_filter.config import (
     FINANCIAL_SECTORS,
+    FREE_FLOAT_ESTIMATES,
+    FREE_FLOAT_MANIPULATION_THRESHOLD,
     NAME_SECTOR_KEYWORDS,
     SECTOR_PBV_BENCHMARK,
     TICKER_SECTOR_HARDCODE,
@@ -28,11 +30,18 @@ from utils.exdate_scanner import (
     scan_exdate,
 )
 from utils.logger_config import logger
+from utils.trade_math import is_lq45_ticker
 from utils.technicals import (
     REGIME_ATR_STOP_MULTIPLIER,
     REGIME_ATR_STOP_MULTIPLIER_DEFAULT,
     compute_atr,
+    compute_bollinger,
+    compute_macd,
     compute_rsi,
+    detect_candlestick_pattern,
+    detect_gap,
+    detect_rsi_divergence,
+    detect_volatility_compression,
     snap_to_tick,
 )
 
@@ -48,6 +57,133 @@ def _get_yfinance():
     import yfinance as yf
 
     return yf
+
+
+# ── Task 2: Weekly OHLCV + Trend ─────────────────────────────────────────────
+
+def fetch_weekly_data(ticker: str, period: str = "2y") -> "pd.DataFrame | None":
+    """Download weekly OHLCV for a single ticker (ticker already has .JK suffix).
+
+    Returns None when data is absent or too short for a 13-week MA.
+    """
+    try:
+        df = _get_yfinance().download(
+            ticker,
+            period=period,
+            interval="1wk",
+            auto_adjust=True,
+            progress=False,
+        )
+        if df.empty or len(df) < 13:
+            return None
+        return df
+    except Exception:
+        return None
+
+
+def compute_weekly_trend(weekly_df: "pd.DataFrame | None") -> dict:
+    """Classify weekly trend using MA13 / MA26 crossover.
+
+    Returns UPTREND / WEAK_UPTREND / DOWNTREND / INSUFFICIENT_DATA.
+    """
+    if weekly_df is None or len(weekly_df) < 13:
+        return {
+            "weekly_trend": "INSUFFICIENT_DATA",
+            "weekly_ma13": None,
+            "weekly_ma26": None,
+            "weekly_above_ma13": None,
+        }
+
+    close = weekly_df["Close"].dropna()
+    if len(close) < 13:
+        return {
+            "weekly_trend": "INSUFFICIENT_DATA",
+            "weekly_ma13": None,
+            "weekly_ma26": None,
+            "weekly_above_ma13": None,
+        }
+
+    ma13 = float(close.rolling(13).mean().iloc[-1])
+    ma26 = float(close.rolling(26).mean().iloc[-1]) if len(close) >= 26 else None
+    price = float(close.iloc[-1])
+    above_ma13 = price > ma13
+
+    if above_ma13:
+        trend = "UPTREND"
+    elif ma26 is not None and price > ma26:
+        trend = "WEAK_UPTREND"
+    else:
+        trend = "DOWNTREND"
+
+    return {
+        "weekly_trend": trend,
+        "weekly_ma13": round(ma13, 2),
+        "weekly_ma26": round(ma26, 2) if ma26 is not None else None,
+        "weekly_above_ma13": above_ma13,
+    }
+
+
+# ── Task 6: Free Float Check ──────────────────────────────────────────────────
+
+def check_free_float(ticker: str) -> dict:
+    """Return free-float estimate and manipulation risk tier for a given ticker.
+
+    UNKNOWN is returned for tickers not in the estimates dict.
+    """
+    ff = FREE_FLOAT_ESTIMATES.get(ticker)
+    if ff is None:
+        return {"free_float_pct": None, "manipulation_risk": "UNKNOWN"}
+    if ff < FREE_FLOAT_MANIPULATION_THRESHOLD:
+        risk = "HIGH"
+    elif ff < 0.25:
+        risk = "MEDIUM"
+    else:
+        risk = "LOW"
+    return {"free_float_pct": round(ff, 4), "manipulation_risk": risk}
+
+
+# ── Task 7: ARA / ARB Risk ────────────────────────────────────────────────────
+
+def compute_ara_arb_risk(
+    close: "pd.Series",
+    high: "pd.Series",
+    low: "pd.Series",
+    lookback: int = 5,
+) -> dict:
+    """Detect near-ARA (overbought run-up) and near-ARB (recent plunge) conditions.
+
+    ARB post-April 2025 IDX rule: -15% single day for all price ranges.
+    ARA: +25% (Rp 200-5000), +20% (>Rp 5000).
+
+    arb_lock_risk HIGH → position may be locked on down-day, hard to exit.
+    ara_entry_risk HIGH → chasing after a +20% run in 3 days; crowded entry.
+    """
+    if len(close) < lookback + 1:
+        return {
+            "arb_lock_risk": "UNKNOWN",
+            "ara_entry_risk": "UNKNOWN",
+            "ara_arb_note": "Insufficient data",
+        }
+
+    tail = close.tail(lookback + 1)
+    max_3d_drawdown = float(tail.iloc[-1] / tail.iloc[0]) - 1
+    max_3d_gain = float(tail.iloc[-1] / tail.iloc[0]) - 1
+
+    arb_risk = "HIGH" if max_3d_drawdown < -0.12 else "LOW"
+    ara_risk = "HIGH" if max_3d_gain > 0.20 else "LOW"
+
+    notes = []
+    if arb_risk == "HIGH":
+        notes.append(f"Recent drawdown {max_3d_drawdown:.1%} — ARB lock risk elevated")
+    if ara_risk == "HIGH":
+        notes.append(f"Recent gain {max_3d_gain:.1%} — ARA chase risk elevated")
+    note = "; ".join(notes) if notes else "Within normal range"
+
+    return {
+        "arb_lock_risk": arb_risk,
+        "ara_entry_risk": ara_risk,
+        "ara_arb_note": note,
+    }
 
 
 def _build_sector_map(
@@ -291,6 +427,7 @@ def _analyze_ticker(
     ihsg_return_1m: float = 0.0,
     regime: str = "NORMAL",
     adapter: "XlsxDataAdapter | None" = None,
+    weekly_df: "pd.DataFrame | None" = None,
 ) -> dict | None:
     """
     Analisis teknikal + fundamental satu ticker.
@@ -584,6 +721,12 @@ def _analyze_ticker(
         total_score -= 10
         mom_note.append("Penalty: no margin of safety (-10)")
 
+    # ── Task 6: Free Float Manipulation Penalty ───────────────────────────────
+    ff_result = check_free_float(t)
+    if ff_result["manipulation_risk"] == "HIGH":
+        total_score -= 20
+        mom_note.append("Penalty: Float Tipis/Manipulation Risk HIGH (-20)")
+
     # Cap composite score to 0..100 to keep the scale interpretable
     total_score = max(0.0, min(total_score, 100.0))
 
@@ -614,6 +757,20 @@ def _analyze_ticker(
         if pbv_current <= sector_bench["fair_hi"]
         else "Mahal"
     )
+
+    # ── Task 7: ARA/ARB Risk ──────────────────────────────────────────────────
+    ara_arb = compute_ara_arb_risk(df_t["Close"], df_t["High"], df_t["Low"])
+
+    # ── Task 2: Weekly Trend ──────────────────────────────────────────────────
+    weekly_trend_data = compute_weekly_trend(weekly_df)
+
+    # ── Tasks 10, 11, 12: MACD / Pattern / BB / Divergence / Gap / Compression
+    macd_data = compute_macd(close)
+    candle_data = detect_candlestick_pattern(df_t)
+    bb_data = compute_bollinger(close)
+    rsi_div_data = detect_rsi_divergence(close, rsi_series)
+    gap_data = detect_gap(df_t)
+    compression_data = detect_volatility_compression(df_t)
 
     # ── Quality Flags dari xlsx ───────────────────────────────────────────────
     # Catatan: piotroski sudah didefinisikan di atas (blok Piotroski adjustment)
@@ -656,6 +813,40 @@ def _analyze_ticker(
         "ExDate Date": exdate_info.get("ex_date"),
         "ExDate Source": exdate_info.get("source", "unknown"),
         "_exdate_info": exdate_info,
+        # Task 6
+        "free_float_pct": ff_result["free_float_pct"],
+        "manipulation_risk": ff_result["manipulation_risk"],
+        # Task 7
+        "arb_lock_risk": ara_arb["arb_lock_risk"],
+        "ara_entry_risk": ara_arb["ara_entry_risk"],
+        "ara_arb_note": ara_arb["ara_arb_note"],
+        # Task 2
+        "weekly_trend": weekly_trend_data["weekly_trend"],
+        "weekly_ma13": weekly_trend_data["weekly_ma13"],
+        "weekly_ma26": weekly_trend_data["weekly_ma26"],
+        "weekly_above_ma13": weekly_trend_data["weekly_above_ma13"],
+        # Task 10
+        "macd_histogram": macd_data["histogram"],
+        "macd_histogram_state": macd_data["histogram_state"],
+        "macd_line": macd_data["macd_line"],
+        "macd_signal_line": macd_data["signal_line"],
+        # Task 11
+        "last_candle_pattern": candle_data["last_candle_pattern"],
+        "pattern_type": candle_data["pattern_type"],
+        "bb_position": bb_data["bb_position"],
+        "bb_squeeze": bb_data["bb_squeeze"],
+        "bb_width": bb_data["bb_width"],
+        "rsi_divergence": rsi_div_data["rsi_divergence"],
+        "divergence_strength": rsi_div_data["divergence_strength"],
+        # Task 12
+        "gap_type": gap_data["gap_type"],
+        "gap_pct": gap_data["gap_pct"],
+        "compression_type": compression_data["compression_type"],
+        "range_pct": compression_data["range_pct"],
+        "is_inside_bar": compression_data["is_inside_bar"],
+        "is_nr7": compression_data["is_nr7"],
+        # Task 21
+        "is_lq45": is_lq45_ticker(t),
     }
 
 
@@ -772,6 +963,7 @@ def _safe_analyze_price_candidate(
     adapter: "XlsxDataAdapter | None",
     failures: list[dict[str, str]],
     regime: str = "NORMAL",
+    weekly_data: "pd.DataFrame | None" = None,
 ) -> dict | None:
     ticker = str(row["Ticker"])
     t_yf = f"{ticker}.JK"
@@ -838,6 +1030,16 @@ def _safe_analyze_price_candidate(
         )
         return None
 
+    weekly_df_t: pd.DataFrame | None = None
+    if weekly_data is not None:
+        try:
+            available_weekly = set(weekly_data.columns.get_level_values(0))
+            if t_yf in available_weekly:
+                sliced = weekly_data[t_yf].dropna(how="all")
+                weekly_df_t = sliced if len(sliced) >= 13 else None
+        except Exception:
+            weekly_df_t = None
+
     try:
         return _analyze_ticker(
             row,
@@ -847,6 +1049,7 @@ def _safe_analyze_price_candidate(
             ihsg_return_1m=ihsg_return_1m,
             regime=regime,
             adapter=adapter,
+            weekly_df=weekly_df_t,
         )
     except (KeyError, TypeError, ValueError, IndexError) as exc:
         _record_price_failure(
@@ -1049,6 +1252,23 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         logger=logger,
     )
 
+    # ── Task 2: Batch weekly download (one call for all tickers) ──────────────
+    weekly_data_batch: pd.DataFrame | None = None
+    try:
+        _raw_weekly = _get_yfinance().download(
+            tickers_yf,
+            period="2y",
+            interval="1wk",
+            auto_adjust=True,
+            progress=False,
+            group_by="ticker",
+        )
+        weekly_data_batch = None if _raw_weekly.empty else _raw_weekly
+        if weekly_data_batch is not None:
+            logger.info(f"[Weekly] Batch weekly data fetched for {len(tickers_yf)} tickers")
+    except Exception as _e:
+        logger.warning(f"[Weekly] Batch weekly download failed, skipping: {_e}")
+
     ihsg_close = None
     ihsg_return_1m: float = 0.0
     try:
@@ -1125,6 +1345,7 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
             regime=regime,
             adapter=adapter,
             failures=price_failures,
+            weekly_data=weekly_data_batch,
         )
         if result:
             results.append(result)

@@ -40,10 +40,23 @@ CHALLENGE 2 — TRANSACTION COST STRESS TEST:
 
   State the entry price used in the calculation. Show every cost component explicitly.
 
+CHALLENGE 3 — ANTI-AVERAGING DOWN CHECK (conditional):
+  Apply ONLY IF: ma200_context = BELOW AND price has declined ≥ 10% from the recent high
+  (use 52w_high if available, otherwise infer from OHLCV context).
+
+  Raise ONE challenge under 60 words addressing:
+  • Has the original bullish thesis changed since the prior high?
+  • IF thesis is unchanged but price is lower: "Averaging down without thesis change is
+    capital destruction — confirm catalyst before adding. Waiting for MA200 reclaim is safer."
+  • IF thesis is broken: "This is distribution, not accumulation — recommend against entry."
+
+  Skip this challenge entirely if ma200_context = ABOVE or price is within 10% of recent high.
+
 CONSTRAINTS:
   • DO NOT vote BUY / HOLD / AVOID -- your role is to raise risks, not recommend.
   • Challenge 1 MUST cite a specific price. DO NOT use vague macro commentary.
   • Challenge 2 MUST show every cost component. DO NOT summarise to a single percentage.
+  • Challenge 3 is conditional — only raise it when the averaging-down criteria are met.
 
 OUTPUT FORMAT:
 Position: STRESS_TEST

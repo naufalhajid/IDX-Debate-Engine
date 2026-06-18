@@ -77,6 +77,26 @@ def _get_market_cap_idr(
 
 
 @lru_cache(maxsize=1)
+def _load_lq45_tickers() -> set[str]:
+    """Load LQ45 ticker list from ``config/rr_tiers.yaml``."""
+    try:
+        with RR_TIERS_CONFIG_PATH.open("r", encoding="utf-8") as handle:
+            config = yaml.safe_load(handle) or {}
+        tickers = config.get("lq45_tickers", [])
+        if not isinstance(tickers, list):
+            return set()
+        return {str(t).upper().strip() for t in tickers if str(t).strip()}
+    except Exception as exc:
+        logger.warning(f"[LQ45] Failed to load lq45_tickers: {exc}")
+        return set()
+
+
+def is_lq45_ticker(ticker: str) -> bool:
+    """Return True if ticker is in the static LQ45 list from rr_tiers.yaml."""
+    return str(ticker or "").upper().strip() in _load_lq45_tickers()
+
+
+@lru_cache(maxsize=1)
 def _load_largecap_fallback() -> set[str]:
     """
     Load fallback large-cap tickers from ``config/rr_tiers.yaml``.
@@ -213,3 +233,89 @@ def _log_rr_resolution(resolution: RRTierResolution) -> None:
         f"[RRTier] {resolution.ticker} -> tier={resolution.tier_name}, "
         f"source={resolution.source}, rr_minimum={resolution.rr_minimum:.1f}x"
     )
+
+
+# ── Task 8: Trailing Stop Computation ────────────────────────────────────────
+
+_TRAILING_STOP_MULTIPLIER: dict[str, float] = {
+    "LOW": 1.5,
+    "NORMAL": 1.5,
+    "HIGH": 1.8,
+    "RECOVERY": 2.0,
+    "DEFENSIVE": 2.5,
+}
+_TRAILING_STOP_MULTIPLIER_DEFAULT: float = 1.5
+
+
+def compute_exit_plan(
+    entry_price: float,
+    t1_price: float,
+    t2_price: float | None,
+    stop_price: float,
+    trailing_stop_pct: float | None = None,
+) -> dict:
+    """Two-tranche partial exit plan for swing trades.
+
+    T1 = first target (50% position exit).
+    T2 = second target if available; else trail the remainder.
+    trailing_stop_pct is the ATR-based trail distance computed by compute_trailing_stop.
+    """
+    risk = entry_price - stop_price
+    if risk <= 0:
+        return {
+            "t1_exit_pct": 0.50,
+            "t1_gain_pct": None,
+            "t2_exit_pct": 0.50 if t2_price else None,
+            "t2_gain_pct": None,
+            "trail_remainder": True,
+            "trail_trigger_price": None,
+            "exit_note": "Invalid stop — stop must be below entry",
+        }
+
+    t1_gain = (t1_price - entry_price) / entry_price
+    t2_gain = (t2_price - entry_price) / entry_price if t2_price else None
+
+    trail_trigger = None
+    if trailing_stop_pct and trailing_stop_pct > 0:
+        trail_trigger = round(entry_price * (1 + trailing_stop_pct * 0.5), 0)
+
+    notes = []
+    notes.append(f"Exit 50% at T1 ({t1_price:.0f}, +{t1_gain:.1%})")
+    if t2_price:
+        notes.append(f"Exit remaining 50% at T2 ({t2_price:.0f}, +{t2_gain:.1%})")
+    else:
+        notes.append("Trail remainder with ATR stop after T1 is hit")
+
+    return {
+        "t1_exit_pct": 0.50,
+        "t1_gain_pct": round(t1_gain * 100, 2),
+        "t2_exit_pct": 0.50 if t2_price else None,
+        "t2_gain_pct": round(t2_gain * 100, 2) if t2_gain is not None else None,
+        "trail_remainder": t2_price is None,
+        "trail_trigger_price": trail_trigger,
+        "exit_note": " | ".join(notes),
+    }
+
+
+def compute_trailing_stop(
+    entry_price: float,
+    atr_14: float,
+    regime: str = "NORMAL",
+) -> dict:
+    """ATR-based trailing stop with regime-aware multiplier.
+
+    Activation fires once the position moves activation_pct in the trader's
+    favour.  Trail distance widens in RECOVERY/DEFENSIVE to accommodate higher
+    volatility without being stopped out prematurely.
+    """
+    multiplier = _TRAILING_STOP_MULTIPLIER.get(
+        str(regime).upper(), _TRAILING_STOP_MULTIPLIER_DEFAULT
+    )
+    trail_distance = atr_14 * multiplier
+    trail_pct = trail_distance / entry_price
+    activation_pct = max(0.03, trail_pct * 0.5)
+    return {
+        "trailing_stop_pct": round(trail_pct, 4),
+        "trailing_stop_trigger_pct": round(activation_pct, 4),
+        "trailing_stop_distance_rp": round(trail_distance, 2),
+    }
