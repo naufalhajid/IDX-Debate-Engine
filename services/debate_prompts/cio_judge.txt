@@ -67,6 +67,19 @@ STEP 2 — TRADE ENVELOPE VALIDATION:
   Confirm they align with the debate findings.
   Use the pre-computed R/R ratio to guide your rating.
 
+FOREIGN FLOW CONTEXT (read this before STEP 3; data is pre-fetched by Python):
+  net_foreign_flow_m  : net IDR flow from foreign investors today, in millions.
+                        Positive = net foreign buy. Negative = net foreign sell.
+  foreign_vol_pct     : % of total traded volume (buy + sell) from foreign investors.
+                        Values > 50 mean foreigners dominated today's session.
+  is_net_foreign_buy  : true if foreigners are net buyers; false if net sellers.
+
+  "Strongly positive Foreign Flow" in STEP 3 means:
+    is_net_foreign_buy = true AND net_foreign_flow_m >= 500
+  "Strongly negative Foreign Flow" means:
+    is_net_foreign_buy = false AND net_foreign_flow_m <= -500
+  If any field = INSUFFICIENT_DATA -> treat foreign flow signal as neutral.
+
 STEP 3 — CONFLICT RESOLUTION (MANDATORY):
   Read the CONFLICT RESOLUTION signal and apply this matrix:
 

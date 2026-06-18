@@ -1,5 +1,34 @@
 # Prompt Migration Log
 
+## 2026-06-18 — `s7-foreign-flow-v11`
+
+**Files changed:**
+- `services/debate_prompts/cio_judge.txt` (FOREIGN FLOW CONTEXT block added)
+- `providers/idx_foreign_flow.py` (new file — `ForeignFlowSnapshot`, `fetch_foreign_flow`)
+- `services/debate_chamber.py` (`_synthesizer_node` fetches foreign flow + passes 3 fields to context pack)
+- `services/context_pack_builder.py` (`net_foreign_flow_m`, `foreign_vol_pct`, `is_net_foreign_buy` added to tier2)
+
+### Changes
+
+**`cio_judge.txt`** — Added FOREIGN FLOW CONTEXT block between STEP 2 and STEP 3:
+- Defines `net_foreign_flow_m`, `foreign_vol_pct`, `is_net_foreign_buy` fields so the CIO judge knows where to read them.
+- Defines "strongly positive" (is_net_foreign_buy=true AND net_foreign_flow_m >= 500) and "strongly negative" (net_foreign_flow_m <= -500) thresholds used in the FAIL/PASS conflict resolution rule.
+- INSUFFICIENT_DATA fallback → treat as neutral.
+
+**`providers/idx_foreign_flow.py`** (NEW) — Task 16:
+- `ForeignFlowSnapshot` dataclass: `net_foreign_flow_m` (IDR millions), `foreign_buy_m`, `foreign_sell_m`, `foreign_vol_pct` (% of total volume), `net_foreign_vol` (shares), `is_net_foreign_buy` (bool), `as_of_date`.
+- Data source: Stockbit findata-view/foreign-domestic endpoint, period=PERIOD_RANGE_1D.
+- Returns `_empty()` snapshot (all-None) on any failure — callers never need a guard.
+
+**`debate_chamber.py`** — `_synthesizer_node` wires foreign flow:
+- Calls `fetch_foreign_flow` via `asyncio.to_thread` (same pattern as `_fetch_url`).
+- Graceful fallback to `_empty` on exception (auth failures in tests are silent).
+- Adds `stockbit_foreign_flow` to `sources` and `source_timestamps` only if data is present.
+- Injects `net_foreign_flow_m`, `foreign_vol_pct`, `is_net_foreign_buy` into `build_context_pack` raw_data dict.
+
+**`context_pack_builder.py`** — three new tier2 fields:
+- `net_foreign_flow_m`, `foreign_vol_pct`, `is_net_foreign_buy`.
+
 ## 2026-06-18 — `s6-insider-sell-post-earnings-v10`
 
 **Files changed:**

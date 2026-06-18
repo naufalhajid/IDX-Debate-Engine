@@ -2853,6 +2853,16 @@ Current Date (Asia/Jakarta): {current_date}
             source_timestamps["yfinance"] = market_data_as_of
             source_timestamps["market_data"] = market_data_as_of
 
+        from providers.idx_foreign_flow import fetch_foreign_flow, _empty as _ff_empty
+        try:
+            _ff = await asyncio.to_thread(fetch_foreign_flow, ticker, self.stockbit_client)
+        except Exception as _exc:
+            logger.warning("[Synthesizer] foreign_flow failed for %s: %s", ticker, _exc)
+            _ff = _ff_empty(ticker)
+        if _ff.net_foreign_flow_m is not None:
+            sources.append("stockbit_foreign_flow")
+            source_timestamps["stockbit_foreign_flow"] = context_generated_at
+
         context_pack = build_context_pack(
             ticker,
             {
@@ -2880,6 +2890,9 @@ Current Date (Asia/Jakarta): {current_date}
                 "sentiment_summary": self._compact_text(s, 800),
                 "insider_selling_flag": bool(metadata.get("has_insider_selling")),
                 "post_earnings_flag": bool(metadata.get("has_post_earnings")),
+                "net_foreign_flow_m": _ff.net_foreign_flow_m,
+                "foreign_vol_pct": _ff.foreign_vol_pct,
+                "is_net_foreign_buy": _ff.is_net_foreign_buy,
                 "data_sources": sources,
                 "source_timestamps": source_timestamps,
                 "market_data": market_data,

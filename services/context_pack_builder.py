@@ -38,6 +38,9 @@ CONTEXT_FIELD_TIERS = {
         "is_lq45",
         "insider_selling_flag",
         "post_earnings_flag",
+        "net_foreign_flow_m",
+        "foreign_vol_pct",
+        "is_net_foreign_buy",
     ],
     "tier3": [
         "news_summary",
@@ -325,6 +328,9 @@ def _collect_priority_fields(
         "post_earnings_flag": _first_present(
             raw_data, metadata, "post_earnings_flag", "has_post_earnings"
         ),
+        "net_foreign_flow_m": _first_present(raw_data, metadata, "net_foreign_flow_m"),
+        "foreign_vol_pct": _first_present(raw_data, metadata, "foreign_vol_pct"),
+        "is_net_foreign_buy": _first_present(raw_data, metadata, "is_net_foreign_buy"),
         "news_summary": _first_present(
             raw_data,
             metadata,
