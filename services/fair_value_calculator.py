@@ -131,6 +131,9 @@ class KeyStats:
     raw_pe_current: float = 0.0
     raw_pb_current: float = 0.0
 
+    # EV/EBITDA current multiple (untuk metode ke-4, mining/energy saja)
+    ev_ebitda_current: float | None = None
+
 
 # ---------------------------------------------------------------------------
 # Extractor — parse response JSON dari Stockbit keystats API
@@ -375,6 +378,15 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
             ]
         )
 
+        stats.ev_ebitda_current = _lookup_optional(
+            [
+                "EV to EBITDA (TTM)",
+                "EV/EBITDA (TTM)",
+                "EV/EBITDA",
+                "Enterprise Value/EBITDA",
+            ]
+        )
+
     # ── Strategy B: legacy flat key-value fallback ────────────────────────────
     # Only runs if Strategy A found nothing useful (flat dict empty or all zeros)
     if not flat or (
@@ -526,7 +538,7 @@ class FairValueCalculator:
     SECTOR_WEIGHTS = {
         "bank": {"pe": 0.35, "pb": 0.45, "ddm": 0.20},
         "consumer": {"pe": 0.50, "pb": 0.30, "ddm": 0.20},
-        "mining": {"pe": 0.60, "pb": 0.30, "ddm": 0.10},
+        "mining": {"pe": 0.35, "pb": 0.20, "ddm": 0.05, "ev_ebitda": 0.40},
         "property": {"pe": 0.30, "pb": 0.55, "ddm": 0.15},
         "default": {"pe": 0.45, "pb": 0.35, "ddm": 0.20},
     }
@@ -568,6 +580,18 @@ class FairValueCalculator:
         "healthcare": "default",
         "default": "default",
     }
+
+    # IDX sector median multiples and profitability ratios (static reference, ~2024–2025 data)
+    SECTOR_MEDIAN_PROFILES: dict[str, dict] = {
+        "bank":     {"pe": 10.0, "pb": 1.5, "roe": 0.14, "net_margin": 0.25},
+        "mining":   {"pe":  7.0, "pb": 1.2, "roe": 0.18, "net_margin": 0.15},
+        "consumer": {"pe": 18.0, "pb": 3.0, "roe": 0.20, "net_margin": 0.08},
+        "property": {"pe": 12.0, "pb": 0.8, "roe": 0.07, "net_margin": 0.20},
+        "default":  {"pe": 14.0, "pb": 1.5, "roe": 0.15, "net_margin": 0.10},
+    }
+
+    # EV/EBITDA target multiple for mining/energy (conservative IDX 5-year median)
+    _MINING_EV_EBITDA_TARGET: float = 5.5
 
     def __init__(self, stats: KeyStats, sector: str | None = None, eps_derived: bool = False):
         self.stats = stats
@@ -637,12 +661,74 @@ class FairValueCalculator:
 
         return round(fv, 0)
 
+    # ── Metode 4: EV/EBITDA Band (mining/energy only) ───────────────────────
+
+    def fair_value_ev_ebitda(self) -> float | None:
+        """
+        Fair value = current_price × (target_EV_EBITDA / current_EV_EBITDA)
+
+        Only fires for mining/energy sector. Returns None if EV/EBITDA is
+        unavailable or the result falls outside a 3x–0.3x sanity band.
+        """
+        if self.sector != "mining":
+            return None
+        current = self.stats.ev_ebitda_current
+        price = self.stats.current_price
+        if not current or current <= 0 or price <= 0:
+            return None
+        fv = round(price * (self._MINING_EV_EBITDA_TARGET / current), 0)
+        ratio = fv / price
+        if ratio > 3.0 or ratio < 0.3:
+            return None
+        return fv
+
+    # ── Task 27: Sector Peer Comparison ──────────────────────────────────────
+
+    def build_sector_comparison(self) -> str:
+        median = self.SECTOR_MEDIAN_PROFILES.get(
+            self.sector, self.SECTOR_MEDIAN_PROFILES["default"]
+        )
+        pe_cur = self.stats.raw_pe_current
+        pb_cur = self.stats.raw_pb_current
+        roe_cur = self.stats.roe
+        margin_cur = self.stats.net_margin
+
+        def _pct_diff(cur: float, med: float) -> str:
+            if med <= 0:
+                return "N/A"
+            diff = (cur - med) / med * 100
+            label = "Above Avg" if diff > 10 else ("Below Avg" if diff < -10 else "In Line")
+            return f"{label} ({diff:+.0f}%)"
+
+        lines = [
+            "── SECTOR PEER CONTEXT (IDX Median) ───────────────────────────────",
+            f"  Sektor : {self.sector.upper()} (data: ~2024–2025 median)",
+        ]
+        if pe_cur > 0:
+            lines.append(
+                f"  P/E    : {pe_cur:.1f}x stock | {median['pe']:.1f}x sector → {_pct_diff(pe_cur, median['pe'])}"
+            )
+        if pb_cur > 0:
+            lines.append(
+                f"  P/BV   : {pb_cur:.1f}x stock | {median['pb']:.1f}x sector → {_pct_diff(pb_cur, median['pb'])}"
+            )
+        if roe_cur > 0:
+            lines.append(
+                f"  ROE    : {roe_cur*100:.1f}% stock | {median['roe']*100:.1f}% sector → {_pct_diff(roe_cur, median['roe'])}"
+            )
+        if margin_cur > 0:
+            lines.append(
+                f"  Margin : {margin_cur*100:.1f}% stock | {median['net_margin']*100:.1f}% sector → {_pct_diff(margin_cur, median['net_margin'])}"
+            )
+        return "\n".join(lines)
+
     # ── Weighted Average ─────────────────────────────────────────────────────
 
     def fair_value_weighted(self) -> dict:
         pe_fv = None if self.eps_derived else self.fair_value_pe()
         pb_fv = self.fair_value_pb()
         ddm_fv = self.fair_value_ddm()
+        ev_ebitda_fv = self.fair_value_ev_ebitda()
 
         results = {}
         if pe_fv is not None:
@@ -651,6 +737,8 @@ class FairValueCalculator:
             results["pb"] = pb_fv
         if ddm_fv is not None:
             results["ddm"] = ddm_fv
+        if ev_ebitda_fv is not None:
+            results["ev_ebitda"] = ev_ebitda_fv
 
         if not results:
             return self._cache_weighted_result(
@@ -675,7 +763,7 @@ class FairValueCalculator:
         weighted_fv = round(weighted_fv, 0)
 
         n = len(results)
-        confidence = "HIGH" if n == 3 else ("MEDIUM" if n == 2 else "LOW")
+        confidence = "HIGH" if n >= 3 else ("MEDIUM" if n == 2 else "LOW")
         range_pct = _range_pct_for_method_count(n)
         if range_pct is None:
             fair_value_low = None
@@ -803,6 +891,19 @@ class FairValueCalculator:
         else:
             lines.append("  Metode DDM      : TIDAK VALID")
 
+        if self.sector == "mining":
+            if "ev_ebitda" in bdown:
+                ev_cur = self.stats.ev_ebitda_current or 0.0
+                lines.append(
+                    f"  EV/EBITDA Band  : {ev_cur:.1f}x current → "
+                    f"{self._MINING_EV_EBITDA_TARGET:.1f}x target "
+                    f"= Rp {bdown['ev_ebitda']:,}"
+                )
+            else:
+                lines.append(
+                    "  EV/EBITDA Band  : TIDAK VALID (EV/EBITDA tidak tersedia)"
+                )
+
         fv_str = (
             f"Rp {fv:,.0f}"
             if fv is not None
@@ -820,7 +921,7 @@ class FairValueCalculator:
             f"  FAIR VALUE (weighted avg) : {fv_str}",
             f"  FAIR VALUE BASE           : {fv_base_str}",
             f"  FAIR VALUE RANGE          : {fv_range_str}",
-            f"  Kalkulasi confidence      : {conf} ({len(bdown)}/3 metode valid)",
+            f"  Kalkulasi confidence      : {conf} ({len(bdown)}/{len(self.weights)} metode valid)",
             f"  RISK OVERVALUED           : {risk_overvalued}",
             "",
         ]
@@ -879,6 +980,8 @@ class FairValueCalculator:
             f"(hist avg: {self.stats.historical_pe_avg:.1f}x)",
             f"  P/B saat ini    : {self.stats.raw_pb_current:.1f}x "
             f"(hist avg: {self.stats.historical_pb_avg:.1f}x)",
+            "",
+            self.build_sector_comparison(),
             "",
             "CATATAN: Semua angka di atas dihitung Python dari data API.",
             "         LLM DILARANG menimpa atau menghitung ulang FAIR VALUE.",

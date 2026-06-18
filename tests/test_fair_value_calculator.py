@@ -369,3 +369,117 @@ def test_quality_gate_passes_two_methods_with_sane_margin(monkeypatch):
     assert result["confidence"] == "MEDIUM"
     assert "fv_quality_rejected" not in result
     assert "FAIR VALUE QUALITY GATE" not in report
+
+
+# ---------------------------------------------------------------------------
+# Task 24: EV/EBITDA method
+# ---------------------------------------------------------------------------
+
+def _mining_calc(ev_ebitda_current: float | None, price: float = 1000.0) -> FairValueCalculator:
+    stats = KeyStats(
+        ticker="ADRO",
+        current_price=price,
+        ev_ebitda_current=ev_ebitda_current,
+    )
+    return FairValueCalculator(stats, sector="mining")
+
+
+def test_fair_value_ev_ebitda_returns_none_for_non_mining():
+    stats = KeyStats(ticker="BBCA", current_price=9000, ev_ebitda_current=10.0)
+    calc = FairValueCalculator(stats, sector="bank")
+    assert calc.fair_value_ev_ebitda() is None
+
+
+def test_fair_value_ev_ebitda_returns_none_when_field_missing():
+    assert _mining_calc(ev_ebitda_current=None).fair_value_ev_ebitda() is None
+
+
+def test_fair_value_ev_ebitda_returns_none_when_zero():
+    assert _mining_calc(ev_ebitda_current=0.0).fair_value_ev_ebitda() is None
+
+
+def test_fair_value_ev_ebitda_computes_correctly():
+    # price 1000, current EV/EBITDA 4.0, target 5.5 → FV = 1000 × 5.5/4.0 = 1375
+    calc = _mining_calc(ev_ebitda_current=4.0, price=1000.0)
+    assert calc.fair_value_ev_ebitda() == pytest.approx(1375.0)
+
+
+def test_fair_value_ev_ebitda_rejects_outlier_high():
+    # current EV/EBITDA 0.5 → FV/price = 5.5/0.5 = 11× → rejected
+    assert _mining_calc(ev_ebitda_current=0.5).fair_value_ev_ebitda() is None
+
+
+def test_fair_value_ev_ebitda_rejects_outlier_low():
+    # current EV/EBITDA 50 → FV/price = 5.5/50 = 0.11× → rejected
+    assert _mining_calc(ev_ebitda_current=50.0).fair_value_ev_ebitda() is None
+
+
+def test_extract_keystats_parses_ev_ebitda():
+    api_response = _stockbit_response(
+        [
+            ("Current EPS (TTM)", "100"),
+            ("Book Value Per Share", "500"),
+            ("EV to EBITDA (TTM)", "4.2"),
+        ]
+    )
+    stats = extract_keystats(api_response, "ADRO")
+    assert stats.ev_ebitda_current == pytest.approx(4.2)
+
+
+def test_mining_weighted_includes_ev_ebitda(monkeypatch):
+    calc = _mining_calc(ev_ebitda_current=4.0, price=1000.0)
+    monkeypatch.setattr(calc, "fair_value_pe", lambda: 1200.0)
+    monkeypatch.setattr(calc, "fair_value_pb", lambda: 900.0)
+    monkeypatch.setattr(calc, "fair_value_ddm", lambda: None)
+    # ev_ebitda fires: 1000 × 5.5/4.0 = 1375
+    result = calc.fair_value_weighted()
+    assert "ev_ebitda" in result["breakdown"]
+    assert result["confidence"] == "HIGH"
+
+
+def test_mining_weighted_four_methods_gives_high_confidence(monkeypatch):
+    calc = _mining_calc(ev_ebitda_current=4.0, price=1000.0)
+    monkeypatch.setattr(calc, "fair_value_pe", lambda: 1200.0)
+    monkeypatch.setattr(calc, "fair_value_pb", lambda: 900.0)
+    monkeypatch.setattr(calc, "fair_value_ddm", lambda: 1100.0)
+    result = calc.fair_value_weighted()
+    assert len(result["breakdown"]) == 4
+    assert result["confidence"] == "HIGH"
+
+
+def test_mining_weights_sum_to_one():
+    weights = FairValueCalculator.SECTOR_WEIGHTS["mining"]
+    assert abs(sum(weights.values()) - 1.0) < 1e-9
+
+
+# ---------------------------------------------------------------------------
+# Task 27: Sector Peer Comparison
+# ---------------------------------------------------------------------------
+
+def test_build_sector_comparison_shows_mining_medians():
+    stats = KeyStats(
+        ticker="ADRO",
+        current_price=2000.0,
+        raw_pe_current=8.2,
+        raw_pb_current=1.1,
+        roe=0.223,
+        net_margin=0.185,
+    )
+    calc = FairValueCalculator(stats, sector="mining")
+    text = calc.build_sector_comparison()
+    assert "MINING" in text.upper()
+    assert "8.2x" in text
+    assert "7.0x" in text   # sector median PE for mining
+
+
+def test_build_sector_comparison_in_report():
+    api_response = _stockbit_response(
+        [
+            ("Current EPS (TTM)", "100"),
+            ("Book Value Per Share", "500"),
+            ("Return on Equity (TTM)", "22%"),
+            ("Net Profit Margin (TTM)", "18%"),
+        ]
+    )
+    report, _ = build_fair_value_payload(api_response, "ADRO", 1000.0)
+    assert "SECTOR PEER CONTEXT" in report

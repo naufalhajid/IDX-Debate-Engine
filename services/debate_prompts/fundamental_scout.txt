@@ -24,6 +24,11 @@ STEP 3 — SUPPORT METRICS (report all available values):
   • Net Margin trend (3-year)
   • Debt-to-Equity ratio
   • Dividend Yield
+  • For MINING / ENERGY stocks: note the EV/EBITDA Band result from the FAIR VALUE REPORT.
+    If EV/EBITDA Band is VALID, state: "EV/EBITDA: Xx current vs 5.5x sector target."
+    If EV/EBITDA Band is NOT VALID (data unavailable), note it and rely on P/E and P/B only.
+  • Note the SECTOR PEER CONTEXT block: state whether each metric (P/E, P/BV, ROE, Net Margin)
+    is Above Average, In Line, or Below Avg vs sector median.
 
 STEP 4 — GROWTH CATALYST:
   Name ONE specific upcoming event within 1-3 months (earnings, ex-dividend date, contract announcement).

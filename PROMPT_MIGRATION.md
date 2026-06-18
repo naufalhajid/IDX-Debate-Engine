@@ -1,5 +1,30 @@
 # Prompt Migration Log
 
+## 2026-06-18 — `s8-ev-ebitda-peer-compare-v12`
+
+**Files changed:**
+- `services/debate_prompts/fundamental_scout.txt` (STEP 3 extended for EV/EBITDA + sector peer context)
+- `services/fair_value_calculator.py` (Task 24: `ev_ebitda_current`, `fair_value_ev_ebitda()`, mining weights; Task 27: `SECTOR_MEDIAN_PROFILES`, `build_sector_comparison()`)
+
+### Changes
+
+**`fundamental_scout.txt`** — STEP 3 SUPPORT METRICS extended:
+- Mining/energy stocks: scout reads EV/EBITDA Band result from the FAIR VALUE REPORT.
+- All sectors: scout reads SECTOR PEER CONTEXT block, states Above/In Line/Below Avg per metric.
+
+**`fair_value_calculator.py`** — Task 24 (EV/EBITDA):
+- `KeyStats.ev_ebitda_current`: new optional float; populated from `"EV to EBITDA (TTM)"` (confirmed Stockbit field name from worktree `fundamental_analyser.py`).
+- `FairValueCalculator.fair_value_ev_ebitda()`: mining sector only; formula `price × (5.5 / current)`; sanity bounds 0.3×–3×.
+- `SECTOR_WEIGHTS["mining"]` updated from `{pe:0.60, pb:0.30, ddm:0.10}` to `{pe:0.35, pb:0.20, ddm:0.05, ev_ebitda:0.40}` (sum=1.0 ✓).
+- `_MINING_EV_EBITDA_TARGET = 5.5` (conservative IDX median).
+- `fair_value_weighted()` calls `fair_value_ev_ebitda()`; confidence threshold updated to `n >= 3`.
+
+**`fair_value_calculator.py`** — Task 27 (Sector Peer Comparison):
+- `SECTOR_MEDIAN_PROFILES`: static IDX sector medians (pe, pb, roe, net_margin) for bank/mining/consumer/property/default.
+- `build_sector_comparison()`: compares P/E, P/BV, ROE, Net Margin to sector median; appended to `build_report()`.
+
+---
+
 ## 2026-06-18 — `s7-foreign-flow-v11`
 
 **Files changed:**
