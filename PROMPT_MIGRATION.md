@@ -1,5 +1,37 @@
 # Prompt Migration Log
 
+## 2026-06-19 — `s9-vwap-flag-timetable-v13`
+
+**Files changed:**
+- `services/debate_prompts/chartist.txt` (STEP 10–12 added: VWAP, flag pattern, time-of-day)
+- `utils/technicals.py` (Task 19: `compute_vwap`; Task 25: `detect_flag_pattern`; Task 26: `get_time_of_day_signal`)
+- `services/debate_chamber.py` (imports + 3 new try/except blocks in `_chartist_node`)
+
+### Changes
+
+**`chartist.txt`** — three new steps added before CONSTRAINTS:
+- STEP 10 VWAP: reads `vwap`, `vwap_position`; outputs "VWAP: Rp X,XXX | Price X% above/below VWAP."
+- STEP 11 FLAG PATTERN: reads `flag_pattern`, `flag_confidence`, `pole_pct`; NONE → silent.
+- STEP 12 TIME-OF-DAY: reads `idx_session`, `entry_window`; advisory only, does not change directional signal.
+
+**`utils/technicals.py`** — Task 19 (`compute_vwap`):
+- Rolling 20-day VWAP on daily bars; typical price = (H+L+C)/3; zero-volume bars excluded.
+- Positions: ABOVE_VWAP (>+1%), BELOW_VWAP (<-1%), AT_VWAP (±1%), INSUFFICIENT_DATA (<20 bars).
+
+**`utils/technicals.py`** — Task 25 (`detect_flag_pattern`):
+- Requires ≥15 bars; pole ≥5% directional move; flag range <5% of flag mean.
+- HIGH confidence when flag vol/pole vol <0.8; returns BULL_FLAG / BEAR_FLAG / NONE.
+
+**`utils/technicals.py`** — Task 26 (`get_time_of_day_signal`):
+- Injectable clock (`now: datetime | None`); WIB = UTC+7; maps time to IDX session + OPTIMAL/SUBOPTIMAL/AVOID.
+- OPTIMAL: SESSION_1 (09:30–11:00) and SESSION_2 (14:00–15:00).
+- Note: Friday early close not modelled (varies per week).
+
+**`services/debate_chamber.py`** — `_chartist_node` wiring:
+- Tasks 19+25 inside OHLCV try-block; Task 26 outside OHLCV block (runs even when OHLCV unavailable).
+
+---
+
 ## 2026-06-18 — `s8-ev-ebitda-peer-compare-v12`
 
 **Files changed:**

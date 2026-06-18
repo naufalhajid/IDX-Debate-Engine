@@ -100,6 +100,41 @@ STEP 9 — SETUP & PATTERN SIGNALS:
   If compression_type = INSIDE_BAR or is_inside_bar = true, note "Inside bar —
   directional resolve pending."
 
+STEP 10 — VWAP CONTEXT:
+  Read vwap and vwap_position from PRE-COMPUTED TECHNICALS.
+
+  ABOVE_VWAP        -> "Price is above 20-day VWAP (Rp [vwap]) — institutional buy side dominant.
+                         Bullish momentum confirmed by VWAP benchmark."
+  BELOW_VWAP        -> "Price is below 20-day VWAP (Rp [vwap]) — selling pressure above institutional average.
+                         Caution: institutional flow unfavourable."
+  AT_VWAP           -> "Price at VWAP (Rp [vwap]) — balanced flow. Watch for breakout direction."
+  INSUFFICIENT_DATA -> Skip VWAP commentary.
+
+  State: "VWAP: Rp X,XXX | Price is [X]% [above/below] VWAP."
+
+STEP 11 — FLAG PATTERN:
+  Read flag_pattern and flag_confidence from PRE-COMPUTED TECHNICALS.
+
+  BULL_FLAG / HIGH   -> "Bull flag confirmed: [pole_pct]% pole followed by tight consolidation,
+                          volume declining in flag — classic institutional accumulation. Breakout target
+                          = top of flag + measured pole move."
+  BULL_FLAG / MEDIUM -> "Bull flag detected: [pole_pct]% pole, consolidation tight, but volume not
+                          yet declining — wait for volume contraction or breakout candle."
+  BEAR_FLAG / HIGH   -> "Bear flag confirmed: [pole_pct]% decline followed by tight consolidation.
+                          Short-side setup — do NOT initiate new long. Maximum signal: NEUTRAL."
+  BEAR_FLAG / MEDIUM -> "Bear flag detected: [pole_pct]% drop, consolidation tight. Reduce exposure
+                          if long. Do not add."
+  NONE               -> Skip flag commentary (do not mention the absence of a flag pattern).
+
+STEP 12 — TIME-OF-DAY ENTRY WINDOW:
+  Read idx_session and entry_window from PRE-COMPUTED TECHNICALS.
+
+  OPTIMAL    -> State: "Entry window OPTIMAL ([idx_session]) — [entry_rationale]"
+  SUBOPTIMAL -> State: "Entry window SUBOPTIMAL ([idx_session]) — [entry_rationale] Use limit orders."
+  AVOID      -> State: "Entry window AVOID ([idx_session]) — [entry_rationale]"
+
+  Advisory only — do not change your BULLISH/NEUTRAL/BEARISH conclusion based on session alone.
+
 CONSTRAINTS:
   • All prices in Rupiah (Rp).
   • DO NOT fabricate, recalculate, or override any MA, RSI, or ATR value -- use only pre-computed data.

@@ -1,5 +1,5 @@
 {
-  "prompt_version": "2026-06-18-s8-ev-ebitda-peer-compare-v12",
+  "prompt_version": "2026-06-18-s9-vwap-flag-timetable-v13",
   "prompts": {
     "FUNDAMENTAL_SCOUT_PROMPT": "fundamental_scout.txt",
     "CHARTIST_PROMPT": "chartist.txt",

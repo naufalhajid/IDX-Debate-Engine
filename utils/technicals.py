@@ -6,7 +6,11 @@ never need to calculate them — they only interpret.
 """
 
 import math
+from datetime import datetime, timedelta, timezone
+
 import pandas as pd
+
+_WIB = timezone(timedelta(hours=7))
 
 # Stop-loss ATR multiplier keyed on core.regime.RegimeType ("DEFENSIVE", "RECOVERY",
 # "HIGH", "NORMAL", "LOW"). Values are deliberately unchanged from the pre-fix
@@ -413,3 +417,205 @@ def validate_ohlcv(
     if (df["Volume"].fillna(0) == 0).all():
         return False, f"[{ticker}] Volume is all-zero (possible suspended/FCA)"
     return True, ""
+
+
+# ── Task 19: Rolling VWAP ─────────────────────────────────────────────────────
+
+def compute_vwap(
+    high: pd.Series,
+    low: pd.Series,
+    close: pd.Series,
+    volume: pd.Series,
+    window: int = 20,
+) -> dict:
+    """Rolling 20-day VWAP (Typical Price × Volume weighted) — institutional price benchmark.
+
+    Uses a rolling window on daily bars because true session VWAP requires intraday ticks.
+    A 20-day rolling VWAP is the standard IDX institutional benchmark used for VWAP execution.
+    """
+    if len(close) < window:
+        return {"vwap": None, "vwap_position": "INSUFFICIENT_DATA", "price_to_vwap_pct": None}
+
+    typical = (high + low + close) / 3
+    vol_clean = volume.where(volume > 0, other=float("nan"))  # exclude zero-volume bars
+    tp_vol = typical * vol_clean
+
+    rolling_tpv = tp_vol.rolling(window).sum()
+    rolling_vol = vol_clean.rolling(window).sum()
+
+    vwap_series = rolling_tpv / rolling_vol
+    vwap_now = float(vwap_series.iloc[-1])
+    price_now = float(close.iloc[-1])
+
+    if not math.isfinite(vwap_now) or vwap_now <= 0:
+        return {"vwap": None, "vwap_position": "INSUFFICIENT_DATA", "price_to_vwap_pct": None}
+
+    pct_diff = (price_now - vwap_now) / vwap_now * 100
+
+    if pct_diff > 1.0:
+        position = "ABOVE_VWAP"
+    elif pct_diff < -1.0:
+        position = "BELOW_VWAP"
+    else:
+        position = "AT_VWAP"
+
+    return {
+        "vwap": round(vwap_now, 0),
+        "vwap_position": position,
+        "price_to_vwap_pct": round(pct_diff, 1),
+    }
+
+
+# ── Task 25: Bull / Bear Flag Pattern ────────────────────────────────────────
+
+def detect_flag_pattern(
+    close: pd.Series,
+    volume: pd.Series,
+    pole_window: int = 10,
+    flag_window: int = 5,
+    pole_min_pct: float = 5.0,
+) -> dict:
+    """Detect bull or bear flag: a strong directional pole followed by tight consolidation.
+
+    BULL FLAG: pole rises ≥ pole_min_pct%, consolidation range < 5% of flag mean.
+    BEAR FLAG: pole falls ≥ pole_min_pct%, same consolidation criterion.
+    Confidence is HIGH when flag volume is also lower than pole volume (classic pattern).
+    Requires pole_window + flag_window bars minimum.
+    """
+    min_bars = pole_window + flag_window
+    if len(close) < min_bars:
+        return {"flag_pattern": "NONE", "flag_confidence": "NONE", "pole_pct": None}
+
+    flag_close = close.iloc[-flag_window:]
+    pole_close = close.iloc[-(pole_window + flag_window) : -flag_window]
+
+    pole_start = float(pole_close.iloc[0])
+    pole_end = float(pole_close.iloc[-1])
+
+    if pole_start <= 0:
+        return {"flag_pattern": "NONE", "flag_confidence": "NONE", "pole_pct": None}
+
+    pole_pct = (pole_end - pole_start) / pole_start * 100
+
+    flag_mean = float(flag_close.mean())
+    flag_range_pct = (
+        (float(flag_close.max()) - float(flag_close.min())) / flag_mean * 100
+        if flag_mean > 0
+        else 999.0
+    )
+    is_tight = flag_range_pct < 5.0
+
+    flag_vol_avg = float(volume.iloc[-flag_window:].mean())
+    pole_vol_avg = float(volume.iloc[-(pole_window + flag_window) : -flag_window].mean())
+    volume_declining = pole_vol_avg > 0 and (flag_vol_avg / pole_vol_avg) < 0.8
+
+    if pole_pct >= pole_min_pct and is_tight:
+        confidence = "HIGH" if volume_declining else "MEDIUM"
+        return {"flag_pattern": "BULL_FLAG", "flag_confidence": confidence, "pole_pct": round(pole_pct, 1)}
+
+    if pole_pct <= -pole_min_pct and is_tight:
+        confidence = "HIGH" if volume_declining else "MEDIUM"
+        return {"flag_pattern": "BEAR_FLAG", "flag_confidence": confidence, "pole_pct": round(pole_pct, 1)}
+
+    return {"flag_pattern": "NONE", "flag_confidence": "NONE", "pole_pct": None}
+
+
+# ── Task 26: IDX Time-of-Day Entry Window ────────────────────────────────────
+
+def get_time_of_day_signal(now: datetime | None = None) -> dict:
+    """Return the current IDX session and swing-trade entry advisory (WIB = UTC+7).
+
+    IDX regular session boundaries (Mon–Fri):
+      Pre-open  : 08:45–09:00   No fills
+      Session 1 : 09:00–11:59   Main morning session
+      Break     : 12:00–13:29   No fills
+      Session 2 : 13:30–15:49   Afternoon session
+      Pre-close : 15:49–16:00   Closing auction
+    Note: Friday session 2 ends ~15:00 — this function does not model Friday early close
+    because the exact minute varies by week; treat as SUBOPTIMAL after 14:45 Fri.
+    """
+    if now is None:
+        now = datetime.now(_WIB)
+    elif now.tzinfo is None:
+        now = now.replace(tzinfo=_WIB)
+    else:
+        now = now.astimezone(_WIB)
+
+    hhmm = now.hour * 60 + now.minute
+    is_weekend = now.weekday() >= 5
+
+    _PRE_OPEN_START  = 8 * 60 + 45   # 08:45
+    _S1_START        = 9 * 60         # 09:00
+    _S1_EARLY_END    = 9 * 60 + 30   # 09:30
+    _S1_PEAK_END     = 11 * 60        # 11:00
+    _S1_END          = 12 * 60        # 12:00
+    _S2_START        = 13 * 60 + 30  # 13:30
+    _S2_EARLY_END    = 14 * 60        # 14:00
+    _S2_LATE_START   = 15 * 60        # 15:00
+    _S2_END          = 15 * 60 + 49  # 15:49
+    _PRE_CLOSE_END   = 16 * 60        # 16:00
+
+    if is_weekend:
+        session, window, rationale = (
+            "MARKET_CLOSED",
+            "AVOID",
+            "Market closed (weekend). Plan entries for Monday open.",
+        )
+    elif hhmm < _PRE_OPEN_START:
+        session, window, rationale = (
+            "PRE_MARKET", "AVOID", "Before IDX pre-open. Prepare watchlist — no fills available."
+        )
+    elif hhmm < _S1_START:
+        session, window, rationale = (
+            "PRE_OPEN", "AVOID", "Pre-open auction. Indicative prices only — no valid fills."
+        )
+    elif hhmm < _S1_EARLY_END:
+        session, window, rationale = (
+            "SESSION_1_OPEN",
+            "SUBOPTIMAL",
+            "First 30 min: spread elevated, gap direction unconfirmed. Wait for trend to establish.",
+        )
+    elif hhmm < _S1_PEAK_END:
+        session, window, rationale = (
+            "SESSION_1",
+            "OPTIMAL",
+            "Best swing entry window: liquidity high, trend direction established (09:30–11:00).",
+        )
+    elif hhmm < _S1_END:
+        session, window, rationale = (
+            "SESSION_1_LATE",
+            "SUBOPTIMAL",
+            "Approaching lunch. Momentum may stall; prefer limit orders only.",
+        )
+    elif hhmm < _S2_START:
+        session, window, rationale = (
+            "BREAK", "AVOID", "Midday break (12:00–13:30). No fills. Review morning action."
+        )
+    elif hhmm < _S2_EARLY_END:
+        session, window, rationale = (
+            "SESSION_2_OPEN",
+            "SUBOPTIMAL",
+            "Session 2 open: confirm morning trend continuation before committing.",
+        )
+    elif hhmm < _S2_LATE_START:
+        session, window, rationale = (
+            "SESSION_2",
+            "OPTIMAL",
+            "Good afternoon window: institutional accumulation visible (14:00–15:00).",
+        )
+    elif hhmm < _S2_END:
+        session, window, rationale = (
+            "SESSION_2_CLOSING",
+            "AVOID",
+            "Closing approach (15:00–15:49): avoid new entries — end-of-day selling risk.",
+        )
+    elif hhmm < _PRE_CLOSE_END:
+        session, window, rationale = (
+            "PRE_CLOSE", "AVOID", "Pre-close auction (15:49–16:00). Overnight gap risk elevated."
+        )
+    else:
+        session, window, rationale = (
+            "AFTER_CLOSE", "AVOID", "Market closed. Entry tomorrow. Monitor overnight news."
+        )
+
+    return {"idx_session": session, "entry_window": window, "entry_rationale": rationale}

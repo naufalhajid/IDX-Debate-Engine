@@ -91,10 +91,13 @@ from utils.technicals import (
     compute_macd,
     compute_rsi,
     compute_swing_low,
+    compute_vwap,
     detect_candlestick_pattern,
+    detect_flag_pattern,
     detect_gap,
     detect_rsi_divergence,
     detect_volatility_compression,
+    get_time_of_day_signal,
     snap_to_tick,
     validate_ohlcv,
 )
@@ -2475,6 +2478,28 @@ Current Date (Asia/Jakarta): {current_date}
                 except Exception as _exc:
                     logger.debug(f"[Chartist] Gap/Compression failed: {_exc}")
 
+                # ── Task 19: Rolling VWAP ─────────────────────────────────────
+                try:
+                    vwap = compute_vwap(df_yf["High"], df_yf["Low"], close, df_yf["Volume"])
+                    tech_indicators.update({
+                        "vwap": vwap["vwap"],
+                        "vwap_position": vwap["vwap_position"],
+                        "price_to_vwap_pct": vwap["price_to_vwap_pct"],
+                    })
+                except Exception as _exc:
+                    logger.debug(f"[Chartist] VWAP failed: {_exc}")
+
+                # ── Task 25: Bull / Bear Flag ─────────────────────────────────
+                try:
+                    flag = detect_flag_pattern(close, df_yf["Volume"])
+                    tech_indicators.update({
+                        "flag_pattern": flag["flag_pattern"],
+                        "flag_confidence": flag["flag_confidence"],
+                        "pole_pct": flag["pole_pct"],
+                    })
+                except Exception as _exc:
+                    logger.debug(f"[Chartist] Flag pattern failed: {_exc}")
+
                 logger.info(
                     f"[Chartist] Technicals computed: MA50={tech_indicators.get('ma50')}, RSI={tech_indicators.get('rsi14')}"
                 )
@@ -2510,6 +2535,17 @@ Current Date (Asia/Jakarta): {current_date}
                     confidence_penalty=decision.confidence_penalty,
                 )
                 state["metadata"] = _metadata_with_planner_note(state, decision)
+
+        # ── Task 26: IDX time-of-day entry window (clock — runs outside OHLCV block) ──
+        try:
+            tod = get_time_of_day_signal()
+            tech_indicators.update({
+                "idx_session": tod["idx_session"],
+                "entry_window": tod["entry_window"],
+                "entry_rationale": tod["entry_rationale"],
+            })
+        except Exception as _exc:
+            logger.debug(f"[Chartist] Time-of-day signal failed: {_exc}")
 
         # ── 2. Also fetch orderbook for near-term level context ──────────────
         orderbook_data: dict = {}
