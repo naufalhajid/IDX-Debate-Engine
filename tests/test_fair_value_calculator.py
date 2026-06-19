@@ -654,3 +654,49 @@ def test_normalized_eps_shows_in_report():
     report = calc.build_report()
     assert "normalized" in report
     assert "peak margin" in report
+
+
+# ── FV-3: SOE Governance Discount ────────────────────────────────────────────
+
+def _make_soe_calc(ticker: str, sector: str = "bank") -> FairValueCalculator:
+    stats = KeyStats(
+        ticker=ticker,
+        current_price=5000.0,
+        eps_ttm=400.0,
+        book_value_per_share=3000.0,
+        roe=0.15,
+        historical_pe_avg=15.0,
+        historical_pb_avg=2.5,
+    )
+    return FairValueCalculator(stats, sector=sector)
+
+
+def test_soe_ticker_fair_value_is_discounted():
+    calc_soe = _make_soe_calc("BBRI")
+    calc_private = _make_soe_calc("BBCA")  # BBCA is private — no discount
+    result_soe = calc_soe.fair_value_weighted()
+    result_private = calc_private.fair_value_weighted()
+    assert result_soe["fair_value"] is not None
+    assert result_private["fair_value"] is not None
+    assert result_soe["fair_value"] < result_private["fair_value"]
+    expected = round(result_private["fair_value"] * 0.85, 0)
+    assert result_soe["fair_value"] == expected
+
+
+def test_soe_result_flags_is_soe_true():
+    result = _make_soe_calc("BMRI").fair_value_weighted()
+    assert result["is_soe"] is True
+    assert result["governance_discount_pct"] == pytest.approx(0.15)
+
+
+def test_non_soe_result_flags_is_soe_false():
+    result = _make_soe_calc("BBCA").fair_value_weighted()
+    assert result["is_soe"] is False
+    assert result["governance_discount_pct"] is None
+
+
+def test_soe_mos_lower_than_non_soe():
+    mos_soe = _make_soe_calc("BBRI").fair_value_weighted()["margin_of_safety_pct"]
+    mos_private = _make_soe_calc("BBCA").fair_value_weighted()["margin_of_safety_pct"]
+    assert mos_soe is not None and mos_private is not None
+    assert mos_soe < mos_private

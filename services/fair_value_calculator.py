@@ -17,6 +17,24 @@ from utils.trade_math import calculate_rr
 
 SECTOR_CACHE_PATH = Path("output/sector_cache.json")
 
+# ── FV-3: SOE Governance Discount ────────────────────────────────────────────
+# BUMN/SOE stocks trade at a structural discount vs private peers due to:
+# political dividend pressure, slower capital allocation, and governance risk.
+# 15% is the market-implied average discount for IDX BUMN vs sector peers.
+_SOE_DISCOUNT_PCT: float = 0.15
+
+_SOE_TICKERS: frozenset[str] = frozenset({
+    "BBRI", "BMRI", "BBNI", "BBTN",   # Banking
+    "TLKM",                             # Telecoms
+    "PGAS",                             # Gas distribution
+    "PTBA", "ANTM", "TINS",            # Mining & Resources
+    "WIKA", "WSKT", "PTPP", "ADHI",   # Construction
+    "SMGR", "SMBR",                    # Cement
+    "KAEF", "INAF",                    # Pharma
+    "JSMR", "GIAA",                    # Transportation & Infrastructure
+    "PPRO",                             # Property
+})
+
 
 def _normalize_ticker_key(ticker: str) -> str:
     """Return the cache key used across IDX ticker payloads."""
@@ -778,6 +796,8 @@ class FairValueCalculator:
         if ev_ebitda_fv is not None:
             results["ev_ebitda"] = ev_ebitda_fv
 
+        is_soe = _normalize_ticker_key(self.stats.ticker) in _SOE_TICKERS
+
         if not results:
             return self._cache_weighted_result(
                 {
@@ -791,6 +811,8 @@ class FairValueCalculator:
                     "confidence": "INSUFFICIENT_DATA",
                     "margin_of_safety_pct": None,
                     "valuation_verdict": "DATA_UNAVAILABLE",
+                    "is_soe": is_soe,
+                    "governance_discount_pct": None,
                 }
             )
 
@@ -799,6 +821,11 @@ class FairValueCalculator:
             results[m] * (self.weights[m] / total_weight) for m in results
         )
         weighted_fv = round(weighted_fv, 0)
+
+        # SOE governance discount — applied before range/MOS so all derived
+        # fields use the discounted FV without a second pass.
+        if is_soe:
+            weighted_fv = round(weighted_fv * (1 - _SOE_DISCOUNT_PCT), 0)
 
         n = len(results)
         confidence = "HIGH" if n >= 3 else ("MEDIUM" if n == 2 else "LOW")
@@ -840,6 +867,8 @@ class FairValueCalculator:
                 "confidence": confidence,
                 "margin_of_safety_pct": mos,
                 "valuation_verdict": verdict,
+                "is_soe": is_soe,
+                "governance_discount_pct": _SOE_DISCOUNT_PCT if is_soe else None,
             }
         )
 
