@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 import pandas as pd
-import pytest
 
 from utils.technicals import (
     compute_volume_profile,
@@ -35,8 +34,8 @@ def _ohlcv(n: int, close_val: float, vol: float = 1000.0) -> tuple:
 # ── Task 19: compute_vwap ─────────────────────────────────────────────────────
 
 def test_compute_vwap_insufficient_data_below_window():
-    h, l, c, v = _ohlcv(10, 100.0)
-    result = compute_vwap(h, l, c, v, window=20)
+    high, low, close, volume = _ohlcv(10, 100.0)
+    result = compute_vwap(high, low, close, volume, window=20)
     assert result["vwap"] is None
     assert result["vwap_position"] == "INSUFFICIENT_DATA"
     assert result["price_to_vwap_pct"] is None
@@ -44,41 +43,41 @@ def test_compute_vwap_insufficient_data_below_window():
 
 def test_compute_vwap_above_vwap():
     # Uniform bars at 100 → VWAP = 100; last bar close overridden to 105 (+5%)
-    h, l, c, v = _ohlcv(25, 100.0)
-    c.iloc[-1] = 105.0  # 5% above VWAP
-    result = compute_vwap(h, l, c, v)
+    high, low, close, volume = _ohlcv(25, 100.0)
+    close.iloc[-1] = 105.0  # 5% above VWAP
+    result = compute_vwap(high, low, close, volume)
     assert result["vwap_position"] == "ABOVE_VWAP"
     assert result["price_to_vwap_pct"] is not None and result["price_to_vwap_pct"] > 1.0
 
 
 def test_compute_vwap_below_vwap():
-    h, l, c, v = _ohlcv(25, 100.0)
-    c.iloc[-1] = 95.0  # 5% below VWAP
-    result = compute_vwap(h, l, c, v)
+    high, low, close, volume = _ohlcv(25, 100.0)
+    close.iloc[-1] = 95.0  # 5% below VWAP
+    result = compute_vwap(high, low, close, volume)
     assert result["vwap_position"] == "BELOW_VWAP"
     assert result["price_to_vwap_pct"] is not None and result["price_to_vwap_pct"] < -1.0
 
 
 def test_compute_vwap_at_vwap_within_band():
-    h, l, c, v = _ohlcv(25, 100.0)
+    high, low, close, volume = _ohlcv(25, 100.0)
     # price == VWAP → price_to_vwap_pct == 0 → AT_VWAP
-    result = compute_vwap(h, l, c, v)
+    result = compute_vwap(high, low, close, volume)
     assert result["vwap_position"] == "AT_VWAP"
     assert result["price_to_vwap_pct"] == 0.0
 
 
 def test_compute_vwap_ignores_zero_volume_bars():
     # First 5 bars have zero volume — should not affect VWAP correctness
-    h, l, c, v = _ohlcv(25, 100.0)
-    v.iloc[:5] = 0.0
-    result = compute_vwap(h, l, c, v)
+    high, low, close, volume = _ohlcv(25, 100.0)
+    volume.iloc[:5] = 0.0
+    result = compute_vwap(high, low, close, volume)
     assert result["vwap"] is not None
     assert result["vwap_position"] == "AT_VWAP"
 
 
 def test_compute_vwap_returns_rounded_float():
-    h, l, c, v = _ohlcv(25, 1234.5)
-    result = compute_vwap(h, l, c, v)
+    high, low, close, volume = _ohlcv(25, 1234.5)
+    result = compute_vwap(high, low, close, volume)
     assert isinstance(result["vwap"], float)
 
 
@@ -222,16 +221,16 @@ def test_time_of_day_result_has_required_keys():
 
 def _vp_series(n: int, prices: list[float], vols: list[float]) -> tuple:
     """Build (high, low, close, volume) with each bar spanning ±2% of its price."""
-    c = pd.Series(prices[:n])
-    h = c * 1.02
-    l = c * 0.98
-    v = pd.Series(vols[:n])
-    return h, l, c, v
+    close = pd.Series(prices[:n])
+    high = close * 1.02
+    low = close * 0.98
+    volume = pd.Series(vols[:n])
+    return high, low, close, volume
 
 
 def test_volume_profile_insufficient_data():
-    h, l, c, v = _ohlcv(30, 1000.0)
-    result = compute_volume_profile(h, l, c, v, window=60)
+    high, low, close, volume = _ohlcv(30, 1000.0)
+    result = compute_volume_profile(high, low, close, volume, window=60)
     assert result["poc"] is None
     assert result["price_vs_poc"] == "INSUFFICIENT_DATA"
     assert result["hvn_levels"] == []
@@ -239,8 +238,8 @@ def test_volume_profile_insufficient_data():
 
 
 def test_volume_profile_returns_required_keys():
-    h, l, c, v = _ohlcv(60, 1000.0)
-    result = compute_volume_profile(h, l, c, v)
+    high, low, close, volume = _ohlcv(60, 1000.0)
+    result = compute_volume_profile(high, low, close, volume)
     assert {"poc", "poc_distance_pct", "price_vs_poc", "hvn_levels", "lvn_levels"} <= result.keys()
 
 
@@ -248,8 +247,8 @@ def test_volume_profile_poc_is_at_heavy_volume_zone():
     # 60 bars at 1000 with large volume, then last 10 bars at 1200 with tiny volume
     prices = [1000.0] * 50 + [1200.0] * 10
     vols   = [10_000.0] * 50 + [100.0] * 10
-    h, l, c, v = _vp_series(60, prices, vols)
-    result = compute_volume_profile(h, l, c, v)
+    high, low, close, volume = _vp_series(60, prices, vols)
+    result = compute_volume_profile(high, low, close, volume)
     assert result["poc"] is not None
     # POC should be near 1000, well below current price 1200
     assert result["price_vs_poc"] == "ABOVE_POC"
@@ -258,33 +257,33 @@ def test_volume_profile_poc_is_at_heavy_volume_zone():
 
 def test_volume_profile_above_poc_when_price_above():
     # Uniform bars at 1000; last bar close bumped to 1100 → price above all typical prices
-    h, l, c, v = _ohlcv(60, 1000.0)
-    c.iloc[-1] = 1100.0
-    h.iloc[-1] = 1100.0 * 1.05
-    l.iloc[-1] = 1100.0 * 0.95
-    result = compute_volume_profile(h, l, c, v)
+    high, low, close, volume = _ohlcv(60, 1000.0)
+    close.iloc[-1] = 1100.0
+    high.iloc[-1] = 1100.0 * 1.05
+    low.iloc[-1] = 1100.0 * 0.95
+    result = compute_volume_profile(high, low, close, volume)
     assert result["price_vs_poc"] == "ABOVE_POC"
 
 
 def test_volume_profile_at_poc_uniform_bars():
     # Uniform price bars → all bars hit same bucket → POC ≈ current price
-    h, l, c, v = _ohlcv(60, 1000.0)
-    result = compute_volume_profile(h, l, c, v)
+    high, low, close, volume = _ohlcv(60, 1000.0)
+    result = compute_volume_profile(high, low, close, volume)
     # With all bars identical, POC should be at or very near 1000
     assert result["price_vs_poc"] == "AT_POC"
     assert result["poc_distance_pct"] == 0.0 or abs(result["poc_distance_pct"]) <= 1.0
 
 
 def test_volume_profile_excludes_zero_volume_bars():
-    h, l, c, v = _ohlcv(60, 1000.0)
-    v.iloc[:10] = 0.0  # first 10 bars have zero volume
-    result = compute_volume_profile(h, l, c, v)
+    high, low, close, volume = _ohlcv(60, 1000.0)
+    volume.iloc[:10] = 0.0  # first 10 bars have zero volume
+    result = compute_volume_profile(high, low, close, volume)
     assert result["poc"] is not None  # should still compute from remaining 50 bars
 
 
 def test_volume_profile_hvn_lvn_are_lists():
-    h, l, c, v = _ohlcv(60, 1000.0)
-    result = compute_volume_profile(h, l, c, v)
+    high, low, close, volume = _ohlcv(60, 1000.0)
+    result = compute_volume_profile(high, low, close, volume)
     assert isinstance(result["hvn_levels"], list)
     assert isinstance(result["lvn_levels"], list)
     assert len(result["hvn_levels"]) <= 3

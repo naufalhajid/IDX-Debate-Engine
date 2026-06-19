@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from schemas.debate import CIOVerdict
 from utils.quality_checks import check_verdict_quality
 

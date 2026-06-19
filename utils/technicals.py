@@ -645,13 +645,13 @@ def compute_volume_profile(
     if len(close) < window:
         return _empty
 
-    h = high.iloc[-window:]
-    l = low.iloc[-window:]
-    c = close.iloc[-window:]
-    v = volume.iloc[-window:]
+    high_window = high.iloc[-window:]
+    low_window = low.iloc[-window:]
+    close_window = close.iloc[-window:]
+    volume_window = volume.iloc[-window:]
 
-    typical = (h + l + c) / 3
-    vol_clean = v.where(v > 0, other=float("nan"))
+    typical = (high_window + low_window + close_window) / 3
+    vol_clean = volume_window.where(volume_window > 0, other=float("nan"))
 
     p_min = float(typical.min())
     p_max = float(typical.max())
@@ -659,7 +659,7 @@ def compute_volume_profile(
         return _empty
     if p_max <= p_min:
         # Zero price range — all bars at the same typical price; POC is that price
-        price_now = float(c.iloc[-1])
+        price_now = float(close_window.iloc[-1])
         if not math.isfinite(price_now) or price_now <= 0:
             return _empty
         return {
@@ -682,7 +682,7 @@ def compute_volume_profile(
     bin_width = (p_max - p_min) / bins
     poc_mid = p_min + (poc_label + 0.5) * bin_width
 
-    price_now = float(c.iloc[-1])
+    price_now = float(close_window.iloc[-1])
     if poc_mid <= 0:
         return _empty
     poc_dist = (price_now - poc_mid) / poc_mid * 100
