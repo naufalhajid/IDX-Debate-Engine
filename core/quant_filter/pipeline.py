@@ -157,6 +157,9 @@ def compute_ara_arb_risk(
 
     arb_lock_risk HIGH → position may be locked on down-day, hard to exit.
     ara_entry_risk HIGH → chasing after a +20% run in 3 days; crowded entry.
+
+    Uses intraday high/low (not close-to-close) so that a stock spiking
+    +22% intraday then closing +4% is still correctly flagged ARA-risk HIGH.
     """
     if len(close) < lookback + 1:
         return {
@@ -165,24 +168,52 @@ def compute_ara_arb_risk(
             "ara_arb_note": "Insufficient data",
         }
 
-    tail = close.tail(lookback + 1)
-    max_3d_drawdown = float(tail.iloc[-1] / tail.iloc[0]) - 1
-    max_3d_gain = float(tail.iloc[-1] / tail.iloc[0]) - 1
+    baseline_close = float(close.iloc[-lookback - 1])
+    if baseline_close <= 0:
+        return {
+            "arb_lock_risk": "UNKNOWN",
+            "ara_entry_risk": "UNKNOWN",
+            "ara_arb_note": "Invalid baseline price",
+        }
 
-    arb_risk = "HIGH" if max_3d_drawdown < -0.12 else "LOW"
-    ara_risk = "HIGH" if max_3d_gain > 0.20 else "LOW"
+    window_high = float(high.tail(lookback).max())
+    window_low = float(low.tail(lookback).min())
 
-    notes = []
-    if arb_risk == "HIGH":
-        notes.append(f"Recent drawdown {max_3d_drawdown:.1%} — ARB lock risk elevated")
-    if ara_risk == "HIGH":
-        notes.append(f"Recent gain {max_3d_gain:.1%} — ARA chase risk elevated")
-    note = "; ".join(notes) if notes else "Within normal range"
+    max_gain = (window_high / baseline_close) - 1   # intraday peak vs baseline
+    max_drop = (window_low / baseline_close) - 1    # intraday trough vs baseline
+
+    # ARB lock risk — based on intraday LOW
+    if max_drop < -0.12:
+        arb_risk = "HIGH"
+        arb_note = (
+            f"Harga sempat menyentuh {max_drop:.1%} dari level {lookback} hari lalu "
+            "(intraday low). Risiko ARB lock jika tren turun berlanjut."
+        )
+    elif max_drop < -0.07:
+        arb_risk = "MEDIUM"
+        arb_note = "Penurunan intraday signifikan — waspadai ARB lock."
+    else:
+        arb_risk = "LOW"
+        arb_note = ""
+
+    # ARA entry risk — based on intraday HIGH
+    if max_gain > 0.20:
+        ara_risk = "HIGH"
+        ara_note = (
+            f"Harga sempat menyentuh +{max_gain:.1%} dari level {lookback} hari lalu "
+            "(intraday high). Entry sekarang berisiko masuk di puncak distribusi/ARA."
+        )
+    elif max_gain > 0.12:
+        ara_risk = "MEDIUM"
+        ara_note = "Kenaikan intraday cepat — potensi ARA diikuti reversal tajam."
+    else:
+        ara_risk = "LOW"
+        ara_note = ""
 
     return {
         "arb_lock_risk": arb_risk,
         "ara_entry_risk": ara_risk,
-        "ara_arb_note": note,
+        "ara_arb_note": arb_note or ara_note or "Within normal range",
     }
 
 
@@ -1273,6 +1304,12 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
             progress=False,
             group_by="ticker",
         )
+        # yfinance returns flat columns (not MultiIndex) for single-ticker downloads.
+        # Without this guard, weekly_data[t_yf] extraction below fails silently and
+        # weekly_trend becomes INSUFFICIENT_DATA for every single-ticker run.
+        if not _raw_weekly.empty and not isinstance(_raw_weekly.columns, pd.MultiIndex):
+            logger.warning("[Weekly] Flat columns dari yfinance — paksa MultiIndex wrapper")
+            _raw_weekly = pd.concat({tickers_yf[0]: _raw_weekly}, axis=1)
         weekly_data_batch = None if _raw_weekly.empty else _raw_weekly
         if weekly_data_batch is not None:
             logger.info(f"[Weekly] Batch weekly data fetched for {len(tickers_yf)} tickers")
