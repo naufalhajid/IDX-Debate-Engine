@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -85,6 +85,13 @@ def _valuation_verdict_from_range(
     return "OVERVALUED"
 
 
+def _capm_cost_of_equity(beta: float = 1.0) -> float:
+    """Cost of Equity via CAPM: Ke = SBN10Y + beta × ERP."""
+    from core.settings import get_settings  # lazy to avoid circular dep
+    s = get_settings()
+    return s.SBN_10Y_YIELD + beta * s.IDX_ERP
+
+
 # ---------------------------------------------------------------------------
 # Data container — diisi dari response API Stockbit keystats
 # ---------------------------------------------------------------------------
@@ -124,7 +131,7 @@ class KeyStats:
     historical_pb_avg: float = 3.5  # rata-rata P/B historis 5 tahun
 
     # Cost of equity untuk DDM/Gordon Growth (dalam desimal)
-    cost_of_equity: float = 0.10  # 10% — default untuk IHSG large cap
+    cost_of_equity: float = field(default_factory=lambda: _capm_cost_of_equity(1.0))
     growth_rate: float = 0.07  # 7% — proyeksi pertumbuhan laba jangka panjang
 
     # Sumber data mentah (untuk debugging)
@@ -592,6 +599,8 @@ class FairValueCalculator:
 
     # EV/EBITDA target multiple for mining/energy (conservative IDX 5-year median)
     _MINING_EV_EBITDA_TARGET: float = 5.5
+    # Cycle-average net margin for IDX mining sector (used for peak EPS normalization)
+    _MINING_SECTOR_MEDIAN_MARGIN: float = 0.15
 
     def __init__(self, stats: KeyStats, sector: str | None = None, eps_derived: bool = False):
         self.stats = stats
@@ -605,6 +614,8 @@ class FairValueCalculator:
         self.sector = self.SECTOR_PROFILE_ALIAS.get(self.raw_sector, "default")
         self.weights = self.SECTOR_WEIGHTS[self.sector]
         self._weighted_result_cache: dict | None = None
+        self._pb_roe_capped: bool = False
+        self._normalized_eps: float | None = None
         assert abs(sum(self.weights.values()) - 1.0) < 1e-9, (
             f"SECTOR_WEIGHTS['{self.sector}'] tidak menjumlah 1.0: {self.weights}"
         )
@@ -613,13 +624,31 @@ class FairValueCalculator:
         self._weighted_result_cache = result
         return result
 
+    # ── Cyclical EPS normalization (T3) ─────────────────────────────────────
+
+    def _normalize_cyclical_eps(self) -> float:
+        """For mining at peak margin (>2× sector median 15%), normalize EPS to cycle-average."""
+        eps = self.stats.eps_ttm or self.stats.eps_forward
+        if self.sector != "mining":
+            self._normalized_eps = None
+            return eps
+        margin = self.stats.net_margin
+        median_margin = self._MINING_SECTOR_MEDIAN_MARGIN
+        if margin > 2 * median_margin:
+            normalized = eps * (median_margin / margin)
+            self._normalized_eps = round(normalized, 2)
+            return self._normalized_eps
+        self._normalized_eps = None
+        return eps
+
     # ── Metode 1: P/E Band ───────────────────────────────────────────────────
 
     def fair_value_pe(self) -> float | None:
         """
-        Fair value = EPS_TTM × historical_pe_avg
+        Fair value = EPS_TTM × historical_pe_avg.
+        Mining at peak margin (>30%) → EPS normalized to cycle-average.
         """
-        eps = self.stats.eps_ttm or self.stats.eps_forward
+        eps = self._normalize_cyclical_eps()
         if eps <= 0 or self.stats.historical_pe_avg <= 0:
             return None
         return round(eps * self.stats.historical_pe_avg, 0)
@@ -628,12 +657,21 @@ class FairValueCalculator:
 
     def fair_value_pb(self) -> float | None:
         """
-        Fair value = BVPS × historical_pb_avg
+        Fair value = BVPS × pb_multiple.
+        ROE < ke (value trap) → pb_multiple capped at min(historical_pb, roe/ke).
         """
         bvps = self.stats.book_value_per_share
         if bvps <= 0 or self.stats.historical_pb_avg <= 0:
             return None
-        return round(bvps * self.stats.historical_pb_avg, 0)
+        roe = self.stats.roe
+        ke = self.stats.cost_of_equity
+        if roe > 0 and ke > 0 and roe < ke:
+            pb_multiple = min(self.stats.historical_pb_avg, roe / ke)
+            self._pb_roe_capped = True
+        else:
+            pb_multiple = self.stats.historical_pb_avg
+            self._pb_roe_capped = False
+        return round(bvps * pb_multiple, 0)
 
     # ── Metode 3: DDM (Gordon Growth Model) ─────────────────────────────────
 
@@ -861,22 +899,42 @@ class FairValueCalculator:
         ]
 
         if "pe" in bdown:
-            lines.append(
-                f"  Metode P/E Band : EPS Rp {self.stats.eps_ttm:,.0f} × "
-                f"P/E historis {self.stats.historical_pe_avg:.1f}x "
-                f"= Rp {bdown['pe']:,}"
-            )
+            if self._normalized_eps is not None:
+                lines.append(
+                    f"  Metode P/E Band : EPS Rp {self.stats.eps_ttm:,.0f} "
+                    f"→ normalized Rp {self._normalized_eps:,.0f} "
+                    f"(peak margin, cycle-avg {self._MINING_SECTOR_MEDIAN_MARGIN * 100:.0f}%) × "
+                    f"P/E historis {self.stats.historical_pe_avg:.1f}x "
+                    f"= Rp {bdown['pe']:,}"
+                )
+            else:
+                lines.append(
+                    f"  Metode P/E Band : EPS Rp {self.stats.eps_ttm:,.0f} × "
+                    f"P/E historis {self.stats.historical_pe_avg:.1f}x "
+                    f"= Rp {bdown['pe']:,}"
+                )
         else:
             lines.append(
                 "  Metode P/E Band : TIDAK VALID (EPS = 0 atau data tidak tersedia)"
             )
 
         if "pb" in bdown:
-            lines.append(
-                f"  Metode P/B Band : BVPS Rp {self.stats.book_value_per_share:,.0f} × "
-                f"P/B historis {self.stats.historical_pb_avg:.1f}x "
-                f"= Rp {bdown['pb']:,}"
-            )
+            if self._pb_roe_capped:
+                roe = self.stats.roe
+                ke = self.stats.cost_of_equity
+                capped_pb = min(self.stats.historical_pb_avg, roe / ke)
+                lines.append(
+                    f"  Metode P/B Band : BVPS Rp {self.stats.book_value_per_share:,.0f} × "
+                    f"P/B {self.stats.historical_pb_avg:.2f}x → capped {capped_pb:.2f}x "
+                    f"(ROE {roe * 100:.1f}% < ke {ke * 100:.1f}%, value trap gate) "
+                    f"= Rp {bdown['pb']:,}"
+                )
+            else:
+                lines.append(
+                    f"  Metode P/B Band : BVPS Rp {self.stats.book_value_per_share:,.0f} × "
+                    f"P/B historis {self.stats.historical_pb_avg:.1f}x "
+                    f"= Rp {bdown['pb']:,}"
+                )
         else:
             lines.append(
                 "  Metode P/B Band : TIDAK VALID (BVPS = 0 atau data tidak tersedia)"
@@ -996,26 +1054,31 @@ class FairValueCalculator:
 # ---------------------------------------------------------------------------
 
 HISTORICAL_MULTIPLES: dict[str, dict] = {
-    "BBCA": {"pe": 25.0, "pb": 4.5, "cost_of_equity": 0.09, "growth_rate": 0.07},
-    "BBRI": {"pe": 14.0, "pb": 2.2, "cost_of_equity": 0.10, "growth_rate": 0.06},
-    "BMRI": {"pe": 13.0, "pb": 1.8, "cost_of_equity": 0.10, "growth_rate": 0.06},
-    "BBNI": {"pe": 10.0, "pb": 1.3, "cost_of_equity": 0.11, "growth_rate": 0.05},
-    "TLKM": {"pe": 18.0, "pb": 3.0, "cost_of_equity": 0.09, "growth_rate": 0.05},
-    "ASII": {"pe": 14.0, "pb": 1.8, "cost_of_equity": 0.10, "growth_rate": 0.06},
-    "UNVR": {"pe": 35.0, "pb": 20.0, "cost_of_equity": 0.09, "growth_rate": 0.05},
-    "ICBP": {"pe": 20.0, "pb": 3.5, "cost_of_equity": 0.09, "growth_rate": 0.07},
-    "GOTO": {"pe": 0.0, "pb": 3.0, "cost_of_equity": 0.12, "growth_rate": 0.15},
-    "ADRO": {"pe": 8.0, "pb": 1.5, "cost_of_equity": 0.12, "growth_rate": 0.03},
-    "BYAN": {"pe": 7.0, "pb": 3.5, "cost_of_equity": 0.12, "growth_rate": 0.02},
-    "BSDE": {"pe": 10.0, "pb": 0.7, "cost_of_equity": 0.11, "growth_rate": 0.05},
+    "BBCA": {"pe": 25.0, "pb": 4.5, "beta": 0.85, "growth_rate": 0.07},
+    "BBRI": {"pe": 14.0, "pb": 2.2, "beta": 0.95, "growth_rate": 0.06},
+    "BMRI": {"pe": 13.0, "pb": 1.8, "beta": 0.95, "growth_rate": 0.06},
+    "BBNI": {"pe": 10.0, "pb": 1.3, "beta": 1.00, "growth_rate": 0.05},
+    "TLKM": {"pe": 18.0, "pb": 3.0, "beta": 0.85, "growth_rate": 0.05},
+    "ASII": {"pe": 14.0, "pb": 1.8, "beta": 1.10, "growth_rate": 0.06},
+    "UNVR": {"pe": 35.0, "pb": 20.0, "beta": 0.75, "growth_rate": 0.05},
+    "ICBP": {"pe": 20.0, "pb": 3.5, "beta": 0.80, "growth_rate": 0.07},
+    "GOTO": {"pe": 0.0, "pb": 3.0, "beta": 1.50, "growth_rate": 0.15},
+    "ADRO": {"pe": 8.0, "pb": 1.5, "beta": 1.30, "growth_rate": 0.03},
+    "BYAN": {"pe": 7.0, "pb": 3.5, "beta": 1.35, "growth_rate": 0.02},
+    "BSDE": {"pe": 10.0, "pb": 0.7, "beta": 1.05, "growth_rate": 0.05},
 }
 
 
 def get_historical_multiples(ticker: str) -> dict:
-    return HISTORICAL_MULTIPLES.get(
+    """Return valuation multiples; computes cost_of_equity from beta via CAPM."""
+    entry = HISTORICAL_MULTIPLES.get(
         _normalize_ticker_key(ticker),
-        {"pe": 15.0, "pb": 2.0, "cost_of_equity": 0.10, "growth_rate": 0.06},
+        {"pe": 15.0, "pb": 2.0, "beta": 1.0, "growth_rate": 0.06},
     )
+    result = dict(entry)
+    beta = result.pop("beta", 1.0)
+    result["cost_of_equity"] = _capm_cost_of_equity(beta)
+    return result
 
 
 def extract_historical_multiples(api_response: dict, ticker: str) -> dict:

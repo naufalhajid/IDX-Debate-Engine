@@ -284,7 +284,13 @@ def test_sector_cache_normalizes_ticker_and_only_changes_weights(
     assert calc.raw_sector == "energy"
     assert calc.sector == "mining"
     assert calc.weights == FairValueCalculator.SECTOR_WEIGHTS["mining"]
-    assert fvc.get_historical_multiples("bbca.jk") == fvc.HISTORICAL_MULTIPLES["BBCA"]
+    result = fvc.get_historical_multiples("bbca.jk")
+    expected = fvc.HISTORICAL_MULTIPLES["BBCA"]
+    assert result["pe"] == expected["pe"]
+    assert result["pb"] == expected["pb"]
+    assert result["growth_rate"] == expected["growth_rate"]
+    assert "cost_of_equity" in result
+    assert "beta" not in result
 
     fvc._load_sector_cache.cache_clear()
 
@@ -483,3 +489,168 @@ def test_build_sector_comparison_in_report():
     )
     report, _ = build_fair_value_payload(api_response, "ADRO", 1000.0)
     assert "SECTOR PEER CONTEXT" in report
+
+
+# ---------------------------------------------------------------------------
+# T1: WACC Calibration — cost_of_equity from CAPM
+# ---------------------------------------------------------------------------
+
+def test_capm_cost_of_equity_default_beta():
+    """Ke = SBN10Y + 1.0 × ERP = 7.14% + 9.23% = 16.37%."""
+    from services.fair_value_calculator import _capm_cost_of_equity
+    ke = _capm_cost_of_equity(beta=1.0)
+    assert abs(ke - (0.0714 + 1.0 * 0.0923)) < 0.0001
+
+
+def test_capm_cost_of_equity_banking_beta():
+    """BBCA beta=0.85 → Ke ≈ 14.99%."""
+    from services.fair_value_calculator import _capm_cost_of_equity
+    ke = _capm_cost_of_equity(beta=0.85)
+    assert abs(ke - (0.0714 + 0.85 * 0.0923)) < 0.0001
+
+
+def test_get_historical_multiples_returns_capm_coe_not_beta():
+    """get_historical_multiples pops beta and injects cost_of_equity from CAPM."""
+    from services.fair_value_calculator import get_historical_multiples, HISTORICAL_MULTIPLES
+    result = get_historical_multiples("BBCA")
+    assert "cost_of_equity" in result
+    assert "beta" not in result
+    expected_ke = 0.0714 + HISTORICAL_MULTIPLES["BBCA"]["beta"] * 0.0923
+    assert abs(result["cost_of_equity"] - expected_ke) < 0.0001
+
+
+def test_get_historical_multiples_does_not_mutate_module_dict():
+    """Calling get_historical_multiples must not modify HISTORICAL_MULTIPLES."""
+    from services.fair_value_calculator import get_historical_multiples, HISTORICAL_MULTIPLES
+    before = dict(HISTORICAL_MULTIPLES["ADRO"])
+    get_historical_multiples("ADRO")
+    assert HISTORICAL_MULTIPLES["ADRO"] == before
+    assert "beta" in HISTORICAL_MULTIPLES["ADRO"]
+
+
+def test_keystats_default_cost_of_equity_uses_capm():
+    """KeyStats() default CoE comes from CAPM, not hardcoded 10%."""
+    stats = KeyStats()
+    expected_ke = 0.0714 + 1.0 * 0.0923
+    assert abs(stats.cost_of_equity - expected_ke) < 0.001
+    assert stats.cost_of_equity != pytest.approx(0.10)
+
+
+# ---------------------------------------------------------------------------
+# T2: ROE-vs-CoE Gate in fair_value_pb()
+# ---------------------------------------------------------------------------
+
+def test_fair_value_pb_capped_when_roe_below_ke():
+    """ROE < ke → min(historical_pb, roe/ke) used; _pb_roe_capped=True."""
+    stats = KeyStats(book_value_per_share=1000.0, roe=0.07, historical_pb_avg=1.5)
+    stats.cost_of_equity = 0.15
+    calc = FairValueCalculator(stats)
+    fv = calc.fair_value_pb()
+    justified_pb = 0.07 / 0.15  # 0.467
+    assert fv == round(1000.0 * min(1.5, justified_pb), 0)
+    assert calc._pb_roe_capped is True
+
+
+def test_fair_value_pb_no_cap_when_roe_above_ke():
+    """ROE > ke → historical_pb_avg used as normal; _pb_roe_capped=False."""
+    stats = KeyStats(book_value_per_share=1000.0, roe=0.22, historical_pb_avg=4.5)
+    stats.cost_of_equity = 0.15
+    calc = FairValueCalculator(stats)
+    fv = calc.fair_value_pb()
+    assert fv == round(1000.0 * 4.5, 0)
+    assert calc._pb_roe_capped is False
+
+
+def test_fair_value_pb_no_cap_when_roe_missing():
+    """roe=0 → gate not applied (missing data)."""
+    stats = KeyStats(book_value_per_share=1000.0, roe=0.0, historical_pb_avg=1.5)
+    stats.cost_of_equity = 0.15
+    calc = FairValueCalculator(stats)
+    fv = calc.fair_value_pb()
+    assert fv == round(1000.0 * 1.5, 0)
+    assert calc._pb_roe_capped is False
+
+
+def test_fair_value_pb_cap_never_raises_multiple():
+    """When historical_pb < roe/ke, min() picks historical (no uplift)."""
+    # property: historical_pb_avg=0.7, roe=0.07, ke=0.08 → roe/ke=0.875
+    # min(0.7, 0.875) = 0.7 → FV unchanged, but gate still fired
+    stats = KeyStats(book_value_per_share=1000.0, roe=0.07, historical_pb_avg=0.7)
+    stats.cost_of_equity = 0.08
+    calc = FairValueCalculator(stats)
+    fv = calc.fair_value_pb()
+    assert fv == round(1000.0 * 0.7, 0)  # min doesn't raise the multiple
+    assert calc._pb_roe_capped is True
+
+
+def test_pb_roe_gate_shows_in_report():
+    """build_report surfaces value trap gate when _pb_roe_capped is True."""
+    stats = KeyStats(
+        ticker="BBTN",
+        current_price=1000.0,
+        book_value_per_share=2000.0,
+        roe=0.08,
+        historical_pb_avg=1.2,
+    )
+    stats.cost_of_equity = 0.15
+    calc = FairValueCalculator(stats)
+    report = calc.build_report()
+    assert "value trap gate" in report
+    assert "ROE" in report
+
+
+# ---------------------------------------------------------------------------
+# T3: Cyclical EPS Normalization (mining peak)
+# ---------------------------------------------------------------------------
+
+def test_normalize_cyclical_eps_at_peak_margin():
+    """Mining margin >30% → EPS normalized down to cycle-average."""
+    stats = KeyStats(ticker="ADRO", eps_ttm=500.0, net_margin=0.40, historical_pe_avg=8.0)
+    calc = FairValueCalculator(stats, sector="mining")
+    normalized = calc._normalize_cyclical_eps()
+    expected = 500.0 * (0.15 / 0.40)
+    assert abs(normalized - expected) < 0.1
+    assert calc._normalized_eps is not None
+
+
+def test_normalize_cyclical_eps_at_normal_margin():
+    """Mining at median margin (15%) → EPS unchanged."""
+    stats = KeyStats(eps_ttm=300.0, net_margin=0.15, historical_pe_avg=8.0)
+    calc = FairValueCalculator(stats, sector="mining")
+    normalized = calc._normalize_cyclical_eps()
+    assert normalized == 300.0
+    assert calc._normalized_eps is None
+
+
+def test_fair_value_pe_uses_normalized_eps_for_mining_peak():
+    """fair_value_pe() applies normalization for mining at peak margin."""
+    stats = KeyStats(ticker="ADRO", eps_ttm=1000.0, net_margin=0.50, historical_pe_avg=8.0)
+    calc = FairValueCalculator(stats, sector="mining")
+    fv = calc.fair_value_pe()
+    normalized_eps = 1000.0 * (0.15 / 0.50)  # 300
+    assert fv == round(normalized_eps * 8.0, 0)  # 2400
+    assert calc._normalized_eps is not None
+
+
+def test_fair_value_pe_unchanged_for_non_mining_high_margin():
+    """Non-mining sectors must not have EPS normalized even at high margin."""
+    stats = KeyStats(eps_ttm=500.0, net_margin=0.50, historical_pe_avg=18.0)
+    calc = FairValueCalculator(stats, sector="consumer")
+    fv = calc.fair_value_pe()
+    assert fv == round(500.0 * 18.0, 0)
+    assert calc._normalized_eps is None
+
+
+def test_normalized_eps_shows_in_report():
+    """build_report surfaces EPS normalization when active."""
+    stats = KeyStats(
+        ticker="ADRO",
+        current_price=2000.0,
+        eps_ttm=1000.0,
+        net_margin=0.50,
+        historical_pe_avg=8.0,
+    )
+    calc = FairValueCalculator(stats, sector="mining")
+    report = calc.build_report()
+    assert "normalized" in report
+    assert "peak margin" in report

@@ -156,6 +156,11 @@ class Settings(BaseSettings):
     TRADE_ENVELOPE_CLEAN_NOISE_ATR_MULTIPLIER: float = 1.50
     TRADE_ENVELOPE_CONDITIONAL_CONFIDENCE_CAP: float = 0.60
 
+    # ── Fair Value / CAPM Calibration ─────────────────────────────────────────
+    SBN_10Y_YIELD: float = 0.0714   # SBN 10-year risk-free yield (June 2026)
+    IDX_ERP: float = 0.0923         # Indonesia ERP via Damodaran (June 2026)
+    DEFAULT_BETA: float = 1.0       # beta for unknown tickers (market weight)
+
     @property
     def database_path(self) -> Path:
         path = Path(self.DATABASE_PATH)
