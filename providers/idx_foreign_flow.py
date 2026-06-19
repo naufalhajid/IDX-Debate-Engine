@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass
+from urllib.parse import quote
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +40,14 @@ def _empty(ticker: str) -> ForeignFlowSnapshot:
     )
 
 
+def _normalize_ticker(ticker: str) -> str:
+    """Normalize local ticker symbols before building the Stockbit URL."""
+    normalized = str(ticker or "").strip().upper()
+    if normalized.endswith(".JK"):
+        normalized = normalized[:-3]
+    return normalized
+
+
 def _safe_raw(mapping: dict, key: str) -> float | None:
     """Extract .value.raw from a Stockbit value-node."""
     node = mapping.get(key)
@@ -48,9 +58,10 @@ def _safe_raw(mapping: dict, key: str) -> float | None:
     if raw is None:
         return None
     try:
-        return float(raw)
+        value = float(raw)
     except (TypeError, ValueError):
         return None
+    return value if math.isfinite(value) else None
 
 
 def _safe_pct(mapping: dict, key: str) -> float | None:
@@ -63,9 +74,10 @@ def _safe_pct(mapping: dict, key: str) -> float | None:
     if raw is None:
         return None
     try:
-        return float(raw)
+        value = float(raw)
     except (TypeError, ValueError):
         return None
+    return value if math.isfinite(value) else None
 
 
 def fetch_foreign_flow(ticker: str, client=None) -> ForeignFlowSnapshot:
@@ -75,12 +87,16 @@ def fetch_foreign_flow(ticker: str, client=None) -> ForeignFlowSnapshot:
     Returns a ForeignFlowSnapshot with all-None values on any failure so callers
     can always proceed without a guard.
     """
+    ticker = _normalize_ticker(ticker)
+    if not ticker:
+        return _empty(ticker)
+
     if client is None:
         from services.stockbit_api_client import StockbitApiClient
         client = StockbitApiClient()
 
     url = (
-        f"{_BASE_URL}/findata-view/foreign-domestic/v1/chart-data/{ticker}"
+        f"{_BASE_URL}/findata-view/foreign-domestic/v1/chart-data/{quote(ticker, safe='')}"
         f"?market_type={_MARKET_TYPE}&period={_PERIOD}"
     )
 
@@ -90,7 +106,7 @@ def fetch_foreign_flow(ticker: str, client=None) -> ForeignFlowSnapshot:
         logger.warning("[ForeignFlow] fetch failed for %s: %s", ticker, exc)
         return _empty(ticker)
 
-    if not resp or not isinstance(resp.get("data"), dict):
+    if not isinstance(resp, dict) or not isinstance(resp.get("data"), dict):
         logger.warning("[ForeignFlow] unexpected response shape for %s", ticker)
         return _empty(ticker)
 

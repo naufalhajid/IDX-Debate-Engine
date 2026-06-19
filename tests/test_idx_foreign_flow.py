@@ -5,12 +5,13 @@ from unittest.mock import MagicMock
 import pytest
 
 from providers.idx_foreign_flow import (
-    ForeignFlowSnapshot,
     _empty,
+    _normalize_ticker,
     _safe_pct,
     _safe_raw,
     fetch_foreign_flow,
 )
+from services.context_pack_builder import build_context_pack, pack_to_prompt_string
 
 # ---------------------------------------------------------------------------
 # Fixture: mirrors the real Stockbit findata-view response for ADRO 2026-06-18
@@ -90,6 +91,12 @@ def test_safe_raw_missing_value_raw_returns_none():
     assert _safe_raw(mapping, "x") is None
 
 
+@pytest.mark.parametrize("raw", ["NaN", "Infinity", "-Infinity"])
+def test_safe_raw_rejects_non_finite_values(raw):
+    mapping = {"x": {"value": {"raw": raw}}}
+    assert _safe_raw(mapping, "x") is None
+
+
 def test_safe_pct_extracts_percentage():
     mapping = {"foreign_total": {"value": {"raw": 26841300}, "percentage": {"raw": 60.32024}}}
     assert _safe_pct(mapping, "foreign_total") == pytest.approx(60.32024)
@@ -97,6 +104,12 @@ def test_safe_pct_extracts_percentage():
 
 def test_safe_pct_missing_returns_none():
     assert _safe_pct({}, "foreign_total") is None
+
+
+@pytest.mark.parametrize("raw", ["NaN", "Infinity", "-Infinity"])
+def test_safe_pct_rejects_non_finite_values(raw):
+    mapping = {"foreign_total": {"percentage": {"raw": raw}}}
+    assert _safe_pct(mapping, "foreign_total") is None
 
 
 # ---------------------------------------------------------------------------
@@ -124,6 +137,16 @@ def test_fetch_foreign_flow_net_sell_snapshot():
     assert snap.source == "stockbit_foreign_flow"
 
 
+def test_fetch_foreign_flow_normalizes_jk_suffix_and_builds_safe_url():
+    client = _mock_client(_NET_BUY_RESPONSE)
+    snap = fetch_foreign_flow(" bbri.jk ", client)
+
+    requested_url = client.get.call_args.args[0]
+    assert snap.ticker == "BBRI"
+    assert "/chart-data/BBRI?" in requested_url
+    assert ".JK" not in requested_url
+
+
 def test_fetch_foreign_flow_net_buy_snapshot():
     client = _mock_client(_NET_BUY_RESPONSE)
     snap = fetch_foreign_flow("BBRI", client)
@@ -136,6 +159,15 @@ def test_fetch_foreign_flow_net_buy_snapshot():
 
 def test_fetch_foreign_flow_empty_response_returns_empty():
     client = _mock_client({})
+    snap = fetch_foreign_flow("TLKM", client)
+
+    assert snap.ticker == "TLKM"
+    assert snap.net_foreign_flow_m is None
+    assert snap.is_net_foreign_buy is None
+
+
+def test_fetch_foreign_flow_non_dict_response_returns_empty():
+    client = _mock_client(["unexpected", "shape"])
     snap = fetch_foreign_flow("TLKM", client)
 
     assert snap.ticker == "TLKM"
@@ -171,3 +203,33 @@ def test_empty_snapshot_has_correct_ticker():
     assert snap.net_foreign_flow_m is None
     assert snap.is_net_foreign_buy is None
     assert snap.source == "stockbit_foreign_flow"
+
+
+def test_normalize_ticker_strips_suffix_and_uppercases():
+    assert _normalize_ticker(" bbca.jk ") == "BBCA"
+    assert _normalize_ticker("tlkm") == "TLKM"
+    assert _normalize_ticker(None) == ""
+
+
+def test_context_pack_surfaces_foreign_flow_fields_in_prompt():
+    raw_data = {
+        "current_price": 9000,
+        "fair_value": 9800,
+        "fundamentals": {"roe": 0.18},
+        "technicals": {"ma50": 8900},
+        "sentiment_summary": "Neutral.",
+        "data_sources": ["stockbit", "stockbit_foreign_flow"],
+        "net_foreign_flow_m": -750.25,
+        "foreign_vol_pct": 61.5,
+        "is_net_foreign_buy": False,
+    }
+
+    pack = build_context_pack("BBCA", raw_data)
+    prompt = pack_to_prompt_string(pack)
+
+    assert pack.priority_fields["net_foreign_flow_m"] == -750.25
+    assert pack.priority_fields["foreign_vol_pct"] == 61.5
+    assert pack.priority_fields["is_net_foreign_buy"] is False
+    assert "net_foreign_flow_m: -750.25" in prompt
+    assert "foreign_vol_pct: 61.5" in prompt
+    assert "is_net_foreign_buy: False" in prompt
