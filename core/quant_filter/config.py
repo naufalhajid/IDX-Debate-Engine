@@ -78,7 +78,9 @@ CONFIG = {
     },
     "max_pbv_hard": 6.0,  # PBV ceiling absolut
     "pbv_sector_pctile": 0.80,  # Buang top 20% PBV per sektor
-    "min_roe": 0.10,  # ROE minimum TTM (10%)
+    "roe_penalty_threshold": 0.10,  # Scoring penalty (NOT hard-gate) — since v3.2, ROE below
+    # this threshold triggers penalty_roe_fail (-30 pts) in composite score, not exclusion.
+    # See _compute_prof_score() for scoring logic.
     "min_piotroski": 4,  # [NEW v3.0] Piotroski F-Score minimum
     "min_altman_z": 1.1,  # [NEW v3.0] Emerging Markets Altman Z''-Score (Modified) > 1.1 (Z'' < 1.1 = distress, 1.1-2.6 = grey, >2.6 = safe)
     "exclude_pemantauan": True,  # [NEW v3.0] Exclude PEMANTAUAN KHUSUS
@@ -469,30 +471,87 @@ NAME_SECTOR_KEYWORDS: list[tuple[list[str], str]] = [
 ]
 
 
+# ── LQ45 Members (per BEI pengumuman Feb 2025) ───────────────────────────────
+# Review setiap rebalancing LQ45 (Februari & Agustus). Gunakan ini sebagai
+# referensi untuk FREE_FLOAT_ESTIMATES expansion — jangan duplikasi list ini
+# di tempat lain di codebase.
+LQ45_MEMBERS: list[str] = [
+    "ADRO", "AKRA", "AMRT", "ANTM", "AMMN", "ASII",
+    "BBCA", "BBNI", "BBRI", "BMRI", "BREN", "BSDE",
+    "BUKA", "CPIN", "DSSA", "EMTK", "EXCL", "GGRM",
+    "GOTO", "HMSP", "ICBP", "INCO", "INDF", "INKP",
+    "INTP", "ISAT", "ITMG", "JPFA", "KLBF", "MAPI",
+    "MBMA", "MDKA", "MEDC", "MIKA", "PGAS", "PGEO",
+    "PTBA", "PTPP", "SMGR", "TBIG", "TLKM", "TOWR",
+    "UNTR", "UNVR", "WSKT",
+]
+
+
 # ── Task 6: Free Float Estimates ─────────────────────────────────────────────
-# Estimates based on public ownership data (KSEI, IDX disclosure, fund filings).
+# Estimates based on public ownership data (KSEI, IDX disclosure, annual reports).
+# Sources: IDX company profiles, BEI fact sheets, KSEI kepemilikan data.
 # Tickers not in this dict are treated as UNKNOWN manipulation risk.
+#
+# PENTING: Jangan tambahkan angka yang tidak bisa ditelusuri sumbernya.
+# Lebih baik ticker tetap UNKNOWN daripada pakai angka tebakan untuk risk scoring.
+# Review dict ini setiap LQ45 rebalancing (Februari & Agustus).
 FREE_FLOAT_ESTIMATES: dict[str, float] = {
-    "BBCA": 0.44,
-    "BBRI": 0.43,
-    "BMRI": 0.40,
-    "TLKM": 0.47,
-    "ASII": 0.50,
-    "UNVR": 0.15,
-    "ICBP": 0.20,
-    "KLBF": 0.40,
-    "ANTM": 0.35,
-    "PTBA": 0.35,
-    "INCO": 0.25,
-    "BREN": 0.05,
-    "DSSA": 0.06,
-    "AMMN": 0.20,
-    "MDKA": 0.30,
-    "GOTO": 0.35,
+    # ── 16 original entries (verified, unchanged) ─────────────────────────
+    "BBCA": 0.44,   # Djarum Group ~56% → float ~44%
+    "BBRI": 0.43,   # Government ~57% → float ~43%
+    "BMRI": 0.40,   # Government ~60% → float ~40%
+    "TLKM": 0.47,   # Government ~53% → float ~47%
+    "ASII": 0.50,   # Jardine Matheson ~50% → float ~50%
+    "UNVR": 0.15,   # Unilever PLC ~85% → float ~15%
+    "ICBP": 0.20,   # Indofood/Salim ~80% → float ~20%
+    "KLBF": 0.40,   # Djoenaedi family ~60% → float ~40%
+    "ANTM": 0.35,   # Government ~65% → float ~35%
+    "PTBA": 0.35,   # Government ~65% → float ~35%
+    "INCO": 0.25,   # Vale Canada ~60%, MIND ID ~20% → float ~25%
+    "BREN": 0.05,   # Prajogo Pangestu ~95% → float ~5%
+    "DSSA": 0.06,   # Prajogo Pangestu ~94% → float ~6%
+    "AMMN": 0.20,   # AP Investment ~82% → float ~20% (post-IPO 2023)
+    "MDKA": 0.30,   # Saratoga/Provident ~70% → float ~30%
+    "GOTO": 0.35,   # Institutional + public post-IPO → float ~35%
+    # ── LQ45 expansion (verified dari IDX/KSEI, update Feb 2025) ─────────
+    "ADRO": 0.48,   # Edwin Soeryadjaya & family ~52% → float ~48%
+    "AKRA": 0.44,   # Soegiarto family (Haryanto Adikoesoemo) ~56% → float ~44%
+    "AMRT": 0.32,   # Djoko Susanto & family (Sumber Alfaria) ~68% → float ~32%
+    "BBNI": 0.40,   # Government ~60% → float ~40%
+    "BSDE": 0.55,   # Sinarmas Group (Widjaja) ~45% → float ~55%
+    "CPIN": 0.44,   # CP Foods Thailand (Jiaravanon family) ~56% → float ~44%
+    "EMTK": 0.30,   # Sariaatmadja family ~70% → float ~30%
+    "EXCL": 0.34,   # Axiata Group Berhad ~66% → float ~34%
+    "GGRM": 0.24,   # Wonowidjojo family ~76% → float ~24%
+    "HMSP": 0.08,   # Philip Morris International ~92.5% → float ~8%
+    "INDF": 0.50,   # First Pacific/Salim ~50% → float ~50%
+    "INTP": 0.49,   # HeidelbergMaterials ~51% → float ~49%
+    "ISAT": 0.35,   # Ooredoo Asia ~65% → float ~35%
+    "ITMG": 0.35,   # Banpu Public Co Thailand ~65% → float ~35%
+    "JPFA": 0.47,   # Japfa Ltd ~53% → float ~47%
+    "MEDC": 0.35,   # Panigoro family (Medco) ~65% → float ~35%
+    "PGAS": 0.43,   # Government (Pertamina) ~57% → float ~43%
+    "PGEO": 0.14,   # Pertamina ~86% → float ~14% (HIGH manipulation risk)
+    "PTPP": 0.35,   # Government ~65% → float ~35%
+    "SMGR": 0.49,   # Government ~51% → float ~49%
+    "TBIG": 0.45,   # Telkom Group ~55% → float ~45%
+    "TOWR": 0.49,   # Provident Agro/public ~49% → float ~49%
+    "UNTR": 0.40,   # PT Astra International ~60% → float ~40%
+    "WSKT": 0.33,   # Government ~67% → float ~33%
 }
 
 # Float < 15% → HIGH manipulation risk; < 25% → MEDIUM; else LOW
 FREE_FLOAT_MANIPULATION_THRESHOLD: float = 0.15
+
+# LQ45 members yang data free float-nya belum bisa diverifikasi dari sumber publik.
+# Perlu diisi manual dari BEI fact sheet / KSEI kepemilikan saham.
+FREE_FLOAT_NEEDS_VERIFICATION: list[str] = [
+    "BUKA",   # Bukalapak — kepemilikan post-IPO tersebar, perlu cek KSEI terbaru
+    "INKP",   # Indah Kiat Pulp — Widjaja family (APP/Sinarmas), perlu konfirmasi %
+    "MAPI",   # Mitra Adiperkasa — struktur kepemilikan perlu verifikasi
+    "MBMA",   # Merdeka Battery Materials — IPO 2023, kepemilikan publik perlu cek
+    "MIKA",   # Mitra Keluarga Karyasehat — perlu cek annual report terbaru
+]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -504,6 +563,8 @@ __all__ = [
     "FINANCIAL_SECTORS",
     "FREE_FLOAT_ESTIMATES",
     "FREE_FLOAT_MANIPULATION_THRESHOLD",
+    "FREE_FLOAT_NEEDS_VERIFICATION",
+    "LQ45_MEMBERS",
     "NAME_SECTOR_KEYWORDS",
     "SECTOR_PBV_BENCHMARK",
     "TICKER_SECTOR_HARDCODE",

@@ -128,18 +128,35 @@ def compute_weekly_trend(weekly_df: "pd.DataFrame | None") -> dict:
 def check_free_float(ticker: str) -> dict:
     """Return free-float estimate and manipulation risk tier for a given ticker.
 
-    UNKNOWN is returned for tickers not in the estimates dict.
+    float_data_coverage values:
+      VERIFIED          — angka ada di FREE_FLOAT_ESTIMATES, sumber teridentifikasi
+      PENDING_VERIFICATION — ada di FREE_FLOAT_NEEDS_VERIFICATION, belum terverifikasi
+      NO_DATA           — tidak ada di kedua list, treated as UNKNOWN risk
     """
+    from core.quant_filter.config import FREE_FLOAT_NEEDS_VERIFICATION
     ff = FREE_FLOAT_ESTIMATES.get(ticker)
     if ff is None:
-        return {"free_float_pct": None, "manipulation_risk": "UNKNOWN"}
+        coverage = (
+            "PENDING_VERIFICATION"
+            if ticker in FREE_FLOAT_NEEDS_VERIFICATION
+            else "NO_DATA"
+        )
+        return {
+            "free_float_pct": None,
+            "manipulation_risk": "UNKNOWN",
+            "float_data_coverage": coverage,
+        }
     if ff < FREE_FLOAT_MANIPULATION_THRESHOLD:
         risk = "HIGH"
     elif ff < 0.25:
         risk = "MEDIUM"
     else:
         risk = "LOW"
-    return {"free_float_pct": round(ff, 4), "manipulation_risk": risk}
+    return {
+        "free_float_pct": round(ff, 4),
+        "manipulation_risk": risk,
+        "float_data_coverage": "VERIFIED",
+    }
 
 
 # ── Task 7: ARA / ARB Risk ────────────────────────────────────────────────────
@@ -737,7 +754,7 @@ def _analyze_ticker(
     # [v3.3 FIX] ROE Turnaround Penalty (raised from -15)
     roe_raw = row.get("Return on Equity (TTM)", 0)
     roe_val = float(roe_raw) if not pd.isna(roe_raw) and roe_raw else 0.0
-    if roe_val < cfg["min_roe"]:
+    if roe_val < cfg["roe_penalty_threshold"]:
         total_score += cfg.get("penalty_roe_fail", -30)
         mom_note.append(
             f"Penalty: ROE Buruk ({roe_val * 100:.1f}%) ({cfg.get('penalty_roe_fail', -30)})"
@@ -931,7 +948,7 @@ def _compute_prof_score(roe: float, cfg: dict) -> float:
         return w * 1.00
     if roe >= cfg["prof_roe_tier2"]:
         return w * 0.70
-    return w * 0.40  # 10-15% — sudah lolos min_roe gate (10%)
+    return w * 0.40  # 10-15% — di bawah roe_penalty_threshold (10%), sudah kena penalty -30
 
 
 # ══════════════════════════════════════════════════════════════════════════════
