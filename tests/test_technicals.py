@@ -1,4 +1,4 @@
-"""Unit tests for utils/technicals.py — Tasks 19, 20, 25, 26."""
+"""Unit tests for utils/technicals.py — Tasks 19, 20, 25, 26 + FV-1."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 import pandas as pd
 
 from utils.technicals import (
+    compute_anchored_vwap,
     compute_volume_profile,
     compute_vwap,
     detect_flag_pattern,
@@ -288,3 +289,60 @@ def test_volume_profile_hvn_lvn_are_lists():
     assert isinstance(result["lvn_levels"], list)
     assert len(result["hvn_levels"]) <= 3
     assert len(result["lvn_levels"]) <= 2
+
+
+# ── FV-1: compute_anchored_vwap ───────────────────────────────────────────────
+
+def test_anchored_vwap_insufficient_data():
+    high, low, close, volume = _ohlcv(4, 100.0)
+    result = compute_anchored_vwap(high, low, close, volume, min_bars_after_anchor=5)
+    assert result["avwap"] is None
+    assert result["avwap_position"] == "INSUFFICIENT_DATA"
+    assert result["anchor_bars_ago"] is None
+
+
+def test_anchored_vwap_price_above():
+    # Uniform bars at 100 with last bar pushed to 110 — anchor is at lowest low
+    high, low, close, volume = _ohlcv(30, 100.0)
+    close.iloc[-1] = 110.0
+    high.iloc[-1] = 115.0
+    result = compute_anchored_vwap(high, low, close, volume)
+    assert result["avwap"] is not None
+    assert result["avwap_position"] == "ABOVE_AVWAP"
+    assert result["price_to_avwap_pct"] is not None and result["price_to_avwap_pct"] > 1.0
+
+
+def test_anchored_vwap_price_below():
+    # Swing low at bar 10 (low=50), current close=85 → AVWAP≈99 → price below
+    high, low, close, volume = _ohlcv(30, 100.0)
+    low.iloc[10] = 50.0   # anchor lands here, not at the last bar
+    close.iloc[-1] = 85.0
+    result = compute_anchored_vwap(high, low, close, volume)
+    assert result["avwap"] is not None
+    assert result["avwap_position"] == "BELOW_AVWAP"
+    assert result["price_to_avwap_pct"] is not None and result["price_to_avwap_pct"] < -1.0
+
+
+def test_anchored_vwap_at_vwap():
+    # All bars uniform → anchor VWAP == close price
+    high, low, close, volume = _ohlcv(30, 100.0)
+    result = compute_anchored_vwap(high, low, close, volume)
+    assert result["avwap_position"] == "AT_AVWAP"
+    assert result["price_to_avwap_pct"] == 0.0
+
+
+def test_anchored_vwap_zero_volume_after_anchor_returns_empty():
+    high, low, close, volume = _ohlcv(30, 100.0)
+    volume[:] = 0.0
+    result = compute_anchored_vwap(high, low, close, volume)
+    assert result["avwap"] is None
+    assert result["avwap_position"] == "INSUFFICIENT_DATA"
+
+
+def test_anchored_vwap_anchor_bars_ago_positive():
+    high, low, close, volume = _ohlcv(30, 100.0)
+    # Force swing low at bar 10 by making it notably lower
+    low.iloc[10] = 50.0
+    result = compute_anchored_vwap(high, low, close, volume, lookback=60)
+    assert result["anchor_bars_ago"] is not None
+    assert result["anchor_bars_ago"] >= 5

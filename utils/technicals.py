@@ -466,6 +466,77 @@ def compute_vwap(
     }
 
 
+# ── FV-1: Anchored VWAP ───────────────────────────────────────────────────────
+
+def compute_anchored_vwap(
+    high: pd.Series,
+    low: pd.Series,
+    close: pd.Series,
+    volume: pd.Series,
+    lookback: int = 60,
+    min_bars_after_anchor: int = 5,
+) -> dict:
+    """VWAP anchored from the most recent swing low within `lookback` bars.
+
+    Unlike rolling VWAP which resets every N bars, anchored VWAP accumulates
+    from a structural price event (the swing low). Price below AVWAP means
+    all buyers since that swing low are underwater on average — bearish for
+    continuation. Price above AVWAP confirms cost-basis support below.
+
+    Returns avwap, avwap_position (ABOVE/AT/BELOW_AVWAP | INSUFFICIENT_DATA),
+    price_to_avwap_pct, and anchor_bars_ago (how long since the anchor event).
+    """
+    _empty: dict = {
+        "avwap": None,
+        "avwap_position": "INSUFFICIENT_DATA",
+        "price_to_avwap_pct": None,
+        "anchor_bars_ago": None,
+    }
+    if len(close) < min_bars_after_anchor + 1:
+        return _empty
+
+    # Anchor at the lowest low within the lookback window
+    tail_len = min(lookback, len(low))
+    window_start = len(low) - tail_len
+    anchor_idx = int(low.iloc[window_start:].argmin()) + window_start
+
+    bars_after_anchor = len(close) - 1 - anchor_idx
+    if bars_after_anchor < min_bars_after_anchor:
+        return _empty
+
+    # Cumulative VWAP from anchor bar to now (inclusive)
+    vol_slice = volume.iloc[anchor_idx:].where(
+        volume.iloc[anchor_idx:] > 0, other=float("nan")
+    )
+    typical = (high.iloc[anchor_idx:] + low.iloc[anchor_idx:] + close.iloc[anchor_idx:]) / 3
+    cum_tpv = float((typical * vol_slice).sum())
+    cum_vol = float(vol_slice.sum())
+
+    if not (math.isfinite(cum_vol) and cum_vol > 0 and math.isfinite(cum_tpv)):
+        return _empty
+
+    avwap = cum_tpv / cum_vol
+    if not math.isfinite(avwap) or avwap <= 0:
+        return _empty
+
+    price_now = float(close.iloc[-1])
+    pct_diff = (price_now - avwap) / avwap * 100
+
+    if pct_diff > 1.0:
+        position = "ABOVE_AVWAP"
+    elif pct_diff < -1.0:
+        position = "BELOW_AVWAP"
+    else:
+        position = "AT_AVWAP"
+
+    return {
+        "avwap": round(avwap, 0),
+        "avwap_position": position,
+        "price_to_avwap_pct": round(pct_diff, 1),
+        "anchor_bars_ago": bars_after_anchor,
+    }
+
+
 # ── Task 25: Bull / Bear Flag Pattern ────────────────────────────────────────
 
 def detect_flag_pattern(

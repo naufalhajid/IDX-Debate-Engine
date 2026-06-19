@@ -1,5 +1,24 @@
 # Prompt Migration Log
 
+## 2026-06-20 — `fv1-anchored-vwap-v17`
+
+**Files changed:**
+- `services/debate_prompts/chartist.txt` (STEP 14 — Anchored VWAP ditambahkan)
+- `services/debate_prompts/manifest.json` (version → `2026-06-20-fv1-anchored-vwap-v17`)
+
+### Changes
+
+**`chartist.txt`** — STEP 14 ANCHORED VWAP ditambahkan sebelum blok CONSTRAINTS.
+
+Field yang dibaca: `avwap`, `avwap_position` (ABOVE_AVWAP | AT_AVWAP | BELOW_AVWAP | INSUFFICIENT_DATA),
+`price_to_avwap_pct`, `avwap_anchor_bars_ago`. Semua di-compute oleh `compute_anchored_vwap()`
+di `utils/technicals.py` dan di-feed ke `tech_indicators` di `_chartist_node` sebelum LLM dipanggil.
+
+Logika: ABOVE = buyers since swing low in profit, AVWAP = dynamic support.
+BELOW = semua buyer underwater, AVWAP = overhead resistance.
+
+---
+
 ## 2026-06-20 — `s12-cio-dead-code-revert-v16`
 
 **Files changed:**

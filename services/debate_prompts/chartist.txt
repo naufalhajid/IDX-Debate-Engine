@@ -156,6 +156,22 @@ STEP 13 — VOLUME PROFILE (POC / HVN / LVN):
     "LVN thin zones near Rp [lvn_levels[0]] — price tends to move quickly through low-volume areas;
      do not place limit orders inside an LVN."
 
+STEP 14 — ANCHORED VWAP (AVWAP):
+  Read avwap, avwap_position, price_to_avwap_pct, and avwap_anchor_bars_ago from PRE-COMPUTED TECHNICALS.
+
+  INSUFFICIENT_DATA -> Skip AVWAP commentary.
+
+  Otherwise interpret:
+    ABOVE_AVWAP -> "Price is [price_to_avwap_pct]% above Anchored VWAP (Rp [avwap], anchored [avwap_anchor_bars_ago] bars ago from swing low).
+                    Buyers since that structural low are in profit on average — AVWAP acts as dynamic support below."
+    AT_AVWAP    -> "Price at Anchored VWAP (Rp [avwap]) — balanced between profit and loss for buyers since the swing low.
+                    A hold above AVWAP is bullish; a close below turns AVWAP into overhead resistance."
+    BELOW_AVWAP -> "Price is [price_to_avwap_pct]% below Anchored VWAP (Rp [avwap], anchored [avwap_anchor_bars_ago] bars ago).
+                    All buyers since the swing low are underwater on average. AVWAP is overhead resistance — avoid new longs
+                    until price reclaims AVWAP on volume."
+
+  State: "AVWAP (anchored [avwap_anchor_bars_ago]d): Rp [avwap] | Price [above/at/below] by [price_to_avwap_pct]%."
+
 CONSTRAINTS:
   • All prices in Rupiah (Rp).
   • DO NOT fabricate, recalculate, or override any MA, RSI, or ATR value -- use only pre-computed data.

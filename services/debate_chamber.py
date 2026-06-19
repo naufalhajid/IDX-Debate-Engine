@@ -92,6 +92,7 @@ from utils.technicals import (
     compute_rsi,
     compute_swing_low,
     compute_volume_profile,
+    compute_anchored_vwap,
     compute_vwap,
     detect_candlestick_pattern,
     detect_flag_pattern,
@@ -2489,6 +2490,20 @@ Current Date (Asia/Jakarta): {current_date}
                     })
                 except Exception as _exc:
                     logger.debug(f"[Chartist] VWAP failed: {_exc}")
+
+                # ── FV-1: Anchored VWAP ───────────────────────────────────────
+                try:
+                    avwap = compute_anchored_vwap(
+                        df_yf["High"], df_yf["Low"], close, df_yf["Volume"]
+                    )
+                    tech_indicators.update({
+                        "avwap": avwap["avwap"],
+                        "avwap_position": avwap["avwap_position"],
+                        "price_to_avwap_pct": avwap["price_to_avwap_pct"],
+                        "avwap_anchor_bars_ago": avwap["anchor_bars_ago"],
+                    })
+                except Exception as _exc:
+                    logger.debug(f"[Chartist] Anchored VWAP failed: {_exc}")
 
                 # ── Task 25: Bull / Bear Flag ─────────────────────────────────
                 try:
