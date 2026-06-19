@@ -8,9 +8,12 @@ import services.fair_value_calculator as fvc
 from services.fair_value_calculator import (
     FairValueCalculator,
     KeyStats,
+    _SECTOR_MEDIAN_PROFILES_DEFAULT,
+    _load_dynamic_sector_benchmarks,
     build_fair_value_payload,
     build_fair_value_report,
     extract_keystats,
+    refresh_sector_benchmarks,
 )
 
 
@@ -734,6 +737,66 @@ def test_unknown_age_no_staleness():
     result = _make_stale_calc(None).fair_value_weighted()
     assert result["keystats_stale"] is False
     assert result["keystats_age_days"] is None
+
+
+# ── FV-5: Dynamic Sector Benchmarks ──────────────────────────────────────────
+
+def test_load_dynamic_sector_benchmarks_falls_back_to_default_when_no_cache(tmp_path, monkeypatch):
+    monkeypatch.setattr(fvc, "_SECTOR_BENCHMARKS_CACHE_PATH", tmp_path / "no_file.json")
+    result = _load_dynamic_sector_benchmarks()
+    assert result == _SECTOR_MEDIAN_PROFILES_DEFAULT
+
+
+def test_load_dynamic_sector_benchmarks_reads_cache_when_fresh(tmp_path, monkeypatch):
+    from datetime import datetime
+    cache = tmp_path / "sector_benchmarks.json"
+    fresh_benchmarks = {"bank": {"pe": 9.5, "pb": 1.3, "roe": 0.13, "net_margin": 0.24}}
+    cache.write_text(
+        __import__("json").dumps({"updated_at": datetime.now().isoformat(), "benchmarks": fresh_benchmarks}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(fvc, "_SECTOR_BENCHMARKS_CACHE_PATH", cache)
+    result = _load_dynamic_sector_benchmarks()
+    assert result == fresh_benchmarks
+
+
+def test_refresh_sector_benchmarks_writes_and_returns_medians(tmp_path, monkeypatch):
+    monkeypatch.setattr(fvc, "_SECTOR_BENCHMARKS_CACHE_PATH", tmp_path / "benchmarks.json")
+
+    def _fake_fetch(ticker: str) -> dict:
+        # Use exact field names extract_keystats() looks for.
+        # eps_ttm must be non-zero so Strategy B doesn't overwrite Strategy A values.
+        return {
+            "data": {
+                "closure_fin_items_results": [
+                    {
+                        "fin_name_results": [
+                            {"fitem": {"name": "Current EPS (TTM)", "value": "100"}},
+                            {"fitem": {"name": "Book Value Per Share", "value": "500"}},
+                            {"fitem": {"name": "Current PE Ratio (TTM)", "value": "12.0"}},
+                            {"fitem": {"name": "Current Price to Book Value", "value": "1.8"}},
+                            {"fitem": {"name": "Return On Equity (TTM)", "value": "15%"}},
+                            {"fitem": {"name": "Net Profit Margin (TTM)", "value": "10%"}},
+                        ]
+                    }
+                ]
+            }
+        }
+
+    result = refresh_sector_benchmarks(_fake_fetch, sectors=["default"])
+    assert "default" in result
+    assert result["default"]["pe"] == pytest.approx(12.0)
+    assert result["default"]["pb"] == pytest.approx(1.8)
+    # Cache file must exist
+    assert (tmp_path / "benchmarks.json").exists()
+
+
+def test_calculator_uses_dynamic_benchmarks(monkeypatch):
+    custom = {"bank": {"pe": 8.0, "pb": 1.0, "roe": 0.10, "net_margin": 0.20}, "default": {"pe": 8.0, "pb": 1.0, "roe": 0.10, "net_margin": 0.10}}
+    monkeypatch.setattr(fvc, "_load_dynamic_sector_benchmarks", lambda: custom)
+    stats = KeyStats(ticker="BBCA", current_price=5000.0, eps_ttm=300.0, book_value_per_share=2000.0)
+    calc = FairValueCalculator(stats, sector="bank")
+    assert calc.sector_medians["bank"]["pe"] == pytest.approx(8.0)
 
 
 def test_stale_fv_shifted_toward_pb():

@@ -6,17 +6,121 @@ from __future__ import annotations
 
 import json
 import re
+import statistics as _stats
 from dataclasses import dataclass, field
-from datetime import date as _date
+from datetime import date as _date, datetime as _datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from utils.logger_config import logger
 from utils.trade_math import calculate_rr
 
 
 SECTOR_CACHE_PATH = Path("output/sector_cache.json")
+
+# ── FV-5: Dynamic Sector Benchmarks ──────────────────────────────────────────
+_SECTOR_BENCHMARKS_CACHE_PATH = Path("output/sector_benchmarks.json")
+_SECTOR_BENCHMARK_MAX_AGE_DAYS: int = 7
+
+# Representative tickers used to compute median PE/PB/ROE/margin per sector.
+_SECTOR_REPRESENTATIVE_TICKERS: dict[str, list[str]] = {
+    "bank":     ["BBCA", "BBRI", "BMRI"],
+    "mining":   ["ADRO", "PTBA", "BYAN"],
+    "consumer": ["UNVR", "ICBP", "MYOR"],
+    "property": ["BSDE", "SMRA"],
+    "default":  ["ASII", "TLKM", "INDF"],
+}
+
+# Static fallback — used when the cache is absent or stale.
+_SECTOR_MEDIAN_PROFILES_DEFAULT: dict[str, dict] = {
+    "bank":     {"pe": 10.0, "pb": 1.5, "roe": 0.14, "net_margin": 0.25},
+    "mining":   {"pe":  7.0, "pb": 1.2, "roe": 0.18, "net_margin": 0.15},
+    "consumer": {"pe": 18.0, "pb": 3.0, "roe": 0.20, "net_margin": 0.08},
+    "property": {"pe": 12.0, "pb": 0.8, "roe": 0.07, "net_margin": 0.20},
+    "default":  {"pe": 14.0, "pb": 1.5, "roe": 0.15, "net_margin": 0.10},
+}
+
+
+def _load_dynamic_sector_benchmarks() -> dict[str, dict]:
+    """Return sector PE/PB/ROE/margin medians from cache if ≤7 days old."""
+    try:
+        if _SECTOR_BENCHMARKS_CACHE_PATH.exists():
+            raw = json.loads(_SECTOR_BENCHMARKS_CACHE_PATH.read_text(encoding="utf-8"))
+            updated_at = _datetime.fromisoformat(raw.get("updated_at", "1970-01-01"))
+            age_days = (_datetime.now() - updated_at).days
+            if age_days <= _SECTOR_BENCHMARK_MAX_AGE_DAYS:
+                benchmarks = raw.get("benchmarks", {})
+                if benchmarks:
+                    logger.info(
+                        "[FV-5] Loaded dynamic sector benchmarks (age {} days).", age_days
+                    )
+                    return benchmarks
+    except Exception as exc:
+        logger.debug("[FV-5] _load_dynamic_sector_benchmarks failed: {}", exc)
+    return _SECTOR_MEDIAN_PROFILES_DEFAULT
+
+
+def refresh_sector_benchmarks(
+    fetch_fn: Callable[[str], dict],
+    sectors: list[str] | None = None,
+) -> dict[str, dict]:
+    """
+    Fetch keystats for representative tickers per sector, compute medians, and
+    write the result to output/sector_benchmarks.json.
+
+    Args:
+        fetch_fn: callable(ticker) → raw Stockbit keystats API response dict.
+        sectors:  subset of sector keys to refresh; defaults to all.
+
+    Returns:
+        dict[sector_key → {"pe", "pb", "roe", "net_margin"}]
+    """
+    target_sectors = sectors or list(_SECTOR_REPRESENTATIVE_TICKERS.keys())
+    benchmarks: dict[str, dict] = {}
+
+    for sector in target_sectors:
+        tickers = _SECTOR_REPRESENTATIVE_TICKERS.get(sector, [])
+        pe_vals, pb_vals, roe_vals, margin_vals = [], [], [], []
+        for ticker in tickers:
+            try:
+                raw = fetch_fn(ticker)
+                s = extract_keystats(raw, ticker=ticker)
+                if s.raw_pe_current > 0:
+                    pe_vals.append(s.raw_pe_current)
+                if s.raw_pb_current > 0:
+                    pb_vals.append(s.raw_pb_current)
+                if s.roe > 0:
+                    roe_vals.append(s.roe)
+                if s.net_margin > 0:
+                    margin_vals.append(s.net_margin)
+            except Exception as exc:
+                logger.warning("[FV-5] Skipping {} for sector {}: {}", ticker, sector, exc)
+
+        fallback = _SECTOR_MEDIAN_PROFILES_DEFAULT.get(sector, _SECTOR_MEDIAN_PROFILES_DEFAULT["default"])
+        benchmarks[sector] = {
+            "pe":         _stats.median(pe_vals)     if pe_vals     else fallback["pe"],
+            "pb":         _stats.median(pb_vals)     if pb_vals     else fallback["pb"],
+            "roe":        _stats.median(roe_vals)    if roe_vals    else fallback["roe"],
+            "net_margin": _stats.median(margin_vals) if margin_vals else fallback["net_margin"],
+        }
+        logger.info("[FV-5] Sector {} benchmarks: {}", sector, benchmarks[sector])
+
+    try:
+        _SECTOR_BENCHMARKS_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _SECTOR_BENCHMARKS_CACHE_PATH.write_text(
+            json.dumps(
+                {"updated_at": _datetime.now().isoformat(), "benchmarks": benchmarks},
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        logger.info("[FV-5] Sector benchmarks cached to {}", _SECTOR_BENCHMARKS_CACHE_PATH)
+    except Exception as exc:
+        logger.warning("[FV-5] Failed to write sector benchmarks cache: {}", exc)
+
+    return benchmarks
+
 
 # ── FV-3: SOE Governance Discount ────────────────────────────────────────────
 # BUMN/SOE stocks trade at a structural discount vs private peers due to:
@@ -673,6 +777,7 @@ class FairValueCalculator:
         )
         self.sector = self.SECTOR_PROFILE_ALIAS.get(self.raw_sector, "default")
         self.weights = self.SECTOR_WEIGHTS[self.sector]
+        self.sector_medians: dict[str, dict] = _load_dynamic_sector_benchmarks()
         self._weighted_result_cache: dict | None = None
         self._pb_roe_capped: bool = False
         self._normalized_eps: float | None = None
@@ -783,8 +888,8 @@ class FairValueCalculator:
     # ── Task 27: Sector Peer Comparison ──────────────────────────────────────
 
     def build_sector_comparison(self) -> str:
-        median = self.SECTOR_MEDIAN_PROFILES.get(
-            self.sector, self.SECTOR_MEDIAN_PROFILES["default"]
+        median = self.sector_medians.get(
+            self.sector, self.sector_medians.get("default", _SECTOR_MEDIAN_PROFILES_DEFAULT["default"])
         )
         pe_cur = self.stats.raw_pe_current
         pb_cur = self.stats.raw_pb_current
