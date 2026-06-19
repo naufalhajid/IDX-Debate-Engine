@@ -619,3 +619,99 @@ def get_time_of_day_signal(now: datetime | None = None) -> dict:
         )
 
     return {"idx_session": session, "entry_window": window, "entry_rationale": rationale}
+
+
+def compute_volume_profile(
+    high: pd.Series,
+    low: pd.Series,
+    close: pd.Series,
+    volume: pd.Series,
+    window: int = 60,
+    bins: int = 20,
+) -> dict:
+    """Volume Profile using typical-price bucketing on daily OHLCV bars.
+
+    Each bar's volume is attributed to its typical price (H+L+C)/3 — the standard
+    approximation for daily bars where tick-level trade records are unavailable.
+    Returns POC (Point of Control), HVN (high-volume nodes), and LVN (low-volume nodes).
+    """
+    _empty: dict = {
+        "poc": None,
+        "poc_distance_pct": None,
+        "price_vs_poc": "INSUFFICIENT_DATA",
+        "hvn_levels": [],
+        "lvn_levels": [],
+    }
+    if len(close) < window:
+        return _empty
+
+    h = high.iloc[-window:]
+    l = low.iloc[-window:]
+    c = close.iloc[-window:]
+    v = volume.iloc[-window:]
+
+    typical = (h + l + c) / 3
+    vol_clean = v.where(v > 0, other=float("nan"))
+
+    p_min = float(typical.min())
+    p_max = float(typical.max())
+    if not math.isfinite(p_min) or not math.isfinite(p_max):
+        return _empty
+    if p_max <= p_min:
+        # Zero price range — all bars at the same typical price; POC is that price
+        price_now = float(c.iloc[-1])
+        if not math.isfinite(price_now) or price_now <= 0:
+            return _empty
+        return {
+            "poc": round(price_now, 0),
+            "poc_distance_pct": 0.0,
+            "price_vs_poc": "AT_POC",
+            "hvn_levels": [],
+            "lvn_levels": [],
+        }
+
+    labels = list(range(bins))
+    bucket = pd.cut(typical, bins=bins, labels=labels, include_lowest=True)
+    bin_vol = vol_clean.groupby(bucket, observed=False).sum().fillna(0.0)
+
+    valid = bin_vol[bin_vol > 0]
+    if valid.empty:
+        return _empty
+
+    poc_label = int(bin_vol.idxmax())
+    bin_width = (p_max - p_min) / bins
+    poc_mid = p_min + (poc_label + 0.5) * bin_width
+
+    price_now = float(c.iloc[-1])
+    if poc_mid <= 0:
+        return _empty
+    poc_dist = (price_now - poc_mid) / poc_mid * 100
+
+    if poc_dist > 1.0:
+        price_vs_poc = "ABOVE_POC"
+    elif poc_dist < -1.0:
+        price_vs_poc = "BELOW_POC"
+    else:
+        price_vs_poc = "AT_POC"
+
+    p70 = float(valid.quantile(0.70))
+    hvn_mids = sorted(
+        [p_min + (i + 0.5) * bin_width for i in range(bins)
+         if i != poc_label and bin_vol.iloc[i] >= p70],
+        key=lambda p: abs(p - price_now),
+    )[:3]
+
+    p30 = float(valid.quantile(0.30))
+    lvn_mids = sorted(
+        [p_min + (i + 0.5) * bin_width for i in range(bins)
+         if 0 < bin_vol.iloc[i] <= p30],
+        key=lambda p: abs(p - price_now),
+    )[:2]
+
+    return {
+        "poc": round(poc_mid, 0),
+        "poc_distance_pct": round(poc_dist, 1),
+        "price_vs_poc": price_vs_poc,
+        "hvn_levels": [round(p, 0) for p in hvn_mids],
+        "lvn_levels": [round(p, 0) for p in lvn_mids],
+    }

@@ -1,5 +1,41 @@
 # Prompt Migration Log
 
+## 2026-06-19 — `s10-volume-profile-v14`
+
+**Files changed:**
+- `services/debate_prompts/chartist.txt` (STEP 13 added: Volume Profile POC/HVN/LVN)
+- `services/debate_prompts/manifest.json` (version → `2026-06-19-s10-volume-profile-v14`)
+- `utils/technicals.py` (Task 20: `compute_volume_profile`)
+- `utils/quality_checks.py` (Task 30: `check_verdict_quality` — 7-point narrative/structural checker)
+- `services/debate_chamber.py` (Task 20 try/except block in `_chartist_node`)
+- `tests/test_technicals.py` (7 tests for `compute_volume_profile`)
+- `tests/test_output_quality.py` (8 quality gate tests for `CIOVerdict`)
+
+### Changes
+
+**`chartist.txt`** — STEP 13 added before CONSTRAINTS:
+- Reads `poc`, `price_vs_poc`, `poc_distance_pct`, `hvn_levels`, `lvn_levels`.
+- ABOVE_POC/BELOW_POC: notes POC as support/resistance; cites % distance.
+- AT_POC: "directional decision" commentary.
+- HVN: flags as key institutional support/resistance nodes.
+- LVN: warns against limit orders inside thin-volume zones.
+- INSUFFICIENT_DATA → silent (skips commentary).
+
+**`utils/technicals.py`** — Task 20 (`compute_volume_profile`):
+- Typical-price bucketing: each bar's volume attributed to (H+L+C)/3.
+- 20 equal-width bins over the rolling 60-day price range.
+- POC = bucket with maximum cumulative volume.
+- HVN = bins at or above 70th percentile (excluding POC), nearest 3 returned.
+- LVN = bins at or below 30th percentile, nearest 2 returned.
+- Zero-range guard: when all bars at same price → POC=close, AT_POC, no HVN/LVN.
+
+**`utils/quality_checks.py`** — Task 30 (`check_verdict_quality`):
+- 7-point advisory checker: weighted_reasoning, critical_risk_factor, key_risks,
+  key_catalysts (BUY only), summary, risk_reward_ratio computable, entry_price_range set.
+- Returns list[str] of issue descriptions; empty = all gates pass.
+
+---
+
 ## 2026-06-19 — `s9-vwap-flag-timetable-v13`
 
 **Files changed:**

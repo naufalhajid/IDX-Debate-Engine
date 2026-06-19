@@ -91,6 +91,7 @@ from utils.technicals import (
     compute_macd,
     compute_rsi,
     compute_swing_low,
+    compute_volume_profile,
     compute_vwap,
     detect_candlestick_pattern,
     detect_flag_pattern,
@@ -2499,6 +2500,19 @@ Current Date (Asia/Jakarta): {current_date}
                     })
                 except Exception as _exc:
                     logger.debug(f"[Chartist] Flag pattern failed: {_exc}")
+
+                # ── Task 20: Volume Profile (POC / HVN / LVN) ────────────────
+                try:
+                    vp = compute_volume_profile(df_yf["High"], df_yf["Low"], close, df_yf["Volume"])
+                    tech_indicators.update({
+                        "poc": vp["poc"],
+                        "poc_distance_pct": vp["poc_distance_pct"],
+                        "price_vs_poc": vp["price_vs_poc"],
+                        "hvn_levels": vp["hvn_levels"],
+                        "lvn_levels": vp["lvn_levels"],
+                    })
+                except Exception as _exc:
+                    logger.debug(f"[Chartist] Volume profile failed: {_exc}")
 
                 logger.info(
                     f"[Chartist] Technicals computed: MA50={tech_indicators.get('ma50')}, RSI={tech_indicators.get('rsi14')}"

@@ -1,5 +1,5 @@
 {
-  "prompt_version": "2026-06-18-s9-vwap-flag-timetable-v13",
+  "prompt_version": "2026-06-19-s10-volume-profile-v14",
   "prompts": {
     "FUNDAMENTAL_SCOUT_PROMPT": "fundamental_scout.txt",
     "CHARTIST_PROMPT": "chartist.txt",

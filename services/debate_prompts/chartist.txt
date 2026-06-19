@@ -135,6 +135,27 @@ STEP 12 — TIME-OF-DAY ENTRY WINDOW:
 
   Advisory only — do not change your BULLISH/NEUTRAL/BEARISH conclusion based on session alone.
 
+STEP 13 — VOLUME PROFILE (POC / HVN / LVN):
+  Read poc, price_vs_poc, poc_distance_pct, hvn_levels, and lvn_levels from PRE-COMPUTED TECHNICALS.
+
+  INSUFFICIENT_DATA -> Skip volume profile commentary.
+
+  Otherwise state the POC price and interpret:
+    ABOVE_POC -> "Price is [poc_distance_pct]% above POC (Rp [poc]) — price trading above the highest-activity node.
+                   POC now acts as major support. Trend is bullish relative to volume-weighted activity."
+    AT_POC    -> "Price at POC (Rp [poc]) — price at the peak institutional activity level.
+                   Expect a directional decision: breakout above POC is bullish, rejection is bearish."
+    BELOW_POC -> "Price is [poc_distance_pct]% below POC (Rp [poc]) — price has fallen below the
+                   highest-activity node. POC now acts as overhead resistance. Bearish volume structure."
+
+  If hvn_levels is non-empty, add:
+    "Key HVN support/resistance levels: Rp [hvn_levels[0]], Rp [hvn_levels[1]] (where available).
+     Expect strong reactions at these nodes — they represent zones of prior institutional interest."
+
+  If lvn_levels is non-empty, add:
+    "LVN thin zones near Rp [lvn_levels[0]] — price tends to move quickly through low-volume areas;
+     do not place limit orders inside an LVN."
+
 CONSTRAINTS:
   • All prices in Rupiah (Rp).
   • DO NOT fabricate, recalculate, or override any MA, RSI, or ATR value -- use only pre-computed data.
