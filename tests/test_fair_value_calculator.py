@@ -700,3 +700,65 @@ def test_soe_mos_lower_than_non_soe():
     mos_private = _make_soe_calc("BBCA").fair_value_weighted()["margin_of_safety_pct"]
     assert mos_soe is not None and mos_private is not None
     assert mos_soe < mos_private
+
+
+# ── FV-4: Staleness Weight Adjustment ────────────────────────────────────────
+
+def _make_stale_calc(age_days: int | None, ticker: str = "BBCA") -> FairValueCalculator:
+    stats = KeyStats(
+        ticker=ticker,
+        current_price=5000.0,
+        eps_ttm=300.0,
+        book_value_per_share=2500.0,
+        roe=0.12,
+        historical_pe_avg=14.0,
+        historical_pb_avg=2.0,
+        keystats_age_days=age_days,
+    )
+    return FairValueCalculator(stats, sector="default")
+
+
+def test_stale_keystats_flag_in_result():
+    result = _make_stale_calc(45).fair_value_weighted()
+    assert result["keystats_stale"] is True
+    assert result["keystats_age_days"] == 45
+
+
+def test_fresh_keystats_flag_in_result():
+    result = _make_stale_calc(20).fair_value_weighted()
+    assert result["keystats_stale"] is False
+    assert result["keystats_age_days"] == 20
+
+
+def test_unknown_age_no_staleness():
+    result = _make_stale_calc(None).fair_value_weighted()
+    assert result["keystats_stale"] is False
+    assert result["keystats_age_days"] is None
+
+
+def test_stale_fv_shifted_toward_pb():
+    # Make PE-implied FV >> PB-implied FV so staleness (which halves PE weight
+    # and boosts PB) visibly pulls the composite FV down.
+    stats_fresh = KeyStats(
+        ticker="BBCA",
+        current_price=10000.0,
+        eps_ttm=1000.0,           # PE FV = 1000 × 14 = 14 000
+        book_value_per_share=2000.0,  # PB FV = 2000 × 2 = 4 000
+        historical_pe_avg=14.0,
+        historical_pb_avg=2.0,
+        keystats_age_days=5,      # fresh
+    )
+    stats_stale = KeyStats(
+        ticker="BBCA",
+        current_price=10000.0,
+        eps_ttm=1000.0,
+        book_value_per_share=2000.0,
+        historical_pe_avg=14.0,
+        historical_pb_avg=2.0,
+        keystats_age_days=60,     # stale
+    )
+    fv_fresh = FairValueCalculator(stats_fresh, sector="default").fair_value_weighted()["fair_value"]
+    fv_stale = FairValueCalculator(stats_stale, sector="default").fair_value_weighted()["fair_value"]
+    assert fv_fresh is not None and fv_stale is not None
+    # Stale shifts weight toward lower PB-implied FV → composite FV must fall
+    assert fv_stale < fv_fresh

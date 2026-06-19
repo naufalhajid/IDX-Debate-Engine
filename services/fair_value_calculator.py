@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
+from datetime import date as _date
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,12 @@ SECTOR_CACHE_PATH = Path("output/sector_cache.json")
 # BUMN/SOE stocks trade at a structural discount vs private peers due to:
 # political dividend pressure, slower capital allocation, and governance risk.
 # 15% is the market-implied average discount for IDX BUMN vs sector peers.
+# ── FV-4: Keystats Staleness Threshold ───────────────────────────────────────
+# When EPS/DPS data is older than 30 days, earnings-based methods (PE, DDM)
+# become unreliable.  Shift 50% of their weight to P/B, which is more stable.
+_STALE_KEYSTATS_DAYS: int = 30
+_STALE_EPS_METHODS: frozenset[str] = frozenset({"pe", "ddm", "ev_ebitda"})
+
 _SOE_DISCOUNT_PCT: float = 0.15
 
 _SOE_TICKERS: frozenset[str] = frozenset({
@@ -158,6 +165,10 @@ class KeyStats:
 
     # EV/EBITDA current multiple (untuk metode ke-4, mining/energy saja)
     ev_ebitda_current: float | None = None
+
+    # Age of the underlying financial data in days (None = unknown).
+    # Populated from the Stockbit API response where a closure date is available.
+    keystats_age_days: int | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -517,6 +528,37 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
                     stats.dps,
                 )
 
+    # ── FV-4: Best-effort keystats age extraction ─────────────────────────────
+    # Try to find a report date so fair_value_weighted() can detect stale data.
+    # The Stockbit closure_fin_items groups may carry a "closure_date" key, or
+    # a flat fitem may contain an ISO-date-like value under a "date"/"period" key.
+    _date_val: str | None = None
+    try:
+        groups = api_response.get("data", {}).get("closure_fin_items_results", [])
+        if groups:
+            # Some API versions surface "closure_date" at the group level
+            _date_val = groups[0].get("closure_date") or groups[0].get("period_date")
+        if not _date_val:
+            # Scan the flat dict for any key containing "date" or "period" with
+            # a value that looks like an ISO date (YYYY-MM-DD or DD/MM/YYYY)
+            _iso_re = re.compile(r"(\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4})")
+            for k, v in flat.items():
+                if ("date" in k.lower() or "period" in k.lower()) and _iso_re.search(str(v)):
+                    _date_val = _iso_re.search(str(v)).group(0)
+                    break
+        if _date_val:
+            _date_val = str(_date_val).strip()
+            for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d", "%m/%d/%Y"):
+                try:
+                    from datetime import datetime
+                    report_date = datetime.strptime(_date_val, fmt).date()
+                    stats.keystats_age_days = (_date.today() - report_date).days
+                    break
+                except ValueError:
+                    continue
+    except Exception as _exc:
+        logger.debug("[FairValue] keystats_age_days extraction failed: {}", _exc)
+
     # ── Debug summary ─────────────────────────────────────────────────────────
     parsed = {
         "eps_ttm": stats.eps_ttm,
@@ -798,6 +840,11 @@ class FairValueCalculator:
 
         is_soe = _normalize_ticker_key(self.stats.ticker) in _SOE_TICKERS
 
+        keystats_stale = (
+            self.stats.keystats_age_days is not None
+            and self.stats.keystats_age_days > _STALE_KEYSTATS_DAYS
+        )
+
         if not results:
             return self._cache_weighted_result(
                 {
@@ -813,12 +860,26 @@ class FairValueCalculator:
                     "valuation_verdict": "DATA_UNAVAILABLE",
                     "is_soe": is_soe,
                     "governance_discount_pct": None,
+                    "keystats_stale": keystats_stale,
+                    "keystats_age_days": self.stats.keystats_age_days,
                 }
             )
 
-        total_weight = sum(self.weights[m] for m in results)
+        # FV-4: Staleness — shift weight from EPS-dependent methods to P/B
+        # when the underlying financial data is older than _STALE_KEYSTATS_DAYS.
+        if keystats_stale:
+            effective_weights = dict(self.weights)
+            shift = sum(effective_weights.get(m, 0) * 0.50 for m in _STALE_EPS_METHODS)
+            for m in _STALE_EPS_METHODS:
+                if m in effective_weights:
+                    effective_weights[m] *= 0.50
+            effective_weights["pb"] = effective_weights.get("pb", 0) + shift
+        else:
+            effective_weights = self.weights
+
+        total_weight = sum(effective_weights[m] for m in results)
         weighted_fv = sum(
-            results[m] * (self.weights[m] / total_weight) for m in results
+            results[m] * (effective_weights[m] / total_weight) for m in results
         )
         weighted_fv = round(weighted_fv, 0)
 
@@ -869,6 +930,8 @@ class FairValueCalculator:
                 "valuation_verdict": verdict,
                 "is_soe": is_soe,
                 "governance_discount_pct": _SOE_DISCOUNT_PCT if is_soe else None,
+                "keystats_stale": keystats_stale,
+                "keystats_age_days": self.stats.keystats_age_days,
             }
         )
 
