@@ -4100,6 +4100,7 @@ async def run_batch_debates(
     abort_event: asyncio.Event | None = None,
     run_id: str | None = None,
     chamber_factory: Callable[[], Any] | None = None,
+    candidates_by_ticker: dict[str, dict] | None = None,
 ) -> list[dict]:
     # abort_event di-inject dari main() agar signal handler bisa mengaksesnya.
     """
@@ -4273,6 +4274,32 @@ async def run_batch_debates(
                 # 6. Eksekusi
                 try:
                     result = await _run_single_debate(ticker, chamber)
+
+                    # Valuation disagreement: Graham FV (screener) vs debate engine FV
+                    if candidates_by_ticker and not result.get("error"):
+                        try:
+                            from services.fair_value_calculator import (
+                                check_valuation_disagreement,
+                            )
+
+                            cand = candidates_by_ticker.get(ticker, {})
+                            graham_fv = cand.get("Est. Fair Value (Graham)")
+                            debate_fv = (result.get("verdict") or {}).get("fair_value")
+                            if graham_fv or debate_fv:
+                                disagreement = check_valuation_disagreement(
+                                    float(graham_fv) if graham_fv else None,
+                                    float(debate_fv) if debate_fv else None,
+                                )
+                                result["valuation_disagreement"] = disagreement
+                                if disagreement["valuation_disagreement"] == "SIGNIFICANT":
+                                    logger.warning(
+                                        f"[ValuationGap] {ticker}: "
+                                        f"Graham Rp{graham_fv:,.0f} vs "
+                                        f"Debate Rp{debate_fv:,.0f} — "
+                                        f"selisih {disagreement['disagreement_pct']}%"
+                                    )
+                        except Exception as _e:
+                            logger.debug(f"[ValuationGap] {ticker}: skip — {_e}")
 
                     # Propagasi BudgetExhaustedError dari dalam chamber
                     if result.get("error") and result["error"].startswith(
@@ -5634,6 +5661,7 @@ async def main(
         if ticker_override:
             tickers = ticker_override
             sector_map = {ticker: "unknown" for ticker in tickers}
+            candidates_by_ticker: dict[str, dict] | None = None
             logger.info(f"[CLI] {len(tickers)} ticker dari --tickers: {tickers}")
         else:
             candidates = _load_quant_candidates(JSON_PATH)
@@ -5641,6 +5669,7 @@ async def main(
             candidates = _apply_pre_cio_filters(candidates, regime)
             tickers = parse_report(candidates=candidates)
             sector_map = parse_sector_map(candidates=candidates)
+            candidates_by_ticker = {c["Ticker"]: c for c in candidates if c.get("Ticker")}
     except (FileNotFoundError, ValueError) as e:
         logger.error(f"[Orchestrator] {e}")
         _cli_renderer.flush_buffered_alerts()
@@ -5767,6 +5796,7 @@ async def main(
                     abort_event=abort_event,
                     run_id=ledger_run_id,
                     chamber_factory=chamber_factory,
+                    candidates_by_ticker=candidates_by_ticker,
                 )
             _enhance_completed_results(results, ledger_run_id, fetch_news=not dry_run)
             _log_risk_warn_distribution(results)

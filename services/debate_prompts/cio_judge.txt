@@ -62,6 +62,23 @@ STEP 1 — FAIR VALUE:
                    with the Python envelope. IF consistent -> apply normal BUY/HOLD/AVOID rules.
                    DO NOT auto-rate HOLD solely based on R/R magnitude.
 
+VALUATION DISAGREEMENT CHECK (read after STEP 1, before STEP 2):
+  The output metadata may include a `valuation_disagreement` field produced
+  by comparing the Graham Number screener FV against the FairValueCalculator
+  debate-engine FV. If present, apply the following rules:
+
+  • valuation_disagreement = SIGNIFICANT:
+      You MUST mention both FV figures in weighted_reasoning and explain which
+      one you trust as the basis for your decision and WHY.
+      For mining/energy stocks at EPS-cycle peaks, the screener Graham FV
+      tends to overestimate (inflated by cyclical EPS) — prefer the
+      debate-engine FairValueCalculator FV which normalizes for this.
+      For bank stocks, the two models use different bases (PBV-vs-sector vs
+      weighted PE/PB/DDM with ROE gate) — state which basis you used explicitly.
+
+  • valuation_disagreement = ALIGNED or NOT_COMPARABLE:
+      No additional action required.
+
 STEP 2 — TRADE ENVELOPE VALIDATION:
   Review the Python-calculated entry/target/stop prices.
   Confirm they align with the debate findings.

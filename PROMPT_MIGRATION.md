@@ -1,5 +1,24 @@
 # Prompt Migration Log
 
+## 2026-06-19 — `s12-valuation-disagreement-v15`
+
+**Files changed:**
+- `services/debate_prompts/cio_judge.txt` (VALUATION DISAGREEMENT CHECK section added)
+- `services/debate_prompts/manifest.json` (version → `2026-06-19-s12-valuation-disagreement-v15`)
+- `services/fair_value_calculator.py` (`check_valuation_disagreement()` added)
+- `core/orchestrator/legacy.py` (`run_batch_debates()` now accepts `candidates_by_ticker`,
+  post-debate disagreement annotation added to result dict)
+
+### Changes
+
+**`cio_judge.txt`** — VALUATION DISAGREEMENT CHECK section inserted between STEP 1 and STEP 2:
+- When `valuation_disagreement = SIGNIFICANT`, CIO must cite both FV figures and explain
+  which it trusts and why.
+- Mining/energy guidance: Graham FV overestimates at EPS-cycle peak → prefer debate FV.
+- Bank guidance: two models use different bases → state basis explicitly.
+
+---
+
 ## 2026-06-19 — `s10-volume-profile-v14`
 
 **Files changed:**

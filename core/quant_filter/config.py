@@ -12,6 +12,48 @@ from core.settings import settings
 # reads as 2-3 days old, so this fires earlier than "N trading days" would.
 # That's the safe direction (warns sooner, never later), kept as-is.
 MAX_XLSX_AGE_CALENDAR_DAYS = 3
+MAX_XLSX_AGE_HARD_BLOCK_DAYS = 5  # Pipeline dihentikan jika XLSX lebih tua dari ini
+
+
+def assess_xlsx_staleness(
+    xlsx_mtime: datetime,
+    now: datetime | None = None,
+) -> dict:
+    """Evaluasi umur XLSX dan kembalikan staleness tier.
+
+    Returns dict dengan keys:
+      xlsx_staleness : "FRESH" | "DEGRADED" | "BLOCKED"
+      xlsx_age_days  : int
+      xlsx_staleness_note : str
+    """
+    now = now or datetime.now()
+    age_days = (now - xlsx_mtime).days
+
+    if age_days > MAX_XLSX_AGE_HARD_BLOCK_DAYS:
+        return {
+            "xlsx_staleness": "BLOCKED",
+            "xlsx_age_days": age_days,
+            "xlsx_staleness_note": (
+                f"Data XLSX sudah {age_days} hari, melebihi batas "
+                f"{MAX_XLSX_AGE_HARD_BLOCK_DAYS} hari. Refresh data fundamental "
+                "sebelum menjalankan pipeline."
+            ),
+        }
+    if age_days > MAX_XLSX_AGE_CALENDAR_DAYS:
+        return {
+            "xlsx_staleness": "DEGRADED",
+            "xlsx_age_days": age_days,
+            "xlsx_staleness_note": (
+                f"Data XLSX sudah {age_days} hari (batas normal "
+                f"{MAX_XLSX_AGE_CALENDAR_DAYS} hari). Composite Score dikurangi 10 "
+                "untuk semua kandidat."
+            ),
+        }
+    return {
+        "xlsx_staleness": "FRESH",
+        "xlsx_age_days": age_days,
+        "xlsx_staleness_note": "",
+    }
 
 
 def _find_latest_xlsx(output_dir: str = "output") -> str:
@@ -565,6 +607,8 @@ __all__ = [
     "FREE_FLOAT_MANIPULATION_THRESHOLD",
     "FREE_FLOAT_NEEDS_VERIFICATION",
     "LQ45_MEMBERS",
+    "MAX_XLSX_AGE_HARD_BLOCK_DAYS",
+    "assess_xlsx_staleness",
     "NAME_SECTOR_KEYWORDS",
     "SECTOR_PBV_BENCHMARK",
     "TICKER_SECTOR_HARDCODE",

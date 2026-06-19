@@ -1260,3 +1260,46 @@ def build_fair_value_report(
 ) -> tuple[str, float | None]:
     report, result = build_fair_value_payload(api_response, ticker, current_price)
     return report, result["fair_value"]
+
+
+def check_valuation_disagreement(
+    graham_fv: float | None,
+    debate_fv: float | None,
+    disagreement_threshold: float = 0.25,
+) -> dict:
+    """Bandingkan FV dari screener (Graham Number) vs debate engine (FairValueCalculator).
+
+    Tidak mereconcile angka — hanya membuat disagreement terlihat di output.
+    Threshold default 25%: selisih di atas ini dianggap SIGNIFICANT.
+
+    Returns dict dengan keys:
+      valuation_disagreement : "SIGNIFICANT" | "ALIGNED" | "NOT_COMPARABLE"
+      disagreement_pct       : float | None
+      valuation_note         : str
+    """
+    if not graham_fv or not debate_fv or graham_fv <= 0 or debate_fv <= 0:
+        return {
+            "valuation_disagreement": "NOT_COMPARABLE",
+            "disagreement_pct": None,
+            "valuation_note": "Salah satu atau kedua FV tidak tersedia untuk perbandingan.",
+        }
+
+    diff_pct = abs(graham_fv - debate_fv) / min(graham_fv, debate_fv)
+
+    if diff_pct > disagreement_threshold:
+        return {
+            "valuation_disagreement": "SIGNIFICANT",
+            "disagreement_pct": round(diff_pct * 100, 1),
+            "valuation_note": (
+                f"Graham Number (screener): Rp{graham_fv:,.0f} vs "
+                f"FairValueCalculator (debate engine): Rp{debate_fv:,.0f} — "
+                f"selisih {diff_pct:.1%}. Kemungkinan disebabkan sifat siklikal "
+                "earnings atau perbedaan metode valuasi sektoral. "
+                "Pertimbangkan metode mana yang lebih relevan untuk sektor ini."
+            ),
+        }
+    return {
+        "valuation_disagreement": "ALIGNED",
+        "disagreement_pct": round(diff_pct * 100, 1),
+        "valuation_note": "",
+    }

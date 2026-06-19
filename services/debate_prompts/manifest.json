@@ -1,5 +1,5 @@
 {
-  "prompt_version": "2026-06-19-s10-volume-profile-v14",
+  "prompt_version": "2026-06-19-s12-valuation-disagreement-v15",
   "prompts": {
     "FUNDAMENTAL_SCOUT_PROMPT": "fundamental_scout.txt",
     "CHARTIST_PROMPT": "chartist.txt",

@@ -18,6 +18,7 @@ from core.quant_filter.config import (
     SECTOR_PBV_BENCHMARK,
     TICKER_SECTOR_HARDCODE,
     _find_latest_xlsx,
+    assess_xlsx_staleness,
     canonical_screener_mode,
 )
 from core.quant_filter.reporting import _build_markdown_report
@@ -1137,6 +1138,18 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
     cfg["input_file"] = str(Path(cfg["input_file"]))  # normalisasi separator OS
     logger.info(f"Input file: {cfg['input_file']}")
 
+    # ── XLSX staleness gate (SEBELUM ingestion, sebelum scoring) ─────────────
+    _xlsx_mtime = datetime.fromtimestamp(Path(cfg["input_file"]).stat().st_mtime)
+    _staleness = assess_xlsx_staleness(_xlsx_mtime)
+    if _staleness["xlsx_staleness"] == "BLOCKED":
+        raise RuntimeError(
+            f"[Staleness] Pipeline dihentikan: {_staleness['xlsx_staleness_note']} "
+            f"Perbarui file XLSX di folder '{cfg.get('output_dir', 'output')}' "
+            "lalu jalankan ulang pipeline."
+        )
+    if _staleness["xlsx_staleness"] == "DEGRADED":
+        logger.warning(f"[Staleness] {_staleness['xlsx_staleness_note']}")
+
     # ── Resolve sector_cache_file path (Windows-safe) ─────────────────────────
     cfg["sector_cache_file"] = str(Path(cfg["sector_cache_file"]))
 
@@ -1421,6 +1434,14 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
     if final_df.empty:
         logger.warning("Tidak ada ticker yang lolos semua filter.")
     else:
+        # DEGRADED staleness: kurangi composite score 10 poin sebelum ranking
+        if _staleness["xlsx_staleness"] == "DEGRADED":
+            final_df["Composite Score"] = (final_df["Composite Score"] - 10).clip(lower=0)
+            final_df["xlsx_staleness_note"] = _staleness["xlsx_staleness_note"]
+            logger.warning(
+                f"[Staleness] Composite Score dikurangi 10 poin untuk semua "
+                f"{len(final_df)} kandidat (XLSX {_staleness['xlsx_age_days']} hari)."
+            )
         final_df = final_df.sort_values("Composite Score", ascending=False).head(
             cfg["top_n"]
         )
