@@ -2,7 +2,6 @@
 
 import glob
 import os
-import warnings
 from datetime import datetime
 from pathlib import Path
 
@@ -77,13 +76,6 @@ def _find_latest_xlsx(output_dir: str = "output") -> str:
         )
     # Ambil yang terbaru (sort by nama file — tanggal ada di nama)
     latest = Path(sorted(found, reverse=True)[0])
-    age_days = (datetime.now() - datetime.fromtimestamp(latest.stat().st_mtime)).days
-    if age_days > MAX_XLSX_AGE_CALENDAR_DAYS:
-        warnings.warn(
-            f"[Screener] XLSX is {age_days} days old (>{MAX_XLSX_AGE_CALENDAR_DAYS}d threshold). "
-            f"Fundamental data may be stale. File: {latest.name}",
-            stacklevel=2,
-        )
     return str(latest)
 
 

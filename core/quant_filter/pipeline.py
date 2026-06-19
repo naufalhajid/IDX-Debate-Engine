@@ -228,10 +228,11 @@ def compute_ara_arb_risk(
         ara_risk = "LOW"
         ara_note = ""
 
+    combined_note = " | ".join(filter(None, [arb_note, ara_note]))
     return {
         "arb_lock_risk": arb_risk,
         "ara_entry_risk": ara_risk,
-        "ara_arb_note": arb_note or ara_note or "Within normal range",
+        "ara_arb_note": combined_note or "Within normal range",
     }
 
 
@@ -1434,10 +1435,13 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
     if final_df.empty:
         logger.warning("Tidak ada ticker yang lolos semua filter.")
     else:
+        # Always stamp staleness metadata so JSON schema is consistent across runs.
+        final_df["xlsx_staleness"] = _staleness["xlsx_staleness"]
+        final_df["xlsx_staleness_note"] = _staleness["xlsx_staleness_note"]
+
         # DEGRADED staleness: kurangi composite score 10 poin sebelum ranking
         if _staleness["xlsx_staleness"] == "DEGRADED":
             final_df["Composite Score"] = (final_df["Composite Score"] - 10).clip(lower=0)
-            final_df["xlsx_staleness_note"] = _staleness["xlsx_staleness_note"]
             logger.warning(
                 f"[Staleness] Composite Score dikurangi 10 poin untuk semua "
                 f"{len(final_df)} kandidat (XLSX {_staleness['xlsx_age_days']} hari)."

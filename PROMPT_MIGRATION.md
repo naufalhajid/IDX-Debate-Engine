@@ -1,5 +1,23 @@
 # Prompt Migration Log
 
+## 2026-06-20 — `s12-cio-dead-code-revert-v16`
+
+**Files changed:**
+- `services/debate_prompts/cio_judge.txt` (VALUATION DISAGREEMENT CHECK section removed)
+- `services/debate_prompts/manifest.json` (version → `2026-06-20-s12-cio-dead-code-revert-v16`)
+
+### Changes
+
+**`cio_judge.txt`** — VALUATION DISAGREEMENT CHECK section dihapus (antara STEP 1 dan STEP 2).
+
+**Alasan**: Section tersebut menginstruksikan CIO judge untuk membaca field `valuation_disagreement`
+dari "output metadata", tetapi field ini ditambahkan oleh `_guarded()` di `legacy.py` **setelah**
+`chamber.run()` selesai — jadi tidak pernah masuk ke context CIO saat debat berjalan.
+Field `valuation_disagreement` tetap dihitung dan tersimpan di result dict post-debate
+(visible di JSON output dan warning log), tetapi CIO judge tidak dapat menggunakannya secara real-time.
+
+---
+
 ## 2026-06-19 — `s12-valuation-disagreement-v15`
 
 **Files changed:**

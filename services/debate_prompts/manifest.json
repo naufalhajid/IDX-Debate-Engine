@@ -1,5 +1,5 @@
 {
-  "prompt_version": "2026-06-19-s12-valuation-disagreement-v15",
+  "prompt_version": "2026-06-20-s12-cio-dead-code-revert-v16",
   "prompts": {
     "FUNDAMENTAL_SCOUT_PROMPT": "fundamental_scout.txt",
     "CHARTIST_PROMPT": "chartist.txt",
