@@ -93,6 +93,7 @@ from utils.technicals import (
     compute_swing_low,
     compute_volume_profile,
     compute_anchored_vwap,
+    compute_fibonacci_levels,
     compute_vwap,
     detect_candlestick_pattern,
     detect_flag_pattern,
@@ -2504,6 +2505,26 @@ Current Date (Asia/Jakarta): {current_date}
                     })
                 except Exception as _exc:
                     logger.debug(f"[Chartist] Anchored VWAP failed: {_exc}")
+
+                # ── FV-2: Fibonacci Retracement ───────────────────────────────
+                try:
+                    fib = compute_fibonacci_levels(df_yf["High"], df_yf["Low"], close)
+                    fib_lvls = fib["fib_levels"] or {}
+                    tech_indicators.update({
+                        "fib_swing_low": fib["fib_swing_low"],
+                        "fib_swing_high": fib["fib_swing_high"],
+                        "fib_23_6": fib_lvls.get("23.6"),
+                        "fib_38_2": fib_lvls.get("38.2"),
+                        "fib_50_0": fib_lvls.get("50.0"),
+                        "fib_61_8": fib_lvls.get("61.8"),
+                        "fib_78_6": fib_lvls.get("78.6"),
+                        "nearest_fib_label": fib["nearest_fib_label"],
+                        "price_to_nearest_fib_pct": fib["price_to_nearest_fib_pct"],
+                        "fib_context": fib["fib_context"],
+                        "fib_trend": fib["fib_trend"],
+                    })
+                except Exception as _exc:
+                    logger.debug(f"[Chartist] Fibonacci failed: {_exc}")
 
                 # ── Task 25: Bull / Bear Flag ─────────────────────────────────
                 try:

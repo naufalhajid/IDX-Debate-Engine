@@ -172,6 +172,34 @@ STEP 14 — ANCHORED VWAP (AVWAP):
 
   State: "AVWAP (anchored [avwap_anchor_bars_ago]d): Rp [avwap] | Price [above/at/below] by [price_to_avwap_pct]%."
 
+STEP 15 — FIBONACCI RETRACEMENT:
+  Read fib_context, fib_trend, fib_swing_low, fib_swing_high, fib_38_2, fib_50_0, fib_61_8,
+  nearest_fib_label, and price_to_nearest_fib_pct from PRE-COMPUTED TECHNICALS.
+
+  INSUFFICIENT_DATA -> Skip Fibonacci commentary.
+
+  State the swing range first: "Fibonacci range: Rp [fib_swing_low] → Rp [fib_swing_high] ([fib_trend])."
+
+  Then interpret fib_context:
+    ABOVE_SWING_HIGH  -> "Price broke above the swing high — Fibonacci structure invalidated upward.
+                          No retracement support levels apply; monitor for extension continuation."
+    BELOW_SWING_LOW   -> "Price broke below the swing low — Fibonacci structure invalidated downward.
+                          Setup invalidated. Do not establish new longs until reclaim of swing low."
+    NEAR_23_6         -> "Price near shallow 23.6% retracement (Rp [fib_38_2 area]) — trend still strong.
+                          Shallow pullbacks indicate high buyer demand; trend continuation likely."
+    NEAR_38_2         -> "Price near 38.2% retracement (Rp [fib_38_2]) — first key support zone.
+                          Valid entry zone for momentum traders in an UPTREND."
+    NEAR_50_0         -> "Price at 50% retracement (Rp [fib_50_0]) — mid-range equilibrium.
+                          Strong bulls hold here; break below shifts momentum to bears."
+    NEAR_61_8         -> "Price at 61.8% golden ratio retracement (Rp [fib_61_8]) — last key support.
+                          High-probability bounce zone in UPTREND; break below = deeper correction likely."
+    NEAR_78_6         -> "Price at 78.6% retracement — deep pullback, approaching swing low.
+                          High risk of swing low invalidation. Only enter with tight stop below swing low."
+    BETWEEN_LEVELS    -> "Price between Fibonacci levels (nearest: [nearest_fib_label]%, [price_to_nearest_fib_pct]% away).
+                          No immediate Fibonacci support or resistance at current price."
+
+  Close with: "Key Fib support: Rp [fib_38_2] (38.2%) / Rp [fib_50_0] (50%) / Rp [fib_61_8] (61.8%)."
+
 CONSTRAINTS:
   • All prices in Rupiah (Rp).
   • DO NOT fabricate, recalculate, or override any MA, RSI, or ATR value -- use only pre-computed data.

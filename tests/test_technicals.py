@@ -8,6 +8,7 @@ import pandas as pd
 
 from utils.technicals import (
     compute_anchored_vwap,
+    compute_fibonacci_levels,
     compute_volume_profile,
     compute_vwap,
     detect_flag_pattern,
@@ -346,3 +347,94 @@ def test_anchored_vwap_anchor_bars_ago_positive():
     result = compute_anchored_vwap(high, low, close, volume, lookback=60)
     assert result["anchor_bars_ago"] is not None
     assert result["anchor_bars_ago"] >= 5
+
+
+# ── FV-2: compute_fibonacci_levels ────────────────────────────────────────────
+
+def _fib_ohlcv(n: int, swing_low: float, swing_high: float, price_now: float) -> tuple:
+    """Build an OHLCV series with a clear swing low at bar 5 and swing high at bar n-10.
+
+    Background bars are set to mid-range so argmin/argmax unambiguously land on
+    the intended swing bars rather than background noise.
+    """
+    mid = (swing_low + swing_high) / 2
+    high   = pd.Series([mid * 1.01] * n)   # background highs well below swing_high
+    low    = pd.Series([mid * 0.99] * n)   # background lows well above swing_low
+    close  = pd.Series([price_now] * n)
+    volume = pd.Series([1000.0] * n)
+    # Swing low at bar 5 — unambiguous argmin
+    low.iloc[5]  = swing_low
+    high.iloc[5] = swing_low * 1.005
+    # Swing high at bar n-10 — unambiguous argmax
+    high.iloc[n - 10] = swing_high
+    low.iloc[n - 10]  = swing_high * 0.995
+    return high, low, close, volume
+
+
+def test_fibonacci_insufficient_data():
+    high, low, close, volume = _ohlcv(4, 100.0)
+    result = compute_fibonacci_levels(high, low, close)
+    assert result["fib_context"] == "INSUFFICIENT_DATA"
+    assert result["fib_levels"] is None
+
+
+def test_fibonacci_small_range_returns_insufficient():
+    # Range < 3% → insufficient
+    high, low, close, volume = _ohlcv(30, 100.0)
+    high[:] = 101.0
+    low[:] = 99.5  # range ≈ 1.5% < 3%
+    result = compute_fibonacci_levels(high, low, close)
+    assert result["fib_context"] == "INSUFFICIENT_DATA"
+
+
+def test_fibonacci_above_swing_high():
+    n = 30
+    high, low, close, volume = _fib_ohlcv(n, swing_low=100.0, swing_high=200.0, price_now=210.0)
+    result = compute_fibonacci_levels(high, low, close)
+    assert result["fib_context"] == "ABOVE_SWING_HIGH"
+    assert result["fib_swing_high"] == 200.0
+    assert result["fib_levels"] is not None
+
+
+def test_fibonacci_below_swing_low():
+    n = 30
+    high, low, close, volume = _fib_ohlcv(n, swing_low=100.0, swing_high=200.0, price_now=90.0)
+    result = compute_fibonacci_levels(high, low, close)
+    assert result["fib_context"] == "BELOW_SWING_LOW"
+
+
+def test_fibonacci_near_38_2_level():
+    # swing_low=100, swing_high=200 → 38.2% level = 200 - 0.382×100 = 161.8
+    n = 30
+    high, low, close, volume = _fib_ohlcv(n, swing_low=100.0, swing_high=200.0, price_now=162.0)
+    result = compute_fibonacci_levels(high, low, close)
+    assert result["fib_context"] == "NEAR_38_2"
+    assert result["nearest_fib_label"] == "38.2"
+    assert result["fib_levels"]["38.2"] == 162.0  # round(161.8, 0) = 162.0
+
+
+def test_fibonacci_near_61_8_level():
+    # 61.8% level = 200 - 0.618×100 = 138.2 → round → 138.0
+    n = 30
+    high, low, close, volume = _fib_ohlcv(n, swing_low=100.0, swing_high=200.0, price_now=138.0)
+    result = compute_fibonacci_levels(high, low, close)
+    assert result["fib_context"] == "NEAR_61_8"
+    assert result["nearest_fib_label"] == "61.8"
+
+
+def test_fibonacci_between_levels():
+    # price_now=170 — 38.2%=162, 23.6%=176.4 — nearest is 23.6% (6.4 pts away)
+    # pct_to_nearest = (170-176)/176 ≈ -3.4% > 2% threshold → BETWEEN_LEVELS
+    n = 30
+    high, low, close, volume = _fib_ohlcv(n, swing_low=100.0, swing_high=200.0, price_now=170.0)
+    result = compute_fibonacci_levels(high, low, close)
+    assert result["fib_context"] == "BETWEEN_LEVELS"
+    assert result["nearest_fib_label"] is not None
+
+
+def test_fibonacci_uptrend_detection():
+    # swing low at bar 5, swing high at bar 20 → UPTREND
+    n = 30
+    high, low, close, volume = _fib_ohlcv(n, swing_low=100.0, swing_high=200.0, price_now=162.0)
+    result = compute_fibonacci_levels(high, low, close)
+    assert result["fib_trend"] == "UPTREND"

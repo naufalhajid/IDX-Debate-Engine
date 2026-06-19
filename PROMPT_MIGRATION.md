@@ -1,5 +1,27 @@
 # Prompt Migration Log
 
+## 2026-06-20 — `fv2-fibonacci-v18`
+
+**Files changed:**
+- `services/debate_prompts/chartist.txt` (STEP 15 — Fibonacci Retracement ditambahkan)
+- `services/debate_prompts/manifest.json` (version → `2026-06-20-fv2-fibonacci-v18`)
+
+### Changes
+
+**`chartist.txt`** — STEP 15 Fibonacci Retracement ditambahkan setelah STEP 14 (AVWAP).
+
+Fields yang dibaca: `fib_context` (NEAR_23_6 | NEAR_38_2 | NEAR_50_0 | NEAR_61_8 | NEAR_78_6 |
+ABOVE_SWING_HIGH | BELOW_SWING_LOW | BETWEEN_LEVELS | INSUFFICIENT_DATA), `fib_trend`
+(UPTREND | DOWNTREND), `fib_swing_low`, `fib_swing_high`, `fib_38_2`, `fib_50_0`, `fib_61_8`,
+`nearest_fib_label`, `price_to_nearest_fib_pct`. Di-compute oleh `compute_fibonacci_levels()`
+di `utils/technicals.py`.
+
+Logika: retracement dari swing high ke swing low — 38.2%/50%/61.8% adalah key support di UPTREND,
+key resistance di DOWNTREND. ABOVE_SWING_HIGH = breakout (no retracement needed).
+BELOW_SWING_LOW = setup invalidated.
+
+---
+
 ## 2026-06-20 — `fv1-anchored-vwap-v17`
 
 **Files changed:**

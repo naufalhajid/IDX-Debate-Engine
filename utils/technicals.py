@@ -537,6 +537,119 @@ def compute_anchored_vwap(
     }
 
 
+# ── FV-2: Fibonacci Retracement ───────────────────────────────────────────────
+
+_FIB_RATIOS: dict[str, float] = {
+    "23.6": 0.236,
+    "38.2": 0.382,
+    "50.0": 0.500,
+    "61.8": 0.618,
+    "78.6": 0.786,
+}
+
+
+def compute_fibonacci_levels(
+    high: pd.Series,
+    low: pd.Series,
+    close: pd.Series,
+    lookback: int = 60,
+    near_threshold_pct: float = 2.0,
+    min_range_pct: float = 3.0,
+) -> dict:
+    """Fibonacci retracement levels from the most recent swing high and swing low.
+
+    Finds structural swing high (argmax of highs) and swing low (argmin of lows)
+    within `lookback` bars. Retracement levels (23.6%, 38.2%, 50%, 61.8%, 78.6%)
+    are computed as: level = swing_high - ratio × (swing_high - swing_low).
+
+    In an UPTREND (swing low precedes swing high), these levels are support zones
+    where price may bounce during a pullback. In a DOWNTREND (swing high precedes
+    swing low), these levels act as overhead resistance during a dead-cat bounce.
+
+    Requires a minimum swing range of `min_range_pct`% to avoid noise signals on
+    flat or very narrow price ranges.
+    """
+    _empty: dict = {
+        "fib_swing_low": None,
+        "fib_swing_high": None,
+        "fib_levels": None,
+        "nearest_fib_label": None,
+        "nearest_fib_price": None,
+        "price_to_nearest_fib_pct": None,
+        "fib_context": "INSUFFICIENT_DATA",
+        "fib_trend": None,
+    }
+
+    if len(close) < max(5, lookback // 2):
+        return _empty
+
+    tail_len = min(lookback, len(high))
+    window_start = len(high) - tail_len
+
+    idx_high = int(high.iloc[window_start:].argmax()) + window_start
+    idx_low = int(low.iloc[window_start:].argmin()) + window_start
+
+    swing_high = float(high.iloc[idx_high])
+    swing_low = float(low.iloc[idx_low])
+
+    if swing_low <= 0 or swing_high <= swing_low:
+        return _empty
+
+    price_range = swing_high - swing_low
+    if price_range / swing_low * 100 < min_range_pct:
+        return _empty
+
+    # Standard retracement: 0% = swing_high, 100% = swing_low
+    fib_levels = {
+        label: round(swing_high - ratio * price_range, 0)
+        for label, ratio in _FIB_RATIOS.items()
+    }
+
+    price_now = float(close.iloc[-1])
+    trend = "UPTREND" if idx_low < idx_high else "DOWNTREND"
+
+    if price_now > swing_high:
+        return {
+            **_empty,
+            "fib_swing_low": round(swing_low, 0),
+            "fib_swing_high": round(swing_high, 0),
+            "fib_levels": fib_levels,
+            "fib_context": "ABOVE_SWING_HIGH",
+            "fib_trend": trend,
+        }
+
+    if price_now < swing_low:
+        return {
+            **_empty,
+            "fib_swing_low": round(swing_low, 0),
+            "fib_swing_high": round(swing_high, 0),
+            "fib_levels": fib_levels,
+            "fib_context": "BELOW_SWING_LOW",
+            "fib_trend": trend,
+        }
+
+    # Price is within the swing range — find nearest Fib level
+    nearest_label = min(fib_levels, key=lambda lbl: abs(price_now - fib_levels[lbl]))
+    nearest_price = fib_levels[nearest_label]
+    pct_to_nearest = round((price_now - nearest_price) / nearest_price * 100, 1)
+
+    if abs(pct_to_nearest) <= near_threshold_pct:
+        context = f"NEAR_{nearest_label.replace('.', '_')}"
+    else:
+        context = "BETWEEN_LEVELS"
+
+    return {
+        "fib_swing_low": round(swing_low, 0),
+        "fib_swing_high": round(swing_high, 0),
+        "fib_levels": fib_levels,
+        "nearest_fib_label": nearest_label,
+        "nearest_fib_price": nearest_price,
+        "price_to_nearest_fib_pct": pct_to_nearest,
+        "fib_context": context,
+        "fib_trend": trend,
+    }
+
+
 # ── Task 25: Bull / Bear Flag Pattern ────────────────────────────────────────
 
 def detect_flag_pattern(
