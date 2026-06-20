@@ -75,7 +75,7 @@ def test_pack_to_prompt_string_truncates_oversized_fundamentals(
         "analyst_notes": "a" * 3000,
     }
 
-    caplog.set_level(logging.WARNING, logger="services.context_pack_builder")
+    caplog.set_level(logging.DEBUG, logger="services.context_pack_builder")
     pack = build_context_pack("TLKM", raw_data)
     prompt = pack_to_prompt_string(pack)
 

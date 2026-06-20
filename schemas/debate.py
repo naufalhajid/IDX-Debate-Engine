@@ -643,6 +643,7 @@ class DebateChamberState(TypedDict):
     fair_value_high: float | None
     fair_value_range_pct: float | None
     risk_overvalued: bool
+    valuation_band_context: str | None  # C3: self-relative PE/PBV percentile vs own history
 
     # Debate engine
     debate_history: Annotated[list[DebateMessage], history_updater]

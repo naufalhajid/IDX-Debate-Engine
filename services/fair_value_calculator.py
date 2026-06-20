@@ -1307,11 +1307,15 @@ def get_historical_multiples(ticker: str) -> dict:
 
 
 def extract_historical_multiples(api_response: dict, ticker: str) -> dict:
-    """Extract 5-year median PE/PB from Stockbit API response.
+    """Extract multi-year median PE/PB from Stockbit API response.
 
-    Tries multiple common Stockbit API response structures to find
-    yearly PE and PB values. Falls back to hardcoded HISTORICAL_MULTIPLES
-    if extraction fails or yields insufficient data.
+    Tries three common Stockbit API response structures to find yearly PE/PB
+    values. Falls back to hardcoded HISTORICAL_MULTIPLES if extraction fails or
+    yields insufficient data.
+
+    When ≥3 yearly values are found the return dict also includes:
+      pe_values : list[float]  — raw yearly series used to compute percentile
+      pb_values : list[float]  — raw yearly series used to compute percentile
     """
     pe_values: list[float] = []
     pb_values: list[float] = []
@@ -1366,16 +1370,115 @@ def extract_historical_multiples(api_response: dict, ticker: str) -> dict:
                 except (ValueError, TypeError):
                     pass
 
+    # Pattern 3: data.closure_fin_items_results[group].fin_name_results[item].fitem
+    # Each group may represent one fiscal year (confirmed live format, year_limit=10).
+    # _parse_stockbit_flat() overwrites duplicate field names so yearly history is lost
+    # there; this pattern reads across ALL groups to reconstruct the series.
+    _PE_SUBSTRINGS = ("P/E", "PRICE EARNINGS", "PRICE/EARNINGS", "PRICE TO EARNINGS")
+    # "PER" matched as prefix only — bare substring also matches "Dividen Per Saham"
+    _PE_PREFIXES = ("PER", "CURRENT PER", "TRAILING PER", "FORWARD PER")
+    _PB_SUBSTRINGS = ("PBV", "P/B", "PRICE BOOK", "PRICE/BOOK", "PRICE TO BOOK")
+    need_pe = len(pe_values) < 3
+    need_pb = len(pb_values) < 3
+    if need_pe or need_pb:
+        for group in data.get("closure_fin_items_results", []):
+            group_pe: float | None = None
+            group_pb: float | None = None
+            for item in group.get("fin_name_results", []):
+                fitem = item.get("fitem", {})
+                name = str(fitem.get("name", "")).upper().strip()
+                raw_val = (
+                    str(fitem.get("value", "")).replace(",", "").replace("%", "").strip()
+                )
+                if not raw_val or raw_val in ("-", "N/A", "NULL", "NONE"):
+                    continue
+                try:
+                    v = float(raw_val)
+                except (ValueError, TypeError):
+                    continue
+                pe_name_match = any(k in name for k in _PE_SUBSTRINGS) or any(
+                    name == p or name.startswith(p + " ") or name.startswith(p + "(")
+                    for p in _PE_PREFIXES
+                )
+                if need_pe and group_pe is None and pe_name_match and 0 < v < 200:
+                    group_pe = v
+                if need_pb and group_pb is None and any(k in name for k in _PB_SUBSTRINGS) and 0 < v < 100:
+                    group_pb = v
+            if need_pe and group_pe is not None:
+                pe_values.append(group_pe)
+            if need_pb and group_pb is not None:
+                pb_values.append(group_pb)
+
     # Start with hardcoded defaults, override with API-derived medians
     result = get_historical_multiples(ticker)
     if len(pe_values) >= 3:
         sorted_pe = sorted(pe_values)
         result["pe"] = round(sorted_pe[len(sorted_pe) // 2], 1)
+        result["pe_values"] = pe_values
     if len(pb_values) >= 3:
         sorted_pb = sorted(pb_values)
         result["pb"] = round(sorted_pb[len(sorted_pb) // 2], 1)
+        result["pb_values"] = pb_values
 
     return result
+
+
+def _compute_valuation_band_context(
+    current_pe: float,
+    current_pb: float,
+    pe_values: list[float],
+    pb_values: list[float],
+) -> str | None:
+    """Return a band section string showing current PE/PBV vs own historical range.
+
+    Returns None when insufficient yearly data (< 3 points or trivially tight range).
+    Only uses real API-derived data — never falls back to hardcoded estimates.
+    """
+
+    def _band(current: float, series: list[float]) -> tuple[float | None, str, float, float]:
+        if len(series) < 3 or current <= 0:
+            return None, "INSUFFICIENT_DATA", 0.0, 0.0
+        lo, hi = min(series), max(series)
+        if hi - lo < 0.5:  # range too tight to be meaningful
+            return None, "INSUFFICIENT_DATA", lo, hi
+        pct = max(0.0, min(100.0, (current - lo) / (hi - lo) * 100.0))
+        if pct <= 25:
+            label = "HISTORICALLY_CHEAP"
+        elif pct <= 50:
+            label = "BELOW_AVG"
+        elif pct <= 75:
+            label = "ABOVE_AVG"
+        else:
+            label = "HISTORICALLY_EXPENSIVE"
+        return round(pct, 0), label, lo, hi
+
+    pe_pct, pe_label, pe_lo, pe_hi = _band(current_pe, pe_values)
+    pb_pct, pb_label, pb_lo, pb_hi = _band(current_pb, pb_values)
+
+    if pe_pct is None and pb_pct is None:
+        return None
+
+    n_pe = len(pe_values)
+    n_pb = len(pb_values)
+    n = max(n_pe, n_pb)
+    parts: list[str] = []
+    if pe_pct is not None:
+        parts.append(
+            f"  PE  {current_pe:.1f}x → {pe_pct:.0f}th pct of {n_pe}-yr range"
+            f" [{pe_lo:.1f}–{pe_hi:.1f}x] → {pe_label}"
+        )
+    if pb_pct is not None:
+        parts.append(
+            f"  PBV {current_pb:.2f}x → {pb_pct:.0f}th pct of {n_pb}-yr range"
+            f" [{pb_lo:.2f}–{pb_hi:.2f}x] → {pb_label}"
+        )
+
+    return (
+        "── HISTORICAL VALUATION BAND (C3) ──────────────────────────────\n"
+        + "\n".join(parts)
+        + f"\n  (source: {n} years of API data; self-relative percentile rank)\n"
+        + "─" * 65
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1422,6 +1525,17 @@ def build_fair_value_payload(
     result = calc.fair_value_weighted()
     report = calc.build_report(current_price=current_price)
 
+    # ── C3: Historical valuation band ─────────────────────────────────────
+    band_ctx = _compute_valuation_band_context(
+        current_pe=stats.raw_pe_current,
+        current_pb=stats.raw_pb_current,
+        pe_values=multiples.get("pe_values", []),
+        pb_values=multiples.get("pb_values", []),
+    )
+    if band_ctx:
+        report = report + "\n" + band_ctx
+    result["valuation_band_context"] = band_ctx
+
     if eps_derived:
         result["eps_source"] = "derived_from_pe"
 
@@ -1467,6 +1581,7 @@ def build_fair_value_payload(
             "valuation_verdict": "QUALITY_REJECTED",
             "fv_quality_rejected": True,
             "fv_quality_reasons": quality_reasons,
+            "valuation_band_context": None,
         }
         report += (
             "\n⚠️ FAIR VALUE QUALITY GATE: estimasi FV di atas TIDAK dipakai "

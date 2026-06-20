@@ -35,6 +35,7 @@ CONTEXT_FIELD_TIERS = {
         "eps",
         "pe_ratio",
         "pbv",
+        "valuation_band_context",
         "is_lq45",
         "insider_selling_flag",
         "post_earnings_flag",
@@ -68,6 +69,7 @@ class ContextPack(BaseModel):
     fair_value_low: float | None = None
     fair_value_high: float | None = None
     risk_overvalued: bool | None = None
+    valuation_band_context: str | None = None
     fundamentals: dict
     technicals: dict
     sentiment_summary: str | None
@@ -148,6 +150,7 @@ def build_context_pack(ticker: str, raw_data: dict) -> ContextPack:
             if value not in (None, ""):
                 risk_overvalued = value
                 break
+    valuation_band_context = _first_text(raw_data, "valuation_band_context")
     fundamentals = _first_dict(
         raw_data, "fundamentals", "fundamental_data", "fundamental"
     )
@@ -187,6 +190,7 @@ def build_context_pack(ticker: str, raw_data: dict) -> ContextPack:
         fair_value_low=fair_value_low,
         fair_value_high=fair_value_high,
         risk_overvalued=_optional_bool(risk_overvalued),
+        valuation_band_context=valuation_band_context or None,
         fundamentals=fundamentals,
         technicals=technicals,
         sentiment_summary=sentiment_summary,
@@ -271,7 +275,7 @@ def pack_to_prompt_string(
         prompt = candidate_text(extra_lines)
 
     if omitted:
-        logger.warning(
+        logger.debug(
             "Context pack fields truncated for %s to keep prompt under %s chars: %s",
             pack.ticker,
             limit,

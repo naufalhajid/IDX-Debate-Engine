@@ -366,6 +366,7 @@ Rules:
             "fair_value_high": fv_payload.get("fair_value_high"),
             "range_pct": fv_payload.get("range_pct"),
             "risk_overvalued": fv_payload.get("risk_overvalued"),
+            "valuation_band_context": fv_payload.get("valuation_band_context"),
         }, fair_value
 
     def _fetch_sentiment_summary(self, ticker: str) -> str | None:

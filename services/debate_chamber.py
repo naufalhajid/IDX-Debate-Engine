@@ -1839,6 +1839,7 @@ class DebateChamber:
                 "flash_calls": 0,
                 "pro_calls": 0,
             },
+            "valuation_band_context": None,
             "error": None,
         }
 
@@ -2137,6 +2138,7 @@ Current Date (Asia/Jakarta): {current_date}
                 "fair_value_high": fv_result.get("fair_value_high"),
                 "fair_value_range_pct": fv_result.get("range_pct"),
                 "risk_overvalued": fv_result.get("risk_overvalued"),
+                "valuation_band_context": fv_result.get("valuation_band_context"),
             }
             if fv_result.get("fv_quality_rejected"):
                 # Propagate the quality rejection through the same metadata
@@ -2995,6 +2997,7 @@ Current Date (Asia/Jakarta): {current_date}
                 "data_sources": sources,
                 "source_timestamps": source_timestamps,
                 "market_data": market_data,
+                "valuation_band_context": state.get("valuation_band_context"),
             },
         )
         if context_pack.missing_fields:
@@ -5058,6 +5061,7 @@ Start your response with '{' and end with '}'. Nothing else."""
                 "flash_calls": 0,
                 "pro_calls": 0,
             },
+            "valuation_band_context": None,
             "error": None,
         }
         self._reset_llm_counters(initial_state)

@@ -9,9 +9,11 @@ from services.fair_value_calculator import (
     FairValueCalculator,
     KeyStats,
     _SECTOR_MEDIAN_PROFILES_DEFAULT,
+    _compute_valuation_band_context,
     _load_dynamic_sector_benchmarks,
     build_fair_value_payload,
     build_fair_value_report,
+    extract_historical_multiples,
     extract_keystats,
     refresh_sector_benchmarks,
 )
@@ -837,3 +839,114 @@ def test_stale_fv_shifted_toward_pb():
     assert fv_fresh is not None and fv_stale is not None
     # Stale shifts weight toward lower PB-implied FV → composite FV must fall
     assert fv_stale < fv_fresh
+
+
+# ---------------------------------------------------------------------------
+# C3 — Historical Valuation Band tests
+# ---------------------------------------------------------------------------
+
+def _multi_year_response(pe_by_year: list[float], pb_by_year: list[float]) -> dict:
+    """Build a closure_fin_items_results response with one group per year."""
+    groups = []
+    for pe, pb in zip(pe_by_year, pb_by_year):
+        groups.append({
+            "fin_name_results": [
+                {"fitem": {"name": "PER", "value": str(pe)}},
+                {"fitem": {"name": "PBV", "value": str(pb)}},
+            ]
+        })
+    return {"data": {"closure_fin_items_results": groups}}
+
+
+def test_extract_historical_multiples_pattern3_returns_values_list():
+    pe_series = [8.0, 10.0, 14.0, 18.0, 22.0]
+    pb_series = [1.2, 1.5, 2.0, 2.5, 3.0]
+    result = extract_historical_multiples(_multi_year_response(pe_series, pb_series), "BBRI")
+    assert "pe_values" in result
+    assert "pb_values" in result
+    assert set(result["pe_values"]) == set(pe_series)
+    assert set(result["pb_values"]) == set(pb_series)
+
+
+def test_extract_historical_multiples_pattern3_updates_median():
+    # 5 groups → median of [8, 10, 14, 18, 22] = 14.0
+    pe_series = [8.0, 10.0, 14.0, 18.0, 22.0]
+    pb_series = [1.2, 1.5, 2.0, 2.5, 3.0]
+    result = extract_historical_multiples(_multi_year_response(pe_series, pb_series), "BBRI")
+    assert result["pe"] == 14.0
+    assert result["pb"] == 2.0
+
+
+def test_extract_historical_multiples_pattern3_insufficient_data_no_list():
+    # Only 2 groups → insufficient for percentile, pe_values not returned
+    resp = _multi_year_response([10.0, 14.0], [1.5, 2.0])
+    result = extract_historical_multiples(resp, "XXXX")
+    assert "pe_values" not in result
+    assert "pb_values" not in result
+
+
+def test_compute_valuation_band_context_returns_none_on_empty():
+    assert _compute_valuation_band_context(15.0, 2.0, [], []) is None
+
+
+def test_compute_valuation_band_context_returns_none_on_insufficient():
+    assert _compute_valuation_band_context(15.0, 2.0, [10.0, 20.0], [1.0, 3.0]) is None
+
+
+def test_compute_valuation_band_context_cheap_label():
+    pe_series = [8.0, 10.0, 14.0, 18.0, 22.0]   # range 8–22, current=9 → ~7th pct → CHEAP
+    pb_series = [1.2, 1.5, 2.0, 2.5, 3.0]
+    ctx = _compute_valuation_band_context(9.0, 1.3, pe_series, pb_series)
+    assert ctx is not None
+    assert "HISTORICALLY_CHEAP" in ctx
+
+
+def test_compute_valuation_band_context_expensive_label():
+    pe_series = [8.0, 10.0, 14.0, 18.0, 22.0]   # current=21 → ~93rd pct → EXPENSIVE
+    pb_series = [1.2, 1.5, 2.0, 2.5, 3.0]
+    ctx = _compute_valuation_band_context(21.0, 2.8, pe_series, pb_series)
+    assert ctx is not None
+    assert "HISTORICALLY_EXPENSIVE" in ctx
+
+
+def test_compute_valuation_band_context_tight_range_returns_none():
+    # Range < 0.5 → insufficient
+    pe_series = [14.0, 14.1, 14.2, 14.3, 14.4]
+    ctx = _compute_valuation_band_context(14.2, 0.0, pe_series, [])
+    assert ctx is None
+
+
+def test_compute_valuation_band_context_includes_year_count():
+    pe_series = [8.0, 10.0, 14.0, 18.0, 22.0]
+    ctx = _compute_valuation_band_context(14.0, 0.0, pe_series, [])
+    assert ctx is not None
+    assert "5-yr" in ctx
+
+
+def test_build_fair_value_payload_band_context_in_result_when_data_present():
+    pe_series = [8.0, 10.0, 14.0, 18.0, 22.0]
+    pb_series = [1.2, 1.5, 2.0, 2.5, 3.0]
+    resp = _multi_year_response(pe_series, pb_series)
+    # Add live fields so extract_keystats can set raw_pe_current / raw_pb_current.
+    # "Current EPS (TTM)" blocks Strategy B (which would overwrite Strategy A's PE with 0).
+    # "Book Value Per Share" enables a second FV method (PBV) to avoid LOW confidence
+    # (quality gate fires on LOW confidence and correctly nulls valuation_band_context).
+    resp["data"]["closure_fin_items_results"][0]["fin_name_results"] += [
+        {"fitem": {"name": "Current EPS (TTM)", "value": "500"}},
+        {"fitem": {"name": "Book Value Per Share", "value": "3000"}},
+        {"fitem": {"name": "P/E Ratio", "value": "14"}},
+        {"fitem": {"name": "P/B Ratio", "value": "1.5"}},
+    ]
+    _, result = build_fair_value_payload(resp, "BBRI", 7000.0)
+    assert result.get("valuation_band_context") is not None
+
+
+def test_build_fair_value_payload_band_context_none_when_no_history():
+    resp = {"data": {"closure_fin_items_results": [
+        {"fin_name_results": [
+            {"fitem": {"name": "Current EPS (TTM)", "value": "500"}},
+            {"fitem": {"name": "Book Value Per Share", "value": "3000"}},
+        ]}
+    ]}}
+    _, result = build_fair_value_payload(resp, "XXXX", 7000.0)
+    assert result.get("valuation_band_context") is None
