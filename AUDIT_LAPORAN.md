@@ -3,6 +3,58 @@
 
 ---
 
+## FAIR VALUE FRAMEWORK UPDATE — 2026-06-20 (FV-1/FV-2/SB-1/SB-2/FV-5)
+
+**Auditor**: Claude Sonnet 4.6 (max-effort mode)
+**Scope**: Verifikasi 5 fitur baru terhadap FV Framework rubrik 200-point
+**Baseline**: FV Deep Audit 154/200 = 77% (2026-06-19)
+
+### Score Summary Update
+
+| Category | Max | Before | After | Delta |
+|----------|-----|--------|-------|-------|
+| A — Fundamental Valuation | 40 | 34 | 34 | 0 |
+| B — Technical Fair Value | 35 | 23 | **33** | **+10** |
+| C — Relative Valuation | 25 | 14 | **17** | **+3** |
+| D — Composite Integration & Wiring | 50 | 48 | 48 | 0 |
+| E — Data Pipeline & Macro | 30 | 19 | **26** | **+7** |
+| F — IDX-Specific Correctness | 20 | 16 | 16 | 0 |
+| **TOTAL** | **200** | **154 (77%)** | **174 (87%)** | **+20** |
+
+### Changed Items
+
+| ID | Item | Before | After | Evidence |
+|----|------|--------|-------|----------|
+| B2 | Anchored VWAP | 0/5 ❌ | **5/5 ✅** | `utils/technicals.py:471` + `debate_chamber.py:2498` + `chartist.txt STEP 14` |
+| B6 | Fibonacci retracement | 0/5 ❌ | **5/5 ✅** | `utils/technicals.py:551` + `debate_chamber.py:2512` + `chartist.txt STEP 15` |
+| C1 | Sector peer median PE/PBV | 5/8 | **8/8 ✅** | 12-sector `_SECTOR_REPRESENTATIVE_TICKERS`; `refresh_sector_benchmarks()` di pipeline startup |
+| E1 | SBN 10Y yield sourcing | 4/8 | **7/8** | `services/macro_refresh.py` World Bank API + TTL cache + pipeline wiring |
+| E2 | Macro auto-refresh | 0/5 ❌ | **4/5** | `_maybe_refresh_macro_rates()` di `async def main()` (non-dry-run) |
+
+### B2 — Anchored VWAP (5/5 ✅)
+
+`compute_anchored_vwap()` (`utils/technicals.py:471`): anchor = argmin(low, last 60 bars) → cumulative VWAP dari anchor ke sekarang. Output: `avwap`, `avwap_position` (ABOVE/AT/BELOW_AVWAP), `price_to_avwap_pct`, `anchor_bars_ago`. Dipanggil di `debate_chamber.py:2498` dalam chartist node; `chartist.txt STEP 14` memformat output ke narasi LLM. 20 unit tests passing (`tests/test_technicals.py:295+`).
+
+### B6 — Fibonacci Retracement (5/5 ✅)
+
+`compute_fibonacci_levels()` (`utils/technicals.py:551`): swing high/low dalam 60 bars; 5 level standar (23.6%, 38.2%, 50%, 61.8%, 78.6%); trend detection (UPTREND/DOWNTREND); `fib_context` (ABOVE_SWING_HIGH | NEAR_38_2 | BETWEEN_LEVELS | dll). Dipanggil di `debate_chamber.py:2512`; `chartist.txt STEP 15` interpretasi. Documented di `PROMPT_MIGRATION.md` (versi `fv2-fibonacci-v18`).
+
+### Remaining Gaps (FV Framework)
+
+| ID | Item | Score | Gap |
+|----|------|-------|-----|
+| A4 | DDM (Gordon Growth) | 4/6 | Full DCF model absent |
+| A6 | WACC / DCF | 4/6 | CAPM ke ada; per-share FCF model absent |
+| B1 | Rolling VWAP | 6/7 | -1: daily bars proxy, bukan true intraday VWAP |
+| B3 | Volume Profile | 6/7 | -1: minor precision |
+| C3 | Historical valuation band (percentile) | 1/7 | Absent dari debate engine; hanya di quant filter |
+| E1 | SBN 10Y direct feed | 7/8 | -1: World Bank ~2yr lag; spread hardcoded 1.7% |
+| E2 | BI rate auto-refresh | 4/5 | -1: policy rate (7DRRR) tidak di-fetch; hanya deposit proxy |
+
+*Update: 2026-06-20 | Baseline: FV Deep Audit 2026-06-19 | Target 85% = 170 pts — **ACHIEVED (174 pts)**.*
+
+---
+
 ## RE-AUDIT PASCA-REMEDIATION — 2026-06-20
 
 **Auditor**: Claude Sonnet 4.6 (max-effort mode)
