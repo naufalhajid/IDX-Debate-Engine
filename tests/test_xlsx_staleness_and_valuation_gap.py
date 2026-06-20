@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-import pytest
 
 from core.quant_filter.config import (
     MAX_XLSX_AGE_CALENDAR_DAYS,

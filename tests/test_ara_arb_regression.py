@@ -9,7 +9,6 @@ for stocks that had touched ARA/ARB territory intraday.
 from __future__ import annotations
 
 import pandas as pd
-import pytest
 
 from core.quant_filter.pipeline import compute_ara_arb_risk
 
