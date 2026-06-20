@@ -67,49 +67,61 @@ class StockbitTokenFetcher:
         except Exception:
             return False
 
+    def _extract_token_from_logs(self) -> str | None:
+        """Scan Chrome performance logs for any exodus.stockbit.com Bearer token."""
+        logs = self.driver.get_log("performance")
+        access_token = None
+        for entry in logs:
+            try:
+                message = json.loads(entry["message"])
+                if message.get("message", {}).get("method") != "Network.requestWillBeSent":
+                    continue
+                request = message["message"]["params"].get("request", {})
+                url = request.get("url", "")
+                # Accept ANY authenticated request to the Stockbit API, not just sample_url.
+                if "exodus.stockbit.com" not in url:
+                    continue
+                headers = request.get("headers", {})
+                auth = headers.get("Authorization") or headers.get("authorization", "")
+                if auth.startswith("Bearer "):
+                    access_token = auth.split(" ", 1)[1]
+                    # Keep iterating — last token wins (most recently refreshed).
+            except (KeyError, json.JSONDecodeError):
+                continue
+        return access_token
+
     def fetch_tokens(self):
+        import time
+
         driver = self.driver
         logger.info("Navigating to Stockbit login page...")
         driver.get(self.login_url)
 
         if self._is_already_logged_in():
-            logger.info("Saved session detected — skipping manual login prompt.")
+            logger.info("Saved session detected — loading dashboard to trigger API calls...")
+            # Navigate to main feed so the SPA fires authenticated exodus.stockbit.com
+            # requests; wait long enough for Bearer token to appear in network logs.
+            driver.get("https://stockbit.com/#/feed")
+            time.sleep(8)
         else:
             logger.info("Please log in to Stockbit in the opened browser.")
             input("Press Enter here AFTER login succeeds and the dashboard loads... ")
 
-        # Scan performance logs for the sample request
-        logs = driver.get_log("performance")
+        access_token = self._extract_token_from_logs()
 
-        access_token = None
-
-        # We look for Network.requestWillBeSent events
-        for entry in logs:
-            try:
-                message = json.loads(entry["message"])
-                method = message.get("message", {}).get("method")
-                if method == "Network.requestWillBeSent":
-                    params = message["message"]["params"]
-                    request = params.get("request", {})
-                    url = request.get("url", "")
-
-                    if self.sample_url in url:
-                        headers = request.get("headers", {})
-                        # Headers keys can be case-sensitive or not depending on browser version, usually title-cased or lowercase.
-                        # We check both.
-                        auth_header = headers.get("Authorization") or headers.get(
-                            "authorization"
-                        )
-
-                        if auth_header and auth_header.startswith("Bearer "):
-                            access_token = auth_header.split(" ", 1)[1]
-                            # Don't break, keep looking for the LATEST token in the logs
-            except (KeyError, json.JSONDecodeError):
-                continue
+        # Fallback: if auto-capture still failed, let the user intervene manually.
+        if not access_token:
+            logger.warning(
+                "Token not captured automatically. "
+                "Please interact with the browser (e.g. scroll the feed), then press Enter."
+            )
+            input("Press Enter after the Stockbit dashboard has fully loaded... ")
+            access_token = self._extract_token_from_logs()
 
         if not access_token:
             logger.error(
-                "Could not find Bearer token in captured requests. Make sure the page finished loading."
+                "Could not find Bearer token in captured requests. "
+                "Make sure the page finished loading before pressing Enter."
             )
             return None, None
 

@@ -120,6 +120,15 @@ from core.risk_governor import RR_IMPLAUSIBLE_CEILING, annotate_risk
 from core.settings import settings
 from core.comparison_reporter import DEFAULT_REPORTER, ComparisonReporter
 from services.debate_prompt_registry import PROMPT_VERSION
+from services.fair_value_calculator import (
+    _SECTOR_BENCHMARKS_CACHE_PATH,
+    _SECTOR_BENCHMARK_MAX_AGE_DAYS,
+    refresh_sector_benchmarks as _refresh_sector_benchmarks,
+)
+from services.macro_refresh import (
+    load_cached_macro_rates,
+    refresh_macro_rates as _refresh_macro_rates,
+)
 from services.explainability_auditor import DEFAULT_AUDITOR
 from services.news_fetcher import DEFAULT_FETCHER
 from services.report_formatter import DEFAULT_MD, MarkdownFormatter, RichFormatter
@@ -5483,6 +5492,68 @@ def generate_top3_report(
 
 
 # ---------------------------------------------------------------------------
+# FV-5: Sector benchmark refresh helper
+# ---------------------------------------------------------------------------
+
+
+def _maybe_refresh_macro_rates() -> None:
+    """Refresh macro rates (SBN 10Y yield) if cache is absent or stale. Non-fatal."""
+    try:
+        cached = load_cached_macro_rates()
+        if cached:
+            logger.info(
+                "[Pipeline] Macro rates cache fresh (SBN 10Y={:.4f}, source={}) — skipping.",
+                cached.get("sbn_10y", 0),
+                cached.get("source", "?"),
+            )
+            return
+        logger.info("[Pipeline] Refreshing macro rates (SBN 10Y yield)...")
+        from services.stockbit_api_client import StockbitApiClient
+        try:
+            client = StockbitApiClient()
+        except Exception:
+            client = None
+        result = _refresh_macro_rates(stockbit_client=client)
+        logger.info(
+            "[Pipeline] Macro rates refreshed: SBN 10Y={:.4f} ({})",
+            result.get("sbn_10y", 0),
+            result.get("source", "?"),
+        )
+    except Exception as exc:
+        logger.warning("[Pipeline] Macro rate refresh skipped (non-fatal): {}", exc)
+
+
+def _maybe_refresh_sector_benchmarks() -> None:
+    """Refresh sector benchmarks if cache is absent or older than the TTL. Non-fatal."""
+    try:
+        stale = True
+        if _SECTOR_BENCHMARKS_CACHE_PATH.exists():
+            raw = json.loads(_SECTOR_BENCHMARKS_CACHE_PATH.read_text(encoding="utf-8"))
+            updated_at = datetime.fromisoformat(raw.get("updated_at", "1970-01-01"))
+            stale = (datetime.now(timezone.utc) - updated_at.replace(tzinfo=timezone.utc)).days > _SECTOR_BENCHMARK_MAX_AGE_DAYS
+        if not stale:
+            logger.info("[Pipeline] Sector benchmarks cache is fresh — skipping refresh.")
+            return
+        logger.info("[Pipeline] Refreshing sector benchmarks (12 IDX sectors)...")
+        from services.stockbit_api_client import StockbitApiClient
+        try:
+            client = StockbitApiClient()
+        except Exception as exc:
+            logger.warning("[Pipeline] Sector benchmark refresh skipped — client init failed: {}", exc)
+            return
+
+        def _fetch(ticker: str) -> dict:
+            return client.get(
+                f"https://exodus.stockbit.com/keystats/ratio/v1/{ticker}?year_limit=10"
+            )
+
+        _refresh_sector_benchmarks(_fetch)
+        logger.info("[Pipeline] Sector benchmarks refreshed and cached.")
+    except Exception as exc:
+        logger.warning("[Pipeline] Sector benchmark refresh skipped (non-fatal): {}", exc)
+
+
+# ---------------------------------------------------------------------------
 # Main entrypoint
 # ---------------------------------------------------------------------------
 
@@ -5576,6 +5647,12 @@ async def main(
         if raise_on_error:
             raise RuntimeError("Dependencies validation failed: blocking issue found.")
         raise SystemExit(1)
+
+    # SB-1: Refresh macro rates (SBN 10Y) + FV-5: sector benchmarks; skip in dry-run.
+    # Run in thread to avoid blocking the event loop during HTTP I/O.
+    if not dry_run:
+        await asyncio.to_thread(_maybe_refresh_macro_rates)
+        await asyncio.to_thread(_maybe_refresh_sector_benchmarks)
 
     # Step 0a: Dependency Validation
     _cli_renderer.phase("Candidate Validation")

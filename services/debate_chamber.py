@@ -67,6 +67,7 @@ from schemas.debate import (
     validate_swing_targets,
 )
 from services.context_pack_builder import build_context_pack, pack_to_prompt_string
+from providers.idx_broker_summary import fetch_broker_summary, _empty as _bs_empty
 from services.evidence_ranker import (
     DEFAULT_RANKER as rag_store,
     CitationGuardReport,
@@ -2949,6 +2950,15 @@ Current Date (Asia/Jakarta): {current_date}
             sources.append("stockbit_foreign_flow")
             source_timestamps["stockbit_foreign_flow"] = context_generated_at
 
+        try:
+            _bs = await asyncio.to_thread(fetch_broker_summary, ticker, self.stockbit_client)
+        except Exception as _exc:
+            logger.warning("[Synthesizer] broker_summary failed for %s: %s", ticker, _exc)
+            _bs = _bs_empty(ticker)
+        if _bs.top_buyer_codes or _bs.top_seller_codes:
+            sources.append("stockbit_broker_summary")
+            source_timestamps["stockbit_broker_summary"] = context_generated_at
+
         context_pack = build_context_pack(
             ticker,
             {
@@ -2979,6 +2989,9 @@ Current Date (Asia/Jakarta): {current_date}
                 "net_foreign_flow_m": _ff.net_foreign_flow_m,
                 "foreign_vol_pct": _ff.foreign_vol_pct,
                 "is_net_foreign_buy": _ff.is_net_foreign_buy,
+                "top_broker_buy": _bs.top_buyer_codes,
+                "top_broker_sell": _bs.top_seller_codes,
+                "broker_accumulation": _bs.is_accumulation,
                 "data_sources": sources,
                 "source_timestamps": source_timestamps,
                 "market_data": market_data,

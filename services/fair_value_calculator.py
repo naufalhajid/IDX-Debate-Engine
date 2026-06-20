@@ -23,22 +23,44 @@ SECTOR_CACHE_PATH = Path("output/sector_cache.json")
 _SECTOR_BENCHMARKS_CACHE_PATH = Path("output/sector_benchmarks.json")
 _SECTOR_BENCHMARK_MAX_AGE_DAYS: int = 7
 
-# Representative tickers used to compute median PE/PB/ROE/margin per sector.
+# Representative tickers per IDX sector (12 raw sector keys matching sector_cache.json).
+# Tickers are LQ45/IDX80 constituents; failed fetches are silently skipped.
 _SECTOR_REPRESENTATIVE_TICKERS: dict[str, list[str]] = {
-    "bank":     ["BBCA", "BBRI", "BMRI"],
-    "mining":   ["ADRO", "PTBA", "BYAN"],
-    "consumer": ["UNVR", "ICBP", "MYOR"],
-    "property": ["BSDE", "SMRA"],
-    "default":  ["ASII", "TLKM", "INDF"],
+    "bank":             ["BBCA", "BBRI", "BMRI"],
+    "finance_nonbank":  ["BFIN", "ADMF", "MFIN"],
+    "energy":           ["ADRO", "PGAS", "MEDC"],
+    "basic_materials":  ["ANTM", "INCO", "TINS"],
+    "consumer_staples": ["UNVR", "ICBP", "MYOR"],
+    "consumer_disc":    ["MAPI", "ACES", "ERAA"],
+    "healthcare":       ["KLBF", "SIDO", "MERK"],
+    "property":         ["BSDE", "SMRA", "CTRA"],
+    "industrials":      ["ASII", "SMGR", "INTP"],
+    "tech":             ["EMTK", "DCII", "BELI"],
+    "infrastructure":   ["TLKM", "JSMR", "TOWR"],
+    "transport":        ["BIRD", "ASSA", "WEHA"],
 }
 
 # Static fallback — used when the cache is absent or stale.
+# 5 bucket keys = used by FairValueCalculator SECTOR_WEIGHTS.
+# 12 raw IDX sector keys = used by build_sector_comparison() raw_sector lookup.
 _SECTOR_MEDIAN_PROFILES_DEFAULT: dict[str, dict] = {
+    # ── 5 FairValueCalculator bucket keys ─────────────────────────────────────
     "bank":     {"pe": 10.0, "pb": 1.5, "roe": 0.14, "net_margin": 0.25},
     "mining":   {"pe":  7.0, "pb": 1.2, "roe": 0.18, "net_margin": 0.15},
     "consumer": {"pe": 18.0, "pb": 3.0, "roe": 0.20, "net_margin": 0.08},
     "property": {"pe": 12.0, "pb": 0.8, "roe": 0.07, "net_margin": 0.20},
     "default":  {"pe": 14.0, "pb": 1.5, "roe": 0.15, "net_margin": 0.10},
+    # ── 12 IDX raw sector keys (sector_cache.json vocabulary) ─────────────────
+    "finance_nonbank":  {"pe": 12.0, "pb": 2.0, "roe": 0.12, "net_margin": 0.18},
+    "energy":           {"pe":  6.0, "pb": 1.0, "roe": 0.16, "net_margin": 0.12},
+    "basic_materials":  {"pe":  8.0, "pb": 1.3, "roe": 0.20, "net_margin": 0.18},
+    "consumer_staples": {"pe": 20.0, "pb": 3.5, "roe": 0.22, "net_margin": 0.09},
+    "consumer_disc":    {"pe": 16.0, "pb": 2.5, "roe": 0.18, "net_margin": 0.07},
+    "healthcare":       {"pe": 22.0, "pb": 3.0, "roe": 0.15, "net_margin": 0.11},
+    "industrials":      {"pe": 14.0, "pb": 1.5, "roe": 0.14, "net_margin": 0.08},
+    "tech":             {"pe": 25.0, "pb": 3.5, "roe": 0.12, "net_margin": 0.15},
+    "infrastructure":   {"pe": 15.0, "pb": 2.0, "roe": 0.13, "net_margin": 0.20},
+    "transport":        {"pe": 13.0, "pb": 1.2, "roe": 0.09, "net_margin": 0.06},
 }
 
 
@@ -217,8 +239,9 @@ def _valuation_verdict_from_range(
 def _capm_cost_of_equity(beta: float = 1.0) -> float:
     """Cost of Equity via CAPM: Ke = SBN10Y + beta × ERP."""
     from core.settings import get_settings  # lazy to avoid circular dep
+    from services.macro_refresh import get_live_sbn_10y  # lazy to avoid circular dep
     s = get_settings()
-    return s.SBN_10Y_YIELD + beta * s.IDX_ERP
+    return get_live_sbn_10y() + beta * s.IDX_ERP
 
 
 # ---------------------------------------------------------------------------
@@ -888,8 +911,13 @@ class FairValueCalculator:
     # ── Task 27: Sector Peer Comparison ──────────────────────────────────────
 
     def build_sector_comparison(self) -> str:
+        # Try raw IDX sector (e.g. "consumer_disc") before falling back to bucket ("consumer").
         median = self.sector_medians.get(
-            self.sector, self.sector_medians.get("default", _SECTOR_MEDIAN_PROFILES_DEFAULT["default"])
+            self.raw_sector,
+            self.sector_medians.get(
+                self.sector,
+                self.sector_medians.get("default", _SECTOR_MEDIAN_PROFILES_DEFAULT["default"]),
+            ),
         )
         pe_cur = self.stats.raw_pe_current
         pb_cur = self.stats.raw_pb_current
@@ -905,7 +933,7 @@ class FairValueCalculator:
 
         lines = [
             "── SECTOR PEER CONTEXT (IDX Median) ───────────────────────────────",
-            f"  Sektor : {self.sector.upper()} (data: ~2024–2025 median)",
+            f"  Sektor : {self.raw_sector.upper()} (data: ~2024–2025 median)",
         ]
         if pe_cur > 0:
             lines.append(

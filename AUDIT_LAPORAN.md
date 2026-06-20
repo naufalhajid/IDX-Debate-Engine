@@ -3,6 +3,241 @@
 
 ---
 
+## RE-AUDIT PASCA-REMEDIATION — 2026-06-20
+
+**Auditor**: Claude Sonnet 4.6 (max-effort mode)
+**Scope**: Verifikasi dampak 6 Remediation Tasks (R1–R6) + max-effort corrections terhadap skor sistem
+**Metodologi**: Grep langsung ke source code + tracing call graph untuk setiap item yang berpotensi berubah
+**Baseline**: S10 re-audit 273/315 = 87% (2026-06-19)
+
+### Verdict: SKOR TIDAK BERUBAH — 273/315 = 87%
+
+| Layer | S10 | Pasca-Remediation | Delta | Alasan |
+|---|---|---|---|---|
+| Layer 1: Universe & Likuiditas | 25/25 | 25/25 | 0 | R4 perluas free float 16→40 ticker, tapi 1.6 sudah ✅ dan layer sudah maxed |
+| Layer 2: Fundamental Filter | 31/35 | 31/35 | 0 | Tidak ada task yang menyentuh insider selling atau post-earnings drift |
+| Layer 3: Valuasi | 35/35 | 35/35 | 0 | Sudah maxed; R6 (cross-model FV) adalah output-only, tidak mengubah FV methodology |
+| Layer 4: Teknikal | 45/45 | 45/45 | 0 | Sudah maxed; R2 fix bug weekly MultiIndex tapi feature sudah ✅ |
+| Layer 5: Setup & Timing | 23/25 | 23/25 | 0 | 5.10 T+2 masih ⚠️ prompt-only; tidak ada Python enforcement baru |
+| Layer 6: Risk | 27/30 | 27/30 | 0 | 6.9 partial exit & 6.10 anti-averaging down masih ⚠️ schema/prompt-only |
+| Layer 7: Portfolio | 18/20 | 18/20 | 0 | Tidak ada task yang menyentuh portfolio layer |
+| IDX-A: Regulasi | 12/15 | 12/15 | 0 | A.1 ARA/ARB sudah ✅ di S10; R1 meningkatkan akurasi tapi tidak menambah poin |
+| IDX-B: Kalender Korporat | 12/20 | 12/20 | 0 | Tidak ada task korporat |
+| IDX-C: Likuiditas Mikro | 8/15 | 8/15 | 0 | C.4 free float scope berbeda dari 1.6; masih ❌ |
+| IDX-D: Arus Dana Asing | 7/15 | 7/15 | 0 | Tidak ada perubahan foreign flow |
+| Hidden Gems | 30/35 | 30/35 | 0 | Tidak ada perubahan |
+| **TOTAL** | **273/315** | **273/315** | **0** | |
+
+### Mengapa Skor Tidak Berubah?
+
+Remediation tasks adalah **bug fix dan peningkatan kualitas data**, bukan kapabilitas baru. Rubrik 315-point menilai *ada/tidaknya* suatu fitur (✅/⚠️/❌), bukan *seberapa akurat* implementasinya. Semua fitur yang diperbaiki sudah di-credit ✅ di S10 — bug fix tidak mengubah ✅ menjadi lebih dari ✅.
+
+| Task | Tipe | Dampak ke Skor |
+|---|---|---|
+| R1: ARA/ARB intraday high/low fix | Bug fix (akurasi) | Nol — A.1 sudah ✅ via risk_governor.py |
+| R2: Weekly MultiIndex guard | Bug fix (reliability) | Nol — 4.10 sudah ✅ |
+| R3: Rename `min_roe` → `roe_penalty_threshold` | Refactor | Nol |
+| R4: Free float 16→40 LQ45 | Data coverage | Nol — 1.6 sudah ✅, layer 1 sudah maxed |
+| R5: XLSX staleness FRESH/DEGRADED/BLOCKED | Data quality gate | Nol — tidak ada item rubrik untuk XLSX pipeline freshness |
+| R6: Cross-model FV comparison (Graham vs FVC) | Baru, output-only | Nol — post-debate only; CIO tidak melihatnya real-time |
+| Max-effort corrections (note combining, dead code) | Cleanup | Nol |
+
+### Peningkatan Kualitas (Tidak Dinilai di Rubrik)
+
+| Aspek | Sebelum | Sesudah |
+|---|---|---|
+| ARA/ARB accuracy | Close-to-close (salah sistematis) | Intraday high/low (benar) |
+| Weekly trend (1 ticker) | Selalu INSUFFICIENT_DATA | Bekerja normal |
+| Free float LQ45 coverage | 16/45 tickers | 40/45 tickers |
+| XLSX data gate | Warn-only | FRESH/DEGRADED (−10 pts)/BLOCKED (RuntimeError) |
+| Cross-model FV | Tidak ada | Graham vs FairValueCalculator di JSON + logs |
+| ARA+ARB note display | Short-circuit (salah satu hilang) | `" | "` join (keduanya tampil) |
+| cio_judge.txt dead code | VALUATION DISAGREEMENT CHECK aktif (CIO tak pernah baca) | Dihapus |
+
+### Remaining Gaps — Masih Terbuka
+
+Verified via grep 2026-06-20: tidak ada kode baru yang menyentuh item-item ini.
+
+| ID | Gap | Poin Tersedia | Feasibility |
+|---|---|---|---|
+| D.2 | IDX Sectoral Index tracking (11 indeks) | ~5 | Feasible — data via yfinance (^JKFIN dll) |
+| D.4 | Institutional vs retail flow | ~5 | Blokir — tidak ada API publik IDX |
+| D.5 | Broker dominance / bandarmologi | ~5 | Blokir — tidak ada API publik IDX |
+| HG-3 | Bandarmologi data source | ~5 | Blokir — tidak ada API publik IDX |
+| 5.7 | Double bottom / double top detection | ~3 | Feasible — `utils/technicals.py` extension |
+| A.5 | LQ45/IDX80 rebalancing calendar | ~3 | Feasible — hardcode Feb/Aug dates |
+| C.4 | Free float liquidity (transaction-level) | ~2 | Parsial feasible |
+| **Total potensi** | | **~28 pts → max ~301/315 = 95.6%** | |
+
+*Re-audit: 2026-06-20 | Baseline: S10 re-audit 2026-06-19 | Verified via grep + call graph tracing*
+
+---
+
+## FAIR VALUE FRAMEWORK DEEP AUDIT — 2026-06-19
+
+**Auditor**: Claude Sonnet 4.6 (automated deep-dive)  
+**Framework**: IDX Fair Value Framework — A–F category scoring (200 pts)  
+**Scope**: `services/fair_value_calculator.py`, `services/debate_chamber.py`, `utils/technicals.py`, `core/risk_governor.py`, `core/settings.py`, semua prompt file  
+**Verdict**: ⚠️ **PARTIAL — NOT READY for live capital deployment**  
+**Score**: **154 / 200 pts (77%)** *(pre-S11 baseline: 134 pts)*  
+**Target**: 85% (170 pts)
+
+> Audit ini berfokus khusus pada akurasi dan kelengkapan implementasi fair value. Berbeda dari audit sistem-level sebelumnya (87% dari 315 pts, framework Layer 1-7).
+
+### Score Summary
+
+| Category | Max | Score | % |
+|----------|-----|-------|---|
+| A — Fundamental Valuation | 40 | 34 | 85% |
+| B — Technical Fair Value | 35 | 23 | 66% |
+| C — Relative Valuation | 25 | 14 | 56% |
+| D — Composite Integration & Wiring | 50 | 48 | 96% |
+| E — Data Pipeline & Macro | 30 | 19 | 63% |
+| F — IDX-Specific Correctness | 20 | 16 | 80% |
+| **TOTAL** | **200** | **154** | **77%** |
+
+### A — Fundamental Valuation (34 / 40)
+
+| ID | Check | File:Line | Score |
+|----|-------|-----------|-------|
+| A1 | P/E Band method (`FV = EPS × historical_pe_avg`) | `fair_value_calculator.py:646` | **7/8** |
+| A2 | P/B Band method (`FV = BVPS × pb_multiple`) | `fair_value_calculator.py:658` | **7/8** |
+| A3 | ROE-vs-CoE gate: `pb_multiple = min(hist_pb, roe/ke)` | `fair_value_calculator.py:668` ✅ S11 | **6/6** |
+| A4 | DDM / Gordon Growth (`FV = DPS / (ke − g)`) | `fair_value_calculator.py:678` | **4/6** |
+| A5 | Cyclical earnings normalization (mining/commodity) | `fair_value_calculator.py:629` ✅ S11 | **6/6** |
+| A6 | WACC ke via IDX CAPM (DCF model masih absent) | `core/settings.py:160` + `fair_value_calculator.py:88` ✅ S11 | **4/6** |
+
+**A3 (6/6)** ✅ **FIXED in S11**. `fair_value_pb()` (`fair_value_calculator.py:668`) sekarang menggunakan `pb_multiple = min(historical_pb, roe/ke)` ketika `ROE < ke`. Ini mencegah value-trap (contoh: WTON PBV ~0.4, ROE ~6%, ke ~16.37%) lolos sebagai "deeply undervalued" — P/B multiple di-cap ke `roe/ke = 6%/16.37% ≈ 0.37` alih-alih historical P/B penuh.
+
+**A5 (6/6)** ✅ **FIXED in S11**. `_normalize_cyclical_eps()` (`fair_value_calculator.py:629`) mendeteksi mining di peak margin (net_margin > 2× median sektor 15%) dan men-scale EPS ke `eps × (median_margin / margin)`. Output raw → normalized EPS diekspos di `build_report()` sehingga LLM anchor konsisten dengan harga yang telah dinormalisasi.
+
+**A6 (4/6)** ⚠️ **PARTIAL — S11 mengimplementasikan CAPM ke; DCF full model masih absent**. `_capm_cost_of_equity(beta)` (`fair_value_calculator.py:88–92`) mengkomputasi `ke = SBN_10Y_YIELD + beta × IDX_ERP`. `KeyStats.cost_of_equity` (`line 134`) sekarang menggunakan fungsi ini alih-alih hardcode 0.10. Ke efektif naik dari ~10% ke ~16.37% (β=1). Yang masih absent: model DCF berbasis per-share free cash flow.
+
+### B — Technical Fair Value (23 / 35)
+
+| ID | Check | File:Line | Score |
+|----|-------|-----------|-------|
+| B1 | Rolling VWAP (20-day, typical price × volume) | `utils/technicals.py:424` | **6/7** |
+| B2 | Anchored VWAP (dari swing low / event date) | — (absent) | **0/5** |
+| B3 | Volume Profile — POC, HVN, LVN (20-bin, 60-day) | `utils/technicals.py:624` | **6/7** |
+| B4 | MA context (SMA20, MA50, MA200, trend classification) | `debate_chamber.py:2311` | **7/7** |
+| B5 | RSI divergence (bullish/bearish, pivot-separated) | `utils/technicals.py:262` | **4/4** |
+| B6 | Fibonacci retracement levels | — (absent) | **0/5** |
+
+**B4 (7/7)** — Lengkap. `_chartist_node()` menghitung semua indicator Python-side; LLM hanya interpretasi. MA200 digunakan `risk_governor.py` untuk counter-trend check, MA50 di `_classify_signals()` untuk CIO conflict resolution.
+
+**B2 + B6 (0 masing-masing)** — Anchored VWAP dan Fibonacci adalah dua framework entry IDX standar yang absen.
+
+### C — Relative Valuation (14 / 25)
+
+| ID | Check | File:Line | Score |
+|----|-------|-----------|-------|
+| C1 | Sector peer median PE/PBV | `fair_value_calculator.py:585` | **5/8** |
+| C2 | EV/EBITDA method (mining sector) | `fair_value_calculator.py:666` | **4/5** |
+| C3 | Historical valuation band (percentile rank) | — (absent dari debate engine) | **1/7** |
+| C4 | Foreign flow integration | `debate_chamber.py` (RAG) | **4/5** |
+
+**C1 (5/8)** — `SECTOR_MEDIAN_PROFILES` (lines 585–591) statis/hardcoded. Tidak ada mekanisme refresh. `build_sector_cache.py` tidak feed-back ke `FairValueCalculator`. Jika market repricing sektor, benchmark debate chamber tetap stale selamanya kecuali developer ubah kode.
+
+**C3 (1/7)** — Quant filter menghitung `PBV_Sector_Percentile`, tapi debate engine `FairValueCalculator` hanya menghasilkan point-estimate. Tidak ada "PBV saat ini di persentil ke-15 → historis murah" di konteks debate agents.
+
+### D — Composite Integration & Debate Wiring (48 / 50) ← Kekuatan Terbesar
+
+| ID | Check | File:Line | Score |
+|----|-------|-----------|-------|
+| D1 | FV di fundamental scout → state fields | `debate_chamber.py:2079` | **5/5** |
+| D2 | FV di synthesizer RAG context_pack | `debate_chamber.py:2799` | **5/5** |
+| D3 | Staleness-aware confidence penalty | `debate_chamber.py:4504` | **3/5** |
+| D4 | RAG evidence verification gate | `debate_chamber.py:581` | **5/5** |
+| D5 | FV quality gate (≥2 metode, net_margin guard) | `fair_value_calculator.py:1098` | **5/5** |
+| D6 | FV dikutip eksplisit di Bull prompt | `debate_prompts/bull_r1.txt:19` | **7/7** |
+| D7 | FV dikutip eksplisit di Bear prompt | `debate_prompts/bear_r1.txt:19` | **7/7** |
+| D8 | FV deterministik di CIO judge (Python envelope) | `debate_chamber.py:4120` | **7/7** |
+| D9 | Structured output (Pydantic v2 `CIOVerdict`) | `debate_chamber.py:4625` | **4/4** |
+
+**D8 (7/7)** — Terbaik di sistem. `_cio_judge_node()` line 4216 memasukkan FV ke `_compute_trade_envelope()` yang meng-cap `target_price` pada `fair_value` (line 3718–3719). Setelah LLM respond, `_apply_envelope()` line 4377 **menimpa** semua LLM price fields dengan nilai Python-computed — mencegah LLM hallucinate price targets.
+
+**D6/D7 (7/7 masing-masing)** — `bull_r1.txt` Step 2a dan `bear_r1.txt` Step 2a mewajibkan engagement eksplisit dengan FV. Agent tidak bisa mengabaikannya secara struktural.
+
+**D3 (3/5)** — Staleness penalty hanya menyesuaikan confidence score CIO, tidak menyesuaikan `SECTOR_WEIGHTS` atau composite FV weights per-metode.
+
+### E — Data Pipeline & Macro (19 / 30)
+
+| ID | Check | File:Line | Score |
+|----|-------|-----------|-------|
+| E1 | SBN 10Y yield sourcing (configurable, bukan live feed) | `core/settings.py:160` + `fair_value_calculator.py:88` ✅ S11 | **4/8** |
+| E2 | BI rate / IDX macro refresh mechanism (auto-update) | `core/settings.py` (masih manual) | **0/5** |
+| E3 | Stockbit keystats freshness tracking | `debate_chamber.py:4504` | **6/7** |
+| E4 | OHLCV data quality validation | `utils/technicals.py:395` | **5/5** |
+| E5 | Adaptive failure recovery | `core/adaptive_planner.py` | **4/5** |
+
+**E1 (4/8)** ✅ **FIXED in S11** (partial). S11 menambahkan `SBN_10Y_YIELD=0.0714`, `IDX_ERP=0.0923`, `DEFAULT_BETA=1.0` ke `core/settings.py:160–162`. `_capm_cost_of_equity()` mengkomputasi ke = 7.14% + β × 9.23% = **16.37%** (β=1). Catatan arah: ke=0.10 sebelumnya *understated* true CAPM ke sebesar ~637bps, sehingga DDM FV *ter-inflate* (denominator ke−g terlalu kecil). S11 menaikkan ke ke ~16.37%, membuat DDM FV lebih konservatif. Yang masih absent: automated live feed (nilai dikonfigurasi manual, bukan pull dari API BI/Bloomberg setiap hari).
+
+**E4 (5/5)** — `validate_ohlcv()` line 395: checks None, empty, missing columns, <30 rows, all-NaN close, all-zero volume. Solid.
+
+### F — IDX-Specific Correctness (16 / 20)
+
+| ID | Check | File:Line | Score |
+|----|-------|-----------|-------|
+| F1 | IDX tick size snapping (tabel BEI lengkap) | `utils/technicals.py:61` | **5/5** |
+| F2 | Banking sector: PBV bobot utama (bukan PE) | `fair_value_calculator.py:538` | **5/5** |
+| F3 | ARA/ARB circuit breaker awareness | `core/risk_governor.py:649` | **4/5** |
+| F4 | SOE governance discount vs private peers | — (absent) | **0/3** |
+| F5 | IDX session / time-of-day entry filter | `utils/technicals.py:525` | **2/2** |
+
+**F2 (5/5)** — `SECTOR_WEIGHTS["bank"] = {"pe": 0.35, "pb": 0.45, "ddm": 0.20}`. PBV bobot terbesar (0.45) — benar untuk valuasi bank IDX.
+
+### Automatic NOT READY Triggers
+
+| Trigger | Status |
+|---------|--------|
+| D6 = 0 (FV tidak ke Bull) | ✅ PASS |
+| D7 = 0 (FV tidak ke Bear) | ✅ PASS |
+| D8 = 0 (FV tidak ke CIO) | ✅ PASS |
+| F2 = 0 (Banking PBV bukan primary) | ✅ PASS |
+| A6: ke non-IDX CAPM | ✅ PASS — S11: `_capm_cost_of_equity()`, ke = 7.14% + β × 9.23% |
+| E1/E2: hardcoded | ❌ FAIL — E1 configurable via settings; E2 auto-refresh masih absent |
+
+**Auto triggers fired: 1 dari 6**
+
+### Verdict: PARTIAL — NOT READY (77%)
+
+**Kekuatan**: Category D (96%) — FV mengalir benar dari komputasi → debate analysts → CIO judge dengan Python price enforcement yang mencegah LLM hallucination. Category A naik signifikan ke 85% berkat S11.
+
+**S11 menutup 3 gap kritis**: A3 (ROE-vs-CoE gate), A5 (cyclical EPS normalization), dan A6/E1 (CAPM ke calibration) — semua diimplementasikan dalam satu sprint.
+
+**Yang masih menghalangi READY**:
+
+1. **Incomplete DCF model (A6=4/6)**: CAPM ke sudah ada, tapi belum ada full DCF berbasis per-share free cash flow. Hanya 3 metode: P/E band, P/B band (dengan ROE gate), DDM.
+
+2. **Static sector benchmarks (C1=5/8, C3=1/7)**: `SECTOR_MEDIAN_PROFILES` masih hardcoded. Tidak ada automated refresh dari market data. Jika sektor repricing, benchmark debate chamber tetap stale.
+
+3. **No live macro refresh (E2=0/5)**: SBN_10Y_YIELD dan IDX_ERP di-update manual di kode. Tidak ada API pull dari BI atau Damodaran.
+
+### Status S11 + Prioritas Berikutnya
+
+**Sudah diimplementasikan di S11 (`fc5f90d`):**
+
+| Gap | Implementasi S11 |
+|-----|-----------------|
+| A5: Cyclical normalization | `_normalize_cyclical_eps()` — halves mining EPS at peak margin (>2× sector median 30%) |
+| E1/A6: ke calibration | `SBN_10Y_YIELD=0.0714`, `IDX_ERP=0.0923` di `core/settings.py`; `_capm_cost_of_equity()` → ke ≈ 16.37% |
+| A3: ROE-vs-CoE gate | `fair_value_pb()`: `pb_multiple = min(historical_pb, roe/ke)` ketika ROE < ke |
+
+**Gap yang masih terbuka (untuk sprint berikutnya):**
+
+| Prioritas | Gap | Impact | Effort |
+|-----------|-----|--------|--------|
+| 1 | C1/C3: Static sector benchmarks | FV dibandingkan universe stale | High |
+| 2 | E2: No live macro refresh | SBN/ERP di-update manual | Medium |
+| 3 | A6: Full DCF model (per-share FCF) | Completion dari CAPM foundation | Medium |
+| 4 | B2/B6: No Anchored VWAP + Fibonacci | Dua framework entry IDX standar absen | Low-Medium |
+| 5 | C3: Historical valuation band (percentile) | Konteks "murah secara historis" absen dari debate | Medium |
+
+*Audit FV Framework: 2026-06-19 | Updated post-S11: 2026-06-19 | Files dibaca: 5 file utama (5 000+ baris) + 12 prompt files*
+
+---
+
 ## RE-AUDIT S10 UPDATE — 2026-06-19
 
 **Berdasarkan commit S1–S10 (terakhir: S10 volume profile + output quality)**

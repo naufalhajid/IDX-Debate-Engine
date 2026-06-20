@@ -41,6 +41,9 @@ CONTEXT_FIELD_TIERS = {
         "net_foreign_flow_m",
         "foreign_vol_pct",
         "is_net_foreign_buy",
+        "top_broker_buy",
+        "top_broker_sell",
+        "broker_accumulation",
     ],
     "tier3": [
         "news_summary",
@@ -331,6 +334,9 @@ def _collect_priority_fields(
         "net_foreign_flow_m": _first_present(raw_data, metadata, "net_foreign_flow_m"),
         "foreign_vol_pct": _first_present(raw_data, metadata, "foreign_vol_pct"),
         "is_net_foreign_buy": _first_present(raw_data, metadata, "is_net_foreign_buy"),
+        "top_broker_buy": _first_present(raw_data, metadata, "top_broker_buy"),
+        "top_broker_sell": _first_present(raw_data, metadata, "top_broker_sell"),
+        "broker_accumulation": _first_present(raw_data, metadata, "broker_accumulation"),
         "news_summary": _first_present(
             raw_data,
             metadata,

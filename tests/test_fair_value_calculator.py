@@ -475,10 +475,12 @@ def test_build_sector_comparison_shows_mining_medians():
         net_margin=0.185,
     )
     calc = FairValueCalculator(stats, sector="mining")
+    # Inject static defaults so the assertion is not tied to live cache values.
+    calc.sector_medians = _SECTOR_MEDIAN_PROFILES_DEFAULT
     text = calc.build_sector_comparison()
     assert "MINING" in text.upper()
     assert "8.2x" in text
-    assert "7.0x" in text   # sector median PE for mining
+    assert "7.0x" in text   # sector median PE for mining (static default)
 
 
 def test_build_sector_comparison_in_report():
@@ -499,26 +501,34 @@ def test_build_sector_comparison_in_report():
 # ---------------------------------------------------------------------------
 
 def test_capm_cost_of_equity_default_beta():
-    """Ke = SBN10Y + 1.0 × ERP = 7.14% + 9.23% = 16.37%."""
+    """Ke = get_live_sbn_10y() + 1.0 × ERP."""
     from services.fair_value_calculator import _capm_cost_of_equity
+    from services.macro_refresh import get_live_sbn_10y
+    from core.settings import get_settings
     ke = _capm_cost_of_equity(beta=1.0)
-    assert abs(ke - (0.0714 + 1.0 * 0.0923)) < 0.0001
+    expected = get_live_sbn_10y() + 1.0 * get_settings().IDX_ERP
+    assert abs(ke - expected) < 0.0001
 
 
 def test_capm_cost_of_equity_banking_beta():
-    """BBCA beta=0.85 → Ke ≈ 14.99%."""
+    """BBCA beta=0.85 → Ke = get_live_sbn_10y() + 0.85 × ERP."""
     from services.fair_value_calculator import _capm_cost_of_equity
+    from services.macro_refresh import get_live_sbn_10y
+    from core.settings import get_settings
     ke = _capm_cost_of_equity(beta=0.85)
-    assert abs(ke - (0.0714 + 0.85 * 0.0923)) < 0.0001
+    expected = get_live_sbn_10y() + 0.85 * get_settings().IDX_ERP
+    assert abs(ke - expected) < 0.0001
 
 
 def test_get_historical_multiples_returns_capm_coe_not_beta():
     """get_historical_multiples pops beta and injects cost_of_equity from CAPM."""
     from services.fair_value_calculator import get_historical_multiples, HISTORICAL_MULTIPLES
+    from services.macro_refresh import get_live_sbn_10y
+    from core.settings import get_settings
     result = get_historical_multiples("BBCA")
     assert "cost_of_equity" in result
     assert "beta" not in result
-    expected_ke = 0.0714 + HISTORICAL_MULTIPLES["BBCA"]["beta"] * 0.0923
+    expected_ke = get_live_sbn_10y() + HISTORICAL_MULTIPLES["BBCA"]["beta"] * get_settings().IDX_ERP
     assert abs(result["cost_of_equity"] - expected_ke) < 0.0001
 
 
@@ -533,9 +543,11 @@ def test_get_historical_multiples_does_not_mutate_module_dict():
 
 def test_keystats_default_cost_of_equity_uses_capm():
     """KeyStats() default CoE comes from CAPM, not hardcoded 10%."""
+    from services.macro_refresh import get_live_sbn_10y
+    from core.settings import get_settings
     stats = KeyStats()
-    expected_ke = 0.0714 + 1.0 * 0.0923
-    assert abs(stats.cost_of_equity - expected_ke) < 0.001
+    expected_ke = get_live_sbn_10y() + 1.0 * get_settings().IDX_ERP
+    assert abs(stats.cost_of_equity - expected_ke) < 0.0001
     assert stats.cost_of_equity != pytest.approx(0.10)
 
 
@@ -783,10 +795,10 @@ def test_refresh_sector_benchmarks_writes_and_returns_medians(tmp_path, monkeypa
             }
         }
 
-    result = refresh_sector_benchmarks(_fake_fetch, sectors=["default"])
-    assert "default" in result
-    assert result["default"]["pe"] == pytest.approx(12.0)
-    assert result["default"]["pb"] == pytest.approx(1.8)
+    result = refresh_sector_benchmarks(_fake_fetch, sectors=["industrials"])
+    assert "industrials" in result
+    assert result["industrials"]["pe"] == pytest.approx(12.0)
+    assert result["industrials"]["pb"] == pytest.approx(1.8)
     # Cache file must exist
     assert (tmp_path / "benchmarks.json").exists()
 
