@@ -4928,7 +4928,7 @@ def _apply_circuit_breaker(top_n: list[dict], portfolio_state: dict) -> bool:
             "reason_codes": ["circuit_breaker"],
             "message": (
                 "Portfolio circuit breaker aktif: realized daily loss "
-                f"≥ 3%. Sizing diblokir untuk semua ticker pada batch ini."
+                "≥ 3%. Sizing diblokir untuk semua ticker pada batch ini."
             ),
         }
     return True
