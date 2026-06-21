@@ -40,6 +40,7 @@ HARD_REJECT_CODES = {
     "insufficient_technical_data",
     "ara_entry_risk_high",
     "insufficient_liquidity",
+    "exdate_imminent",
 }
 
 # Task F: Liquidity gate thresholds (IDR). Stocks below Rp 2B ADT are
@@ -279,6 +280,39 @@ def evaluate_risk(candidate: dict[str, Any]) -> RiskDecision:
                     f"ADT ≈ Rp {_adt / 1_000_000_000:.1f}B (2B–10B) — "
                     "sizing terbatas; konfirmasi depth sebelum entry."
                 ),
+                current_price=current_price,
+                entry_low=entry_low,
+                entry_high=entry_high,
+                target_price=target_price,
+                stop_loss=stop_loss,
+            )
+        )
+
+    # Task G: Ex-date enforcement — deterministic override of LLM compliance.
+    _exdate_tier = _exdate_tier_from_candidate(candidate)
+    if _exdate_tier == "AVOID":
+        return _log_decision(
+            RiskDecision(
+                ticker=ticker,
+                status="reject",
+                sizing_allowed=False,
+                reason_codes=[*verdict_reason_codes, "exdate_imminent"],
+                message="Ex-date dalam ≤7 hari — entry ditolak (gap risk tinggi).",
+                current_price=current_price,
+                entry_low=entry_low,
+                entry_high=entry_high,
+                target_price=target_price,
+                stop_loss=stop_loss,
+            )
+        )
+    if _exdate_tier == "CAP_65":
+        return _log_decision(
+            RiskDecision(
+                ticker=ticker,
+                status="conditional_deployable",
+                sizing_allowed=False,
+                reason_codes=[*verdict_reason_codes, "exdate_cap65"],
+                message="Ex-date dalam 8–14 hari — confidence dicap 0.65; sizing terbatas.",
                 current_price=current_price,
                 entry_low=entry_low,
                 entry_high=entry_high,
@@ -653,6 +687,19 @@ def _rr_minimum_for_candidate(
         regime or "none",
     )
     return rr_min
+
+
+def _exdate_tier_from_candidate(candidate: dict[str, Any]) -> str:
+    """Return the exdate tier string (AVOID/CAP_65/MONITOR/CLEAR) from candidate.
+
+    Checks risk_context first, then metadata. Defaults to CLEAR so missing data
+    never blocks a valid trade.
+    """
+    risk_ctx = candidate.get("risk_context") or {}
+    tier = risk_ctx.get("exdate_tier")
+    if not tier:
+        tier = (candidate.get("metadata") or {}).get("exdate_tier")
+    return str(tier or "CLEAR").upper()
 
 
 def _compute_adt_approx(

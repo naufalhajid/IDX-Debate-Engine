@@ -2868,6 +2868,19 @@ Current Date (Asia/Jakarta): {current_date}
         exdate_block = format_exdate_block(ticker, exdate_info)
         exdate_gate = _compute_exdate_gate(exdate_info)
 
+        # Thread structured exdate data into metadata so the risk governor can
+        # enforce AVOID/CAP_65 deterministically, independent of LLM compliance.
+        _exdate_tier = exdate_gate.split(":", 1)[1].strip().split(" ")[0]
+        metadata["exdate_tier"] = _exdate_tier
+        _exdate_days_val = (
+            exdate_info.get("days_until_exdate")
+            if isinstance(exdate_info, dict)
+            else None
+        )
+        if _exdate_days_val is not None:
+            metadata["exdate_days"] = int(_exdate_days_val)
+        state["metadata"] = metadata
+
         # Include pre-computed technical indicators in the synthesized data
         tech_block = ""
         if tech:

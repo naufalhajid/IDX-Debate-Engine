@@ -593,6 +593,38 @@ def test_liquid_ticker_unaffected() -> None:
     assert decision.sizing_allowed is True
 
 
+# ── Task G: Ex-date enforcement ──────────────────────────────────────────────
+
+
+def _exdate_candidate(exdate_tier: str, **overrides):
+    c = _candidate(**overrides)
+    c.setdefault("risk_context", {})["exdate_tier"] = exdate_tier
+    return c
+
+
+def test_exdate_avoid_hard_rejects() -> None:
+    decision = evaluate_risk(_exdate_candidate("AVOID"))
+
+    assert decision.status == "reject"
+    assert decision.sizing_allowed is False
+    assert "exdate_imminent" in decision.reason_codes
+
+
+def test_exdate_cap65_is_conditional() -> None:
+    decision = evaluate_risk(_exdate_candidate("CAP_65"))
+
+    assert decision.status == "conditional_deployable"
+    assert decision.sizing_allowed is False
+    assert "exdate_cap65" in decision.reason_codes
+
+
+def test_exdate_clear_unaffected() -> None:
+    decision = evaluate_risk(_exdate_candidate("CLEAR"))
+
+    assert decision.status == "deployable"
+    assert decision.sizing_allowed is True
+
+
 def test_missing_adt_degrades_gracefully() -> None:
     # No avg_volume in risk_context or technical_indicators → gate is skipped
     decision = evaluate_risk(_candidate())
