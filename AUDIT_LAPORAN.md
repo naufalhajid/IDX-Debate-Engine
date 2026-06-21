@@ -125,6 +125,145 @@ Verified via grep 2026-06-20: tidak ada kode baru yang menyentuh item-item ini.
 
 ---
 
+## AUDIT ENTRY & STOP LOSS — 2026-06-21
+
+**Auditor**: Claude Sonnet 4.6 (max-effort mode)
+**Scope**: Generator (`_compute_trade_envelope`, `debate_chamber.py:3676–3843`) + Validator (`evaluate_risk`, `risk_governor.py:100–318`) + seam antar keduanya
+**Metodologi**: Line-by-line read + cross-file tracer (entry format → parse → R/R recompute) + advisor review sebelum nulis
+
+### Temuan
+
+---
+
+#### E-1 — HIGH: No-ATR Path Bypasses Noise Gate Sepenuhnya
+
+**File**: `services/debate_chamber.py:3722-3760`
+
+Generator split ke dua path berdasarkan `atr14 > 0`:
+
+```
+if atr14 > 0 and sma20 > 0:          ← path lengkap
+    structural_stop = swing_low - 0.5*atr14
+    atr_stop        = current - k_atr*atr14
+    stop = max(structural_stop, atr_stop, hard_floor) → snap
+    # lalu noise gate runs
+else:
+    stop = snap_to_tick(entry_mid * 0.96)  ← path no-ATR
+    # noise gate TIDAK RUNS (gated on "if atr14 > 0:")
+```
+
+Noise gate di bawahnya (`if atr14 > 0: ... if _stop_distance < _hard_floor_atr: return rejected`) sepenuhnya diskip ketika `atr14 == 0`. Artinya: saham yang tidak punya data ATR (baru listing, yfinance gagal parsial, atau liquidity gap) selalu lolos dengan stop `entry_mid * 0.96` tanpa validasi apapun.
+
+**Skenario kritis**: Saham baru listing dengan volatilitas tinggi. ATR belum bisa dihitung (< 14 hari data). Stop dipasang di 4% bawah midpoint tanpa tahu apakah 4% itu di dalam noise band. Untuk saham dengan intraday swing 5-6%, stop ini akan kena di hari pertama dari noise biasa.
+
+**Rekomendasi**: Ketika `atr14 == 0`, return `{"rejected": True, "reason": "insufficient_atr_for_stop_placement"}` daripada menerima heuristic 4%. Alternatif lebih lembut: pakai `(entry_high - entry_low)` sebagai proxy ATR untuk validasi noise.
+
+---
+
+#### E-2 — MEDIUM: Governor Tidak Validasi `stop_loss < entry_low`
+
+**File**: `core/risk_governor.py:226-240`
+
+Governor memvalidasi:
+- `stop_loss >= current_price` → `invalid_stop_loss` ✓
+- `stop_loss <= 0` → `missing_stop_loss` ✓
+
+Tapi **tidak** memvalidasi: `stop_loss >= entry_low` (stop di dalam entry zone).
+
+Setup dengan stop di antara `entry_low` dan `entry_high` bisa lolos governor dengan `sizing_allowed=True`. Contoh konkrit:
+- `entry_low=9700, entry_high=10000, stop=9900, target=10200, current_price=9950`
+- R/R = (10200-10000)/(10000-9900) = 2.0x → lolos minimum (≥1.3x)
+- `stop(9900) < current_price(9950)` → lolos check governor
+- Trader beli di 9900, stop langsung kena
+
+**Mitigasi yang sudah ada**: `validate_setup_coherence()` di orchestrator (`legacy.py`) cek `stop >= entry_low` dan raise `SetupCoherenceError`. Tapi ini hanya berjalan di orchestrator pipeline, bukan di standalone `evaluate_risk()`. Jika governor dipanggil langsung (API endpoint, testing, future integration), celah ini terbuka.
+
+**Rekomendasi**: Tambahkan di `evaluate_risk()` setelah check `stop_loss >= current_price`:
+```python
+if entry_low is not None and entry_low > 0 and stop_loss >= entry_low:
+    reason_codes.append("stop_inside_entry_range")
+```
+Lanjutkan ke reject block yang sudah ada.
+
+---
+
+#### E-3 — MEDIUM: Swing-Low Default ke `current_price * 0.95` Saat Data Hilang
+
+**File**: `services/debate_chamber.py:3723-3726`
+
+```python
+swing_low = min(
+    tech.get("low_20d", current_price * 0.95),
+    tech.get("low_50d", current_price * 0.95),
+)
+```
+
+Jika `low_20d` dan `low_50d` keduanya tidak ada (data gap, yfinance partial fail), `swing_low = 0.95 * current_price` — sebuah level floating yang tidak mengacu ke support aktual apapun. Structural stop = `0.95*current - 0.5*atr14`, yang terlihat "struktural" tapi sebenarnya heuristik.
+
+Ini berbeda dari E-1: ATR bisa tersedia (`atr14 > 0`) sehingga noise gate tetap jalan dan structural stop path dipakai — tapi swing-low-nya adalah 5% floating, bukan data candlestick nyata.
+
+Return dict tidak menyertakan flag apapun bahwa swing_low adalah fallback. CIO dan governor tidak tahu perbedaannya.
+
+**Rekomendasi**: Tambahkan `"swing_low_fallback": True` ke return dict ketika kedua key absen. Atau raise rejected ketika kedua key absen (lebih tegas, memaksa chartist memperbaiki data pipeline).
+
+---
+
+#### E-4 — LOW: `snap_to_tick` Bisa Rounding Stop ke Atas (Toward Entry)
+
+**File**: `utils/technicals.py:61-84`
+
+`snap_to_tick` menggunakan `round(price / tick) * tick` — Python banker's rounding, membulatkan ke yang terdekat. Untuk stop loss, "conservative" seharusnya selalu membulatkan ke bawah (away from entry).
+
+Contoh di range > Rp 5000 (tick=25):
+- `stop = 9237.5` → `round(9237.5/25) = round(369.5) = 370` → `9250` (naik 12.5 IDR ke arah entry)
+- R/R berbasis stop yang lebih tinggi menjadi sedikit lebih baik dari aslinya
+
+Dampaknya terbatas: drift maksimum 12.5 IDR untuk saham > Rp 5000. Guard `stop >= entry_low` menangkap kasus di mana rounding melewati batas entry. Setup tetap self-consistent karena R/R dihitung dari stop yang sudah disnap.
+
+**Rekomendasi**: Buat `_snap_stop_conservative(price)` yang pakai `math.floor(price / tick) * tick`. Tidak urgent.
+
+---
+
+#### E-5 — LOW: `stop_basis` Tidak Ada di Return Dict
+
+**File**: `services/debate_chamber.py:3829-3842`
+
+Stop placement menggunakan tiga kandidat: `structural_stop`, `atr_stop`, dan `hard_floor`. Final stop = `max(...)` setelah snap. Tapi return dict tidak mencatat kandidat mana yang menang:
+
+```python
+return {
+    "target_basis": target_basis,   # ada untuk target → "Resistance 20-Day (FV Ceiling)"
+    "stop_loss": stop,              # stop_basis: TIDAK ADA
+}
+```
+
+Jika hard_floor override structural stop (misalnya swing lows sangat jauh di crash), CIO dan analyst tidak bisa bedakan "stop ini di support struktural" vs "stop ini di hard floor 10% dari harga sekarang". Ini berbeda dari target yang punya `target_basis`.
+
+**Rekomendasi**: Tambahkan `"stop_basis"` ke return dict: nilai `"structural"`, `"atr"`, atau `"hard_floor"` tergantung candidate mana yang menang di `max()`.
+
+---
+
+### Summary
+
+| ID | Severity | Issue | File | Fix (est.) |
+|----|----------|-------|------|-----------|
+| E-1 | HIGH | No-ATR path bypasses noise gate | `debate_chamber.py:3734` | ~30 menit |
+| E-2 | MEDIUM | Governor tidak cek `stop >= entry_low` | `risk_governor.py:240` | ~15 menit |
+| E-3 | MEDIUM | Swing-low fallback heuristic tanpa flag | `debate_chamber.py:3723` | ~20 menit |
+| E-4 | LOW | `snap_to_tick` tidak floor-round untuk stop | `technicals.py:61` | ~1 jam (ada test impact) |
+| E-5 | LOW | `stop_basis` tidak di-expose di envelope | `debate_chamber.py:3840` | ~10 menit |
+
+**Tidak ditemukan bug di:**
+- String round-trip `entry_price_range`: format `"int(low) - int(high)"` → `_parse_entry_range` idempotent ✓
+- R/R consistency: `calculate_rr(entry_high, target, stop)` di governor identik dengan `rr_ratio` di envelope ✓
+- Hard-floor + noise gate interaction: floor-clamped stop terlalu sempit → noise-rejected (conservative path) ✓
+- `_previous_tick_below` dan `_next_tick_above`: loop-safe dengan fallback yang benar ✓
+- `stop >= entry_high` path di `calculate_rr`: caught, returns 0.0 → `rr_too_low` reject ✓
+
+*Audit: 2026-06-21 | Scope: `_compute_trade_envelope` + `evaluate_risk` + tick-snap utils | Baseline: 903 tests passing (commit ee86ba1)*
+
+---
+
 ## FAIR VALUE FRAMEWORK DEEP AUDIT — 2026-06-19
 
 **Auditor**: Claude Sonnet 4.6 (automated deep-dive)  
