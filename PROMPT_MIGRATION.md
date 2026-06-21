@@ -1,5 +1,43 @@
 # Prompt Migration Log
 
+## 2026-06-22 — `p2-chartist-stop-v21`
+
+**Files changed:**
+- `services/debate_prompts/chartist.txt` (STEP 4 stop-loss multiplier corrected)
+- `services/debate_prompts/manifest.json` (version → `2026-06-22-p2-chartist-stop-v21`)
+
+### Changes
+
+**`chartist.txt`** — STEP 4 stop-loss reference aligned with Python envelope.
+
+The chartist told the LLM to debate around a 1.5× ATR stop while the actual
+executed stop uses 2.5× ATR (`REGIME_ATR_STOP_MULTIPLIER` in `utils/technicals.py`).
+Bear R2 stress tests and bull stop-validity arguments were semantically disconnected
+from the real stop. Final trade output was unaffected (CIO uses Python prices verbatim)
+but debate quality suffered.
+
+**Before:** `Standard stop = 1.5 x ATR(14) below EMA20`
+**After:** `Standard stop = 2.5 x ATR(14) below EMA20 (3.0x in DEFENSIVE regime)`
+
+---
+
+## 2026-06-22 — `p1-catalyst-window-v20`
+
+**Files changed:**
+- `services/debate_prompts/cio_judge.txt` (Phase B catalyst bonus window widened)
+- `services/debate_prompts/manifest.json` (version → `2026-06-22-p1-catalyst-window-v20`)
+
+### Changes
+
+**`cio_judge.txt`** — Phase B confidence checklist item updated.
+
+Previously awarded `[+0.02]` only for catalysts within 30 days — creating a short-term bias inside a 1–3 month trading frame. A catalyst materializing in month 2 or 3 is equally valid for the stated horizon but received no bonus.
+
+**Before:** `[+0.02] Specific catalyst confirmed within 30 days`
+**After:** `[+0.02] Specific catalyst confirmed within 1–3 months`
+
+---
+
 ## 2026-06-21 — `taskE-failpass-v19`
 
 **Files changed:**

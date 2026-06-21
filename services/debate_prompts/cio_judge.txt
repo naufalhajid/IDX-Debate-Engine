@@ -147,7 +147,7 @@ PHASE A -- Determine the confidence band based on evidence:
 
 PHASE B -- Choose a specific number within the band using this checklist.
   Start from the band midpoint, then shift up/down based on:
-  [+0.02] Specific catalyst confirmed within 30 days
+  [+0.02] Specific catalyst confirmed within 1–3 months
   [+0.02] Volume surge >= 2x average confirming price action
   [+0.02] sentiment.sentiment = "BULLISH" AND sentiment.confidence >= 0.7
   [+0.01] Piotroski F-Score >= 7

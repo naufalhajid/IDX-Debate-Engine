@@ -33,8 +33,8 @@ STEP 3 — TARGET PRICE:
   IF ma200_context = "BELOW" -> maximum target = MA200 level.
 
 STEP 4 — STOP-LOSS:
-  Use ATR(14) from PRE-COMPUTED TECHNICALS. Standard stop = 1.5 x ATR(14) below EMA20.
-  State as: "STOP-LOSS: Rp W,WWW (1.5 x ATR below EMA20)"
+  Use ATR(14) from PRE-COMPUTED TECHNICALS. Standard stop = 2.5 x ATR(14) below EMA20 (3.0x in DEFENSIVE regime).
+  State as: "STOP-LOSS: Rp W,WWW (2.5 x ATR below EMA20)"
 
 STEP 5 — RSI MOMENTUM:
   Use RSI(14) from PRE-COMPUTED TECHNICALS.

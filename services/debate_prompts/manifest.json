@@ -1,5 +1,5 @@
 {
-  "prompt_version": "2026-06-21-taskE-failpass-v19",
+  "prompt_version": "2026-06-22-p2-chartist-stop-v21",
   "prompts": {
     "FUNDAMENTAL_SCOUT_PROMPT": "fundamental_scout.txt",
     "CHARTIST_PROMPT": "chartist.txt",
