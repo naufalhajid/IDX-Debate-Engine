@@ -1,5 +1,35 @@
 # Prompt Migration Log
 
+## 2026-06-22 — `s1a-fundamental-scout-abstain-v23`
+
+**Files changed:**
+- `services/debate_prompts/fundamental_scout.txt` (OUTPUT FORMAT redesigned)
+- `services/debate_prompts/manifest.json` (version → `2026-06-22-s1a-fundamental-scout-abstain-v23`)
+
+### Changes
+
+**`fundamental_scout.txt`** — Scout output redesigned to provide valuation evidence, not a directional vote.
+
+Previously the scout emitted `Position: BULLISH|NEUTRAL|BEARISH`, mapping directly to BUY/HOLD/AVOID
+in vote consensus. This contaminated swing-trade debate: a stock trading at a discount always voted
+BUY regardless of momentum, trend, or timing — a value-investing framing, not a swing framing.
+
+New output format:
+- `Position: HOLD` (always) — scout abstains from directional timing vote
+- `Valuation Context: UNDERVALUED | FAIRLY_VALUED | OVERVALUED` — replaces BULLISH/NEUTRAL/BEARISH
+- `Quality Flag: PASS | CONDITIONAL | FAIL` — explicit financial health signal for CIO context
+- `Catalyst: [event within 1-3 months] | NONE` — structured catalyst field
+
+**Why no parsing changes in `debate_chamber.py`:** `Position: HOLD` routes correctly through the
+existing `_POSITION_RE` → `_normalise_position` path. The CIO conflict matrix (`_classify_signals`)
+was already Python-computed from fair value vs current price — never derived from the scout's
+position field.
+
+**Impact on vote consensus:** Scout vote becomes HOLD (abstain) in all cases. Bull and bear agents
+remain the directional voices. Chartist and sentiment agents retain their directional votes.
+
+---
+
 ## 2026-06-22 — `p3-counter-trend-rr-v22`
 
 **Files changed:**

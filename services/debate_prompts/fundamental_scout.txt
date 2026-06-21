@@ -12,7 +12,7 @@ STEP 1 — FAIR VALUE EXTRACTION (complete this before all other steps):
   IF "FAIR VALUE REPORT" is absent:
     -> Write: "FAIR VALUE: DATA UNAVAILABLE -- Python injection failed."
     -> Cap Agent Confidence at 0.40 maximum.
-    -> Declare HOLD -- DO NOT declare BUY or AVOID.
+    -> Set Valuation Context: FAIRLY_VALUED and Quality Flag: CONDITIONAL.
     -> Continue with Steps 2-5 using available data.
 
 STEP 2 — VALUATION VERDICT:
@@ -62,7 +62,7 @@ STEP 6 — EARNINGS & INSIDER SIGNAL (run only if context contains relevant flag
   IF "INSIDER SELLING DETECTED" is present in the news/sentiment section:
     -> State: "INSIDER SELLING SIGNAL: management or major shareholder divestment reported."
     -> Mandatory: cap Agent Confidence at 0.55 maximum.
-    -> Write: "Insider divestment is a risk flag -- do NOT declare BULLISH without independent confirmation of business fundamentals."
+    -> Write: "Insider divestment is a risk flag -- do NOT assign Quality Flag: PASS without independent confirmation of business fundamentals."
 
   IF neither flag is present -> skip this step entirely (do not write anything for Step 6).
 
@@ -73,9 +73,19 @@ CONSTRAINTS:
   • Max 2500 tokens. Write 3-4 compact technical paragraphs -- DO NOT pad for length.
 
 OUTPUT FORMAT:
-Position: BULLISH | NEUTRAL | BEARISH
-(Select one that matches your valuation verdict above:
- BULLISH — current price is UNDERVALUED vs fair value; margin of safety exists.
- BEARISH — current price is OVERVALUED vs fair value; no margin of safety.
- NEUTRAL — price is FAIRLY VALUED, or fair value data unavailable (FALLBACK triggered).)
+Position: HOLD
+Valuation Context: UNDERVALUED | FAIRLY_VALUED | OVERVALUED
+(Select one that matches your STEP 2 verdict:
+ UNDERVALUED — current price below fair value; margin of safety exists.
+ FAIRLY_VALUED — current price within ±5% of fair value; or fair value unavailable (FALLBACK).
+ OVERVALUED — current price above fair value; no margin of safety.)
+Quality Flag: PASS | CONDITIONAL | FAIL
+(PASS — no red flags from STEP 5; financials support the valuation.
+ CONDITIONAL — minor flags or limited data; proceed with caution.
+ FAIL — major red flags detected (ROE-Margin Divergence, Revenue-CFO Divergence,
+         or Insider Selling confirmed).)
+Catalyst: [specific event within 1-3 months] | NONE
 Agent Confidence: 0.xx
+
+Note: Position is always HOLD. The fundamental scout provides valuation evidence
+and quality context, not a directional timing vote.
