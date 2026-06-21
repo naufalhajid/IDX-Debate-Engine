@@ -1,5 +1,32 @@
 # Prompt Migration Log
 
+## 2026-06-21 — `taskE-failpass-v19`
+
+**Files changed:**
+- `services/debate_prompts/cio_judge.txt` (STEP 3 FAIL/PASS conflict matrix relaxed)
+- `schemas/debate.py` (`CIOVerdict.momentum_play` field + confidence cap)
+- `services/debate_prompts/manifest.json` (version → `2026-06-21-taskE-failpass-v19`)
+
+### Changes
+
+**`cio_judge.txt`** — FAIL/PASS conflict resolution matrix (STEP 3) relaxed.
+
+Previously required **both** Foreign Flow AND Volume breakout for a BUY. New logic:
+- Volume breakout alone (volume_surge_ratio ≥ 1.5 AND return_5d_pct > 0) → Lean BUY at 50% size
+- Volume breakout + strongly positive Foreign Flow → BUY at 75% size
+- No volume breakout → HOLD
+
+LLM instructed to set `"momentum_play": true` in JSON output for FAIL/PASS-to-BUY verdicts.
+
+**`schemas/debate.py`** — Added `CIOVerdict.momentum_play: bool = False`.
+Deterministic Python guardrail in `_derive_computed_fields`: when `momentum_play=True` and
+`rating in (BUY, STRONG_BUY)`, confidence is capped at `min(confidence, 0.65)`.
+
+**Motivation:** Requiring both foreign flow AND volume was too restrictive. Volume is the primary
+gate; foreign flow amplifies size but should not block the entry entirely.
+
+---
+
 ## 2026-06-20 — `fv2-fibonacci-v18`
 
 **Files changed:**

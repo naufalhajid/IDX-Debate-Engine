@@ -39,7 +39,13 @@ HARD_REJECT_CODES = {
     "rr_implausible",
     "insufficient_technical_data",
     "ara_entry_risk_high",
+    "insufficient_liquidity",
 }
+
+# Task F: Liquidity gate thresholds (IDR). Stocks below Rp 2B ADT are
+# impractical to fill at swing-trade size; 2B-10B allows entry with reduced sizing.
+ADT_HARD_REJECT_THRESHOLD_IDR: int = 2_000_000_000
+ADT_SOFT_FLAG_THRESHOLD_IDR: int = 10_000_000_000
 
 # P5: halt all sizing when realized daily portfolio loss reaches this threshold.
 CIRCUIT_BREAKER_DAILY_LOSS_PCT = 0.03
@@ -231,6 +237,48 @@ def evaluate_risk(candidate: dict[str, Any]) -> RiskDecision:
                 sizing_allowed=False,
                 reason_codes=[*verdict_reason_codes, "invalid_stop_loss"],
                 message="Stop-loss tidak berada di bawah harga sekarang.",
+                current_price=current_price,
+                entry_low=entry_low,
+                entry_high=entry_high,
+                target_price=target_price,
+                stop_loss=stop_loss,
+            )
+        )
+
+    # Task F: Liquidity gate — uses current_price × avg_volume_20d as ADT proxy.
+    # Missing ADT degrades gracefully (warning + skip); never blocks a valid setup.
+    _adt = _compute_adt_approx(candidate, current_price)
+    if _adt is None:
+        logger.warning("[Risk] {} avg_volume unavailable — skipping liquidity gate", ticker)
+    elif _adt < ADT_HARD_REJECT_THRESHOLD_IDR:
+        return _log_decision(
+            RiskDecision(
+                ticker=ticker,
+                status="reject",
+                sizing_allowed=False,
+                reason_codes=[*verdict_reason_codes, "insufficient_liquidity"],
+                message=(
+                    f"ADT ≈ Rp {_adt / 1_000_000_000:.1f}B — di bawah floor Rp 2B; "
+                    "fill tidak praktis pada ukuran swing trade."
+                ),
+                current_price=current_price,
+                entry_low=entry_low,
+                entry_high=entry_high,
+                target_price=target_price,
+                stop_loss=stop_loss,
+            )
+        )
+    elif _adt < ADT_SOFT_FLAG_THRESHOLD_IDR:
+        return _log_decision(
+            RiskDecision(
+                ticker=ticker,
+                status="conditional_deployable",
+                sizing_allowed=False,
+                reason_codes=[*verdict_reason_codes, "low_liquidity"],
+                message=(
+                    f"ADT ≈ Rp {_adt / 1_000_000_000:.1f}B (2B–10B) — "
+                    "sizing terbatas; konfirmasi depth sebelum entry."
+                ),
                 current_price=current_price,
                 entry_low=entry_low,
                 entry_high=entry_high,
@@ -605,6 +653,37 @@ def _rr_minimum_for_candidate(
         regime or "none",
     )
     return rr_min
+
+
+def _compute_adt_approx(
+    candidate: dict[str, Any],
+    current_price: float,
+) -> float | None:
+    """Approximate 20-day Average Daily Turnover as current_price × avg_volume_20d.
+
+    Returns None when avg_volume is not present in the candidate, so the caller
+    can degrade gracefully (log + skip the gate) rather than hard-rejecting.
+    """
+    risk_ctx = candidate.get("risk_context") or {}
+    tech = candidate.get("technical_indicators") or {}
+    raw_data = (candidate.get("raw_data") or {})
+    if not isinstance(raw_data, dict):
+        raw_data = {}
+
+    avg_volume = (
+        risk_ctx.get("avg_volume")
+        or tech.get("avg_volume_20d")
+        or raw_data.get("avg_volume_20d")
+    )
+    if avg_volume is None:
+        return None
+    try:
+        vol = float(avg_volume)
+        if vol <= 0:
+            return None
+        return current_price * vol
+    except (TypeError, ValueError):
+        return None
 
 
 def _risk_yf_info(

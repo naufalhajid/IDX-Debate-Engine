@@ -85,9 +85,14 @@ STEP 3 — CONFLICT RESOLUTION (MANDATORY):
 
   Fundamental + Technical == PASS/PASS -> BUY; apply calibration rubric, caps, and DA penalty.
   Fundamental + Technical == PASS/FAIL -> HOLD ("Wait for technical confirmation")
-  Fundamental + Technical == FAIL/PASS -> IF strongly positive Foreign Flow AND Volume breakout
-                                              -> Lean BUY (Momentum Play, size 50%).
-                                           ELSE -> HOLD.
+  Fundamental + Technical == FAIL/PASS ->
+    IF Volume breakout confirmed (volume_surge_ratio >= 1.5 AND return_5d_pct > 0):
+      -> Lean BUY (Momentum Play, size 50%). Set "momentum_play": true in your JSON output.
+      -> IF also strongly positive Foreign Flow: raise size to 75%.
+      -> State explicitly in weighted_reasoning:
+         "Momentum trade — entry is purely technical, no fundamental support."
+    ELSE (no volume breakout):
+      -> HOLD ("Wait for volume confirmation before momentum entry")
   Fundamental + Technical == FAIL/FAIL -> AVOID.
                                            (High R/R alone does not override two failing signals --
                                             check fundamentals independently.)

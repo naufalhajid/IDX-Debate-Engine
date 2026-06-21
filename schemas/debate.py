@@ -238,6 +238,16 @@ class CIOVerdict(BaseDataClass):
         description="If True, trail the remaining position after T1 exit.",
     )
 
+    # ── Task E: FAIL/PASS conflict matrix ────────────────────────────────────
+    momentum_play: bool = Field(
+        default=False,
+        description=(
+            "True when the BUY verdict is a FAIL/PASS momentum trade "
+            "(volume breakout confirmed, but fundamentals do not pass). "
+            "Caps confidence at 0.65 deterministically."
+        ),
+    )
+
     @model_validator(mode="after")
     def _derive_computed_fields(self) -> "CIOVerdict":
         """
@@ -361,6 +371,11 @@ class CIOVerdict(BaseDataClass):
                     "Invalid swing price ordering: expected "
                     "stop_loss < entry_low <= entry_high < target_price"
                 )
+
+        # 8. Momentum-play confidence cap — FAIL/PASS BUY capped at 0.65 so
+        #    a weak-fundamental setup cannot masquerade as a high-conviction trade.
+        if self.momentum_play and self.rating in ("BUY", "STRONG_BUY"):
+            self.confidence = min(self.confidence, 0.65)
 
         return self
 

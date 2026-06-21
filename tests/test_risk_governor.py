@@ -554,3 +554,50 @@ def test_counter_trend_hold_llm_rr_diverges_from_recomputed_stays_conditional() 
     # Recomputed R/R 1.58 < 3.5 → counter-trend short-circuit blocked → conditional.
     assert decision.status == "conditional_deployable"
     assert decision.sizing_allowed is False
+
+
+# ── Task F: Liquidity gate ────────────────────────────────────────────────────
+
+
+def _liquid_candidate(avg_volume: float | None = None, **overrides):
+    """Candidate with configurable avg_volume in risk_context."""
+    c = _candidate(**overrides)
+    if avg_volume is not None:
+        c.setdefault("risk_context", {})["avg_volume"] = avg_volume
+    return c
+
+
+def test_illiquid_ticker_hard_rejects() -> None:
+    # current_price=1000, avg_volume=1_500_000 → ADT = 1.5B < 2B
+    decision = evaluate_risk(_liquid_candidate(avg_volume=1_500_000))
+
+    assert decision.status == "reject"
+    assert decision.sizing_allowed is False
+    assert "insufficient_liquidity" in decision.reason_codes
+
+
+def test_low_liquidity_ticker_conditional() -> None:
+    # current_price=1000, avg_volume=4_000_000 → ADT = 4B (between 2B and 10B)
+    decision = evaluate_risk(_liquid_candidate(avg_volume=4_000_000))
+
+    assert decision.status == "conditional_deployable"
+    assert decision.sizing_allowed is False
+    assert "low_liquidity" in decision.reason_codes
+
+
+def test_liquid_ticker_unaffected() -> None:
+    # current_price=1000, avg_volume=15_000_000 → ADT = 15B >= 10B → normal flow
+    decision = evaluate_risk(_liquid_candidate(avg_volume=15_000_000))
+
+    assert decision.status == "deployable"
+    assert decision.sizing_allowed is True
+
+
+def test_missing_adt_degrades_gracefully() -> None:
+    # No avg_volume in risk_context or technical_indicators → gate is skipped
+    decision = evaluate_risk(_candidate())
+
+    # Default _candidate has no avg_volume → no liquidity gate → deployable as before
+    assert decision.status == "deployable"
+    assert "insufficient_liquidity" not in decision.reason_codes
+    assert "low_liquidity" not in decision.reason_codes

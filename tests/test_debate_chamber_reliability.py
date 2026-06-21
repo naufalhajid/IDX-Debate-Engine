@@ -987,7 +987,7 @@ async def test_debate_run_derives_current_price_and_adds_prompt_metadata(monkeyp
 def test_prompt_registry_loads_required_prompts_and_version():
     registry = debate_prompt_registry.PROMPT_REGISTRY
 
-    assert registry.prompt_version == "2026-06-20-fv2-fibonacci-v18"
+    assert registry.prompt_version == "2026-06-21-taskE-failpass-v19"
     assert set(debate_prompt_registry.REQUIRED_PROMPTS).issubset(registry.prompts)
     assert "CONFIDENCE CALIBRATION" in registry.prompts["CIO_SYSTEM_PROMPT"]
 
@@ -2018,4 +2018,58 @@ def test_noise_gate_hard_floor_is_1x_atr_not_1p5x():
     result = chamber._run_tradeability_preflight(tech, 1000.0)
     assert result["status"] == "conditional", (
         f"1.1xATR gap should be conditional (not hard reject): {result}"
+    )
+
+
+# ── Task E: FAIL/PASS momentum_play confidence cap ───────────────────────────
+
+
+def test_momentum_play_caps_confidence_at_065():
+    verdict = CIOVerdict(
+        ticker="DSSA",
+        rating="BUY",
+        confidence=0.90,
+        momentum_play=True,
+        entry_price_range="9800 - 10000",
+        target_price=10800,
+        stop_loss=9500,
+        current_price=9900,
+        fair_value=8500,
+    )
+    assert verdict.confidence == 0.65, (
+        f"momentum_play BUY should be capped at 0.65, got {verdict.confidence}"
+    )
+
+
+def test_momentum_play_preserves_low_confidence():
+    verdict = CIOVerdict(
+        ticker="DSSA",
+        rating="BUY",
+        confidence=0.62,
+        momentum_play=True,
+        entry_price_range="9800 - 10000",
+        target_price=10800,
+        stop_loss=9500,
+        current_price=9900,
+        fair_value=8500,
+    )
+    assert verdict.confidence == 0.62, (
+        f"cap should not raise low confidence, got {verdict.confidence}"
+    )
+
+
+def test_momentum_play_false_does_not_cap_confidence():
+    verdict = CIOVerdict(
+        ticker="DSSA",
+        rating="BUY",
+        confidence=0.82,
+        momentum_play=False,
+        entry_price_range="9800 - 10000",
+        target_price=10800,
+        stop_loss=9500,
+        current_price=9900,
+        fair_value=11000,
+    )
+    assert verdict.confidence == 0.82, (
+        f"momentum_play=False must not cap confidence, got {verdict.confidence}"
     )
