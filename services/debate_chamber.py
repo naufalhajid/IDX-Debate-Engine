@@ -3642,6 +3642,32 @@ Current Date (Asia/Jakarta): {current_date}
     #: itself can sit far above spot; both inflate R/R past anything tradeable.
     MAX_TARGET_RETURN = 0.10
 
+    #: Sector-aware swing caps (P7). Mining and property are cyclical with wider
+    #: legitimate swings; banks are low-volatility and rarely move >10% in a swing.
+    _SECTOR_MAX_TARGET: dict[str, float] = {
+        "mining": 0.20,
+        "consumer": 0.12,
+        "property": 0.15,
+        "bank": 0.10,
+        "default": 0.10,
+    }
+
+    # Raw IDX sector keys (from quant_filter config) → _SECTOR_MAX_TARGET bucket
+    _SECTOR_ALIAS: dict[str, str] = {
+        "energy": "mining",
+        "basic_materials": "mining",
+        "consumer_staples": "consumer",
+        "consumer_disc": "consumer",
+        "finance_nonbank": "bank",
+    }
+
+    @classmethod
+    def _max_target_return(cls, sector: str | None) -> float:
+        if not sector:
+            return cls.MAX_TARGET_RETURN
+        resolved = cls._SECTOR_ALIAS.get(sector.lower(), sector.lower())
+        return cls._SECTOR_MAX_TARGET.get(resolved, cls.MAX_TARGET_RETURN)
+
     def _compute_trade_envelope(
         self,
         current_price: float,
@@ -3651,6 +3677,7 @@ Current Date (Asia/Jakarta): {current_date}
         """Compute entry/target/stop in Python. All prices snapped to IHSG tick sizes."""
         sma20 = tech.get("sma20", current_price)
         ma50 = tech.get("ma50")
+        sector = tech.get("sector")
         atr14 = tech.get("atr14", 0)
         rsi14 = tech.get("rsi14")
         return_5d = tech.get("return_5d_pct")
@@ -3757,7 +3784,7 @@ Current Date (Asia/Jakarta): {current_date}
         elif high_50d >= target_candidate:
             target_candidate = high_50d
             target_basis = "Resistance 50-Day"
-        elif high_52w >= target_candidate:
+        elif high_52w >= target_candidate and high_52w <= current_price * 1.30:
             target_candidate = high_52w
             target_basis = "Resistance 52-Week"
 
@@ -3776,16 +3803,19 @@ Current Date (Asia/Jakarta): {current_date}
         # and inflate R/R (e.g. DSSA target Rp 1,030 / R/R 9.22x vs the
         # FV-anchored Rp 665 / 1.11x), and an FV far above spot (NZIA: FV 417
         # vs spot 177) never triggers Ceiling 1 at all.
-        capped = snap_to_tick(entry_high * (1 + self.MAX_TARGET_RETURN))
+        capped = snap_to_tick(entry_high * (1 + self._max_target_return(sector)))
         if 0 < capped < target:
             target = capped
             target_basis += " (Swing Cap)"
 
         if target <= entry_high:
-            target = self._next_tick_above(entry_high)
-            # Append, don't overwrite: keep the "(FV Ceiling)"/"(Swing Cap)"
-            # provenance that explains WHY the target collapsed to a tick.
-            target_basis += " (Tick Increment Fallback)"
+            return {
+                "rejected": True,
+                "reason": (
+                    f"target_collapsed: target {target} ≤ entry_high {entry_high}"
+                    f" after ceiling(s): {target_basis}"
+                ),
+            }
 
         # Compute display percentages from entry_mid, but canonical R/R from entry_high.
         gain_pct = ((target - entry_mid) / entry_mid) * 100 if entry_mid > 0 else 0
@@ -4187,6 +4217,9 @@ Current Date (Asia/Jakarta): {current_date}
         _meta_regime = _extract_regime_str((state.get("metadata") or {}).get("regime", ""))
         if _meta_regime:
             tech["regime"] = _meta_regime
+        _meta_sector = str((state.get("metadata") or {}).get("sector", "") or "")
+        if _meta_sector:
+            tech["sector"] = _meta_sector
         state_metadata = dict(_state_metadata(state))
         fair_value = (
             0.0
@@ -4732,7 +4765,11 @@ Start your response with '{' and end with '}'. Nothing else."""
                 "rag_citation_guard": _state_metadata(state).get("rag_citation_guard"),
             },
         )
-        return {"final_verdict": verdict_json, "metadata": _state_metadata(state)}
+        _meta_out = dict(_state_metadata(state))
+        _vbc = state.get("valuation_band_context")
+        if _vbc:
+            _meta_out["valuation_band_context"] = _vbc
+        return {"final_verdict": verdict_json, "metadata": _meta_out}
 
     # ── Graph Assembly ───────────────────────────────────────────────────────
 
@@ -5004,7 +5041,7 @@ Start your response with '{' and end with '}'. Nothing else."""
 
     # ── Public API ───────────────────────────────────────────────────────────
 
-    async def run(self, ticker: str, current_price: float = 0.0) -> dict:
+    async def run(self, ticker: str, current_price: float = 0.0, sector: str = "") -> dict:
         """
         Execute the full swing-trade debate pipeline for a given IHSG ticker.
 
@@ -5014,6 +5051,9 @@ Start your response with '{' and end with '}'. Nothing else."""
                             Used by the Synthesizer for margin-of-safety checks
                             and by the CIO for is_overvalued auto-flagging.
                             Pass 0.0 to skip price-level validation.
+            sector        : Raw IDX sector key (e.g. "energy", "bank"). Injected
+                            into metadata so _compute_trade_envelope can apply the
+                            sector-aware swing cap via _max_target_return().
 
         Returns:
             The final LangGraph state dict.
@@ -5055,6 +5095,7 @@ Start your response with '{' and end with '}'. Nothing else."""
                 "prompt_version": getattr(self, "prompt_version", PROMPT_VERSION),
                 "run_id": getattr(self, "run_id", "unknown"),
                 "regime": _extract_regime_str(getattr(self, "market_regime", None)),
+                "sector": sector,
                 "market_data_source": market_data.get("source", "unknown"),
                 "market_data_fetched_at": _market_data_timestamp(market_data),
                 "market_data_cached": True,

@@ -1,8 +1,8 @@
 """
-Per-ticker broker flow summary from Stockbit broker-summary endpoint.
+Per-ticker broker flow summary from Stockbit broker distribution endpoint.
 
 Importers: services/debate_chamber.py (_synthesizer_node)
-Endpoint:  GET https://exodus.stockbit.com/broker-summary/v1/{ticker}
+Endpoint:  GET https://exodus.stockbit.com/order-trade/broker/distribution
 Data:      top-5 buyer/seller broker codes, net accumulation signal
 """
 
@@ -11,10 +11,16 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass, field
+from urllib.parse import urlencode
 
 logger = logging.getLogger(__name__)
 
 _BASE_URL = "https://exodus.stockbit.com"
+_BROKER_DISTRIBUTION_PATH = "/order-trade/broker/distribution"
+_INVESTOR_TYPE = "INVESTOR_TYPE_ALL"
+_MARKET_BOARD = "MARKET_TYPE_REGULER"
+_DATA_TYPE = "BROKER_DISTRIBUTION_DATA_TYPE_VALUE"
+_PERIOD = "TB_PERIOD_LAST_1_DAY"
 
 
 @dataclass
@@ -39,11 +45,98 @@ def _normalize_ticker(ticker: str) -> str:
 
 
 def _safe_float(val) -> float | None:
+    if isinstance(val, dict):
+        for key in (
+            "raw",
+            "value",
+            "amount",
+            "total",
+            "total_value",
+            "net",
+            "lot",
+            "volume",
+        ):
+            if key in val:
+                parsed = _safe_float(val.get(key))
+                if parsed is not None:
+                    return parsed
+        return None
     try:
+        if isinstance(val, bool):
+            return None  # bool is int subclass; float(True)==1.0 would silently fabricate volume
+        if isinstance(val, str):
+            val = (
+                val.replace("Rp", "")
+                .replace(",", "")
+                .replace(" ", "")
+                .strip()
+            )
         v = float(val)
         return v if math.isfinite(v) else None
     except (TypeError, ValueError):
         return None
+
+
+def _first_present(mapping: dict, keys: tuple[str, ...]):
+    for key in keys:
+        if key in mapping and mapping.get(key) not in (None, ""):
+            return mapping.get(key)
+    return None
+
+
+def _broker_code(entry: dict) -> str:
+    detail_node = entry.get("detail") if isinstance(entry.get("detail"), dict) else {}
+    broker_node = entry.get("broker") if isinstance(entry.get("broker"), dict) else {}
+    buyer_node = entry.get("buyer") if isinstance(entry.get("buyer"), dict) else {}
+    seller_node = entry.get("seller") if isinstance(entry.get("seller"), dict) else {}
+    code = (
+        detail_node.get("code")
+        or detail_node.get("broker_code")
+        or broker_node.get("code")
+        or buyer_node.get("code")
+        or seller_node.get("code")
+        or _first_present(
+            entry,
+            (
+                "code",
+                "broker_code",
+                "buyer_code",
+                "seller_code",
+                "brokerCode",
+                "brokerCodeBuyer",
+                "brokerCodeSeller",
+            ),
+        )
+        or ""
+    )
+    return str(code)
+
+
+def _broker_name(entry: dict) -> str:
+    detail_node = entry.get("detail") if isinstance(entry.get("detail"), dict) else {}
+    broker_node = entry.get("broker") if isinstance(entry.get("broker"), dict) else {}
+    buyer_node = entry.get("buyer") if isinstance(entry.get("buyer"), dict) else {}
+    seller_node = entry.get("seller") if isinstance(entry.get("seller"), dict) else {}
+    name = (
+        detail_node.get("name")
+        or detail_node.get("broker_name")
+        or broker_node.get("name")
+        or buyer_node.get("name")
+        or seller_node.get("name")
+        or _first_present(
+            entry,
+            (
+                "name",
+                "broker_name",
+                "buyer_name",
+                "seller_name",
+                "company",
+                "brokerName",
+            ),
+        )
+        or ""
+    )
+    return str(name)
 
 
 def _extract_broker_list(entries: list, top_n: int = 5) -> list[dict]:
@@ -52,26 +145,35 @@ def _extract_broker_list(entries: list, top_n: int = 5) -> list[dict]:
     Handles two known Stockbit shapes:
       Shape A: {"broker": {"code": "YP", "name": "..."}, "lot": N, "value": N}
       Shape B: {"code": "YP", "name": "...", "lot": N, "value": N}
+      Shape C: order-trade broker distribution top_broker_buy/top_broker_sell rows
     """
     result = []
     for entry in entries[:top_n]:
         if not isinstance(entry, dict):
             continue
-        broker_node = entry.get("broker") or {}
-        code = (
-            broker_node.get("code")
-            or entry.get("code")
-            or entry.get("broker_code")
-            or ""
+        detail_node = (
+            entry.get("detail") if isinstance(entry.get("detail"), dict) else {}
         )
-        name = (
-            broker_node.get("name")
-            or entry.get("name")
-            or entry.get("broker_name")
-            or ""
+        code = _broker_code(entry)
+        name = _broker_name(entry)
+        _detail_lot = _first_present(
+            detail_node, ("lot", "lots", "volume", "total_lot", "total_volume")
         )
-        lot = _safe_float(next((entry.get(k) for k in ("lot", "volume", "lot_volume") if entry.get(k) is not None), None))
-        raw_value = _safe_float(next((entry.get(k) for k in ("value", "value_idr", "total_value") if entry.get(k) is not None), None))
+        _entry_lot = _first_present(
+            entry,
+            ("lot", "lots", "volume", "lot_volume", "total_lot", "total_volume",
+             "buy_lot", "sell_lot"),
+        )
+        lot = _safe_float(_detail_lot if _detail_lot is not None else _entry_lot)
+        _detail_value = _first_present(
+            detail_node, ("amount", "value", "total_value", "totalValue")
+        )
+        _entry_value = _first_present(
+            entry,
+            ("amount", "value", "total_value", "value_idr", "totalValue",
+             "transaction_value", "buy_value", "sell_value", "net_value"),
+        )
+        raw_value = _safe_float(_detail_value if _detail_value is not None else _entry_value)
         value_m = round(raw_value / 1_000_000, 2) if raw_value is not None else None
         if code:
             result.append({"code": str(code), "name": str(name), "lot": lot, "value_m": value_m})
@@ -81,6 +183,30 @@ def _extract_broker_list(entries: list, top_n: int = 5) -> list[dict]:
 def _codes_string(broker_list: list[dict]) -> str | None:
     codes = [b["code"] for b in broker_list if b.get("code")]
     return ", ".join(codes) if codes else None
+
+
+def _broker_distribution_url(ticker: str) -> str:
+    query = urlencode(
+        {
+            "date": "",  # empty = latest trading day (API default)
+            "symbol": ticker,
+            "investor_type": _INVESTOR_TYPE,
+            "market_board": _MARKET_BOARD,
+            "data_type": _DATA_TYPE,
+            "period": _PERIOD,
+        }
+    )
+    return f"{_BASE_URL}{_BROKER_DISTRIBUTION_PATH}?{query}"
+
+
+def _broker_distribution_section(data: dict) -> dict:
+    by_value = data.get("by_value")
+    if isinstance(by_value, dict):
+        return by_value
+    by_lot = data.get("by_lot")
+    if isinstance(by_lot, dict):
+        return by_lot
+    return data
 
 
 def fetch_broker_summary(ticker: str, client=None) -> BrokerSummarySnapshot:
@@ -102,10 +228,10 @@ def fetch_broker_summary(ticker: str, client=None) -> BrokerSummarySnapshot:
             logger.warning("[BrokerSummary] client init failed for %s: %s", ticker, exc)
             return _empty(ticker)
 
-    url = f"{_BASE_URL}/broker-summary/v1/{ticker}"
+    url = _broker_distribution_url(ticker)
 
     try:
-        resp = client.get(url)
+        resp = client.get(url, operation="broker summary", optional=True)
     except Exception as exc:
         logger.warning("[BrokerSummary] fetch failed for %s: %s", ticker, exc)
         return _empty(ticker)
@@ -120,18 +246,21 @@ def fetch_broker_summary(ticker: str, client=None) -> BrokerSummarySnapshot:
         return _empty(ticker)
 
     logger.debug("[BrokerSummary] %s data keys: %s", ticker, list(data.keys()))
+    broker_data = _broker_distribution_section(data)
 
     # Try multiple key names for buy/sell lists (defensive against Stockbit schema changes)
     buy_list = (
-        data.get("buy")
-        or data.get("broker_buy")
-        or data.get("top_buy")
+        broker_data.get("top_broker_buy")
+        or broker_data.get("buy")
+        or broker_data.get("broker_buy")
+        or broker_data.get("top_buy")
         or []
     )
     sell_list = (
-        data.get("sell")
-        or data.get("broker_sell")
-        or data.get("top_sell")
+        broker_data.get("top_broker_sell")
+        or broker_data.get("sell")
+        or broker_data.get("broker_sell")
+        or broker_data.get("top_sell")
         or []
     )
 

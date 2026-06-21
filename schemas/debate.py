@@ -311,9 +311,9 @@ class CIOVerdict(BaseDataClass):
             elif self.fair_value is not None and self.fair_value > 0:
                 self.risk_overvalued = self.current_price > self.fair_value
             else:
-                self.risk_overvalued = False
+                self.risk_overvalued = None  # FV unmeasurable — unknown, not safe
         else:
-            self.risk_overvalued = False
+            self.risk_overvalued = None  # price unknown — cannot evaluate
         self.is_overvalued = self.risk_overvalued
 
         # 5. Rating downgrade guard — only trigger on genuinely bad R/R.

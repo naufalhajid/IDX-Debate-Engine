@@ -33,12 +33,48 @@ UNBUYABLE_RATINGS = {"AVOID", "SELL"}
 SOFT_BUYABLE_RATINGS = {"HOLD"}
 HARD_REJECT_CODES = {
     "rating_not_buyable",
+    "low_confidence",
     "overvalued",
     "rr_too_low",
     "rr_implausible",
     "insufficient_technical_data",
     "ara_entry_risk_high",
 }
+
+# P5: halt all sizing when realized daily portfolio loss reaches this threshold.
+CIRCUIT_BREAKER_DAILY_LOSS_PCT = 0.03
+
+
+def check_circuit_breaker(portfolio_state: dict) -> bool:
+    """Return True if the portfolio daily-loss circuit breaker should halt sizing.
+
+    portfolio_state keys (all optional):
+        realized_loss_pct  : float — today's realized P&L as a negative fraction
+                             (e.g. -0.04 means -4%). Positive values are profits.
+        realized_loss_amount: float — absolute loss in IDR (alternative to pct).
+        total_capital      : float — required when using realized_loss_amount only.
+
+    Returns True when the daily loss equals or exceeds CIRCUIT_BREAKER_DAILY_LOSS_PCT.
+    """
+    if not portfolio_state:
+        return False
+
+    loss_pct = portfolio_state.get("realized_loss_pct")
+    if loss_pct is not None:
+        try:
+            return float(loss_pct) <= -CIRCUIT_BREAKER_DAILY_LOSS_PCT
+        except (TypeError, ValueError):
+            pass
+
+    loss_amount = portfolio_state.get("realized_loss_amount")
+    total_capital = portfolio_state.get("total_capital")
+    if loss_amount is not None and total_capital and float(total_capital) > 0:
+        try:
+            return float(loss_amount) <= -(float(total_capital) * CIRCUIT_BREAKER_DAILY_LOSS_PCT)
+        except (TypeError, ValueError):
+            pass
+
+    return False
 
 
 class RiskDecision(BaseModel):
@@ -203,7 +239,14 @@ def evaluate_risk(candidate: dict[str, Any]) -> RiskDecision:
             )
         )
 
-    conditional = _is_conditional_setup(verdict_reason_codes, verdict)
+    conditional = _is_conditional_setup(
+        verdict_reason_codes,
+        verdict,
+        ticker=ticker,
+        entry_high=entry_high,
+        target_price=target_price,
+        stop_loss=stop_loss,
+    )
     if entry_low <= current_price <= entry_high:
         if conditional:
             return _log_decision(
@@ -408,14 +451,16 @@ def _parse_entry_range(value: Any) -> tuple[float | None, float | None]:
     return parsed[0], parsed[1]
 
 
-def _risk_overvalued_flag(candidate: dict[str, Any], verdict: dict[str, Any]) -> bool:
+def _risk_overvalued_flag(candidate: dict[str, Any], verdict: dict[str, Any]) -> bool | None:
     for value in (
         verdict.get("risk_overvalued"),
         candidate.get("risk_overvalued"),
+        verdict.get("is_overvalued"),
+        candidate.get("is_overvalued"),
     ):
         if value not in (None, ""):
             return _truthy(value)
-    return _truthy(verdict.get("is_overvalued") or candidate.get("is_overvalued"))
+    return None  # all sources unmeasurable — caller must treat as unknown
 
 
 def _preflight_noise_reject(candidate: dict[str, Any], verdict: dict[str, Any]) -> bool:
@@ -451,18 +496,21 @@ def _verdict_reason_codes(
         verdict.get("confidence"),
         candidate.get("confidence"),
     )
-    if confidence is not None and confidence < MIN_BUYABLE_CONFIDENCE:
+    if confidence is None or confidence < MIN_BUYABLE_CONFIDENCE:
         reason_codes.append("low_confidence")
 
-    if _risk_overvalued_flag(candidate, verdict):
+    _ovv = _risk_overvalued_flag(candidate, verdict)
+    if _ovv is True:
         reason_codes.append("overvalued")
+    elif _ovv is None:
+        reason_codes.append("fv_unmeasurable")
 
-    # Precedence: canonical verdict ratio → recompute from current prices →
-    # candidate-level echoes last. Candidate values can be stale leftovers from
-    # an earlier run, so a fresh recompute must outrank them.
-    rr_ratio = _first_float(verdict.get("risk_reward_ratio"))
+    # Precedence: recompute from current prices → canonical verdict ratio →
+    # candidate-level echoes last. LLM-provided ratios can use stale inputs;
+    # a fresh price-based recompute must take priority when data is available.
+    rr_ratio = _recompute_rr(ticker, entry_high, target_price, stop_loss)
     if rr_ratio is None:
-        rr_ratio = _recompute_rr(ticker, entry_high, target_price, stop_loss)
+        rr_ratio = _first_float(verdict.get("risk_reward_ratio"))
     if rr_ratio is None:
         rr_ratio = _first_float(
             candidate.get("risk_reward_ratio"),
@@ -486,6 +534,14 @@ def _verdict_reason_codes(
     if ara_code:
         reason_codes.append(ara_code)
 
+    # P8: historically expensive — soft flag, not a hard reject
+    _vbc = (
+        (candidate.get("metadata") or {}).get("valuation_band_context")
+        or verdict.get("valuation_band_context")
+    )
+    if _vbc and "HISTORICALLY_EXPENSIVE" in str(_vbc).upper():
+        reason_codes.append("historically_expensive")
+
     return _dedupe(reason_codes)
 
 
@@ -495,7 +551,7 @@ def _recompute_rr(
     target_price: float | None,
     stop_loss: float | None,
 ) -> float | None:
-    """Recompute the canonical entry_high-based R/R when the verdict omits it."""
+    """Recompute the canonical entry_high-based R/R from actual prices (primary source)."""
     if entry_high is None or target_price is None or stop_loss is None:
         return None
     try:
@@ -505,7 +561,7 @@ def _recompute_rr(
         # floor check rejects it instead of skipping silently.
         rr = 0.0
     logger.debug(
-        "[Risk] {} risk_reward_ratio missing from verdict; recomputed rr={}",
+        "[Risk] {} recomputed rr={} from prices (primary source)",
         ticker,
         rr,
     )
@@ -706,7 +762,15 @@ def _flatten_text(values: list[Any]) -> list[str]:
     return flattened
 
 
-def _is_conditional_setup(reason_codes: list[str], verdict: dict[str, Any]) -> bool:
+def _is_conditional_setup(
+    reason_codes: list[str],
+    verdict: dict[str, Any],
+    *,
+    ticker: str = "",
+    entry_high: float | None = None,
+    target_price: float | None = None,
+    stop_loss: float | None = None,
+) -> bool:
     if not reason_codes:
         return False
     if any(code in HARD_REJECT_CODES for code in reason_codes):
@@ -715,19 +779,29 @@ def _is_conditional_setup(reason_codes: list[str], verdict: dict[str, Any]) -> b
     # High-R/R counter-trend HOLD setups don't need to wait for breakout confirmation.
     # When the only soft flags are counter_trend + rating_hold and R/R >= 3.5x, the
     # valuation margin is wide enough to deploy without waiting for MA crossover.
+    # P3 precedence: prefer price-recomputed R/R over LLM-supplied ratio.
     if "counter_trend_setup" in reason_codes and rating in SOFT_BUYABLE_RATINGS:
         soft_only = [
             c for c in reason_codes if c not in {"counter_trend_setup", "rating_hold"}
         ]
-        rr = _first_float(verdict.get("risk_reward_ratio")) or 0.0
+        rr = _recompute_rr(ticker, entry_high, target_price, stop_loss)
+        if rr is None:
+            rr = _first_float(verdict.get("risk_reward_ratio")) or 0.0
         if not soft_only and rr >= 3.5:
             return False
-    return rating in SOFT_BUYABLE_RATINGS or "counter_trend_setup" in reason_codes
+    return (
+        rating in SOFT_BUYABLE_RATINGS
+        or "counter_trend_setup" in reason_codes
+        or "fv_unmeasurable" in reason_codes
+        or "historically_expensive" in reason_codes
+    )
 
 
 def _reject_message(reason_codes: list[str]) -> str:
     if "rating_not_buyable" in reason_codes:
         return "Setup ditolak karena verdict akhir bukan rating buyable."
+    if "low_confidence" in reason_codes:
+        return "Setup ditolak karena confidence LLM di bawah threshold minimum (60%)."
     if "insufficient_technical_data" in reason_codes:
         return "Setup ditolak karena data teknikal tidak cukup untuk validasi risiko."
     if "overvalued" in reason_codes:

@@ -7,7 +7,7 @@ from run_debate import _debate_one, _ledger_call
 
 
 class FakeDebateChamber:
-    async def run(self, ticker: str) -> dict:
+    async def run(self, ticker: str, current_price: float = 0.0, sector: str = "") -> dict:
         return {
             "ticker": ticker,
             "final_verdict": json.dumps(

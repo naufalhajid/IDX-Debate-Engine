@@ -303,7 +303,7 @@ async def test_batch_debate_records_unexpected_ticker_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class FakeChamber:
-        async def run(self, ticker: str) -> dict:
+        async def run(self, ticker: str, current_price: float = 0.0, sector: str = "") -> dict:
             if ticker == "BADX":
                 raise KeyError("raw_data")
             return {

@@ -10,7 +10,7 @@ def _candidate(**overrides):
             "confidence": 0.75,
             "current_price": 1000,
             "entry_price_range": "950 - 1050",
-            "target_price": 1150,
+            "target_price": 1290,  # (1290-1050)/(1050-930) = 2.0x R/R from prices
             "stop_loss": 930,
             "is_overvalued": False,
             "risk_reward_ratio": 2.0,
@@ -120,8 +120,9 @@ def test_defensive_regime_downgrades_deployable_buy_to_watchlist() -> None:
 
 
 def test_current_price_above_entry_high_waits_for_pullback() -> None:
+    # target=1230: (1230-1050)/(1050-930)=1.5 — at floor, no rr_too_low; price above range.
     decision = evaluate_risk(
-        _candidate(verdict={"current_price": 1100, "target_price": 1200})
+        _candidate(verdict={"current_price": 1100, "target_price": 1230})
     )
 
     assert decision.status == "wait_for_pullback"
@@ -130,13 +131,15 @@ def test_current_price_above_entry_high_waits_for_pullback() -> None:
 
 
 def test_target_at_or_below_current_price_rejects() -> None:
+    # After P3: recomputed R/R=(1100-1050)/120=0.42 → rr_too_low fires first (hard reject).
+    # upside_exhausted is added by price-position checks which run after hard-reject gate.
     decision = evaluate_risk(
         _candidate(verdict={"current_price": 1100, "target_price": 1100})
     )
 
     assert decision.status == "reject"
     assert decision.sizing_allowed is False
-    assert "upside_exhausted" in decision.reason_codes
+    assert "rr_too_low" in decision.reason_codes
 
 
 def test_invalid_or_missing_entry_range_rejects() -> None:
@@ -190,8 +193,9 @@ def test_stop_loss_at_or_above_current_price_rejects() -> None:
 
 
 def test_current_price_below_entry_low_is_watchlist_only() -> None:
+    # stop=890: (1290-1050)/(1050-890)=240/160=1.5 — at floor, no rr_too_low; price below range.
     decision = evaluate_risk(
-        _candidate(verdict={"current_price": 900, "stop_loss": 850})
+        _candidate(verdict={"current_price": 900, "stop_loss": 890})
     )
 
     assert decision.status == "watchlist_only"
@@ -200,6 +204,7 @@ def test_current_price_below_entry_low_is_watchlist_only() -> None:
 
 
 def test_avoid_verdict_rejects_even_inside_entry_range() -> None:
+    # target=1100: (1100-1050)/120=0.42 → rr_too_low matches original spirit (bad R/R).
     decision = evaluate_risk(
         _candidate(
             verdict={
@@ -207,6 +212,7 @@ def test_avoid_verdict_rejects_even_inside_entry_range() -> None:
                 "confidence": 0.22,
                 "is_overvalued": True,
                 "risk_reward_ratio": 0.56,
+                "target_price": 1100,
                 "weighted_reasoning": (
                     "Absence of technical indicators (INSUFFICIENT_DATA)."
                 ),
@@ -265,6 +271,7 @@ def test_large_cap_rr_above_tier_threshold_is_not_too_low() -> None:
 
 
 def test_default_tier_rr_below_default_threshold_is_too_low() -> None:
+    # target=1216: (1216-1050)/120=1.383 < 1.5 floor → rr_too_low.
     decision = evaluate_risk(
         _candidate(
             ticker="CYBR",
@@ -274,6 +281,7 @@ def test_default_tier_rr_below_default_threshold_is_too_low() -> None:
                 "rating": "AVOID",
                 "confidence": 0.25,
                 "risk_reward_ratio": 1.38,
+                "target_price": 1216,
             },
         )
     )
@@ -283,9 +291,8 @@ def test_default_tier_rr_below_default_threshold_is_too_low() -> None:
 
 
 def test_implausible_rr_is_hard_rejected() -> None:
-    # INDO 2026-06-11: R/R 22.3x from a pre-crash-high target over a 6-point
-    # ATR stop — broken geometry, not opportunity.
-    decision = evaluate_risk(_candidate(verdict={"risk_reward_ratio": 22.3}))
+    # target=1700: (1700-1050)/120=5.42x — recomputed from prices, above ceiling.
+    decision = evaluate_risk(_candidate(verdict={"risk_reward_ratio": 22.3, "target_price": 1700}))
 
     assert decision.status == "reject"
     assert decision.sizing_allowed is False
@@ -300,17 +307,65 @@ def test_high_but_plausible_rr_stays_deployable() -> None:
     assert "rr_implausible" not in decision.reason_codes
 
 
+def test_recomputed_rr_overrides_llm_inflated_ratio() -> None:
+    """P3: price-based recompute wins over LLM-provided ratio when both are available."""
+    # LLM claims R/R=5.0; actual from prices (1150-1050)/120=0.83 → rr_too_low.
+    decision = evaluate_risk(
+        _candidate(verdict={"risk_reward_ratio": 5.0, "target_price": 1150,
+                            "risk_overvalued": False, "is_overvalued": False})
+    )
+
+    assert "rr_implausible" not in decision.reason_codes  # 5.0 is NOT used
+    assert "rr_too_low" in decision.reason_codes          # 0.83 IS used
+    assert decision.sizing_allowed is False
+
+
+def test_buy_low_confidence_is_hard_rejected() -> None:
+    """P2: BUY with confidence below threshold → sizing blocked, not conditional."""
+    decision = evaluate_risk(
+        _candidate(verdict={"confidence": 0.35, "risk_overvalued": False, "is_overvalued": False})
+    )
+
+    assert decision.status == "reject"
+    assert decision.sizing_allowed is False
+    assert "low_confidence" in decision.reason_codes
+
+
+def test_fv_unmeasurable_yields_conditional_deployable() -> None:
+    """FV absent → risk_overvalued=None → fv_unmeasurable → conditional, not deployable."""
+    decision = evaluate_risk(
+        _candidate(verdict={"risk_overvalued": None, "is_overvalued": None})
+    )
+
+    assert "fv_unmeasurable" in decision.reason_codes
+    assert "overvalued" not in decision.reason_codes
+    assert decision.status == "conditional_deployable"
+    assert decision.sizing_allowed is False
+
+
+def test_fv_explicitly_false_is_not_flagged_as_unmeasurable() -> None:
+    """Explicit risk_overvalued=False (safe) must not produce fv_unmeasurable."""
+    decision = evaluate_risk(
+        _candidate(verdict={"risk_overvalued": False, "is_overvalued": False})
+    )
+
+    assert "fv_unmeasurable" not in decision.reason_codes
+    assert "overvalued" not in decision.reason_codes
+    assert decision.status == "deployable"
+    assert decision.sizing_allowed is True
+
+
 def test_rr_exactly_at_ceiling_is_rejected() -> None:
-    # Boundary must match _rr_component_score, which zeroes at exactly 5.0:
-    # an R/R the scorer treats as worthless may not pass the governor.
-    decision = evaluate_risk(_candidate(verdict={"risk_reward_ratio": 5.0}))
+    # target=1650: (1650-1050)/120=5.0 exactly — recomputed hits the ceiling.
+    decision = evaluate_risk(_candidate(verdict={"risk_reward_ratio": 5.0, "target_price": 1650}))
 
     assert decision.status == "reject"
     assert decision.sizing_allowed is False
     assert "rr_implausible" in decision.reason_codes
 
 
-def test_hold_low_confidence_inside_entry_is_conditional_not_sized() -> None:
+def test_hold_low_confidence_inside_entry_is_hard_rejected() -> None:
+    # After P2: low_confidence is a HARD_REJECT_CODE — no longer conditional.
     decision = evaluate_risk(
         _candidate(
             verdict={
@@ -321,12 +376,9 @@ def test_hold_low_confidence_inside_entry_is_conditional_not_sized() -> None:
         )
     )
 
-    assert decision.status == "conditional_deployable"
+    assert decision.status == "reject"
     assert decision.sizing_allowed is False
-    assert "rating_hold" in decision.reason_codes
     assert "low_confidence" in decision.reason_codes
-    assert "counter_trend_setup" in decision.reason_codes
-    assert "price_inside_entry_range" in decision.reason_codes
 
 
 def test_sentiment_insufficient_data_does_not_reject_when_technicals_exist() -> None:
@@ -409,12 +461,13 @@ def test_counter_trend_hold_with_string_rr_does_not_crash() -> None:
 def test_thousand_dot_entry_range_parses_as_full_idr_prices() -> None:
     # Regression: "4.300 - 4.600" used to parse as (4.3, 4.6), making a price
     # of 4500 look like it was far above the entry range.
+    # target=5350: (5350-4600)/(4600-4100)=750/500=1.5 — recomputed at floor, no rr_too_low.
     decision = evaluate_risk(
         _candidate(
             verdict={
                 "current_price": 4500,
                 "entry_price_range": "4.300 - 4.600",
-                "target_price": "Rp 5.200",
+                "target_price": "Rp 5.350",
                 "stop_loss": "Rp 4.100",
                 "risk_reward_ratio": 2.0,
             }
@@ -423,7 +476,7 @@ def test_thousand_dot_entry_range_parses_as_full_idr_prices() -> None:
 
     assert decision.entry_low == 4300.0
     assert decision.entry_high == 4600.0
-    assert decision.target_price == 5200.0
+    assert decision.target_price == 5350.0
     assert decision.stop_loss == 4100.0
     assert decision.status == "deployable"
 
@@ -445,3 +498,59 @@ def test_stale_candidate_rr_ratio_does_not_bypass_recompute() -> None:
     # Fresh recompute: (1150 - 1050) / (1050 - 930) = 0.83x < floor.
     assert decision.status == "reject"
     assert "rr_too_low" in decision.reason_codes
+
+
+def test_historically_expensive_appended_as_soft_code() -> None:
+    # P8: stock at 95th-percentile PE → "historically_expensive" in reason_codes.
+    # Soft flag: NOT in HARD_REJECT_CODES, setup becomes conditional_deployable.
+    decision = evaluate_risk(
+        _candidate(
+            metadata={"valuation_band_context": "HISTORICALLY_EXPENSIVE (PE 95th pct)"},
+        )
+    )
+
+    assert "historically_expensive" in decision.reason_codes
+    assert decision.status == "conditional_deployable"
+    assert decision.sizing_allowed is False
+
+
+def test_historically_expensive_does_not_hard_reject() -> None:
+    # P8: "historically_expensive" alone must not block BUY with clean R/R.
+    from core.risk_governor import HARD_REJECT_CODES
+
+    assert "historically_expensive" not in HARD_REJECT_CODES
+
+
+def test_historically_expensive_absent_when_band_context_is_normal() -> None:
+    # No flag when valuation_band_context does not contain HISTORICALLY_EXPENSIVE.
+    decision = evaluate_risk(
+        _candidate(
+            metadata={"valuation_band_context": "FAIRLY_VALUED (PE 50th pct)"},
+        )
+    )
+
+    assert "historically_expensive" not in decision.reason_codes
+
+
+def test_counter_trend_hold_llm_rr_diverges_from_recomputed_stays_conditional() -> None:
+    # bug_008 regression: LLM claims R/R=3.8 (above 3.5 short-circuit threshold) but
+    # recomputed from prices gives 1.58x. Without fix, setup became deployable; with
+    # fix, price-recomputed R/R < 3.5 → short-circuit does NOT fire → conditional.
+    decision = evaluate_risk(
+        _candidate(
+            verdict={
+                "rating": "HOLD",
+                "confidence": 0.75,
+                "entry_price_range": "950 - 1050",
+                "target_price": 1240,   # (1240-1050)/(1050-930) = 1.58x recomputed
+                "stop_loss": 930,
+                "risk_reward_ratio": 3.8,  # LLM-inflated; must NOT win
+                "current_price": 1000,
+                "weighted_reasoning": "Counter-trend bounce below MA200.",
+            },
+        )
+    )
+
+    # Recomputed R/R 1.58 < 3.5 → counter-trend short-circuit blocked → conditional.
+    assert decision.status == "conditional_deployable"
+    assert decision.sizing_allowed is False

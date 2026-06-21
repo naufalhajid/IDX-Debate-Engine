@@ -2,6 +2,8 @@ import os
 import tempfile
 import time
 import threading
+from typing import Any
+from urllib.parse import urlsplit
 
 import requests
 
@@ -14,6 +16,13 @@ class StockbitApiClient:
     """
     Handles HTTP requests to the Stockbit API, including authentication and retries.
     """
+
+    _OPTIONAL_OPERATIONS = {
+        "broker summary",
+        "foreign flow",
+        "social stream",
+    }
+    _UNRECOGNIZED_COMMAND = "unrecognized command"
 
     def __init__(self):
         """
@@ -53,13 +62,93 @@ class StockbitApiClient:
             self._thread_local.session = requests.Session()
         return self._thread_local.session
 
-    def _request(self, url: str, method: str, payload: dict = None):
+    @staticmethod
+    def _operation_from_url(url: str, method: str) -> str:
+        path = urlsplit(str(url)).path.lower()
+        if "/keystats/ratio/" in path:
+            return "key statistics"
+        if "/company-price-feed/" in path:
+            return "price feed"
+        if "/findata-view/foreign-domestic/" in path:
+            return "foreign flow"
+        if "/broker-summary/" in path:
+            return "broker summary"
+        if "/order-trade/broker/distribution" in path:
+            return "broker summary"
+        if "/stream/" in path:
+            return "social stream"
+        if "/login/refresh" in path:
+            return "token refresh"
+        if "/research/indicator/" in path:
+            return "auth challenge"
+        return f"{method.upper()} request"
+
+    @staticmethod
+    def _response_json(response) -> Any:
+        try:
+            return response.json()
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _response_message(response, body: Any) -> str:
+        if isinstance(body, dict):
+            for key in ("message", "error", "detail"):
+                value = body.get(key)
+                if value not in (None, ""):
+                    return str(value)
+        text = str(getattr(response, "text", "") or "").strip()
+        return text[:300]
+
+    @classmethod
+    def _should_log_as_warning(
+        cls,
+        *,
+        status_code: int | None,
+        operation: str,
+        message: str,
+        optional: bool,
+    ) -> bool:
+        if optional or operation in cls._OPTIONAL_OPERATIONS:
+            return True
+        normalized_message = message.lower()
+        return (
+            status_code == 404
+            and cls._UNRECOGNIZED_COMMAND in normalized_message
+        )
+
+    @classmethod
+    def _is_optional_unrecognized_command(
+        cls,
+        *,
+        status_code: int | None,
+        operation: str,
+        message: str,
+        optional: bool,
+    ) -> bool:
+        return (
+            status_code == 404
+            and cls._UNRECOGNIZED_COMMAND in message.lower()
+            and (optional or operation in cls._OPTIONAL_OPERATIONS)
+        )
+
+    def _request(
+        self,
+        url: str,
+        method: str,
+        payload: dict | None = None,
+        *,
+        operation: str | None = None,
+        optional: bool = False,
+    ):
         """
         Makes an HTTP request with the specified method and payload, retrying on failure.
 
         Parameters:
         - method (str): The HTTP method ("GET" or "POST").
         - payload (dict): Optional payload for POST requests.
+        - operation (str): Human-readable Stockbit operation name for logs.
+        - optional (bool): Whether a failure should be reported as degraded enrichment.
 
         Returns:
         - dict: The JSON response from the server, or an empty dictionary on failure.
@@ -67,6 +156,8 @@ class StockbitApiClient:
         retry = 0
         last_status_code = None
         session = self._get_session()
+        operation_name = operation or self._operation_from_url(url, method)
+        terminal_failure_logged = False
 
         while retry <= 3:
             try:
@@ -79,29 +170,76 @@ class StockbitApiClient:
                 else:
                     raise ValueError("Unsupported HTTP method")
 
-                logger.debug(url)
-                logger.debug(response.status_code)
-                logger.debug(response.json())
+                body = self._response_json(response)
+                logger.debug(
+                    "Stockbit {} {} -> {}",
+                    method,
+                    operation_name,
+                    response.status_code,
+                )
+                logger.debug(body if body is not None else getattr(response, "text", ""))
                 last_status_code = response.status_code
 
                 if response.status_code == 200:
-                    return response.json()
+                    return body if body is not None else {}
                 else:
-                    logger.error(
-                        f"Error: Received status code {response.status_code}, "
-                        f"text: {response.text}, "
-                        f"retry: {retry}"
-                    )
                     if response.status_code == 401:
+                        logger.warning(
+                            f"Stockbit {operation_name} unauthorized; "
+                            f"refreshing token and retrying ({retry}/3)."
+                        )
                         self._authenticate_stockbit()
                         retry += 1
                     else:
+                        message = self._response_message(response, body)
+                        if self._is_optional_unrecognized_command(
+                            status_code=response.status_code,
+                            operation=operation_name,
+                            message=message,
+                            optional=optional,
+                        ):
+                            logger.debug(
+                                "Stockbit {} endpoint unavailable "
+                                "(404 Unrecognized Command); continuing without "
+                                "optional enrichment.",
+                                operation_name,
+                            )
+                            terminal_failure_logged = True
+                            break
+                        log_as_warning = self._should_log_as_warning(
+                            status_code=response.status_code,
+                            operation=operation_name,
+                            message=message,
+                            optional=optional,
+                        )
+                        log = logger.warning if log_as_warning else logger.error
+                        if (
+                            response.status_code == 404
+                            and self._UNRECOGNIZED_COMMAND in message.lower()
+                        ):
+                            log(
+                                f"Stockbit {operation_name} endpoint unavailable "
+                                "(404 Unrecognized Command); continuing without "
+                                "that data."
+                            )
+                        else:
+                            log(
+                                f"Stockbit {operation_name} request failed: "
+                                f"status={response.status_code}, retry={retry}, "
+                                f"message={message or '-'}"
+                            )
+                        terminal_failure_logged = True
                         break
 
             except requests.exceptions.RequestException as e:
                 failure = classify_exception(e, source="stockbit")
-                logger.error(f"Stockbit failure classified: {failure.model_dump()}")
-                logger.error(f"Request failed: {e} retry: {retry}")
+                log = logger.warning if optional else logger.error
+                log(
+                    f"Stockbit {operation_name} failure classified: "
+                    f"{failure.model_dump()}"
+                )
+                log(f"Stockbit {operation_name} request failed: {e} retry: {retry}")
+                terminal_failure_logged = True
                 break
 
             time.sleep(0.2)
@@ -109,19 +247,40 @@ class StockbitApiClient:
         if last_status_code == 401:
             raise Exception("401 Unauthorized after retrying authentication.")
 
-        logger.error(f"Failed to retrieve key statistics retry: {retry}")
+        if not terminal_failure_logged:
+            log_as_warning = self._should_log_as_warning(
+                status_code=last_status_code,
+                operation=operation_name,
+                message="",
+                optional=optional,
+            )
+            log = logger.warning if log_as_warning else logger.error
+            log(f"Stockbit {operation_name} request failed after retry={retry}.")
         return {}
 
-    def get(self, url: str):
+    def get(
+        self,
+        url: str,
+        *,
+        operation: str | None = None,
+        optional: bool = False,
+    ):
         """
         Performs a GET request using the stored URL and headers.
 
         Returns:
         - dict: The JSON response from the server, or an empty dictionary on failure.
         """
-        return self._request(url, "GET")
+        return self._request(url, "GET", operation=operation, optional=optional)
 
-    def post(self, url: str, payload: dict):
+    def post(
+        self,
+        url: str,
+        payload: dict,
+        *,
+        operation: str | None = None,
+        optional: bool = False,
+    ):
         """
         Performs a POST request using the stored URL, headers, and provided payload.
 
@@ -131,7 +290,13 @@ class StockbitApiClient:
         Returns:
         - dict: The JSON response from the server, or an empty dictionary on failure.
         """
-        return self._request(url, "POST", payload)
+        return self._request(
+            url,
+            "POST",
+            payload,
+            operation=operation,
+            optional=optional,
+        )
 
     def _authenticate_stockbit(self):
         """
@@ -280,7 +445,10 @@ class StockbitApiClient:
         try:
             with open(self.token_temp_file_path, "r") as file:
                 token = file.read()
-                logger.debug(f"Token: {token}")
+                logger.debug(
+                    "Loaded Stockbit access token from temp file: {}",
+                    "present" if token else "empty",
+                )
                 if token != "":
                     self.headers["Authorization"] = f"Bearer {token}"
 

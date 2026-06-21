@@ -3994,7 +3994,7 @@ def _check_report_consistency(
         logger.warning(f"[ReportConsistency] failed: {e}")
 
 
-async def _run_single_debate(ticker: str, chamber: Any) -> dict:
+async def _run_single_debate(ticker: str, chamber: Any, sector: str = "") -> dict:
     """
     Jalankan debate untuk satu ticker: chamber.run() owns market-data prefetch â†' validasi schema.
 
@@ -4006,7 +4006,7 @@ async def _run_single_debate(ticker: str, chamber: Any) -> dict:
     logger.info(f"[Debate] Mulai: {ticker}")
 
     try:
-        result = await chamber.run(ticker)
+        result = await chamber.run(ticker, sector=sector)
         if result.get("error") is not None:
             error = str(result["error"])
             _guard_status = (result.get("metadata") or {}).get("guard_status", "")
@@ -4282,7 +4282,7 @@ async def run_batch_debates(
 
                 # 6. Eksekusi
                 try:
-                    result = await _run_single_debate(ticker, chamber)
+                    result = await _run_single_debate(ticker, chamber, sector=sector_key)
 
                     # Valuation disagreement: Graham FV (screener) vs debate engine FV
                     if candidates_by_ticker and not result.get("error"):
@@ -4902,29 +4902,75 @@ def _build_sizing_candidates(top_n: list[dict]) -> list[dict]:
     return candidates
 
 
+def _apply_circuit_breaker(top_n: list[dict], portfolio_state: dict) -> bool:
+    """Block all sizing when portfolio daily-loss circuit breaker is tripped.
+
+    Returns True if the breaker fired (all entries blocked), False otherwise.
+    """
+    from core.risk_governor import check_circuit_breaker
+
+    if not check_circuit_breaker(portfolio_state):
+        return False
+
+    loss_pct = portfolio_state.get("realized_loss_pct", "?")
+    logger.warning(
+        "[CircuitBreaker] Daily loss ≥ %.0f%% (realized_loss_pct=%s) — "
+        "all sizing halted for this batch.",
+        100 * 0.03,
+        loss_pct,
+    )
+    for entry in top_n:
+        ticker = entry.get("ticker", "unknown")
+        entry["risk_governor"] = {
+            "ticker": ticker,
+            "status": "reject",
+            "sizing_allowed": False,
+            "reason_codes": ["circuit_breaker"],
+            "message": (
+                "Portfolio circuit breaker aktif: realized daily loss "
+                f"≥ 3%. Sizing diblokir untuk semua ticker pada batch ini."
+            ),
+        }
+    return True
+
+
 def _annotate_risk_governor(top_n: list[dict]) -> None:
     """Attach deterministic actionability metadata before sizing/reporting."""
     for entry in top_n:
         entry.setdefault("market_regime", ORCHESTRATOR_CONFIG.get("market_regime"))
-        decision = annotate_risk(entry)
-        if not decision.sizing_allowed:
-            logger.info(
-                f"[RiskGovernor] {decision.ticker}: {decision.status} "
-                f"({', '.join(decision.reason_codes)})"
+        try:
+            decision = annotate_risk(entry)
+            if not decision.sizing_allowed:
+                logger.info(
+                    f"[RiskGovernor] {decision.ticker}: {decision.status} "
+                    f"({', '.join(decision.reason_codes)})"
+                )
+        except Exception as exc:
+            ticker = entry.get("ticker", "unknown")
+            logger.error(
+                f"[RiskGovernor] {ticker} annotation failed — blocking sizing: {exc}"
             )
+            entry["risk_governor"] = {
+                "ticker": ticker,
+                "status": "reject",
+                "sizing_allowed": False,
+                "reason_codes": ["governor_error"],
+                "message": f"Risk governor gagal ({exc}); sizing diblokir untuk keamanan.",
+            }
 
 
 def _risk_holds(top_n: list[dict]) -> list[dict]:
     holds: list[dict] = []
     for entry in top_n:
         risk = entry.get("risk_governor")
-        if not isinstance(risk, dict) or risk.get("sizing_allowed") is not False:
+        if isinstance(risk, dict) and risk.get("sizing_allowed") is True:
             continue
+        risk_dict = risk if isinstance(risk, dict) else {}
         holds.append(
             {
-                "ticker": entry.get("ticker") or risk.get("ticker"),
-                "status": risk.get("status"),
-                "message": risk.get("message"),
+                "ticker": entry.get("ticker") or risk_dict.get("ticker"),
+                "status": risk_dict.get("status"),
+                "message": risk_dict.get("message"),
             }
         )
     return holds
@@ -5908,7 +5954,9 @@ async def main(
         debate_records=debate_records,
         realized_outcomes=realized_outcomes,
     )
-    _annotate_risk_governor(top_n)
+    _portfolio_state = (user_config or {}).get("portfolio_state", {})
+    if not _apply_circuit_breaker(top_n, _portfolio_state):
+        _annotate_risk_governor(top_n)
     sizing_candidates = _build_sizing_candidates(top_n)
     logger.debug(f"[Sizing DEBUG] user_config masuk: {user_config}")
     logger.debug(f"[Sizing DEBUG] jumlah candidates: {len(sizing_candidates)}")

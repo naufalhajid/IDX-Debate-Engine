@@ -1441,7 +1441,7 @@ def _compute_valuation_band_context(
         lo, hi = min(series), max(series)
         if hi - lo < 0.5:  # range too tight to be meaningful
             return None, "INSUFFICIENT_DATA", lo, hi
-        pct = max(0.0, min(100.0, (current - lo) / (hi - lo) * 100.0))
+        pct = sum(1 for v in series if v <= current) / len(series) * 100.0
         if pct <= 25:
             label = "HISTORICALLY_CHEAP"
         elif pct <= 50:
@@ -1476,7 +1476,7 @@ def _compute_valuation_band_context(
     return (
         "── HISTORICAL VALUATION BAND (C3) ──────────────────────────────\n"
         + "\n".join(parts)
-        + f"\n  (source: {n} years of API data; self-relative percentile rank)\n"
+        + f"\n  (source: {n} years of API data; self-relative percentile rank vs own history)\n"
         + "─" * 65
     )
 
