@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 
 from core.quant_filter import pipeline
-from core.quant_filter.config import CONFIG, SECTOR_PBV_BENCHMARK
+from core.quant_filter.config import CONFIG, SECTOR_MEDIAN_PE, SECTOR_PBV_BENCHMARK
 from core.quant_filter.reporting import _build_markdown_report
 from utils.technicals import snap_to_tick
 
@@ -398,6 +398,67 @@ def test_compute_val_score_bank_sector_uses_pbv_relative():
     assert cheap == pytest.approx(w * 0.70)
     assert fair == pytest.approx(w * 0.40)
     assert expensive == pytest.approx(w * 0.10)
+
+
+def test_compute_val_score_pe_blend_both_cheap():
+    """When both Graham gap and PE gap are tier-1, blended score equals w * 1.0."""
+    cfg = _analysis_cfg()
+    w = cfg["weight_valuation"]
+    # default sector median PE = 14.0; current_pe = 5.0 → pe_gap ~64% → tier1
+    row = pd.Series({
+        "Sector": "default",
+        "Valuation_Gap_Pct": 60.0,
+        "Current EPS (TTM)": 2.0,
+        "Close Price": 10.0,
+    })
+    score = pipeline._compute_val_score(row, cfg)
+    assert score == pytest.approx(w * (0.70 * 1.0 + 0.30 * 1.0))
+
+
+def test_compute_val_score_pe_blend_disagreement():
+    """Graham tier-1 (cheap vs absolute) but PE tier-4 (expensive vs sector median)."""
+    cfg = _analysis_cfg()
+    w = cfg["weight_valuation"]
+    # current_pe = 200/10 = 20.0; default median 14.0 → pe_gap < 0 → capped at 0 → tier4
+    row = pd.Series({
+        "Sector": "default",
+        "Valuation_Gap_Pct": 60.0,
+        "Current EPS (TTM)": 10.0,
+        "Close Price": 200.0,
+    })
+    score = pipeline._compute_val_score(row, cfg)
+    assert score == pytest.approx(w * (0.70 * 1.0 + 0.30 * 0.10))
+
+
+def test_compute_val_score_pe_blend_fallback_no_eps():
+    """EPS=0 → PE component unavailable → Graham-only (existing behaviour preserved)."""
+    cfg = _analysis_cfg()
+    w = cfg["weight_valuation"]
+    row = pd.Series({
+        "Sector": "default",
+        "Valuation_Gap_Pct": 60.0,
+        "Current EPS (TTM)": 0.0,
+        "Close Price": 500.0,
+    })
+    score = pipeline._compute_val_score(row, cfg)
+    assert score == pytest.approx(w * 1.00)
+
+
+def test_compute_val_score_pe_uses_sector_specific_median():
+    """PE gap is evaluated against the correct sector median, not the default."""
+    cfg = _analysis_cfg()
+    w = cfg["weight_valuation"]
+    # healthcare sector median PE = 22.0; current_pe = 10.0 → gap = 55% → tier1
+    row = pd.Series({
+        "Sector": "healthcare",
+        "Valuation_Gap_Pct": 5.0,      # graham tier3 = 0.40
+        "Current EPS (TTM)": 5.0,
+        "Close Price": 50.0,            # PE = 10x vs 22x median
+    })
+    assert SECTOR_MEDIAN_PE["healthcare"] == 22.0  # sanity-check config value
+    score = pipeline._compute_val_score(row, cfg)
+    # graham_tier=0.40 (gap=5% hits tier3), pe_tier=1.00 (pe_gap ~55% ≥ tier1)
+    assert score == pytest.approx(w * (0.70 * 0.40 + 0.30 * 1.00))
 
 
 def test_compute_prof_score_roe_tiers():

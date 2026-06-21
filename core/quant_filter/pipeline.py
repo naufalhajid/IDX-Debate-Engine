@@ -15,6 +15,7 @@ from core.quant_filter.config import (
     FREE_FLOAT_ESTIMATES,
     FREE_FLOAT_MANIPULATION_THRESHOLD,
     NAME_SECTOR_KEYWORDS,
+    SECTOR_MEDIAN_PE,
     SECTOR_PBV_BENCHMARK,
     TICKER_SECTOR_HARDCODE,
     _find_latest_xlsx,
@@ -943,15 +944,35 @@ def _compute_val_score(row: pd.Series, cfg: dict) -> float:
             return w * 0.40
         return w * 0.10  # di atas fair_lo = tidak menarik
 
-    # Non-finansial: Graham-based gap
+    # Non-finansial: Graham gap (70%) blended with PE-vs-sector-median gap (30%).
+    # If EPS is unavailable or negative, fall back to Graham-only (existing behaviour).
     gap = float(row.get("Valuation_Gap_Pct", 0) or 0)
     if gap >= cfg["val_tier1_gap"]:
-        return w * 1.00
-    if gap >= cfg["val_tier2_gap"]:
-        return w * 0.70
-    if gap >= cfg["val_tier3_gap"]:
-        return w * 0.40
-    return w * 0.10
+        graham_tier = 1.00
+    elif gap >= cfg["val_tier2_gap"]:
+        graham_tier = 0.70
+    elif gap >= cfg["val_tier3_gap"]:
+        graham_tier = 0.40
+    else:
+        graham_tier = 0.10
+
+    eps = float(row.get("Current EPS (TTM)", 0) or 0)
+    price = float(row.get("Close Price", 0) or 0)
+    if eps > 0 and price > 0:
+        current_pe = price / eps
+        sector_median_pe = SECTOR_MEDIAN_PE.get(sector, SECTOR_MEDIAN_PE["default"])
+        pe_gap_pct = max(0.0, (sector_median_pe - current_pe) / sector_median_pe * 100)
+        if pe_gap_pct >= cfg["val_tier1_gap"]:
+            pe_tier = 1.00
+        elif pe_gap_pct >= cfg["val_tier2_gap"]:
+            pe_tier = 0.70
+        elif pe_gap_pct >= cfg["val_tier3_gap"]:
+            pe_tier = 0.40
+        else:
+            pe_tier = 0.10
+        return w * (0.70 * graham_tier + 0.30 * pe_tier)
+
+    return w * graham_tier
 
 
 # [v3.1 FIX] Absolute threshold-based Prof_Score — tidak lagi rank(pct=True).

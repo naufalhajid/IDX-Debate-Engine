@@ -84,8 +84,8 @@ def _find_latest_xlsx(output_dir: str = "output") -> str:
 # ══════════════════════════════════════════════════════════════════════════════
 
 CONFIG = {
-    # v3.2 — swing trade optimized
-    "version": "v3.2",
+    # v3.3 — PE-to-sector blend + triple-fail reject + volume gate tightened
+    "version": "v3.3",
     # ── Path
     # input_file = None → auto-detect xlsx terbaru di output_dir saat runtime
     "input_file": None,
@@ -281,6 +281,25 @@ SECTOR_PBV_BENCHMARK = {
     "infrastructure": {"label": "Infrastruktur", "fair_lo": 0.8, "fair_hi": 2.5},
     "transport": {"label": "Transportasi & Logistik", "fair_lo": 0.8, "fair_hi": 2.5},
     "default": {"label": "Lain-lain", "fair_lo": 0.8, "fair_hi": 2.5},
+}
+
+# Sector median trailing PE — sourced from _SECTOR_MEDIAN_PROFILES_DEFAULT in
+# services/fair_value_calculator.py. Kept as a local copy so core/quant_filter
+# stays self-contained (no cross-layer import). Update both dicts together.
+SECTOR_MEDIAN_PE: dict[str, float] = {
+    "bank":             10.0,
+    "finance_nonbank":  12.0,
+    "energy":            6.0,
+    "basic_materials":   8.0,
+    "industrials":      14.0,
+    "consumer_staples": 20.0,
+    "consumer_disc":    16.0,
+    "healthcare":       22.0,
+    "property":         12.0,
+    "tech":             25.0,
+    "infrastructure":   15.0,
+    "transport":        13.0,
+    "default":          14.0,
 }
 
 # Hardcode 70+ ticker populer sebagai fallback lapis-2
@@ -602,6 +621,7 @@ __all__ = [
     "MAX_XLSX_AGE_HARD_BLOCK_DAYS",
     "assess_xlsx_staleness",
     "NAME_SECTOR_KEYWORDS",
+    "SECTOR_MEDIAN_PE",
     "SECTOR_PBV_BENCHMARK",
     "TICKER_SECTOR_HARDCODE",
     "canonical_screener_mode",
