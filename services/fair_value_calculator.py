@@ -730,11 +730,14 @@ class FairValueCalculator:
     # Bobot default per metode (harus jumlah = 1.0)
     # Untuk bank (BBCA, BBRI, BMRI): P/B lebih relevan karena aset berbasis ekuitas
     SECTOR_WEIGHTS = {
-        "bank": {"pe": 0.35, "pb": 0.45, "ddm": 0.20},
-        "consumer": {"pe": 0.50, "pb": 0.30, "ddm": 0.20},
-        "mining": {"pe": 0.35, "pb": 0.20, "ddm": 0.05, "ev_ebitda": 0.40},
-        "property": {"pe": 0.30, "pb": 0.55, "ddm": 0.15},
-        "default": {"pe": 0.45, "pb": 0.35, "ddm": 0.20},
+        # DDM (Gordon Growth Model) is a perpetuity formula — unsuitable for
+        # 3–15 day swing trades. Bank/property retain a small weight (5%) as
+        # dividend yield is a genuine sector signal for those; all others zero.
+        "bank":     {"pe": 0.45, "pb": 0.50, "ddm": 0.05},
+        "consumer": {"pe": 0.60, "pb": 0.40, "ddm": 0.00},
+        "mining":   {"pe": 0.35, "pb": 0.25, "ddm": 0.00, "ev_ebitda": 0.40},
+        "property": {"pe": 0.35, "pb": 0.60, "ddm": 0.05},
+        "default":  {"pe": 0.55, "pb": 0.45, "ddm": 0.00},
     }
 
     # Ticker → sektor mapping untuk emiten populer IHSG

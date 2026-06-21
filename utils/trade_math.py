@@ -22,6 +22,16 @@ LARGE_CAP_THRESHOLD_IDR: int = 50_000_000_000_000
 LARGE_CAP_RR_MINIMUM: float = 1.3
 DEFAULT_RR_MINIMUM: float = 1.5
 
+# ATR stops widen in DEFENSIVE/HIGH regimes; R/R minimums scale up to match.
+# LOW and NORMAL use no scaling — base thresholds are calibrated for calm markets.
+REGIME_RR_SCALING: dict[str, float] = {
+    "LOW":       1.0,
+    "NORMAL":    1.0,
+    "HIGH":      1.2,
+    "RECOVERY":  1.1,
+    "DEFENSIVE": 1.3,
+}
+
 
 @dataclass(frozen=True)
 class RRTierResolution:
@@ -189,14 +199,30 @@ def get_rr_resolution(
     return resolution
 
 
-def get_rr_minimum(ticker: str, yf_info: dict[str, Any] | None = None) -> float:
+def apply_regime_rr_scaling(base_rr: float, regime: str | None) -> float:
+    """Scale a base R/R minimum by the current market regime.
+
+    Returns base_rr unchanged when regime is None, empty, or unknown.
     """
-    Return the minimum acceptable R/R threshold for a ticker.
+    if not regime:
+        return base_rr
+    scale = REGIME_RR_SCALING.get(str(regime).upper(), 1.0)
+    return round(base_rr * scale, 3)
+
+
+def get_rr_minimum(
+    ticker: str,
+    regime: str | None = None,
+    yf_info: dict[str, Any] | None = None,
+) -> float:
+    """Return the minimum acceptable R/R threshold for a ticker.
 
     Cached yfinance marketCap is preferred. When unavailable, the static YAML
     fallback list is used; otherwise the default threshold is returned.
+    Pass ``regime`` to apply regime-aware scaling on top of the tier floor.
     """
-    return get_rr_resolution(ticker, yf_info=yf_info).rr_minimum
+    base = get_rr_resolution(ticker, yf_info=yf_info).rr_minimum
+    return apply_regime_rr_scaling(base, regime)
 
 
 def get_rr_tier_name(ticker: str, yf_info: dict[str, Any] | None = None) -> str:

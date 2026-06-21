@@ -8,7 +8,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict
 
 from utils.logger_config import logger
-from utils.trade_math import calculate_rr, get_rr_resolution
+from utils.trade_math import apply_regime_rr_scaling, calculate_rr, get_rr_resolution
 
 
 RiskStatus = Literal[
@@ -595,13 +595,16 @@ def _rr_minimum_for_candidate(
         return explicit_minimum
 
     resolution = get_rr_resolution(ticker, yf_info=_risk_yf_info(candidate, verdict))
+    regime = _market_regime(candidate)
+    rr_min = apply_regime_rr_scaling(resolution.rr_minimum, regime)
     logger.debug(
-        "[Risk] {} rr_minimum={} source={}",
+        "[Risk] {} rr_minimum={} source={} regime={}",
         ticker,
-        resolution.rr_minimum,
+        rr_min,
         resolution.source,
+        regime or "none",
     )
-    return resolution.rr_minimum
+    return rr_min
 
 
 def _risk_yf_info(

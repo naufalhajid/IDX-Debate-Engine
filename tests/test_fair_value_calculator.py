@@ -950,3 +950,33 @@ def test_build_fair_value_payload_band_context_none_when_no_history():
     ]}}
     _, result = build_fair_value_payload(resp, "XXXX", 7000.0)
     assert result.get("valuation_band_context") is None
+
+
+# ---------------------------------------------------------------------------
+# Task C: DDM weight reduction
+# ---------------------------------------------------------------------------
+
+
+def test_sector_weights_ddm_zero_for_default_and_consumer() -> None:
+    assert FairValueCalculator.SECTOR_WEIGHTS["default"]["ddm"] == 0.0
+    assert FairValueCalculator.SECTOR_WEIGHTS["consumer"]["ddm"] == 0.0
+
+
+def test_sector_weights_ddm_at_most_five_pct_for_bank_and_property() -> None:
+    assert FairValueCalculator.SECTOR_WEIGHTS["bank"]["ddm"] <= 0.05
+    assert FairValueCalculator.SECTOR_WEIGHTS["property"]["ddm"] <= 0.05
+
+
+def test_composite_fair_value_ignores_ddm_when_weight_is_zero(monkeypatch) -> None:
+    """Zero-weight DDM must not pull the composite FV even when DDM returns a value."""
+    stats = KeyStats(ticker="TEST", current_price=1000.0)
+    calc = FairValueCalculator(stats, sector="default")
+    monkeypatch.setattr(calc, "fair_value_pe", lambda: 1200.0)
+    monkeypatch.setattr(calc, "fair_value_pb", lambda: 800.0)
+    monkeypatch.setattr(calc, "fair_value_ddm", lambda: 3000.0)  # outlier
+
+    result = calc.fair_value_weighted()
+
+    # pe*0.55 + pb*0.45 + ddm*0.0 = 660 + 360 = 1020; DDM outlier has no effect
+    assert result["fair_value"] == 1020.0
+    assert result["fair_value"] < 1100.0

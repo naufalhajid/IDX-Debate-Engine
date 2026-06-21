@@ -141,3 +141,47 @@ def test_confidence_gate_passes_at_exact_threshold() -> None:
     assert _confidence_gate_should_skip(confidence=25) is False
     assert _confidence_gate_should_skip(confidence=24) is True
     assert _confidence_gate_should_skip(confidence=26) is False
+
+
+# ── Task D: regime-aware R/R minimums ────────────────────────────────────────
+
+
+def test_get_rr_minimum_none_regime_unchanged() -> None:
+    yf_info = {"marketCap": 5_000_000_000_000}
+    assert get_rr_minimum("CYBR", regime=None, yf_info=yf_info) == DEFAULT_RR_MINIMUM
+
+
+def test_get_rr_minimum_normal_regime_unchanged() -> None:
+    yf_info = {"marketCap": 5_000_000_000_000}
+    assert get_rr_minimum("CYBR", regime="NORMAL", yf_info=yf_info) == DEFAULT_RR_MINIMUM
+
+
+def test_get_rr_minimum_high_regime_applies_scaling() -> None:
+    yf_info = {"marketCap": 5_000_000_000_000}
+    result = get_rr_minimum("CYBR", regime="HIGH", yf_info=yf_info)
+    assert result == round(DEFAULT_RR_MINIMUM * 1.2, 3)  # 1.8
+
+
+def test_get_rr_minimum_defensive_regime_applies_scaling() -> None:
+    yf_info = {"marketCap": 5_000_000_000_000}
+    result = get_rr_minimum("CYBR", regime="DEFENSIVE", yf_info=yf_info)
+    assert result == round(DEFAULT_RR_MINIMUM * 1.3, 3)  # 1.95
+
+
+def test_get_rr_minimum_large_cap_high_regime() -> None:
+    yf_info = {"marketCap": 400_000_000_000_000}
+    result = get_rr_minimum("BMRI", regime="HIGH", yf_info=yf_info)
+    assert result == round(LARGE_CAP_RR_MINIMUM * 1.2, 3)  # 1.56
+
+
+def test_get_rr_minimum_regime_case_insensitive() -> None:
+    yf_info = {"marketCap": 5_000_000_000_000}
+    result_lower = get_rr_minimum("CYBR", regime="defensive", yf_info=yf_info)
+    result_upper = get_rr_minimum("CYBR", regime="DEFENSIVE", yf_info=yf_info)
+    assert result_lower == result_upper
+
+
+def test_get_rr_minimum_unknown_regime_no_scaling() -> None:
+    yf_info = {"marketCap": 5_000_000_000_000}
+    result = get_rr_minimum("CYBR", regime="UNKNOWN_REGIME", yf_info=yf_info)
+    assert result == DEFAULT_RR_MINIMUM
