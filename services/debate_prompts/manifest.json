@@ -1,5 +1,5 @@
 {
-  "prompt_version": "2026-06-22-p2-chartist-stop-v21",
+  "prompt_version": "2026-06-22-p3-counter-trend-rr-v22",
   "prompts": {
     "FUNDAMENTAL_SCOUT_PROMPT": "fundamental_scout.txt",
     "CHARTIST_PROMPT": "chartist.txt",

@@ -1,5 +1,31 @@
 # Prompt Migration Log
 
+## 2026-06-22 — `p3-counter-trend-rr-v22`
+
+**Files changed:**
+- `services/debate_prompts/cio_judge.txt` (STEP 4 counter-trend AVOID rule added)
+- `core/risk_governor.py` (counter-trend R/R floor 2.5x enforced deterministically)
+- `services/debate_prompts/manifest.json` (version → `2026-06-22-p3-counter-trend-rr-v22`)
+
+### Changes
+
+**`cio_judge.txt`** — STEP 4 AVOID rules extended.
+
+Added explicit counter-trend AVOID rule:
+> AVOID (counter-trend): ma200_context = BELOW AND R/R < 2.5.
+
+Counter-trend setups have empirically lower win rates; the system previously only
+applied the standard 1.3x/1.5x tier floor. The higher 2.5x floor aligns with the
+lower expected win rate of below-MA200 entries.
+
+**`core/risk_governor.py`** — Deterministic enforcement of counter-trend R/R floor.
+
+Added `_COUNTER_TREND_RR_FLOOR = 2.5`. After detecting `counter_trend_setup`,
+if `rr_ratio < 2.5` the governor appends `rr_too_low` (hard reject), preventing
+`conditional_deployable` from masking an insufficient-R/R counter-trend setup.
+
+---
+
 ## 2026-06-22 — `p2-chartist-stop-v21`
 
 **Files changed:**

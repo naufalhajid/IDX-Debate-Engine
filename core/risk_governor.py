@@ -29,6 +29,9 @@ MIN_BUYABLE_CONFIDENCE = 0.60
 # warning threshold and CONVICTION_RR_NORMALIZATION_CAP; the rejection boundary
 # (>=) mirrors _rr_component_score, which zeroes exactly at this line.
 RR_IMPLAUSIBLE_CEILING = 5.0
+# Counter-trend setups (price below MA200) have empirically lower win rates.
+# A 2.5x floor ensures the asymmetry compensates before deployment is allowed.
+_COUNTER_TREND_RR_FLOOR: float = 2.5
 UNBUYABLE_RATINGS = {"AVOID", "SELL"}
 SOFT_BUYABLE_RATINGS = {"HOLD"}
 HARD_REJECT_CODES = {
@@ -608,6 +611,12 @@ def _verdict_reason_codes(
         reason_codes.append("insufficient_technical_data")
     if _counter_trend_setup(candidate, verdict):
         reason_codes.append("counter_trend_setup")
+        if (
+            rr_ratio is not None
+            and "rr_too_low" not in reason_codes
+            and rr_ratio < _COUNTER_TREND_RR_FLOOR
+        ):
+            reason_codes.append("rr_too_low")
 
     # Task 7: ARA/ARB enforcement
     arb_code, ara_code = _arb_ara_risk_codes(candidate)

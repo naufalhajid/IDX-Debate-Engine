@@ -267,7 +267,8 @@ def test_large_cap_rr_above_tier_threshold_is_not_too_low() -> None:
     assert "rating_not_buyable" in decision.reason_codes
     assert "low_confidence" in decision.reason_codes
     assert "counter_trend_setup" in decision.reason_codes
-    assert "rr_too_low" not in decision.reason_codes
+    # P3: 1.38x < 2.5 counter-trend floor → rr_too_low now also fires
+    assert "rr_too_low" in decision.reason_codes
 
 
 def test_default_tier_rr_below_default_threshold_is_too_low() -> None:
@@ -532,10 +533,9 @@ def test_historically_expensive_absent_when_band_context_is_normal() -> None:
     assert "historically_expensive" not in decision.reason_codes
 
 
-def test_counter_trend_hold_llm_rr_diverges_from_recomputed_stays_conditional() -> None:
-    # bug_008 regression: LLM claims R/R=3.8 (above 3.5 short-circuit threshold) but
-    # recomputed from prices gives 1.58x. Without fix, setup became deployable; with
-    # fix, price-recomputed R/R < 3.5 → short-circuit does NOT fire → conditional.
+def test_counter_trend_hold_llm_rr_diverges_from_recomputed_is_rejected() -> None:
+    # bug_008 + P3: LLM claims R/R=3.8 but recomputed from prices gives 1.58x.
+    # 1.58x < 2.5 counter-trend floor → rr_too_low → hard reject.
     decision = evaluate_risk(
         _candidate(
             verdict={
@@ -551,9 +551,55 @@ def test_counter_trend_hold_llm_rr_diverges_from_recomputed_stays_conditional() 
         )
     )
 
-    # Recomputed R/R 1.58 < 3.5 → counter-trend short-circuit blocked → conditional.
+    assert decision.status == "reject"
+    assert "rr_too_low" in decision.reason_codes
+    assert "counter_trend_setup" in decision.reason_codes
+
+
+def test_counter_trend_rr_below_floor_is_rejected() -> None:
+    # P3: R/R 1.9x clears the default 1.5x tier floor but falls below the 2.5x
+    # counter-trend floor → rr_too_low must fire → hard reject.
+    decision = evaluate_risk(
+        _candidate(
+            technical_indicators={"ma200_context": "BELOW"},
+            verdict={
+                "rating": "BUY",
+                "confidence": 0.72,
+                "entry_price_range": "950 - 1050",
+                "target_price": 1278,   # (1278-1050)/(1050-930) = 1.9x recomputed
+                "stop_loss": 930,
+                "risk_reward_ratio": 1.9,
+                "current_price": 1000,
+            },
+        )
+    )
+
+    assert decision.status == "reject"
+    assert "rr_too_low" in decision.reason_codes
+    assert "counter_trend_setup" in decision.reason_codes
+
+
+def test_counter_trend_rr_above_floor_stays_conditional() -> None:
+    # P3: R/R 2.8x clears the 2.5x counter-trend floor but is below the 3.5x
+    # short-circuit bypass → counter_trend_setup soft flag → conditional_deployable.
+    decision = evaluate_risk(
+        _candidate(
+            technical_indicators={"ma200_context": "BELOW"},
+            verdict={
+                "rating": "BUY",
+                "confidence": 0.72,
+                "entry_price_range": "950 - 1050",
+                "target_price": 1386,   # (1386-1050)/(1050-930) = 2.8x recomputed
+                "stop_loss": 930,
+                "risk_reward_ratio": 2.8,
+                "current_price": 1000,
+            },
+        )
+    )
+
     assert decision.status == "conditional_deployable"
-    assert decision.sizing_allowed is False
+    assert "counter_trend_setup" in decision.reason_codes
+    assert "rr_too_low" not in decision.reason_codes
 
 
 # ── Task F: Liquidity gate ────────────────────────────────────────────────────

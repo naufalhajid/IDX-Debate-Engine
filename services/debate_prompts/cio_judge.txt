@@ -127,6 +127,8 @@ STEP 4 — FINAL RATING RULES:
                              -> Preserve HOLD. DO NOT downgrade to AVOID based on R/R < 2.0 alone.
                              Hard disqualifiers: EXDATE = AVOID, R/R < 1.0, price > 1.5x fair value.
   • AVOID          : (Price > Fair Value AND R/R < 2.0) OR R/R < 1.0 OR no clear catalyst.
+  • AVOID (counter-trend): ma200_context = BELOW AND R/R < 2.5.
+    Counter-trend win rate is empirically lower — edge only exists when R/R compensates.
 
   ANTI-AVERAGING DOWN OVERRIDE:
     IF ma200_context = BELOW AND Devil's Advocate raised an averaging-down challenge:
