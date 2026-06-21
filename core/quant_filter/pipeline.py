@@ -730,6 +730,7 @@ def _analyze_ticker(
 
     # [v3.2 FIX] Piotroski F-Score adjustment & Turnaround Penalty.
     piotroski = int(row.get("Piotroski F-Score", 0) or 0)
+    _piotroski_fail = False
     if piotroski >= cfg["piotroski_strong_min"]:
         total_score += cfg["piotroski_strong_bonus"]
         mom_note.append(f"F-Score Kuat ({piotroski}/9)")
@@ -738,6 +739,7 @@ def _analyze_ticker(
         mom_note.append(
             f"Penalty: F-Score Buruk ({piotroski}/9) ({cfg.get('penalty_piotroski_fail', -30)})"
         )
+        _piotroski_fail = True
     elif piotroski <= cfg["piotroski_weak_max"]:
         total_score += cfg["piotroski_weak_penalty"]
         mom_note.append(f"F-Score Lemah ({piotroski}/9)")
@@ -747,20 +749,31 @@ def _analyze_ticker(
     altman_z_val = (
         float(altman_z_raw) if not pd.isna(altman_z_raw) and altman_z_raw else 0.0
     )
+    _altman_z_fail = False
     if 0 < altman_z_val < cfg["min_altman_z"]:
         total_score += cfg.get("penalty_altman_z_fail", -40)
         mom_note.append(
             f"Penalty: Altman-Z Distress ({altman_z_val:.2f}) ({cfg.get('penalty_altman_z_fail', -40)})"
         )
+        _altman_z_fail = True
 
     # [v3.3 FIX] ROE Turnaround Penalty (raised from -15)
     roe_raw = row.get("Return on Equity (TTM)", 0)
     roe_val = float(roe_raw) if not pd.isna(roe_raw) and roe_raw else 0.0
+    _roe_fail = False
     if roe_val < cfg["roe_penalty_threshold"]:
         total_score += cfg.get("penalty_roe_fail", -30)
         mom_note.append(
             f"Penalty: ROE Buruk ({roe_val * 100:.1f}%) ({cfg.get('penalty_roe_fail', -30)})"
         )
+        _roe_fail = True
+
+    # Triple-fail hard reject: all three distress signals firing simultaneously
+    # means the stock is financially distressed AND operationally weak — no swing
+    # setup justifies the risk regardless of short-term momentum.
+    if _altman_z_fail and _piotroski_fail and _roe_fail:
+        logger.debug(f"[{t}] Triple-fail hard reject: Altman-Z + Piotroski + ROE all fail")
+        return None
 
     # Penalti jika tidak ada margin of safety (Valuation gap == 0)
     try:

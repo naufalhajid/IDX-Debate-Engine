@@ -77,6 +77,16 @@ def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
             icon = "⚠️"
         return f"{icon} {value:+.1f}%"
 
+    def _format_weekly_trend(row: pd.Series) -> str:
+        wt = row.get("weekly_trend")
+        if not wt or wt == "INSUFFICIENT_DATA":
+            return "—"
+        if wt == "UPTREND":
+            return "✅ UP"
+        if wt == "WEAK_UPTREND":
+            return "⚠️ WEAK"
+        return "🔻 DOWN"
+
     lines = []
     lines.append(f"# 🏆 Top {cfg['top_n']} High-Conviction IHSG Swing Candidates")
     lines.append(f"*Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
@@ -90,9 +100,9 @@ def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
     lines.append("")
     lines.append(
         "| Rank | Ticker | Sektor | Harga | Stop Loss | Graham Fair Value "
-        "| Score | Gap | RSI (14) | Price Mom 1M | RS vs IHSG | PBV | F-Score | Entry Note |"
+        "| Score | Gap | RSI (14) | Weekly | Price Mom 1M | RS vs IHSG | PBV | F-Score | Entry Note |"
     )
-    lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+    lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
 
     for i, (_, r) in enumerate(final_df.iterrows(), 1):
         is_financial = r.get("Sektor Key") in FINANCIAL_SECTORS
@@ -133,6 +143,7 @@ def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
             f"| **{r['Composite Score']:.1f}/100** "
             f"| {gap_str} "
             f"| {r['RSI (14)']:.1f} "
+            f"| {_format_weekly_trend(r)} "
             f"| {_format_signed_pct(r, 'price_return_1m')} "
             f"| {_format_signed_pct(r, 'rs_vs_ihsg_1m')} "
             f"| {r['PBV']:.1f}× ({r['PBV vs Sektor']}) "
@@ -209,6 +220,10 @@ def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
         lines.append(
             f"- **Quality**: Piotroski F-Score **{top1.get('Piotroski F-Score', 'N/A')}/9** | "
             f"Altman Z **{top1.get('Altman Z-Score', 'N/A')}**"
+        )
+        lines.append(
+            f"- **Weekly Trend**: {_format_weekly_trend(top1)} "
+            f"(MA13 {top1.get('weekly_ma13', 'N/A')} / MA26 {top1.get('weekly_ma26', 'N/A')})"
         )
         lines.append(
             f"- **Momentum**: Harga Rp {top1['Current Price']:,.0f} di atas "
