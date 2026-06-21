@@ -25,9 +25,9 @@ CHARS_PER_TOKEN = 4
 DEFAULT_PATH = settings.rag_evidence_log_path
 
 CATEGORY_WEIGHTS = {
-    "fair_value": 1.0,
-    "fundamental": 0.9,
-    "technical": 0.85,
+    "fair_value": 0.85,
+    "fundamental": 0.80,
+    "technical": 0.95,
     "sentiment": 0.6,
     "exdate": 0.7,
     "metadata": 0.3,

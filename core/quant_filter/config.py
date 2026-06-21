@@ -152,7 +152,7 @@ CONFIG = {
     "vol_surge_tier2": 1.5,  # volume 1.5–2x          -> 70%
     "vol_surge_tier3": 1.1,  # volume 1.1–1.5x        -> 40%
     # volume <1.1x           -> 10%
-    "min_volume_surge_for_candidate": 0.30,  # hard gate: below this, no momentum
+    "min_volume_surge_for_candidate": 0.80,  # hard gate: below this, no momentum
     # ── Suspended/FCA Heuristic
     "max_zero_vol_days": 3,
     # ── RSI Scoring
