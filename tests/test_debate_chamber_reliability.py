@@ -853,9 +853,10 @@ async def test_cio_invalid_current_price_fallback_has_no_trade_levels():
     assert verdict["stop_loss"] is None
 
 
-def test_trade_envelope_keeps_target_above_entry_after_low_fair_value_blend():
-    # P4: FV (800) < current_price (1000) → FV ceiling collapses target below
-    # entry_high → envelope is rejected instead of using a one-tick fallback.
+def test_trade_envelope_proceeds_when_price_above_fair_value():
+    # Task A: FV ceiling removed. A stock trading above its intrinsic-value
+    # anchor is exactly the momentum-breakout scenario swing trading targets.
+    # The envelope must compute a valid setup using the swing cap, not reject.
     chamber = _chamber()
 
     envelope = chamber._compute_trade_envelope(
@@ -864,12 +865,17 @@ def test_trade_envelope_keeps_target_above_entry_after_low_fair_value_blend():
         tech={"ma50": 980.0, "sma20": 1000.0, "atr14": 10.0},
     )
 
-    assert envelope.get("rejected") is True
-    assert "target_collapsed" in envelope.get("reason", "")
+    assert not envelope.get("rejected")
+    assert envelope["target_price"] > envelope["entry_high"]
+    assert "(Swing Cap)" in envelope["target_basis"]
+    assert "(FV Ceiling)" not in envelope["target_basis"]
 
 
 @pytest.mark.asyncio
-async def test_cio_parse_fallback_survives_low_fair_value_blend(monkeypatch):
+async def test_cio_parse_fallback_preserves_envelope_prices_on_llm_failure(monkeypatch):
+    # Task A: FV ceiling removed — envelope is valid even when price > FV.
+    # When the LLM returns invalid JSON, the safe-fallback verdict must preserve
+    # the valid envelope's trade levels rather than returning null prices.
     chamber = _chamber()
     chamber.pro_llm = FakeLLM(model="gemini-2.5-pro")
 
@@ -895,11 +901,11 @@ async def test_cio_parse_fallback_survives_low_fair_value_blend(monkeypatch):
     )
     verdict = json.loads(result["final_verdict"])
 
-    # P4: envelope is rejected before the LLM is called — HOLD with null prices.
+    # Parse failure → HOLD fallback; valid envelope prices must be included.
     assert verdict["rating"] == "HOLD"
-    assert verdict["entry_price_range"] is None
-    assert verdict["target_price"] is None
-    assert verdict["stop_loss"] is None
+    assert verdict["entry_price_range"] is not None
+    assert verdict["target_price"] is not None
+    assert verdict["stop_loss"] is not None
 
 
 @pytest.mark.asyncio
@@ -1421,12 +1427,11 @@ def test_trade_envelope_guarantees_sufficient_rr_from_entry_high():
     assert envelope["risk_reward_ratio"] >= 1.3
 
 
-def test_trade_envelope_fair_value_is_hard_ceiling_not_blend():
+def test_trade_envelope_swing_cap_limits_target_regardless_of_fair_value():
     chamber = _chamber()
 
     # INDO 2026-06-11: 52w high Rp 519 is > 130% of spot Rp 165 — P6 ignores it.
-    # Target falls back to baseline R/R, which is already below FV (253) and the
-    # swing cap, so neither ceiling fires.  Old blend produced Rp 386 / R/R 22.3x.
+    # Target falls back to R/R seed, then swing cap fires.
     envelope = chamber._compute_trade_envelope(
         current_price=165.0,
         fair_value=253.0,
@@ -1437,14 +1442,14 @@ def test_trade_envelope_fair_value_is_hard_ceiling_not_blend():
     assert envelope["risk_reward_ratio"] < 5.0
     assert "52-Week" not in envelope["target_basis"]  # stale 52W high ignored (P6)
 
-    # FV ceiling fires only when baseline target already exceeds FV — use a
-    # 52w_high within 130% to exercise that path.
+    # 52w_high within 130% — resistance is used as target; swing cap fires at ~Rp 180.
     envelope2 = chamber._compute_trade_envelope(
         current_price=165.0,
         fair_value=253.0,
         tech={"ma50": 162.0, "sma20": 150.0, "atr14": 6.0, "52w_high": 210.0},
     )
-    assert "(FV Ceiling)" in envelope2["target_basis"] or envelope2["target_price"] <= 253.0
+    assert "(Swing Cap)" in envelope2["target_basis"]
+    assert envelope2["target_price"] <= 253.0
     assert envelope2["risk_reward_ratio"] < 5.0
 
 
@@ -1465,10 +1470,10 @@ def test_trade_envelope_swing_cap_applies_even_with_fair_value_above_resistance(
     assert "(FV Ceiling)" not in envelope["target_basis"]
 
 
-def test_trade_envelope_tick_fallback_preserves_ceiling_provenance():
-    # P4: FV (800) below entry → FV ceiling applied → target collapses → rejected.
-    # The rejection reason must record that FV Ceiling caused the collapse so
-    # the audit trail still shows valuation killed the setup, not tick geometry.
+def test_trade_envelope_swing_cap_is_operative_ceiling_when_fv_below_entry():
+    # Task A: FV below entry_high no longer drives rejection.
+    # The swing cap (sector-aware percentage limit from entry_high) is the
+    # operative ceiling and must appear in target_basis.
     chamber = _chamber()
 
     envelope = chamber._compute_trade_envelope(
@@ -1477,9 +1482,63 @@ def test_trade_envelope_tick_fallback_preserves_ceiling_provenance():
         tech={"ma50": 980.0, "sma20": 1000.0, "atr14": 10.0},
     )
 
+    assert not envelope.get("rejected")
+    assert "(Swing Cap)" in envelope["target_basis"]
+    assert "(FV Ceiling)" not in envelope["target_basis"]
+
+
+def test_trade_envelope_uses_resistance_when_below_rr_seed():
+    # Task B: when high_20d sits between entry_high (127) and the 2.0x R/R
+    # seed (145), resistance-first picks high_20d as the target, not the seed.
+    # Geometry: entry_high=127, stop=118, seed=145, high_20d=139 → R/R≈1.33.
+    chamber = _chamber()
+    envelope = chamber._compute_trade_envelope(
+        current_price=127.0,
+        fair_value=423.0,
+        tech={"ma50": 140.0, "sma20": 133.0, "atr14": 5.0, "high_20d": 139.0},
+    )
+    assert not envelope.get("rejected")
+    assert envelope["target_price"] == 139  # resistance, not seed (145) or swing cap (140)
+    assert "20-Day" in envelope["target_basis"]
+
+
+def test_trade_envelope_falls_back_to_rr_seed_when_no_resistance():
+    # Task B: no resistance provided → 2.0x R/R seed is the safety floor.
+    chamber = _chamber()
+    envelope = chamber._compute_trade_envelope(
+        current_price=127.0,
+        fair_value=423.0,
+        tech={"ma50": 140.0, "sma20": 133.0, "atr14": 5.0},
+    )
+    assert not envelope.get("rejected")
+    assert "Minimum R/R" in envelope["target_basis"]
+
+
+def test_trade_envelope_ignores_52w_high_above_130pct_after_inversion():
+    # Task B: the 130% cap on 52w_high is preserved after the resistance-first
+    # inversion — a stale 52w high must not slip in as a resistance candidate.
+    chamber = _chamber()
+    envelope = chamber._compute_trade_envelope(
+        current_price=165.0,
+        fair_value=253.0,
+        tech={"ma50": 162.0, "sma20": 150.0, "atr14": 6.0, "52w_high": 300.0},
+    )
+    assert not envelope.get("rejected")
+    assert "52-Week" not in envelope["target_basis"]
+
+
+def test_trade_envelope_rejects_when_resistance_gives_low_rr():
+    # Task B: nearest resistance too close to entry (R/R < 1.3) → envelope
+    # rejects rather than shipping a setup the governor would silently kill.
+    # Geometry: entry_high=127, stop=118, high_20d=130 → R/R=(130-127)/9≈0.33.
+    chamber = _chamber()
+    envelope = chamber._compute_trade_envelope(
+        current_price=127.0,
+        fair_value=423.0,
+        tech={"ma50": 140.0, "sma20": 133.0, "atr14": 5.0, "high_20d": 130.0},
+    )
     assert envelope.get("rejected") is True
-    assert "FV Ceiling" in envelope.get("reason", "")
-    assert "target_collapsed" in envelope.get("reason", "")
+    assert "rr_too_low" in envelope.get("reason", "")
 
 
 def test_sector_aware_cap_mining_allows_wider_target():

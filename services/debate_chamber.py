@@ -106,7 +106,7 @@ from utils.technicals import (
     validate_ohlcv,
 )
 from core.quant_filter.pipeline import compute_weekly_trend, fetch_weekly_data
-from utils.trade_math import calculate_rr
+from utils.trade_math import LARGE_CAP_RR_MINIMUM, calculate_rr
 
 
 def _compute_exdate_gate(exdate_info: Any) -> str:
@@ -3760,14 +3760,6 @@ Current Date (Asia/Jakarta): {current_date}
                 }
             _stop_near_noise = _stop_distance < _clean_floor_atr
 
-        # Target calculation: seed the target at a 2.0x R/R from entry_high
-        # (worst-case fill). This is only the starting point — the resistance
-        # bump, FV-blend, no-FV cap, and tick fallback below may raise OR lower
-        # it, so the final R/R is recomputed at the end and is NOT guaranteed
-        # to remain >= 2.0x.
-        risk_from_entry_high = entry_high - stop
-        rr_target = entry_high + (risk_from_entry_high * 2.0)
-
         # Floor: minimal 4% from entry for worthwhile swing
         min_target = entry_mid * 1.04
 
@@ -3775,34 +3767,31 @@ Current Date (Asia/Jakarta): {current_date}
         high_50d = tech.get("high_50d", 0)
         high_52w = tech.get("52w_high", 0)
 
-        target_basis = "Minimum R/R"
-        target_candidate = max(rr_target, min_target)
+        # Target: resistance-first. Collect candidates above entry_high, pick
+        # the nearest, then let the swing cap and R/R gate below finalise.
+        # If no resistance qualifies, fall back to the 2.0x R/R seed.
+        risk_from_entry_high = entry_high - stop
+        resistance_candidates: list[tuple[float, str]] = []
+        if high_20d > current_price:
+            resistance_candidates.append((high_20d, "Resistance 20-Day"))
+        if high_50d > current_price:
+            resistance_candidates.append((high_50d, "Resistance 50-Day"))
+        if high_52w > current_price and high_52w <= current_price * 1.30:
+            resistance_candidates.append((high_52w, "Resistance 52-Week"))
 
-        if high_20d >= target_candidate:
-            target_candidate = high_20d
-            target_basis = "Resistance 20-Day"
-        elif high_50d >= target_candidate:
-            target_candidate = high_50d
-            target_basis = "Resistance 50-Day"
-        elif high_52w >= target_candidate and high_52w <= current_price * 1.30:
-            target_candidate = high_52w
-            target_basis = "Resistance 52-Week"
+        if resistance_candidates:
+            nearest_resistance, target_basis = min(resistance_candidates, key=lambda x: x[0])
+            target_candidate = max(snap_to_tick(nearest_resistance), snap_to_tick(min_target))
+        else:
+            rr_target = entry_high + (risk_from_entry_high * 2.0)
+            target_candidate = max(rr_target, min_target)
+            target_basis = "Minimum R/R"
 
         target = snap_to_tick(target_candidate)
 
-        # Ceiling 1: fair value is a hard ceiling. The old FV *blend*
-        # ((target + FV) / 2) could land the target above FV itself when the
-        # resistance was far away (INDO: (519 + 253) / 2 = 386 vs FV 253 →
-        # R/R 22.3x) — an average is not a ceiling.
-        if fair_value and fair_value > 0 and target > fair_value:
-            target = snap_to_tick(fair_value)
-            target_basis += " (FV Ceiling)"
-
-        # Ceiling 2: realistic swing cap, FV or not. Resistance levels —
-        # especially a recent pre-crash high — push the target far above price
-        # and inflate R/R (e.g. DSSA target Rp 1,030 / R/R 9.22x vs the
-        # FV-anchored Rp 665 / 1.11x), and an FV far above spot (NZIA: FV 417
-        # vs spot 177) never triggers Ceiling 1 at all.
+        # Ceiling: realistic swing cap. Resistance levels — especially a recent
+        # pre-crash high — push the target far above price and inflate R/R
+        # (e.g. DSSA target Rp 1,030 / R/R 9.22x, NZIA FV 417 vs spot 177).
         capped = snap_to_tick(entry_high * (1 + self._max_target_return(sector)))
         if 0 < capped < target:
             target = capped
@@ -3825,6 +3814,18 @@ Current Date (Asia/Jakarta): {current_date}
             else 0
         )
         rr_ratio = calculate_rr(entry_high, target, stop)
+
+        # Reject below the absolute R/R floor so bad setups don't propagate
+        # silently. Non-large-cap stocks face a higher threshold (1.5x) in the
+        # governor; this catches the worst cases early.
+        if rr_ratio < LARGE_CAP_RR_MINIMUM:
+            return {
+                "rejected": True,
+                "reason": (
+                    f"rr_too_low: R/R {rr_ratio:.2f} < {LARGE_CAP_RR_MINIMUM}"
+                    f" (target {target}, entry_high {entry_high}, stop {stop})"
+                ),
+            }
 
         return {
             "entry_low": entry_low,
