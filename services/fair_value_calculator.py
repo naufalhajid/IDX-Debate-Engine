@@ -1484,6 +1484,44 @@ def _compute_valuation_band_context(
     )
 
 
+def compute_52w_range_signal(
+    current_price: float,
+    high_52w: float,
+    low_52w: float,
+) -> str | None:
+    """52-week price range position signal for swing trade context.
+
+    Returns a formatted context string, or None when data is unavailable.
+    Percentile expresses where the current price sits inside [low_52w, high_52w].
+
+    Labels (swing-trade oriented):
+      NEAR_52W_HIGH  — >= 80th pct: limited upside, potential exhaustion zone
+      ABOVE_MID      — >= 55th pct: above midpoint, momentum-neutral
+      BELOW_MID      — >= 25th pct: below midpoint, mean-reversion potential
+      NEAR_52W_LOW   —  < 25th pct: deep discount zone, watch for reversal catalyst
+    """
+    if not (current_price > 0 and high_52w > 0 and low_52w > 0):
+        return None
+    rng = high_52w - low_52w
+    if rng <= 0:
+        return None
+    pct = round((current_price - low_52w) / rng * 100.0, 1)
+    midpoint = round((high_52w + low_52w) / 2.0, 0)
+    if pct >= 80.0:
+        label = "NEAR_52W_HIGH"
+    elif pct >= 55.0:
+        label = "ABOVE_MID"
+    elif pct >= 25.0:
+        label = "BELOW_MID"
+    else:
+        label = "NEAR_52W_LOW"
+    return (
+        f"52W RANGE SIGNAL: {label} — "
+        f"harga saat ini di persentil ke-{pct:.1f} dari kisaran 52 minggu "
+        f"(Low Rp {low_52w:,.0f} – High Rp {high_52w:,.0f}, Mid Rp {midpoint:,.0f})."
+    )
+
+
 # ---------------------------------------------------------------------------
 # Convenience factory — satu baris dari API response ke report string
 # ---------------------------------------------------------------------------

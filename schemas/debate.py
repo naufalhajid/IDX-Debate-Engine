@@ -659,6 +659,7 @@ class DebateChamberState(TypedDict):
     fair_value_range_pct: float | None
     risk_overvalued: bool
     valuation_band_context: str | None  # C3: self-relative PE/PBV percentile vs own history
+    range_52w_signal: str | None  # C4: price position in 52-week high/low range
 
     # Debate engine
     debate_history: Annotated[list[DebateMessage], history_updater]

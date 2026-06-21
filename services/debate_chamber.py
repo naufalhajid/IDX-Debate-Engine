@@ -75,7 +75,7 @@ from services.evidence_ranker import (
     citations_for_bundle,
     guard_evidence_citation_ids,
 )
-from services.fair_value_calculator import build_fair_value_payload
+from services.fair_value_calculator import build_fair_value_payload, compute_52w_range_signal
 from services.debate_prompt_registry import PROMPT_REGISTRY, PROMPT_VERSION
 from services.debate_run_guard import run_with_guard
 from utils.logger_config import logger
@@ -1819,6 +1819,8 @@ class DebateChamber:
             "fair_value_high": None,
             "fair_value_range_pct": None,
             "risk_overvalued": False,
+            "valuation_band_context": None,
+            "range_52w_signal": None,
             "debate_history": [],
             "round_count": 0,
             "consensus_reached": False,
@@ -2858,6 +2860,12 @@ Current Date (Asia/Jakarta): {current_date}
         news_brief = str(state.get("news_brief") or metadata.get("news_brief") or "")
         current_price = state.get("current_price", 0.0)
         tech = state.get("technical_indicators", {})
+        range_52w_signal = compute_52w_range_signal(
+            current_price=current_price,
+            high_52w=float(tech.get("52w_high") or 0),
+            low_52w=float(tech.get("52w_low") or 0),
+        )
+        state["range_52w_signal"] = range_52w_signal
 
         # Fetch ex-date info (non-blocking — returns CLEAR on failure)
         exdate_info = scan_exdate_from_market_data(
@@ -3011,6 +3019,7 @@ Current Date (Asia/Jakarta): {current_date}
                 "source_timestamps": source_timestamps,
                 "market_data": market_data,
                 "valuation_band_context": state.get("valuation_band_context"),
+                "range_52w_signal": range_52w_signal,
             },
         )
         if context_pack.missing_fields:
@@ -3196,6 +3205,7 @@ Current Date (Asia/Jakarta): {current_date}
             "fair_value_high": fair_value_high,
             "fair_value_range_pct": fair_value_range_pct,
             "risk_overvalued": risk_overvalued,
+            "range_52w_signal": range_52w_signal,
             "metadata": state.get("metadata", {}),
         }
 

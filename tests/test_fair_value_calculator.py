@@ -13,6 +13,7 @@ from services.fair_value_calculator import (
     _load_dynamic_sector_benchmarks,
     build_fair_value_payload,
     build_fair_value_report,
+    compute_52w_range_signal,
     extract_historical_multiples,
     extract_keystats,
     refresh_sector_benchmarks,
@@ -980,3 +981,52 @@ def test_composite_fair_value_ignores_ddm_when_weight_is_zero(monkeypatch) -> No
     # pe*0.55 + pb*0.45 + ddm*0.0 = 660 + 360 = 1020; DDM outlier has no effect
     assert result["fair_value"] == 1020.0
     assert result["fair_value"] < 1100.0
+
+
+# ---------------------------------------------------------------------------
+# compute_52w_range_signal
+# ---------------------------------------------------------------------------
+
+def test_52w_range_signal_near_high():
+    result = compute_52w_range_signal(current_price=9_500, high_52w=10_000, low_52w=5_000)
+    assert result is not None
+    assert "NEAR_52W_HIGH" in result
+    assert "90.0" in result  # (9500-5000)/(10000-5000)*100 = 90.0
+
+
+def test_52w_range_signal_near_low():
+    result = compute_52w_range_signal(current_price=5_500, high_52w=10_000, low_52w=5_000)
+    assert result is not None
+    assert "NEAR_52W_LOW" in result
+    assert "10.0" in result  # (5500-5000)/5000*100 = 10.0
+
+
+def test_52w_range_signal_below_mid():
+    result = compute_52w_range_signal(current_price=7_000, high_52w=10_000, low_52w=5_000)
+    assert result is not None
+    assert "BELOW_MID" in result
+    assert "40.0" in result  # (7000-5000)/5000*100 = 40.0
+
+
+def test_52w_range_signal_above_mid():
+    result = compute_52w_range_signal(current_price=8_000, high_52w=10_000, low_52w=5_000)
+    assert result is not None
+    assert "ABOVE_MID" in result
+    assert "60.0" in result  # (8000-5000)/5000*100 = 60.0
+
+
+def test_52w_range_signal_returns_none_on_missing_data():
+    assert compute_52w_range_signal(0.0, 10_000, 5_000) is None
+    assert compute_52w_range_signal(7_000, 0.0, 5_000) is None
+    assert compute_52w_range_signal(7_000, 10_000, 0.0) is None
+
+
+def test_52w_range_signal_returns_none_when_range_zero():
+    assert compute_52w_range_signal(10_000, 10_000, 10_000) is None
+
+
+def test_52w_range_signal_contains_rp_prices():
+    result = compute_52w_range_signal(7_500, 10_000, 5_000)
+    assert result is not None
+    assert "Rp 5,000" in result
+    assert "Rp 10,000" in result
