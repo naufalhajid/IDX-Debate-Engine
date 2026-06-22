@@ -87,6 +87,10 @@ def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
             return "⚠️ WEAK"
         return "🔻 DOWN"
 
+    mode = cfg.get("screener_mode", "momentum")
+    mode_label = "Momentum (Trend-Following)" if mode == "momentum" else "Mean Reversion (Pullback)"
+    mode_icon = "📈" if mode == "momentum" else "🔄"
+
     lines = []
     lines.append(f"# 🏆 Top {cfg['top_n']} High-Conviction IHSG Swing Candidates")
     lines.append(f"*Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
@@ -96,6 +100,7 @@ def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
     )
     lines.append(
         f"**Filter Version:** {cfg.get('version', 'v3.x')} — Swing Trade Optimized"
+        f" | {mode_icon} **Mode: {mode_label}**"
     )
     lines.append("")
     lines.append(
@@ -334,12 +339,13 @@ def _build_position_summary(sizing_result: dict | None) -> str:
         lines += [f"- {factor}" for factor in risk_factors]
 
     comparison = sizing_result.get("deployment_scenario_comparison") or {}
-    deploy_now = comparison.get("deploy_60_now") or {}
+    deploy_now = comparison.get("deploy_now") or {}
     wait = comparison.get("wait_for_confirmation") or {}
     if deploy_now or wait:
+        actual_pct = deploy_now.get("deployment_pct", 0)
         lines += [
             "",
-            "### Deploy 60% Now vs Wait",
+            f"### Deploy {actual_pct:.1f}% Now vs Wait",
             "",
             "| Scenario | Expected Return | Max Drawdown | Catatan |",
             "|---|---:|---:|---|",

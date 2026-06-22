@@ -160,14 +160,16 @@ def _deployment_scenario_comparison(
     total_capital: float,
     max_loss_pct: float,
     positions: list[dict],
+    actual_deployment_pct: float,
 ) -> dict:
     avg_trade_return_pct = _weighted_average_expected_return(positions)
-    deploy_pct = 0.60
+    deploy_pct = actual_deployment_pct
     expected_return_rp = total_capital * deploy_pct * (avg_trade_return_pct / 100)
     max_drawdown_rp = total_capital * deploy_pct * max_loss_pct
+    deploy_pct_display = round(deploy_pct * 100, 1)
     return {
-        "deploy_60_now": {
-            "deployment_pct": 60.0,
+        "deploy_now": {
+            "deployment_pct": deploy_pct_display,
             "expected_return_on_deployed_pct": round(avg_trade_return_pct, 2),
             "expected_return_portfolio_pct": round(
                 deploy_pct * avg_trade_return_pct, 2
@@ -184,7 +186,8 @@ def _deployment_scenario_comparison(
             "max_drawdown_rp": 0.0,
             "tradeoff": (
                 "Cash protects capital while waiting for cleaner entry, but gives up "
-                f"roughly Rp {expected_return_rp:,.0f} if the current 60% deployment scenario works."
+                f"roughly Rp {expected_return_rp:,.0f} if the current "
+                f"{deploy_pct_display}% deployment scenario works."
             ),
         },
     }
@@ -468,6 +471,7 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
             total_capital=total_capital,
             max_loss_pct=max_loss_pct,
             positions=positions,
+            actual_deployment_pct=summary["deployed_pct"],
         ),
     }
 
