@@ -1060,13 +1060,19 @@ class DebateChamber:
             stream = data.get("stream")
             if isinstance(stream, list):
                 return [post for post in stream if isinstance(post, dict)]
-            if any(key in data for key in ("stream_id", "id", "post_id", "content")):
+            if any(data.get(k) for k in ("stream_id", "id", "post_id")) and any(
+                isinstance(data.get(k), str) and data.get(k, "").strip()
+                for k in ("content", "text", "body")
+            ):
                 return [data]
 
         stream = raw.get("stream")
         if isinstance(stream, list):
             return [post for post in stream if isinstance(post, dict)]
-        if any(key in raw for key in ("stream_id", "id", "post_id", "content")):
+        if any(raw.get(k) for k in ("stream_id", "id", "post_id")) and any(
+            isinstance(raw.get(k), str) and raw.get(k, "").strip()
+            for k in ("content", "text", "body")
+        ):
             return [raw]
         return []
 

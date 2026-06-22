@@ -107,6 +107,52 @@ def chamber(monkeypatch) -> DebateChamber:
     return instance
 
 
+class TestExtractStockbitPosts:
+    def test_null_data_envelope_returns_empty(self) -> None:
+        raw = {"message": "Successfully retrieved pinned post", "data": None}
+        assert DebateChamber._extract_stockbit_posts(raw) == []
+
+    def test_null_value_data_dict_returns_empty(self) -> None:
+        raw = {"data": {"stream_id": None, "content": None, "id": None}}
+        assert DebateChamber._extract_stockbit_posts(raw) == []
+
+    def test_id_only_no_content_returns_empty(self) -> None:
+        raw = {"data": {"stream_id": "abc", "content": None}}
+        assert DebateChamber._extract_stockbit_posts(raw) == []
+
+    def test_content_only_no_id_returns_empty(self) -> None:
+        raw = {"data": {"content": "bullish", "stream_id": None}}
+        assert DebateChamber._extract_stockbit_posts(raw) == []
+
+    def test_real_post_dict_in_data_extracted(self) -> None:
+        post = _post("pinned-1")
+        result = DebateChamber._extract_stockbit_posts({"data": post})
+        assert len(result) == 1
+        assert result[0]["stream_id"] == "pinned-1"
+
+    def test_real_post_list_in_data_extracted(self) -> None:
+        result = DebateChamber._extract_stockbit_posts(
+            {"data": [_post("p1"), _post("p2")]}
+        )
+        assert [r["stream_id"] for r in result] == ["p1", "p2"]
+
+    def test_stream_in_data_dict_extracted(self) -> None:
+        result = DebateChamber._extract_stockbit_posts(
+            {"data": {"stream": [_post("s1"), _post("s2")]}}
+        )
+        assert [r["stream_id"] for r in result] == ["s1", "s2"]
+
+    def test_root_level_null_id_returns_empty(self) -> None:
+        raw = {"stream_id": None, "content": "text", "message": "api msg"}
+        assert DebateChamber._extract_stockbit_posts(raw) == []
+
+    def test_root_level_real_post_extracted(self) -> None:
+        raw = _post("root-post")
+        result = DebateChamber._extract_stockbit_posts(raw)
+        assert len(result) == 1
+        assert result[0]["stream_id"] == "root-post"
+
+
 class TestSentimentNodeDataVolume:
     def test_deduplication_prefers_stockbit_stream_id_field(
         self,
