@@ -245,9 +245,9 @@ Note: Jika `ClosedTrade` punya field `holding_days`, gunakan average aktual alih
 | C7 -- R/R cost-adjust | [x] | 2026-06-22 |
 | C8 -- T+2 settlement | [x] | 2026-06-22 |
 | C9 -- Risk budget per-pos | [x] | 2026-06-22 |
-| C10 -- Graham k doc | [ ] | — |
-| C11 -- DDM suppress | [ ] | — |
-| C12 -- MACD zero edge | [ ] | — |
+| C10 -- Graham k doc | [x] | 2026-06-22 |
+| C11 -- DDM suppress | [x] | 2026-06-22 |
+| C12 -- MACD zero edge | [x] | 2026-06-22 |
 
 **Quick wins (< 5 menit each, HIGH impact): C1, C5, C6 -- tiga perubahan ini masing-masing satu baris.**
 

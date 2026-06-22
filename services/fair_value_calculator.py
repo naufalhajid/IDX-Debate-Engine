@@ -880,6 +880,8 @@ class FairValueCalculator:
             return None  # model tidak valid
         if ke - g < 0.03:
             return None  # spread < 3% → DDM too sensitive to be reliable
+        if self.stats.roe and self.stats.roe > 0.20 and ke > 0.14:
+            return None  # DDM breaks down for high-ROE compounders when Ke > 14%
 
         fv = dps / (ke - g)
 

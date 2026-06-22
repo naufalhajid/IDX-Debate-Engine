@@ -125,6 +125,9 @@ CONFIG = {
     # Relative Strength vs IHSG
     "min_rs_vs_ihsg_1m": 0.0,  # return 1 bulan saham >= return IHSG 1 bulan (outperform atau minimal setara)
     # ── Graham Number (IHSG-calibrated)
+    # 18.2 = 13x P/E × 1.4x P/B (IDX universe median).
+    # Conservative vs the US standard of 22.5 (15x P/E × 1.5x P/B).
+    # Consumer/telecom sectors may warrant a higher k in future calibration.
     "graham_k": 18.2,
     "graham_bear_eps": 0.85,
     "graham_bull_eps": 1.15,

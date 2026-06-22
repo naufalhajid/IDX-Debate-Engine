@@ -131,6 +131,8 @@ def compute_macd(
         state = "POSITIVE_SHRINKING"
     elif hist_now < 0 and hist_now < hist_prev:
         state = "NEGATIVE_EXPANDING"
+    elif hist_now == 0:
+        state = "NEUTRAL"
     else:
         state = "NEGATIVE_SHRINKING"
 
