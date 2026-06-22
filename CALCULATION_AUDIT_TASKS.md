@@ -242,7 +242,7 @@ Note: Jika `ClosedTrade` punya field `holding_days`, gunakan average aktual alih
 | C4 -- ARA target check | [x] | 2026-06-22 |
 | C5 -- Bollinger ddof=0 | [x] | 2026-06-22 |
 | C6 -- Volume surge fix | [x] | 2026-06-22 |
-| C7 -- R/R cost-adjust | [ ] | — |
+| C7 -- R/R cost-adjust | [x] | 2026-06-22 |
 | C8 -- T+2 settlement | [x] | 2026-06-22 |
 | C9 -- Risk budget per-pos | [x] | 2026-06-22 |
 | C10 -- Graham k doc | [ ] | — |

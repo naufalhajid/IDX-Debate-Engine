@@ -159,19 +159,19 @@ def test_get_rr_minimum_normal_regime_unchanged() -> None:
 def test_get_rr_minimum_high_regime_applies_scaling() -> None:
     yf_info = {"marketCap": 5_000_000_000_000}
     result = get_rr_minimum("CYBR", regime="HIGH", yf_info=yf_info)
-    assert result == round(DEFAULT_RR_MINIMUM * 1.2, 3)  # 1.8
+    assert result == round(DEFAULT_RR_MINIMUM * 1.2, 3)  # 1.944
 
 
 def test_get_rr_minimum_defensive_regime_applies_scaling() -> None:
     yf_info = {"marketCap": 5_000_000_000_000}
     result = get_rr_minimum("CYBR", regime="DEFENSIVE", yf_info=yf_info)
-    assert result == round(DEFAULT_RR_MINIMUM * 1.3, 3)  # 1.95
+    assert result == round(DEFAULT_RR_MINIMUM * 1.3, 3)  # 2.106
 
 
 def test_get_rr_minimum_large_cap_high_regime() -> None:
     yf_info = {"marketCap": 400_000_000_000_000}
     result = get_rr_minimum("BMRI", regime="HIGH", yf_info=yf_info)
-    assert result == round(LARGE_CAP_RR_MINIMUM * 1.2, 3)  # 1.56
+    assert result == round(LARGE_CAP_RR_MINIMUM * 1.2, 3)  # 1.68
 
 
 def test_get_rr_minimum_regime_case_insensitive() -> None:

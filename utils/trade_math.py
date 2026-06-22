@@ -19,8 +19,8 @@ LARGE_CAP_TIER_NAME = "large_cap"
 # Market cap threshold for large-cap classification (IDR). Rp 50 trillion
 # captures LQ45-class stocks without pulling in mid-caps.
 LARGE_CAP_THRESHOLD_IDR: int = 50_000_000_000_000
-LARGE_CAP_RR_MINIMUM: float = 1.3
-DEFAULT_RR_MINIMUM: float = 1.5
+LARGE_CAP_RR_MINIMUM: float = 1.4
+DEFAULT_RR_MINIMUM: float = 1.62
 
 # ATR stops widen in DEFENSIVE/HIGH regimes; R/R minimums scale up to match.
 # LOW and NORMAL use no scaling — base thresholds are calibrated for calm markets.
