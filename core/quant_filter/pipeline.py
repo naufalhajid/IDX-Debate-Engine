@@ -1259,12 +1259,14 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
     logger.info(f"Total ticker universe: {len(df)}")
+    _n_universe = len(df)
 
     # ── 1b. Exclude PEMANTAUAN KHUSUS di awal ────────────────────────────────
     if cfg.get("exclude_pemantauan", True):
         n_before = len(df)
         df = df[~df["Note"].str.contains("PEMANTAUAN KHUSUS", na=False)].copy()
         logger.info(f"Exclude PEMANTAUAN KHUSUS: {n_before} → {len(df)}")
+    _n_after_pemantauan = len(df)
 
     # ── 2. SECTOR RESOLVE — 4 lapis prioritas ────────────────────────────────
     names_map = dict(zip(df_idx["Ticker"], df_idx["Name"].fillna("")))
@@ -1301,6 +1303,7 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
     ].copy()
 
     logger.info(f"Lolos static filter: {len(filtered)} ticker")
+    _n_after_static = len(filtered)
 
     # Distribusi sektor setelah filter
     sector_dist = filtered["Sector"].value_counts()
@@ -1497,12 +1500,23 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         if result:
             results.append(result)
     _log_price_failure_summary(price_failures, logger)
+    _n_after_technical = len(results)
 
     # ── 7. FINALIZE & OUTPUT ──────────────────────────────────────────────────
     final_df = pd.DataFrame(results)
 
+    score_floor = (
+        cfg.get("score_floor_high_regime", 45)
+        if regime in ("HIGH", "DEFENSIVE")
+        else cfg.get("score_floor_normal_regime", 35)
+    )
+
+    _pre_floor_sorted: pd.DataFrame = pd.DataFrame()
+
     if final_df.empty:
         logger.warning("Tidak ada ticker yang lolos semua filter.")
+        _n_after_floor = 0
+        _n_final = 0
     else:
         # Always stamp staleness metadata so JSON schema is consistent across runs.
         final_df["xlsx_staleness"] = _staleness["xlsx_staleness"]
@@ -1515,11 +1529,7 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
                 f"[Staleness] Composite Score dikurangi 10 poin untuk semua "
                 f"{len(final_df)} kandidat (XLSX {_staleness['xlsx_age_days']} hari)."
             )
-        score_floor = (
-            cfg.get("score_floor_high_regime", 45)
-            if regime in ("HIGH", "DEFENSIVE")
-            else cfg.get("score_floor_normal_regime", 35)
-        )
+        _pre_floor_sorted = final_df.sort_values("Composite Score", ascending=False).head(5).copy()
         before_floor = len(final_df)
         final_df = final_df[final_df["Composite Score"] >= score_floor]
         if len(final_df) < before_floor:
@@ -1527,10 +1537,25 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
                 f"[ScoreFloor] {before_floor - len(final_df)} kandidat dibuang "
                 f"(Composite Score < {score_floor} untuk regime {regime})."
             )
+        _n_after_floor = len(final_df)
         final_df = final_df.sort_values("Composite Score", ascending=False).head(
             cfg["top_n"]
         )
-        logger.info(f"Top {len(final_df)} kandidat berhasil disaring.")
+        _n_final = len(final_df)
+        logger.info(f"Top {_n_final} kandidat berhasil disaring.")
+
+    print(
+        f"\n{'─' * 52}\n"
+        f"  Filter Funnel  [{regime} regime]\n"
+        f"{'─' * 52}\n"
+        f"  Universe (XLSX)            : {_n_universe:>4}\n"
+        f"  Setelah exclude PEMANTAUAN : {_n_after_pemantauan:>4}\n"
+        f"  Setelah static filter      : {_n_after_static:>4}  (DER, PBV, harga)\n"
+        f"  Setelah technical scoring  : {_n_after_technical:>4}  (EMA, RSI, yfinance)\n"
+        f"  Setelah score floor        : {_n_after_floor:>4}  (score >= {score_floor})\n"
+        f"  Final output               : {_n_final:>4}\n"
+        f"{'─' * 52}"
+    )
 
     # Export JSON (untuk orchestrator.py)
     if not final_df.empty:
@@ -1541,6 +1566,15 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         export_df["screener_mode"] = canonical_screener_mode(cfg.get("screener_mode"))
         export_df.to_json(json_path, orient="records", indent=2, force_ascii=False)
         logger.info(f"JSON diekspor -> {json_path}")
+
+    # Watchlist JSON: top pre-floor candidates for CLI display when no main output
+    if not _pre_floor_sorted.empty:
+        wl_path = os.path.join(cfg["output_dir"], "watchlist_candidates.json")
+        wl_export = _pre_floor_sorted.drop(columns=["_exdate_info"], errors="ignore").copy()
+        wl_export["regime"] = regime
+        wl_export["score_floor"] = score_floor
+        wl_export.to_json(wl_path, orient="records", indent=2, force_ascii=False)
+        logger.info(f"Watchlist JSON diekspor -> {wl_path}")
 
     # Export Markdown Report
     md_content = _build_markdown_report(final_df, cfg)

@@ -103,7 +103,35 @@ def filter_command(
                 )
 
     if df is None or df.empty:
-        console.print("[idx.warn]No candidates passed all filters.[/idx.warn]")
+        import json as _json
+
+        watchlist_path = output_dir / "watchlist_candidates.json"
+        watchlist: list[dict] = []
+        if watchlist_path.exists():
+            try:
+                watchlist = _json.loads(watchlist_path.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+
+        if watchlist:
+            _regime = watchlist[0].get("regime", "?")
+            _floor = watchlist[0].get("score_floor", "?")
+            console.print(
+                f"[idx.warn]No candidates passed all filters.[/idx.warn] "
+                f"[idx.muted](regime={_regime}, score floor={_floor})[/idx.muted]"
+            )
+            console.print("\n[idx.header]Watchlist (belum trigger):[/idx.header]")
+            for _w in watchlist[:5]:
+                console.print(
+                    f"  [idx.ticker]{_w['Ticker']}[/idx.ticker]"
+                    f"  score=[bold]{_w.get('Composite Score', 0):.1f}[/bold]"
+                    f"  [{_w.get('Weekly Trend', '?')}]"
+                )
+            console.print(
+                "\n[idx.muted]→ Jalankan ulang jika IHSG volatility turun atau score naik.[/idx.muted]"
+            )
+        else:
+            console.print("[idx.warn]No candidates passed all filters.[/idx.warn]")
         return
 
     console.print(build_filter_results_table(df, top_n=top))
