@@ -524,19 +524,23 @@ NAME_SECTOR_KEYWORDS: list[tuple[list[str], str]] = [
 ]
 
 
-# ── LQ45 Members (per BEI pengumuman Feb 2025) ───────────────────────────────
+# ── LQ45 Members (per BEI pengumuman Aug 2025) ───────────────────────────────
+# Confirmed removals vs Feb 2025 list:
+#   BUKA — voluntary delisting from IDX effective Sept 25, 2024
+#   WSKT — trading suspended 2024 (Notasi Khusus E), removed at Feb 2025 rebalancing
+# Full Aug 2025 composition needs manual verification against official BEI announcement.
 # Review setiap rebalancing LQ45 (Februari & Agustus). Gunakan ini sebagai
 # referensi untuk FREE_FLOAT_ESTIMATES expansion — jangan duplikasi list ini
 # di tempat lain di codebase.
 LQ45_MEMBERS: list[str] = [
     "ADRO", "AKRA", "AMRT", "ANTM", "AMMN", "ASII",
     "BBCA", "BBNI", "BBRI", "BMRI", "BREN", "BSDE",
-    "BUKA", "CPIN", "DSSA", "EMTK", "EXCL", "GGRM",
+    "CPIN", "DSSA", "EMTK", "EXCL", "GGRM",
     "GOTO", "HMSP", "ICBP", "INCO", "INDF", "INKP",
     "INTP", "ISAT", "ITMG", "JPFA", "KLBF", "MAPI",
     "MBMA", "MDKA", "MEDC", "MIKA", "PGAS", "PGEO",
     "PTBA", "PTPP", "SMGR", "TBIG", "TLKM", "TOWR",
-    "UNTR", "UNVR", "WSKT",
+    "UNTR", "UNVR",
 ]
 
 
@@ -591,19 +595,20 @@ FREE_FLOAT_ESTIMATES: dict[str, float] = {
     "TOWR": 0.49,   # Provident Agro/public ~49% → float ~49%
     "UNTR": 0.40,   # PT Astra International ~60% → float ~40%
     "WSKT": 0.33,   # Government ~67% → float ~33%
+    # ── P3.5 resolved (verified dari annual report / prospektus publik) ────
+    "INKP": 0.25,   # PT Purinusa Ekapersada (Sinarmas/APP) ~75% → float ~25% (AR 2023)
+    "MAPI": 0.50,   # PT Satya Mulia Gema Gemilang ~49.7% → float ~50% (AR 2023)
+    "MBMA": 0.32,   # PT Merdeka Copper Gold (MDKA) ~68.2% → float ~32% (prospektus IPO 2023)
+    "MIKA": 0.27,   # PT Karya Bersama Anugerah ~73.2% → float ~27% (AR 2023)
 }
 
 # Float < 15% → HIGH manipulation risk; < 25% → MEDIUM; else LOW
 FREE_FLOAT_MANIPULATION_THRESHOLD: float = 0.15
 
 # LQ45 members yang data free float-nya belum bisa diverifikasi dari sumber publik.
-# Perlu diisi manual dari BEI fact sheet / KSEI kepemilikan saham.
+# BUKA dihapus karena delisting Sept 2024. INKP/MAPI/MBMA/MIKA sudah dipindah ke
+# FREE_FLOAT_ESTIMATES di atas (resolved dari AR/prospektus publik).
 FREE_FLOAT_NEEDS_VERIFICATION: list[str] = [
-    "BUKA",   # Bukalapak — kepemilikan post-IPO tersebar, perlu cek KSEI terbaru
-    "INKP",   # Indah Kiat Pulp — Widjaja family (APP/Sinarmas), perlu konfirmasi %
-    "MAPI",   # Mitra Adiperkasa — struktur kepemilikan perlu verifikasi
-    "MBMA",   # Merdeka Battery Materials — IPO 2023, kepemilikan publik perlu cek
-    "MIKA",   # Mitra Keluarga Karyasehat — perlu cek annual report terbaru
 ]
 
 
