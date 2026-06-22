@@ -63,7 +63,7 @@ def compute_metrics(
     holding_days = [r.holding_period_days for r in records if r.holding_period_days is not None]
     avg_holding_days = sum(holding_days) / len(holding_days) if holding_days else None
 
-    sharpe_ratio = _compute_sharpe(pnl_values)
+    sharpe_ratio = _compute_sharpe(pnl_values, avg_holding_days)
 
     scored = [r for r in records if r.pnl_pct is not None]
     best_trade = max(scored, key=lambda r: r.pnl_pct) if scored else None  # type: ignore[arg-type]
@@ -108,11 +108,18 @@ def compute_metrics(
     )
 
 
-def _compute_sharpe(pnl_values: list[float]) -> float | None:
-    """Annualized Sharpe ratio using per-trade pnl_pct as a proxy.
+_IDX_SWING_AVG_HOLD_DAYS = 10  # conservative fallback for IDX swing trades
 
-    NOTE: pnl_pct values are per-trade total returns over variable holding periods,
-    not daily returns. The sqrt(252) annualization factor is therefore an approximation.
+
+def _compute_sharpe(
+    pnl_values: list[float],
+    avg_holding_days: float | None = None,
+) -> float | None:
+    """Annualized Sharpe ratio using per-trade pnl_pct.
+
+    Annualizes by trades-per-year = 252 / avg_hold, where avg_hold is the
+    actual average holding period in trading days. Falls back to
+    _IDX_SWING_AVG_HOLD_DAYS when not provided.
     Returns None when n < 2 or std == 0.
     """
     if len(pnl_values) < 2:
@@ -122,7 +129,8 @@ def _compute_sharpe(pnl_values: list[float]) -> float | None:
     std = math.sqrt(variance)
     if std == 0:
         return None
-    return (mean / std) * math.sqrt(252)
+    avg_hold = avg_holding_days if (avg_holding_days and avg_holding_days >= 1) else _IDX_SWING_AVG_HOLD_DAYS
+    return (mean / std) * math.sqrt(252 / avg_hold)
 
 
 def _compute_tiers(records: list[TradeOutcome]) -> list[TierMetrics]:

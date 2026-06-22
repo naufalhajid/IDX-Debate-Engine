@@ -295,9 +295,14 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
     )
     target_deployment_pct = min(max(target_deployment_pct, 0.40), 0.70)
 
+    # T+2: cash from recently sold positions is not yet settled.
+    # Callers can pass unsettled_capital in user_config to prevent double-counting.
+    unsettled_capital = _to_float(user_config.get("unsettled_capital", 0.0))
+    effective_capital = max(total_capital - unsettled_capital, 0.0)
+
     max_loss_budget = total_capital * max_loss_pct
-    max_deployed = total_capital * 0.95
-    desired_deployed = min(total_capital * target_deployment_pct, max_deployed)
+    max_deployed = effective_capital * 0.95
+    desired_deployed = min(effective_capital * target_deployment_pct, max_deployed)
     eligible: list[dict] = []
     positions: list[dict] = []
 

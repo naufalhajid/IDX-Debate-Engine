@@ -172,7 +172,9 @@ def compute_ara_arb_risk(
 ) -> dict:
     """Detect near-ARA (overbought run-up) and near-ARB (recent plunge) conditions.
 
-    ARB post-April 2025 IDX rule: -15% single day for all price ranges.
+    ARB: -15% flat for all price tiers (Kep-00002/BEI/04-2025, effective Apr 8 2025).
+    HIGH threshold -12% = early warning at 80% of ARB limit (5-day intraday window).
+    MEDIUM threshold -7% = sustained selling pressure; was the old large-cap ARB tier.
     ARA: +25% (Rp 200-5000), +20% (>Rp 5000).
 
     arb_lock_risk HIGH → position may be locked on down-day, hard to exit.
@@ -631,7 +633,7 @@ def _analyze_ticker(
         return None
 
     # ── Volume Confirmation ───────────────────────────────────────────────────
-    vol_20d_avg: float = float(vol.tail(20).mean())
+    vol_20d_avg: float = float(vol.iloc[-21:-1].mean()) if len(vol) >= 21 else float(vol.iloc[:-1].mean())
     curr_vol: float = float(vol.iloc[-1])
     vol_surge_ratio: float = curr_vol / vol_20d_avg if vol_20d_avg > 0 else 0.0
     if vol_surge_ratio < cfg.get("min_volume_surge_for_candidate", 0.30):

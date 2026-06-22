@@ -55,7 +55,7 @@ def compute_atr(
         ],
         axis=1,
     ).max(axis=1)
-    return tr.rolling(window).mean()
+    return tr.ewm(alpha=1 / window, min_periods=window, adjust=False).mean()
 
 
 def snap_to_tick(price: float) -> float:
@@ -221,7 +221,7 @@ def compute_bollinger(
         }
 
     rolling_mean = close.rolling(period).mean()
-    rolling_std  = close.rolling(period).std()
+    rolling_std  = close.rolling(period).std(ddof=0)
     bb_upper = rolling_mean + (std_mult * rolling_std)
     bb_lower = rolling_mean - (std_mult * rolling_std)
 

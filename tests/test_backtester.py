@@ -19,6 +19,7 @@ from core.backtester.signal_loader import (
     signals_to_outcomes,
 )
 from core.backtester.metrics_calculator import (
+    _IDX_SWING_AVG_HOLD_DAYS,
     _compute_by_regime,
     _compute_open_by_age,
     _compute_sharpe,
@@ -249,8 +250,24 @@ def test_compute_sharpe_correct_formula():
     pnl = [10.0, 20.0]
     mean = 15.0
     std = math.sqrt(((10 - 15) ** 2 + (20 - 15) ** 2) / 1)
-    expected = (mean / std) * math.sqrt(252)
+    # default fallback: _IDX_SWING_AVG_HOLD_DAYS = 10
+    expected = (mean / std) * math.sqrt(252 / 10)
     assert _compute_sharpe(pnl) == pytest.approx(expected, rel=1e-6)
+
+
+def test_compute_sharpe_uses_actual_holding_days():
+    pnl = [10.0, 20.0]
+    mean = 15.0
+    std = math.sqrt(((10 - 15) ** 2 + (20 - 15) ** 2) / 1)
+    expected = (mean / std) * math.sqrt(252 / 7)
+    assert _compute_sharpe(pnl, avg_holding_days=7.0) == pytest.approx(expected, rel=1e-6)
+
+
+def test_compute_sharpe_falls_back_to_default_when_hold_none():
+    pnl = [10.0, 20.0]
+    assert _compute_sharpe(pnl, avg_holding_days=None) == pytest.approx(
+        _compute_sharpe(pnl), rel=1e-9
+    )
 
 
 # ─── _confidence_tier_key ─────────────────────────────────────────────────────

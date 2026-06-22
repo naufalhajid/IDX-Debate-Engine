@@ -32,6 +32,8 @@ RR_IMPLAUSIBLE_CEILING = 5.0
 # Counter-trend setups (price below MA200) have empirically lower win rates.
 # A 2.5x floor ensures the asymmetry compensates before deployment is allowed.
 _COUNTER_TREND_RR_FLOOR: float = 2.5
+# Soft flag when target requires more ARA sessions than a typical IDX swing horizon.
+_SWING_HORIZON_DAYS: int = 5
 UNBUYABLE_RATINGS = {"AVOID", "SELL"}
 SOFT_BUYABLE_RATINGS = {"HOLD"}
 HARD_REJECT_CODES = {
@@ -625,6 +627,12 @@ def _verdict_reason_codes(
     if ara_code:
         reason_codes.append(ara_code)
 
+    # C4: target beyond ARA reach within swing horizon — soft flag
+    if entry_high and target_price and entry_high > 0:
+        sessions = _ara_sessions_needed(entry_high, target_price)
+        if sessions > _SWING_HORIZON_DAYS:
+            reason_codes.append("target_beyond_ara_reach")
+
     # P8: historically expensive — soft flag, not a hard reject
     _vbc = (
         (candidate.get("metadata") or {}).get("valuation_band_context")
@@ -838,6 +846,15 @@ def _counter_trend_setup(
         "DI BAWAH MA200",
     )
     return any(marker in text for marker in counter_trend_markers)
+
+
+def _ara_sessions_needed(entry: float, target: float) -> int:
+    """How many consecutive ARA sessions are needed to reach target from entry."""
+    import math
+    if target <= entry or entry <= 0:
+        return 0
+    ara = 0.35 if entry < 200 else (0.25 if entry <= 5000 else 0.20)
+    return math.ceil(math.log(target / entry) / math.log(1 + ara))
 
 
 def _arb_ara_risk_codes(candidate: dict[str, Any]) -> tuple[str | None, str | None]:
