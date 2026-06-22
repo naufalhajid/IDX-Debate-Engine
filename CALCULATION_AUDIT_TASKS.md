@@ -244,7 +244,7 @@ Note: Jika `ClosedTrade` punya field `holding_days`, gunakan average aktual alih
 | C6 -- Volume surge fix | [x] | 2026-06-22 |
 | C7 -- R/R cost-adjust | [ ] | — |
 | C8 -- T+2 settlement | [x] | 2026-06-22 |
-| C9 -- Risk budget per-pos | [ ] | — |
+| C9 -- Risk budget per-pos | [x] | 2026-06-22 |
 | C10 -- Graham k doc | [ ] | — |
 | C11 -- DDM suppress | [ ] | — |
 | C12 -- MACD zero edge | [ ] | — |

@@ -359,13 +359,14 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
         )
 
     total_weight = sum(item["weight"] for item in eligible) or 1.0
+    per_position_risk_budget = max_loss_budget / max_positions
 
     for item in eligible:
         allocation_pct = min(
             target_deployment_pct * (item["weight"] / total_weight), allocation_cap
         )
         capital_allocated = total_capital * allocation_pct
-        lot_from_risk = floor(max_loss_budget / (item["risk_per_share"] * LOT_SIZE))
+        lot_from_risk = floor(per_position_risk_budget / (item["risk_per_share"] * LOT_SIZE))
         lot_from_alloc = floor(capital_allocated / (item["entry_price"] * LOT_SIZE))
         final_lot = min(lot_from_risk, lot_from_alloc)
         if final_lot < 1:
@@ -411,7 +412,7 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
             if not _can_add_lot(
                 position,
                 total_capital=total_capital,
-                max_loss_budget=max_loss_budget,
+                max_loss_budget=per_position_risk_budget,
                 allocation_cap=allocation_cap,
             ):
                 continue

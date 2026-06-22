@@ -63,3 +63,19 @@ def test_entry_price_falls_back_to_current_price_without_entry_high() -> None:
 
     [position] = result["positions"]
     assert position["entry_price"] == 1000.0
+
+
+def test_per_position_risk_budget_enforced_across_multiple_candidates() -> None:
+    """Each position must not exceed 1/max_positions of the total risk budget."""
+    config = {**USER_CONFIG, "max_positions": 3}
+    candidates = [
+        _candidate(ticker="BBRI", entry_high=1050.0, stop_loss=930.0),
+        _candidate(ticker="TLKM", entry_high=3400.0, stop_loss=3100.0),
+        _candidate(ticker="ASII", entry_high=5200.0, stop_loss=4900.0),
+    ]
+    result = calculate_positions(candidates, config)
+
+    total_budget = config["total_capital"] * config["max_loss_pct"]
+    per_pos_budget = total_budget / config["max_positions"]
+    for pos in result["positions"]:
+        assert pos["max_loss_rp"] <= per_pos_budget + 1e-6  # tolerance for floor rounding
