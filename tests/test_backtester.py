@@ -19,7 +19,6 @@ from core.backtester.signal_loader import (
     signals_to_outcomes,
 )
 from core.backtester.metrics_calculator import (
-    _IDX_SWING_AVG_HOLD_DAYS,
     _compute_by_regime,
     _compute_open_by_age,
     _compute_sharpe,

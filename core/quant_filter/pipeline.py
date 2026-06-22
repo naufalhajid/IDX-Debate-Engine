@@ -111,8 +111,10 @@ def compute_weekly_trend(weekly_df: "pd.DataFrame | None") -> dict:
     price = float(close.iloc[-1])
     above_ma13 = price > ma13
 
-    if above_ma13:
+    if above_ma13 and (ma26 is None or ma13 > ma26):
         trend = "UPTREND"
+    elif above_ma13:  # price > MA13 but MA13 <= MA26: bearish weekly cross
+        trend = "WEAK_UPTREND"
     elif ma26 is not None and price > ma26:
         trend = "WEAK_UPTREND"
     else:
@@ -784,7 +786,7 @@ def _analyze_ticker(
         gap_pct = float(row.get("Valuation_Gap_Pct", 0) or 0)
     except Exception:
         gap_pct = 0.0
-    if gap_pct == 0.0:
+    if gap_pct <= 0.0:
         total_score -= 10
         mom_note.append("Penalty: no margin of safety (-10)")
 
@@ -864,6 +866,7 @@ def _analyze_ticker(
         "Graham_Bear": row["Graham_Bear"],
         "Graham_Bull": row["Graham_Bull"],
         "graham_fv_capped": bool(row.get("graham_fv_capped", False)),
+        "graham_low_roe_capped": bool(row.get("graham_low_roe_capped", False)),
         "Valuation Gap (%)": row["Valuation_Gap_Pct"],
         "Price to Equity Discount": row.get("Price to Equity Discount (%)", 0),
         "RSI (14)": rsi_latest,
@@ -1349,11 +1352,27 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         filtered["Graham_Bull"],
     )
 
+    # Graham Low-ROE Cap: stocks with ROE < threshold + inflated BVPS produce misleadingly
+    # high Graham FV. Cap them to 1.5x price so they don't masquerade as deep value.
+    _low_roe_mask = filtered["Return on Equity (TTM)"] < cfg["roe_penalty_threshold"]
+    _low_roe_cap = filtered["Close Price"] * cfg["graham_low_roe_cap_mult"]
+    _graham_low_roe_capped = _low_roe_mask & (filtered["Graham_Number"] > _low_roe_cap)
+    filtered["graham_low_roe_capped"] = _graham_low_roe_capped
+    for _, _lr in filtered[_graham_low_roe_capped].iterrows():
+        logger.warning(
+            f"[Graham-LowROE] {_lr['Ticker']}: FV={_lr['Graham_Number']:,.0f} > "
+            f"{cfg['graham_low_roe_cap_mult']}x price={_lr['Close Price']:,.0f} "
+            f"(ROE={_lr['Return on Equity (TTM)']:.1%}). Capped ke {_low_roe_cap[_lr.name]:,.0f}."
+        )
+    filtered["Graham_Number"] = np.where(_graham_low_roe_capped, _low_roe_cap, filtered["Graham_Number"])
+    filtered["Graham_Bear"] = np.where(_graham_low_roe_capped, _low_roe_cap * cfg["graham_bear_eps"], filtered["Graham_Bear"])
+    filtered["Graham_Bull"] = np.where(_graham_low_roe_capped, _low_roe_cap * cfg["graham_bull_eps"], filtered["Graham_Bull"])
+
     filtered["Valuation_Gap_Pct"] = (
         (filtered["Graham_Number"] - filtered["Close Price"])
         / filtered["Close Price"]
         * 100
-    ).clip(lower=0)
+    )
 
     filtered["Val_Score"] = filtered.apply(lambda r: _compute_val_score(r, cfg), axis=1)
 
@@ -1495,6 +1514,18 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
             logger.warning(
                 f"[Staleness] Composite Score dikurangi 10 poin untuk semua "
                 f"{len(final_df)} kandidat (XLSX {_staleness['xlsx_age_days']} hari)."
+            )
+        score_floor = (
+            cfg.get("score_floor_high_regime", 45)
+            if regime in ("HIGH", "DEFENSIVE")
+            else cfg.get("score_floor_normal_regime", 35)
+        )
+        before_floor = len(final_df)
+        final_df = final_df[final_df["Composite Score"] >= score_floor]
+        if len(final_df) < before_floor:
+            logger.info(
+                f"[ScoreFloor] {before_floor - len(final_df)} kandidat dibuang "
+                f"(Composite Score < {score_floor} untuk regime {regime})."
             )
         final_df = final_df.sort_values("Composite Score", ascending=False).head(
             cfg["top_n"]

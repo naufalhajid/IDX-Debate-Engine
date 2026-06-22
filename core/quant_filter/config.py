@@ -133,6 +133,9 @@ CONFIG = {
     "graham_bull_eps": 1.15,
     # ── Graham FV Sanity Cap
     "graham_fv_cap_multiplier": 5.0,  # FV maksimal 5x current price
+    # ── Graham Low-ROE Cap: low-quality earners inflate FV via high BVPS despite poor ROE.
+    # Fires when Graham_Number > cap_mult × price AND ROE < roe_penalty_threshold.
+    "graham_low_roe_cap_mult": 1.5,  # cap FV ke 1.5x price untuk low-ROE stocks
     # ── yfinance (HANYA untuk teknikal OHLCV)
     "yf_period": "120d",
     "yf_retries": 3,
@@ -241,6 +244,10 @@ CONFIG = {
     # 0.90 because a market-wide -15% IHSG correction drags solid stocks well below
     # MA200 without fundamental deterioration — 0.90 gave 0 candidates.
     "mr_ma200_floor": 0.80,
+    # ── Score Floor: minimum composite score to appear in final output.
+    # Prevents weak stocks from filling top_n slots in thin universes.
+    "score_floor_high_regime": 45,   # HIGH/DEFENSIVE regime: stricter floor
+    "score_floor_normal_regime": 35,  # NORMAL/RECOVERY/LOW regime
     # ── Output
     "top_n": 10,
 }

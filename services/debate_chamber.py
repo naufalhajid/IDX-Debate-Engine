@@ -1439,7 +1439,13 @@ class DebateChamber:
             confidence = 0.0
             signal["confidence"] = confidence
         if signal.get("position") == "UNKNOWN":
-            signal["position"] = "HOLD" if confidence == 0.0 else "UNKNOWN"
+            if confidence == 0.0:
+                signal["position"] = "HOLD"
+            else:
+                logger.info(
+                    f"[{role.upper()}] UNKNOWN position retained with confidence={confidence:.2f} — "
+                    f"may be mixed signal or ambiguous LLM output. Raw: {text[:200]}"
+                )
 
         if "agent confidence" not in text.lower() or "position:" not in text.lower():
             text = (
@@ -1841,7 +1847,6 @@ class DebateChamber:
                 "flash_calls": 0,
                 "pro_calls": 0,
             },
-            "valuation_band_context": None,
             "error": None,
         }
 

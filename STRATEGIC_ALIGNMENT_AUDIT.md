@@ -283,3 +283,451 @@ Any stock with less than Rp 1B average daily turnover should require explicit li
 ---
 
 *This audit evaluates conceptual alignment with swing trading methodology, not code correctness. File references point to the codebase state as of 2026-06-21.*
+
+---
+
+---
+
+# Strategic Alignment Audit — Part II: Full System (Excluding R/R, Target, FV, Governor)
+
+**Date:** 2026-06-22
+**Scope:** Every component NOT covered in Part I above: prompt corpus, regime detection, quant filter, evidence ranker, position sizer, portfolio optimizer, historical scorer.
+**Question:** Outside the four areas already fixed or assessed in Part I, does the rest of the system behave like a competent 1–3 month swing trader?
+
+---
+
+## Finding 0 — Holding Period Contract: What Is "Swing Trading" Here?
+
+This needs to be stated once and anchored, because every other finding depends on it.
+
+**What the codebase says:**
+- `schemas/debate.py` line 5 docstring: "1-3 month swing trade frame"
+- `CIOVerdict.timeframe` default: `"1-3 Months"`
+- `fundamental_scout.txt` line 1: "1–3 month horizon"
+- `chartist.txt` line 1: "1-3 month frame"
+- Every debate prompt, bull/bear role, CIO judge: "1-3 month horizon, 3-10% target"
+- `CLAUDE.md`: describes the system as "swing trading"
+
+**What "swing trading" means in standard practice:**
+- Classic definition: 2–10 trading days (some extend to 3 weeks)
+- "Position trading": weeks to 3 months
+- What this system implements at 1–3 months is technically *position trading*, not classic swing trading
+
+**Verdict:** The system is internally consistent at the 1–3 month contract. The word "swing" in CLAUDE.md is informal shorthand, not a calibration target. Every prompt, schema field, and confidence band is built for 1–3 month holds. **All subsequent findings are audited against the 1–3 month stated contract**, not classic 3–15 day swing trading.
+
+This framing matters: MA200 as a structural trend gate is appropriate for 1–3 month holds (and would be overkill for 1-week trades). Weekly trend filters are appropriate. A catalyst within "1–3 months" is appropriate. None of these are misaligned once you accept the 1–3 month frame as the real contract.
+
+---
+
+## Prompt Corpus — Alignment
+
+### Fundamental Scout (`fundamental_scout.txt`)
+
+**Role as designed:** Provide fundamental context (valuation, quality checks, growth catalyst) for the debate. Output: BULLISH / NEUTRAL / BEARISH.
+
+**What BULLISH means in this prompt (lines 78–81):**
+```
+BULLISH — current price is UNDERVALUED vs fair value; margin of safety exists.
+BEARISH — current price is OVERVALUED vs fair value; no margin of safety.
+NEUTRAL — price is FAIRLY VALUED, or fair value data unavailable.
+```
+
+**The problem:** This is a *value investing* output signal, not a *swing timing* signal. A stock can trade at 20% above fair value for 12 consecutive months during a bull cycle and still be the best 1–3 month swing trade available. The scout declaring it BEARISH (overvalued) early in that cycle would systematically bias the entire debate toward HOLD/AVOID for precisely the stock a momentum swing trader most wants to own.
+
+The FAIL/PASS matrix in `cio_judge.txt` (Task E) partially corrects this: when Fundamental FAIL + Technical PASS + volume breakout, a momentum BUY is still possible. But the scout's BEARISH output travels through all debate rounds and confidence calculations, creating a structural drag on confidence scores for all above-fair-value setups even when the CIO correctly overrides.
+
+**What would be more aligned:** The scout should output its valuation finding and quality flags without labeling the stock BULLISH/BEARISH on that basis alone. The scout's output is useful context; it should not be a directional verdict. The direction verdict belongs to the chartist and CIO synthesis.
+
+**STEP 4 (Growth Catalyst):** "ONE specific upcoming event within 1–3 months" — well aligned.
+
+**STEP 6 (Post-Earnings Drift, Insider Selling):** Both are genuine swing signals. Insider selling reducing confidence by a forced cap is appropriate; post-earnings drift window is a real short-to-medium term effect. Well aligned.
+
+**Verdict: Partially aligned.** The BULLISH/BEARISH definitions are value investing framing applied to a swing timing slot. The content (quality checks, catalysts, insider flags) is otherwise swing-appropriate.
+
+---
+
+### Chartist (`chartist.txt`)
+
+**Overall:** 15 steps covering MA200, EMA20, ATR stop, RSI, volume, weekly trend, MACD, candlestick patterns, Bollinger Bands, RSI divergence, gap, compression, VWAP, AVWAP, Fibonacci. This is a genuinely comprehensive technical analysis framework, not a boilerplate prompt. Almost all of it is directly swing-trade relevant.
+
+**One active discrepancy — stop-loss level:**
+
+The chartist says (STEP 4):
+> "STOP-LOSS: Rp W,WWW (1.5 x ATR below EMA20)"
+
+The Python envelope (`REGIME_ATR_STOP_MULTIPLIER` in `utils/technicals.py` + `_compute_trade_envelope` in `debate_chamber.py`) uses:
+```python
+stop = max(
+    sma20 - 1.0 × ATR,          # SMA20-anchored floor
+    current_px - 2.5 × ATR,     # Price-anchored floor (2.5× in NORMAL regime)
+)
+# Hard floor: ≥ 88% of current price
+```
+
+The chartist tells the LLM to debate around a 1.5× stop. The executed stop is 2.5× (NORMAL) or 3.0× (DEFENSIVE). This means:
+
+- Bear R2's stress test (`bear_r2.txt` line 27: "maximum 1-week adverse move = 2 × ATR") checks whether `2×ATR ≥ Bull's claimed margin of safety` using the debate reference stop, not the real stop. If the real stop is already at 2.5×ATR, the bear's 2×ATR stress test never fires — and the bear doesn't know why, because the chartist told the LLM 1.5×.
+- When Bull argues that MA50 or EMA20 "held as support," they are implicitly defending a stop slightly above those levels — which doesn't match the wider Python stop.
+
+Every trade envelope arrives pre-computed from Python and the CIO is instructed to use it verbatim (cio_judge STEP 6). The debate agents' stop references are irrelevant to the final trade output. The practical damage is: debate-round arguments about stop validity are semantically disconnected from the actual executed stop, reducing debate quality without affecting the final output.
+
+**Verdict: Structurally well aligned, with one stop-level mismatch that degrades debate quality but does not corrupt the final output.**
+
+---
+
+### Sentiment Scout (`sentiment.txt`)
+
+**Contrarian intensity signal:** EXTREME_BULLISH (≥80% bullish discussion) → contrarian sell signal. EXTREME_BEARISH → contrarian buy signal. This is correct swing trading psychology: crowd extremes mark reversal points, not continuation. Well aligned.
+
+**CIO threshold:** `sentiment.confidence >= 0.7` for the +0.02 bonus. A threshold of 0.70 is high — in practice Stockbit social data is noisy and low-confidence, so most sentiment readings will miss this bonus. The effect is a slight underweight on sentiment in the CIO calibration, which is arguably appropriate given data quality on IDX.
+
+**Verdict: Aligned.** Sentiment as a contrarian signal at extremes is appropriate for 1–3 month swing frames.
+
+---
+
+### Bull R1 / Bear R1 / Bull R2 / Bear R2
+
+All four explicitly say "swing trade frame ONLY (1-3 months). DO NOT write long-term narratives." and require:
+- One fundamental metric with actual number
+- One technical metric with actual number
+- One company-specific catalyst (not generic macro)
+- Specific R/R statement
+
+The data-citation requirement is the strongest alignment feature: it forces LLMs to work from specific numbers, not from generic bullish/bearish narratives. The "DO NOT repeat any price or argument from Round 1" cross-examination rule prevents circular arguments.
+
+**Bear R2 stress test:**
+> "Maximum 1-week adverse move = 2 × ATR(14). IF 2 × ATR(14) >= Bull's claimed margin of safety → declare: 'Trade is unviable for swing execution'"
+
+For a 1–3 month hold, a 1-week stress test is appropriate as an *entry quality* check (can you survive the first week without being stopped out). It is not a full holding-period stress test, nor is it meant to be. Appropriate.
+
+**Verdict: Well aligned.** Cross-examination structure and specific-citation requirements are genuine improvements over open-ended debate.
+
+---
+
+### Consensus (`consensus.txt`)
+
+Four disagreement types: `direction`, `timing`, `valuation`, `catalyst`. Note on `timing`: "most common in a sideways IHSG market — use it when both agents agree the stock is good but disagree on entry point or RSI readiness." This is IDX-specific and 1–3 month appropriate.
+
+**Verdict: Aligned.**
+
+---
+
+### Devil's Advocate (`devils_advocate.txt`)
+
+**Challenge 2 (Transaction Cost Stress Test):**
+Round-trip costs: 0.15% buy + 0.25% sell + 0.10% income tax + 0.15–0.30% slippage = ~0.65–0.80% total.
+Net return threshold: < 2.0% = INSUFFICIENT, 2.0–3.0% = MARGINAL, > 3.0% = VIABLE.
+
+For 1–3 month swing trades targeting 3–10% gains, a 2% net return minimum is appropriate — it ensures transaction costs aren't consuming the majority of the swing gain. For a 3% target swing, 0.8% costs leaves 2.2% net, which clears the threshold. For a 4% target, 3.2% net = VIABLE. Correctly calibrated.
+
+**Verdict: Well aligned.** The transaction cost challenge is the most IDX-specific and swing-appropriate stress test in the entire system.
+
+---
+
+### CIO Judge (`cio_judge.txt`)
+
+**Phase B Calibration — 30-day catalyst bias:**
+
+```
+[+0.02] Specific catalyst confirmed within 30 days
+```
+
+The system's stated horizon is 1–3 months. This +0.02 bonus is awarded only to catalysts in month 1, not months 2–3. A Q3 earnings release in month 2 is equally valid as a catalyst for a 1–3 month trade, but receives no bonus. This creates a systematic short-term bias inside a medium-term frame: trades driven by near-term catalysts score higher than structurally equivalent setups where the catalyst materializes slightly later.
+
+The practical magnitude is small (+0.02 confidence), but the direction is wrong. A correct implementation would award the bonus for any catalyst confirmed within the 1–3 month window, not only within 30 days.
+
+**CONFLICT RESOLUTION MATRIX:** The Task E fix (FAIL/PASS → momentum BUY with volume confirmation) is the right correction. The PASS/FAIL → HOLD is also correct: fundamentally good stocks that haven't confirmed technically should wait for confirmation. The matrix is now properly tiered.
+
+**DEFENSIVE regime circuit breaker logic (cio_judge lines 28–30):**
+> "IF regime = DEFENSIVE AND R/R < 2.0: AVOID is strongly preferred."
+
+This is a meaningful regime-specific constraint. Under DEFENSIVE conditions, the CIO further raises the effective R/R floor through its own AVOID preference. This is additive to the risk governor's regime downgrades — appropriate and swing-aligned.
+
+**Verdict: Mostly aligned**, with one minor calibration issue (30-day catalyst bonus should cover the full 1–3 month window).
+
+---
+
+## Regime Detection (`core/regime.py`)
+
+**Five regimes:** DEFENSIVE, RECOVERY, HIGH, NORMAL, LOW. Detection logic:
+- DEFENSIVE: 5d weekly drop ≤ −5% OR JKSE close < MA20 AND MA50 AND MA200
+- RECOVERY: HIGH vol + 5d weekly return ≥ +10%
+- HIGH/NORMAL/LOW: 20-day realized volatility bands (2% / 1–2% / <1%)
+
+**Regime propagation across the system:**
+
+| Component | Uses Regime? |
+|---|---|
+| Quant filter ATR stop multiplier | ✅ |
+| Debate chamber (injected to prompts) | ✅ |
+| CIO judge (circuit breaker, defensive AVOID preference) | ✅ |
+| CIO calibration (-0.01 for LQ45 in DEFENSIVE) | ✅ |
+| Risk governor (regime downgrade to watchlist, Task D R/R floor) | ✅ |
+| Position sizer (trailing stop regime-scaling) | ✅ |
+
+The system has consistent regime propagation from detection through to every decision layer. This is one of the most complete implementations in the codebase.
+
+**One known gap — ATR multiplier doesn't differentiate HIGH from NORMAL:**
+```python
+REGIME_ATR_STOP_MULTIPLIER = {
+    "LOW": 2.5, "NORMAL": 2.5, "HIGH": 2.5, "RECOVERY": 2.5, "DEFENSIVE": 3.0
+}
+```
+In HIGH volatility regime, intraday ranges expand — the same 2.5× multiplier that works in NORMAL produces a stop that's too tight relative to the realized noise band. The code comment in `technicals.py` explicitly flags this as a deferred calibration decision. It is a real gap but a known one.
+
+**Verdict: Well aligned and comprehensively integrated.** The flat HIGH/NORMAL/RECOVERY ATR multiplier is a documented calibration deferral, not an oversight.
+
+---
+
+## Quant Filter — Screening Criteria and Scoring (`core/quant_filter/`)
+
+### Score Weights (config.py)
+```
+70% Technical Momentum: RSI 25 + Volume 25 + Price Momentum 20
+30% Fundamentals:       Valuation 20 + Profitability 10
+```
+
+A 70/30 technical/fundamental split is appropriate for swing trading. Most professional momentum screeners are 100% technical; the 30% fundamental weight provides a quality floor without dominating the momentum signal.
+
+### Screening Gates — Alignment Assessment
+
+| Gate | Value | Assessment |
+|---|---|---|
+| Price > EMA20 (momentum mode) | required | ✅ Aligned — entry in uptrend |
+| RS vs IHSG ≥ 0 (1 month) | required | ✅ Aligned — sector relative strength |
+| RSI hard reject | > 70 | ✅ Aligned — don't buy overbought |
+| ADT 20d | ≥ Rp 10B | ✅ Aligned — liquidity floor |
+| ATR% | ≤ 5% | ✅ Aligned — cap on excessive volatility |
+| ExDate CRITICAL | exclude | ✅ Aligned — ex-div risk gate |
+| Volume surge hard gate | ≥ 0.30× | ⚠️ Too permissive |
+
+**Volume gate issue:** `min_volume_surge_for_candidate = 0.30` means a stock trading at 30% of its 20-day average volume still passes the filter. A stock at 0.30× average volume is showing sharply reduced participation — exactly the opposite of what a swing trader needs. Most swing entry criteria require at least 0.80× average volume at screening time, and 1.5–2× for breakout confirmation. The current threshold effectively means "not completely dead," not "showing momentum."
+
+This gate is distinct from the volume confirmation step inside `_analyze_ticker` (where `vol_surge_ratio` is scored and affects composite score). A stock at 0.35× average volume passes the gate and only takes a 10% weight on the volume scoring sub-component — producing a candidate with acceptable composite score but genuinely poor volume confirmation.
+
+### RSI Scoring Asymmetry
+
+```
+Oversold (<45):       40% weight (potential reversal)
+Accumulation (45-55): 100% weight (sweet spot)
+Uptrend (55-70):      80% weight
+Overbought (>70):     hard reject
+```
+
+This asymmetry is explicitly documented as "swing-trade aware" and is correct. RSI in the accumulation zone (45–55) is the ideal entry for momentum continuation: momentum is positive but not stretched. The 80% weight for uptrend RSI (55–70) still rewards strength without penalizing it.
+
+### Static Filter: PBV < 80th sector percentile
+
+This filter has a notable side effect: it systematically excludes momentum leaders. In a strong sector rally, the stocks with the most price appreciation will be near the 80th percentile PBV or above. The filter removes the strongest stocks precisely because they ran the hardest. For a 1–3 month system targeting continuation setups, this creates tension: the stocks most clearly in an uptrend may be excluded.
+
+The filter was designed to avoid overvalued stocks at peak PBV. But it conflates "high PBV rank" with "overvalued" — a stock can be at the 85th percentile PBV in its sector because it's genuinely a quality business growing faster than peers.
+
+**Verdict: Mostly aligned, with two items to watch:**
+1. Volume gate threshold (0.30×) is too permissive for momentum screening
+2. PBV 80th percentile sector filter may exclude momentum leaders in uptrending markets
+
+---
+
+## Evidence Ranker — Category Weights (`services/evidence_ranker.py`)
+
+```python
+CATEGORY_WEIGHTS = {
+    "fair_value": 1.0,
+    "fundamental": 0.9,
+    "technical": 0.85,
+    "sentiment": 0.6,
+    "exdate": 0.7,
+    "metadata": 0.3,
+}
+```
+
+The ranking puts `fair_value` and `fundamental` above `technical`. For swing trading, the correct priority is inverted: technical (entry timing, momentum, setup quality) is the primary signal; fundamental (quality filter, context) is secondary.
+
+The practical effect: when the evidence bundle is assembled for the LLM prompts, the most space-efficient (highest score) chunks are fundamental and fair-value data. If the bundle hits `MAX_BUNDLE_CHARS = 2,400`, technical chunks are the ones most likely to get cut.
+
+Mitigating factor: fair_value is always force-pinned first in `select_evidence()`, guaranteeing its inclusion. Technical data is still likely to appear since it's the third category. The practical degradation is modest.
+
+**Staleness handling** (`STALE_THRESHOLD_SECONDS = 86,400` — 24 market hours) correctly excludes weekends and IDX holidays via `_market_freshness_seconds`. This is excellent IDX-specific engineering.
+
+**Verdict: Minor misalignment in category weights.** For swing trading, technical data should score ≥ fundamental (suggested: technical=0.95, fundamental=0.85, fair_value=0.80). Practical impact is limited because technical chunks are usually selected regardless.
+
+---
+
+## Position Sizer (`core/quant_filter/position_sizer.py`)
+
+**Capital deployment:** Target 40–70% of capital, capped at 95%. Appropriate for a swing portfolio — enough deployment to generate returns, enough cash reserve to act on new signals.
+
+**Entry price basis:** `entry_high` (worst-case fill within the entry zone) for all risk calculations. This is the professional standard and prevents underestimating position risk.
+
+**Lot sizing logic:**
+```python
+lot_from_risk  = floor(max_loss_budget / (risk_per_share × LOT_SIZE))
+lot_from_alloc = floor(capital_allocated / (entry_price × LOT_SIZE))
+final_lot      = min(lot_from_risk, lot_from_alloc)
+```
+
+Conservative minimum of risk-based and allocation-based lot sizes. Correct.
+
+**Trailing stop integration:** ATR-based trailing stop parameters attached to each position when `atr14` data is available. This is the correct exit mechanic for swing trades that go in your favor — let winners run with a moving stop rather than selling at a fixed target.
+
+**Partial exit plan (T1 50%, trail remainder):** Standard two-tranche exit for BUY and STRONG_BUY. Counter-trend below MA200 forces 75% exit at T1. Weekly downtrend forces 100% exit at T1. These regime-aware modifications are textbook professional practice.
+
+**Verdict: Well aligned.** Position sizing is one of the most swing-trade-competent components in the entire system.
+
+---
+
+## Portfolio Optimizer (`core/portfolio_optimizer.py`)
+
+**Greedy sector cap** with soft-cap fallback and tie-breaking: appropriate diversification logic to avoid sector concentration.
+
+**`min_conviction` by regime:**
+```
+DEFENSIVE: 0.70 (very selective in bear markets)
+HIGH:      0.45
+RECOVERY:  0.40
+NORMAL:    no override
+LOW:       0.20 (permissive in calm markets)
+```
+
+The LOW regime threshold (0.20) is permissive but self-limiting: conviction scores below 0.40 produce HOLD verdicts with 10% base allocation and 0.45 weight, so low-conviction candidates in LOW regime receive very small position sizes. The 0.20 threshold is more permissive than ideal but not operationally harmful given the sizing mechanics downstream.
+
+**Verdict: Aligned.**
+
+---
+
+## Historical Scorer (`core/historical_scorer.py`)
+
+**Two-tier win rate system:**
+1. Debate-history win rate: BUY/STRONG_BUY with confidence > 0.50 in past runs
+2. Realized outcome win rate: actual trade P&L from `BacktestMemory`
+
+The realized outcome tier is the correct final arbiter. The two-tier approach (fall back to debate history if realized outcomes < 10 records) is pragmatic given limited backtest data early in the system's life.
+
+**`_MIN_RECORDS_FOR_ADJUSTMENT = 10`:** Most tickers will have < 10 records until the system has been running for some time. In practice, the historical scorer is largely inactive for new tickers — which is correct behavior (avoid adjusting scores based on insufficient statistical evidence).
+
+**`_EV_HIGH_THRESHOLD = 3.0%`** (avg P&L ≥ 3% = bonus): Maps correctly to the 3–10% swing trade target. Appropriate.
+
+**No time-decay on historical records:** Past records from different market regimes are weighted equally. A BUY signal from 18 months ago in a different regime affects conviction scoring equally to one from 2 months ago. This is a known limitation but not a fundamental misalignment.
+
+**Verdict: Conceptually aligned.** The realized P&L tier is correctly designed.
+
+---
+
+## System-Level Summary
+
+### What Is Well Aligned (Part II)
+
+1. **Regime pipeline:** Detection → propagation → ATR stops → conviction gates → position sizing → partial exit. Fully consistent end-to-end.
+2. **Price computation isolation:** Python computes all OHLCV-derived numbers. LLMs only interpret. Prevents hallucinated prices in trade decisions.
+3. **IDX-specific mechanics:** ARA/ARB detection, tick-size snapping, T+2 settlement note, IDX circuit breaker awareness, Indonesian trading session windows, IDX holiday calendar in staleness calculations.
+4. **Exit discipline:** Two-tranche exits, ATR trailing stops, regime-sensitive T1 pct, anti-averaging-down rules — genuine swing portfolio management.
+5. **Data quality gates:** XLSX staleness blocking pipeline after 5 days, degrading after 3 days.
+
+### What Is Not Well Aligned (Part II)
+
+1. **Fundamental Scout BULLISH/BEARISH = value signal, not swing timing signal.** Contaminates debate rounds for above-FV momentum candidates throughout all rounds. Partially mitigated by FAIL/PASS matrix (Task E) but structurally embedded.
+
+2. **Chartist stop reference (1.5× ATR) doesn't match Python envelope (2.5× ATR).** LLM debate arguments about stop validity are semantically disconnected from the actual executed stop. Final output is unaffected; debate quality suffers.
+
+3. **CIO catalyst bonus covers 30 days, not 1–3 months.** Minor calibration error in Phase B.
+
+4. **Volume gate threshold (0.30×) too permissive.** Candidates with 30–60% of average volume reach the debate engine, diluting momentum quality.
+
+5. **Evidence ranker weights: fundamental > technical.** Directionally wrong for swing trading context. Practical impact modest.
+
+---
+
+## Part II Summary Verdict
+
+```
+PART II STRATEGIC ALIGNMENT VERDICT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Overall alignment (excluding the 4 Part I areas):   MOSTLY ALIGNED
+
+The 1-3 month frame is consistently applied across
+all prompts, schemas, calibration rules, and exit
+mechanics. The regime pipeline is the best-engineered
+component: end-to-end from detection through position
+sizing with zero gaps.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Most aligned: Position Sizer + Regime Pipeline
+  - ATR-trailing stop, lot sizing, partial exit, and
+    regime-sensitive T1 allocation are all correctly
+    conceived swing trade mechanics.
+  - Regime propagation is complete and consistent.
+
+Partially misaligned: Fundamental Scout
+  - BULLISH/BEARISH output uses value investing framing
+    (price vs fair value), not swing timing framing.
+  - The scout should surface fundamental context as
+    evidence, not as a directional verdict. Direction
+    belongs to the chartist and CIO synthesis.
+
+Minor gaps:
+  - Chartist stop mismatch (debate quality only;
+    final output unaffected)
+  - CIO 30-day catalyst bonus bias (±0.02 confidence)
+  - Volume gate too permissive (0.30× vs recommended
+    0.80× for momentum screening)
+  - Evidence ranker category weights favor fundamental
+    over technical
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+COMBINED VERDICT (Part I + Part II):
+
+The system has a coherent 1-3 month swing framework
+everywhere except where fundamental fair value was
+allowed to determine trade targets (Part I) and where
+the fundamental scout was given a directional output
+slot that contaminates momentum analysis (Part II).
+
+The infrastructure is correctly built. The philosophy
+is correctly stated. Two specific design decisions —
+FV ceiling on targets, FV framing on scout output —
+import value investing logic into swing timing slots
+where it doesn't belong.
+
+Fixing these two decisions would produce a genuinely
+consistent 1-3 month swing trading system.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+---
+
+## Prioritized Fix List (Part II Only)
+
+**P1 — Volume gate threshold (quick fix, high impact):**
+Raise `min_volume_surge_for_candidate` from `0.30` to `0.80` in `core/quant_filter/config.py`. A stock at 80% average volume is showing normal activity; a stock at 30% is showing disengagement.
+
+**P2 — Fundamental Scout directional output (medium effort, structural):**
+Remove BULLISH/BEARISH from `fundamental_scout.txt` output format. Replace with a neutral output:
+```
+Valuation Context: UNDERVALUED / FAIRLY_VALUED / OVERVALUED
+Quality Flag: PASS / CONDITIONAL / FAIL
+Catalyst: [event within 1-3 months or NONE]
+Agent Confidence: 0.xx
+```
+This removes the value investing directional vote from the fundamental slot while preserving all the useful information (quality, valuation context, catalyst). The CIO uses these fields directly anyway.
+
+**P3 — Chartist stop reference:**
+Update `chartist.txt` STEP 4 from "1.5 × ATR" to "2.5 × ATR (or 3.0 × ATR in DEFENSIVE regime)" to match `REGIME_ATR_STOP_MULTIPLIER`.
+
+**P4 — CIO catalyst bonus window:**
+Change Phase B from "within 30 days" to "within 1–3 months" in `cio_judge.txt`.
+
+**P5 — Evidence ranker weights:**
+Adjust `CATEGORY_WEIGHTS` in `services/evidence_ranker.py`:
+```python
+"technical": 0.95,      # was 0.85 — primary timing signal
+"fair_value": 0.85,     # was 1.00
+"fundamental": 0.80,    # was 0.90
+```
+
+---
+
+*Part II audit covers codebase state as of 2026-06-22. Excludes R/R Threshold, Target Price, Fair Value Threshold, and Risk Governor — those are assessed in Part I above.*

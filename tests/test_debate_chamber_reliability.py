@@ -1489,16 +1489,16 @@ def test_trade_envelope_swing_cap_is_operative_ceiling_when_fv_below_entry():
 
 def test_trade_envelope_uses_resistance_when_below_rr_seed():
     # Task B: when high_20d sits between entry_high (127) and the 2.0x R/R
-    # seed (145), resistance-first picks high_20d as the target, not the seed.
-    # Geometry: entry_high=127, stop=118, seed=145, high_20d=139 → R/R≈1.33.
+    # seed (143), resistance-first picks high_20d as the target, not the seed.
+    # Geometry: entry_high=127, stop=119, seed=143, high_20d=139 → R/R=1.5.
     chamber = _chamber()
     envelope = chamber._compute_trade_envelope(
         current_price=127.0,
         fair_value=423.0,
-        tech={"ma50": 140.0, "sma20": 133.0, "atr14": 5.0, "high_20d": 139.0},
+        tech={"ma50": 140.0, "sma20": 133.0, "atr14": 3.0, "high_20d": 139.0},
     )
     assert not envelope.get("rejected")
-    assert envelope["target_price"] == 139  # resistance, not seed (145) or swing cap (140)
+    assert envelope["target_price"] == 139  # resistance, not seed (143) or swing cap
     assert "20-Day" in envelope["target_basis"]
 
 
