@@ -36,6 +36,7 @@ from utils.trade_math import is_lq45_ticker
 from utils.technicals import (
     REGIME_ATR_STOP_MULTIPLIER,
     REGIME_ATR_STOP_MULTIPLIER_DEFAULT,
+    compute_52w_range_signal,
     compute_atr,
     compute_bollinger,
     compute_macd,
@@ -828,6 +829,17 @@ def _analyze_ticker(
     # ── Task 2: Weekly Trend ──────────────────────────────────────────────────
     weekly_trend_data = compute_weekly_trend(weekly_df)
 
+    # ── P3.4: 52-Week Range Signal ────────────────────────────────────────────
+    range_52w_signal: str | None = None
+    if weekly_df is not None and len(weekly_df) >= 4:
+        try:
+            recent_52w = weekly_df.tail(52)
+            high_52w = float(recent_52w["High"].max())
+            low_52w = float(recent_52w["Low"].min())
+            range_52w_signal = compute_52w_range_signal(current_px, high_52w, low_52w)
+        except Exception:
+            pass
+
     # ── Tasks 10, 11, 12: MACD / Pattern / BB / Divergence / Gap / Compression
     macd_data = compute_macd(close)
     candle_data = detect_candlestick_pattern(df_t)
@@ -889,6 +901,8 @@ def _analyze_ticker(
         "weekly_ma13": weekly_trend_data["weekly_ma13"],
         "weekly_ma26": weekly_trend_data["weekly_ma26"],
         "weekly_above_ma13": weekly_trend_data["weekly_above_ma13"],
+        # P3.4
+        "range_52w_signal": range_52w_signal,
         # Task 10
         "macd_histogram": macd_data["histogram"],
         "macd_histogram_state": macd_data["histogram_state"],

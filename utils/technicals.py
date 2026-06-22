@@ -899,3 +899,34 @@ def compute_volume_profile(
         "hvn_levels": [round(p, 0) for p in hvn_mids],
         "lvn_levels": [round(p, 0) for p in lvn_mids],
     }
+
+
+def compute_52w_range_signal(
+    current_price: float,
+    high_52w: float,
+    low_52w: float,
+) -> str | None:
+    """Return a label describing where current price sits in its 52-week range.
+
+    Labels: NEAR_52W_HIGH (≥80th pct) / ABOVE_MID (≥55) / BELOW_MID (≥25) / NEAR_52W_LOW (<25).
+    Returns None when inputs are invalid or the range collapses to zero.
+    """
+    if not (current_price > 0 and high_52w > 0 and low_52w > 0):
+        return None
+    rng = high_52w - low_52w
+    if rng <= 0:
+        return None
+    pct = round((current_price - low_52w) / rng * 100.0, 1)
+    if pct >= 80.0:
+        label = "NEAR_52W_HIGH"
+    elif pct >= 55.0:
+        label = "ABOVE_MID"
+    elif pct >= 25.0:
+        label = "BELOW_MID"
+    else:
+        label = "NEAR_52W_LOW"
+    mid = round((high_52w + low_52w) / 2.0, 0)
+    return (
+        f"52W RANGE: {label} — persentil ke-{pct:.1f} "
+        f"(Low Rp {low_52w:,.0f} – High Rp {high_52w:,.0f}, Mid Rp {mid:,.0f})"
+    )

@@ -230,6 +230,8 @@ def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
             f"- **Weekly Trend**: {_format_weekly_trend(top1)} "
             f"(MA13 {top1.get('weekly_ma13', 'N/A')} / MA26 {top1.get('weekly_ma26', 'N/A')})"
         )
+        if top1.get("range_52w_signal"):
+            lines.append(f"- **{top1['range_52w_signal']}**")
         lines.append(
             f"- **Momentum**: Harga Rp {top1['Current Price']:,.0f} di atas "
             f"SMA-20 (Rp {top1['SMA 20']:,.0f}). {top1['Entry Strategy']}."
