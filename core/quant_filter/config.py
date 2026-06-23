@@ -553,6 +553,30 @@ LQ45_MEMBERS: list[str] = [
     "UNTR", "UNVR",
 ]
 
+# ── IDX80 Members (per InvestasiKu update Mei 2026) ──────────────────────────
+# IDX80 = 80 most liquid stocks by market cap + liquidity + fundamentals.
+# LQ45 ⊂ IDX80. BUKA excluded (delisting Sept 2024). BREN exited May 2026 rebalancing.
+# Review setiap rebalancing IDX80 (Februari & Agustus).
+IDX80_MEMBERS: list[str] = [
+    "AADI", "ACES", "ADMR", "ADRO", "AKRA", "AMMN", "AMRT", "ANTM", "ARTO", "ASII",
+    "BBCA", "BBNI", "BBRI", "BBTN", "BKSL", "BMRI", "BRMS", "BRPT", "BSDE", "BUMI",
+    "CBDK", "CMRY", "CPIN", "CTRA", "CUAN",
+    "DEWA", "DSNG",
+    "ELSA", "EMTK", "ENRG", "ERAA", "ESSA", "EXCL",
+    "GGRM", "GOTO",
+    "HEAL", "HRTA", "HRUM",
+    "ICBP", "INCO", "INDF", "INDY", "INKP", "INTP", "ISAT", "ITMG",
+    "JPFA", "JSMR",
+    "KIJA", "KLBF", "KPIG",
+    "MAPA", "MAPI", "MBMA", "MDKA", "MEDC", "MIKA", "MYOR",
+    "PANI", "PGAS", "PGEO", "PNLF", "PTBA", "PTRO", "PWON",
+    "RAJA", "RATU",
+    "SCMA", "SIDO", "SMGR", "SMRA", "SSIA",
+    "TAPG", "TLKM", "TOWR", "TPIA",
+    "UNTR", "UNVR",
+    "WIFI",
+]
+
 
 # ── Task 6: Free Float Estimates ─────────────────────────────────────────────
 # Estimates based on public ownership data (KSEI, IDX disclosure, annual reports).
@@ -610,6 +634,61 @@ FREE_FLOAT_ESTIMATES: dict[str, float] = {
     "MAPI": 0.50,   # PT Satya Mulia Gema Gemilang ~49.7% → float ~50% (AR 2023)
     "MBMA": 0.32,   # PT Merdeka Copper Gold (MDKA) ~68.2% → float ~32% (prospektus IPO 2023)
     "MIKA": 0.27,   # PT Karya Bersama Anugerah ~73.2% → float ~27% (AR 2023)
+    # ── IDX80 expansion (verified dari web search / AR / IndoPremier, update Jun 2026) ─
+    # Pemerintah/BUMN
+    "BBTN": 0.40,   # Pemerintah RI ~60% → float ~40%
+    "ELSA": 0.49,   # PT Pertamina Hulu Energi (PHE) ~51% → float ~49%
+    "JSMR": 0.30,   # Pemerintah RI ~70% → float ~30%
+    # Prajogo Pangestu group
+    "BRPT": 0.29,   # Prajogo Pangestu voting rights ~71% → float ~29% (Jan 2025)
+    "CUAN": 0.15,   # Prajogo Pangestu ~84.97% → float ~15% (HIGH manipulation risk)
+    "TPIA": 0.09,   # BRPT 34.63% + SCG Chemicals 30.57% + Top Investment 15% + Prajogo 5% ≈ 85% → float ~9%
+    # Adaro/Thohir group
+    "AADI": 0.19,   # Adaro Strategic 41.09% + Alamtri (ADRO) 15.37% + affiliates 18.85% + Garibaldi 5.83% ≈ 81% → float ~19% (Oct 2025)
+    "ADMR": 0.16,   # PT Alamtri Resources Indonesia (ADRO) ~83.84% → float ~16% (Q3 2024)
+    # Bakrie group
+    "BUMI": 0.40,   # Mach Energy (HK)/Bakrie+Salim 45.78% + affiliates → float ~40% (approx Dec 2025)
+    "BRMS": 0.42,   # Emirates Tarian Global 25.1% + BUMI 2.87% → public float 41.52% (Sep 2025)
+    "DEWA": 0.60,   # Controlling entity (Nirwan Bakrie UBO) ~11.5%; diverse non-controlling → float ~60% (Jan 2025)
+    "ENRG": 0.52,   # PT Shima Global Kapital (Bakrie) ~18.15%; Trimegah Sekuritas (custodian) 23.33%; public 58.52% → float ~52%
+    # PIK/Agung Sedayu group
+    "BKSL": 0.31,   # PT Sakti Generasi Perdana ~69.47% → float ~31%
+    "CBDK": 0.45,   # PT Pantai Indah Kapuk Dua (PANI/Aguan) ~45.9% → float ~45%
+    "PANI": 0.10,   # PT Multi Artha Pratama (Agung Sedayu+Salim) ~89.92% → float ~10% (EXTREME manipulation risk)
+    # Other property
+    "CTRA": 0.47,   # PT Sang Pelopor (Ciputra family) ~53.31% → float ~47%
+    "KIJA": 0.48,   # Founders (Setyono Djuandi+Aida Garnida) + Mu'min Ali 21.08% + IDB 11.52% → float ~48% (Nov 2025)
+    "PWON": 0.31,   # Pakuwon Arthaniaga (Tedja family) ~68.68% → float ~31%
+    "SMRA": 0.58,   # PT Semarop Agung ~36% + Liliawati Rahardjo ~5.72% → float ~58% (Apr 2026)
+    "SSIA": 0.52,   # Public (<5% holders) 52.26%; Djarum 10.24% + Persada Capital 7.85% non-controlling (Apr 2026)
+    # Consumer/retail
+    "ACES": 0.40,   # PT Kawan Lama Sejahtera ~60% → float ~40% (Oct 2024)
+    "CMRY": 0.24,   # Bambang Sutantio 53.56% + family 21.63% → float ~24% (Q3 2023)
+    "ERAA": 0.45,   # PT Eralink International ~55.17% → float ~45%
+    "MAPA": 0.43,   # PT Mitra Adiperkasa (MAPI) ~57% → float ~43% (AR 2023)
+    "MYOR": 0.41,   # UNITA BRANINDO 32.93% + MAYORA DHANA UTAMA 26.14% → float ~41% (Q3 2024)
+    # Energy/mining
+    "DSNG": 0.38,   # Triputra affiliates (Persada 23.24% + Investindo 22.93% + TRI NUR 7.44% + Daya 14.02% + Gochean 10.9%) → float ~38%
+    "ESSA": 0.55,   # PT Trinugraha Akraya Sejahtera 23.1% + Chander Laroya ~18.88% → float ~55% (approx 2025)
+    "HRTA": 0.29,   # PT Terang Anugerah Abadi ~71% → float ~29% (Jul 2025)
+    "HRUM": 0.17,   # PT Karunia Bara Perkasa ~79.79% → float ~17% (Apr 2026)
+    "INDY": 0.29,   # Indika Inti 37.78% + Teladan 28.08% + Pandri 5.09% ≈ 71% → float ~29% (Sep 2025)
+    "PTRO": 0.28,   # PT Kreasi Jasa Persada (CUAN) 45.31% + PT Caraka Reksa Optima 27.17% → float ~28% (Aug 2025)
+    "TAPG": 0.14,   # Triputra affiliates ~85.98% → float ~14% (EXTREME manipulation risk)
+    "WIFI": 0.45,   # PT Investasi Sukses Bersama ~54.71% → float ~45%
+    # Banking/financial
+    "ARTO": 0.37,   # MEI/Jerry Ng 29.81% + WTT/Patrick 11.69% + GoTo 21.4% ≈ 63%; GIC 9.12% + public 27.98% = ~37% investable float
+    "PNLF": 0.32,   # PT Paninvest Tbk (Panin Group/Gunawan family) ~67.89% → float ~32% (May 2026)
+    # Healthcare
+    "HEAL": 0.67,   # Controllers (Yulisar+Binsar+Hasmoro+Meijani) 25.08%; large institutional float ~67% (Sep 2025)
+    # Media/entertainment
+    "KPIG": 0.50,   # MNC Asia Holding (BHIT) 21.37% + HT Investment 9% → float ~50% (approx Jun 2025)
+    "SCMA": 0.39,   # PT Elang Mahkota Teknologi (EMTK) ~61.09% → float ~39% (Dec 2024)
+    # Energy infrastructure
+    "RAJA": 0.36,   # PT Sentosa Bersama 36.07% + Happy Hapsoro 28.23% → float ~36%
+    "RATU": 0.31,   # PT Rukun Raharja (RAJA) ~68.68% → float ~31% (Apr 2026)
+    # Pharma/consumer health
+    "SIDO": 0.21,   # PT Hotel Candi Baru (Hidayat family) ~77.59% → float ~21% (Sep 2025)
 }
 
 # Float < 15% → HIGH manipulation risk; < 25% → MEDIUM; else LOW
@@ -632,6 +711,7 @@ __all__ = [
     "FREE_FLOAT_ESTIMATES",
     "FREE_FLOAT_MANIPULATION_THRESHOLD",
     "FREE_FLOAT_NEEDS_VERIFICATION",
+    "IDX80_MEMBERS",
     "LQ45_MEMBERS",
     "MAX_XLSX_AGE_HARD_BLOCK_DAYS",
     "assess_xlsx_staleness",
