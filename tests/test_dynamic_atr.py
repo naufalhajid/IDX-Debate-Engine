@@ -131,6 +131,16 @@ def test_full_result_is_dataclass_instance(idx_like_prices):
     assert full.method in {"garch", "classic_fallback", "classic"}
 
 
+def test_tgarch_model_reports_asymmetric_metadata(idx_like_prices):
+    full = compute_dynamic_atr_full(idx_like_prices, model_type="tgarch")
+    assert isinstance(full, DynamicATRResult)
+    assert full.model_type == "tgarch"
+    assert full.method in {"tgarch", "classic_fallback"}
+    if full.method == "tgarch":
+        assert full.gamma is not None
+        assert full.aic is not None
+
+
 # ── period scaling ─────────────────────────────────────────────────────────────
 
 def test_period_1_smaller_than_period_14(idx_like_prices):

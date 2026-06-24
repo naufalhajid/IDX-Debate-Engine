@@ -24,8 +24,8 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from core.backtester.metrics_calculator import calculate_deflated_sharpe_ratio
 from scripts.historical_backtest import replay_ticker
-from src.evaluation.backtest_metrics import calculate_deflated_sharpe_ratio
 
 _BENCHMARK_SR = 0.5  # swing trading threshold
 
@@ -193,7 +193,7 @@ def main() -> None:
 
     print(f"Walk-forward backtest  {args.insample}d IS / {args.oos}d OOS")
     print(f"Min data needed: {min_days_needed} trading days ≈ {min_days_needed / 252:.1f} years")
-    print(f"Reporting: Deflated Sharpe Ratio (Bailey & Lopez de Prado, 2014)")
+    print("Reporting: Deflated Sharpe Ratio (Bailey & Lopez de Prado, 2014)")
     print()
 
     ticker_results: dict[str, dict] = {}

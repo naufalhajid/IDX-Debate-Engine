@@ -490,6 +490,43 @@ def test_compute_val_score_ocf_price_primary_when_available():
     assert score == pytest.approx(w * (0.50 * 1.00 + 0.50 * 0.10))
 
 
+def test_compute_sector_ocf_percentiles_only_ranks_positive_values():
+    frame = pd.DataFrame(
+        {
+            "Sector": ["energy", "energy", "energy", "consumer", "consumer"],
+            "OCF_Price_Ratio": [0.02, 0.10, 0.0, 0.03, -0.01],
+        }
+    )
+
+    pct = pipeline._compute_sector_ocf_percentiles(frame)
+
+    assert pct.iloc[0] == pytest.approx(0.5)
+    assert pct.iloc[1] == pytest.approx(1.0)
+    assert pct.iloc[2] == pytest.approx(0.0)
+    assert pct.iloc[3] == pytest.approx(1.0)
+    assert pct.iloc[4] == pytest.approx(0.0)
+
+
+def test_compute_val_score_blends_ocf_absolute_and_sector_percentile():
+    cfg = _analysis_cfg()
+    w = cfg["weight_valuation"]
+    row = pd.Series(
+        {
+            "Sector": "default",
+            "Valuation_Gap_Pct": 2.0,
+            "Current EPS (TTM)": 10.0,
+            "Close Price": 200.0,
+            "OCF/Price": 0.03,
+            "OCF_Price_Sector_Pctile": 0.90,
+        }
+    )
+
+    score = pipeline._compute_val_score(row, cfg)
+
+    ocf_tier = 0.65 * 0.40 + 0.35 * 1.00
+    assert score == pytest.approx(w * (0.50 * ocf_tier + 0.50 * 0.10))
+
+
 def test_compute_prof_score_roe_tiers():
     """Prof_Score follows the absolute ROE tiers; non-positive ROE scores 0."""
     cfg = _analysis_cfg()

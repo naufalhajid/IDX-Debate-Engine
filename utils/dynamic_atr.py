@@ -39,9 +39,12 @@ class DynamicATRResult:
     value: float
     method: str
     fallback_reason: str | None = None
+    model_type: str = "garch"
     alpha: float | None = None
     beta: float | None = None
+    gamma: float | None = None
     persistence: float | None = None
+    aic: float | None = None
 
 
 def calculate_dynamic_atr(
@@ -49,6 +52,7 @@ def calculate_dynamic_atr(
     period: int = 14,
     use_garch: bool = True,
     fit_window: int = 120,
+    model_type: str = "garch",
 ) -> float:
     """GARCH(1,1) dynamic ATR — returns a single float (Rupiah).
 
@@ -66,7 +70,7 @@ def calculate_dynamic_atr(
     """
     if not use_garch:
         return _classic_atr(prices, period)
-    return _compute_dynamic_atr(prices, period, fit_window).value
+    return _compute_dynamic_atr(prices, period, fit_window, model_type).value
 
 
 def compute_dynamic_atr_full(
@@ -74,17 +78,29 @@ def compute_dynamic_atr_full(
     period: int = 14,
     use_garch: bool = True,
     fit_window: int = 120,
+    model_type: str = "garch",
 ) -> DynamicATRResult:
     """Same as calculate_dynamic_atr but returns full diagnostic DynamicATRResult."""
     if not use_garch:
         return DynamicATRResult(value=_classic_atr(prices, period), method="classic")
-    return _compute_dynamic_atr(prices, period, fit_window)
+    return _compute_dynamic_atr(prices, period, fit_window, model_type)
 
 
 # ── internals ─────────────────────────────────────────────────────────────────
 
-def _compute_dynamic_atr(prices: pd.Series, period: int, fit_window: int) -> DynamicATRResult:
+def _normalize_model_type(model_type: str) -> str:
+    normalized = str(model_type or "garch").strip().lower()
+    return "tgarch" if normalized in {"tgarch", "tarch", "gjr"} else "garch"
+
+
+def _compute_dynamic_atr(
+    prices: pd.Series,
+    period: int,
+    fit_window: int,
+    model_type: str,
+) -> DynamicATRResult:
     classic_atr = _classic_atr(prices, period)
+    model_type = _normalize_model_type(model_type)
 
     if len(prices) < _MIN_BARS_FOR_GARCH:
         logger.debug(
@@ -95,27 +111,30 @@ def _compute_dynamic_atr(prices: pd.Series, period: int, fit_window: int) -> Dyn
             value=classic_atr,
             method="classic_fallback",
             fallback_reason="insufficient_data",
+            model_type=model_type,
         )
 
     try:
-        garch_result = _garch_atr(prices, period, fit_window)
+        garch_result = _garch_atr(prices, period, fit_window, model_type)
     except Exception as exc:
         logger.warning(f"[DynATR] GARCH exception: {type(exc).__name__}: {exc} — classic fallback")
         return DynamicATRResult(
             value=classic_atr,
             method="classic_fallback",
-            fallback_reason=f"garch_exception:{type(exc).__name__}",
+            fallback_reason=f"{model_type}_exception:{type(exc).__name__}",
+            model_type=model_type,
         )
 
     if garch_result is None:
         return DynamicATRResult(
             value=classic_atr,
             method="classic_fallback",
-            fallback_reason="garch_non_convergence",
+            fallback_reason=f"{model_type}_non_convergence",
+            model_type=model_type,
         )
 
-    garch_value, alpha, beta = garch_result
-    persistence = alpha + beta
+    garch_value, alpha, beta, gamma, aic = garch_result
+    persistence = alpha + beta + ((gamma or 0.0) / 2.0)
 
     cap = _GARCH_CAP_MULTIPLIER * classic_atr
     if garch_value > cap:
@@ -124,24 +143,35 @@ def _compute_dynamic_atr(prices: pd.Series, period: int, fit_window: int) -> Dyn
         )
         return DynamicATRResult(
             value=cap,
-            method="garch",
+            method=model_type,
             fallback_reason="variance_cap_applied",
+            model_type=model_type,
             alpha=alpha,
             beta=beta,
+            gamma=gamma,
             persistence=persistence,
+            aic=aic,
         )
 
     return DynamicATRResult(
         value=garch_value,
-        method="garch",
+        method=model_type,
+        model_type=model_type,
         alpha=alpha,
         beta=beta,
+        gamma=gamma,
         persistence=persistence,
+        aic=aic,
     )
 
 
-def _garch_atr(prices: pd.Series, period: int, fit_window: int) -> tuple[float, float, float] | None:
-    """Fit GARCH(1,1) on log-returns. Returns (atr_rp, alpha, beta) or None on failure."""
+def _garch_atr(
+    prices: pd.Series,
+    period: int,
+    fit_window: int,
+    model_type: str,
+) -> tuple[float, float, float, float | None, float] | None:
+    """Fit GARCH/TGARCH on log-returns and return ATR plus fitted params."""
     try:
         from arch import arch_model
     except ImportError:
@@ -161,7 +191,9 @@ def _garch_atr(prices: pd.Series, period: int, fit_window: int) -> tuple[float, 
             log_returns,
             vol="GARCH",
             p=1,
+            o=1 if model_type == "tgarch" else 0,
             q=1,
+            power=1.0 if model_type == "tgarch" else 2.0,
             dist="normal",
             mean="Zero",
         )
@@ -186,11 +218,16 @@ def _garch_atr(prices: pd.Series, period: int, fit_window: int) -> tuple[float, 
         beta = float(result.params["beta[1]"])
     except KeyError:
         return None
+    gamma = float(result.params.get("gamma[1]", 0.0)) if model_type == "tgarch" else None
 
     # Stationarity check: α + β < 1
-    if not (alpha >= 0 and beta >= 0 and (alpha + beta) < 1.0):
+    persistence = alpha + beta + ((gamma or 0.0) / 2.0)
+    if not (alpha >= 0 and beta >= 0 and persistence < 1.0):
         logger.warning(
-            f"[DynATR] GARCH non-stationary: α={alpha:.4f}, β={beta:.4f}, α+β={alpha+beta:.4f}"
+            f"[DynATR] GARCH non-stationary: α={alpha:.4f}, β={beta:.4f}, "
+            f"γ={gamma:.4f}, persistence={persistence:.4f}"
+            if gamma is not None
+            else f"[DynATR] GARCH non-stationary: α={alpha:.4f}, β={beta:.4f}, persistence={persistence:.4f}"
         )
         return None
 
@@ -206,7 +243,7 @@ def _garch_atr(prices: pd.Series, period: int, fit_window: int) -> tuple[float, 
     if not math.isfinite(garch_atr) or garch_atr <= 0:
         return None
 
-    return garch_atr, alpha, beta
+    return garch_atr, alpha, beta, gamma, float(result.aic)
 
 
 def _classic_atr(prices: pd.Series, period: int) -> float:

@@ -1099,6 +1099,21 @@ def test_fair_value_dcf_returns_none_when_ocf_zero():
     assert calc.fair_value_dcf() is None
 
 
+def test_fair_value_dcf_requires_stable_ocf_when_score_is_available():
+    calc = _consumer_calc(ocf_per_share=300.0)
+    calc.stats.ocf_stability_score = 0.20
+    assert calc.fair_value_dcf() is None
+
+    calc.stats.ocf_stability_score = 0.80
+    assert calc.fair_value_dcf() is not None
+
+
+def test_fair_value_dcf_rejects_stale_ocf_data():
+    calc = _consumer_calc(ocf_per_share=300.0)
+    calc.stats.keystats_age_days = fvc._STALE_KEYSTATS_DAYS + 1
+    assert calc.fair_value_dcf() is None
+
+
 def test_fair_value_dcf_derives_ocf_from_ttm_and_shares():
     # ocf_per_share=0 but derivable from ttm/shares
     calc = _consumer_calc(ocf_per_share=0.0, ocf_ttm=3_000_000_000, shares=10_000_000, price=5_000.0)

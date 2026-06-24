@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import date
 
 import numpy as np
+from scipy.stats import norm as _scipy_norm
 
 from core.backtest_memory import TradeOutcome
 
@@ -36,6 +37,9 @@ class BacktestMetrics:
     best_trade: TradeOutcome | None
     worst_trade: TradeOutcome | None
     deflated_sr: float | None = None  # DSR per Bailey & Lopez de Prado (2014)
+    probabilistic_sr: float | None = None
+    min_track_record_days: float | None = None
+    dsr_trials: int = 1
     by_ticker: dict[str, dict] = field(default_factory=dict)
     by_confidence_tier: list[TierMetrics] = field(default_factory=list)
     by_regime: dict[str, dict] = field(default_factory=dict)
@@ -67,7 +71,12 @@ def compute_metrics(
     avg_holding_days = sum(holding_days) / len(holding_days) if holding_days else None
 
     sharpe_ratio = _compute_sharpe(pnl_values, avg_holding_days)
-    deflated_sr = _compute_deflated_sharpe(pnl_values, avg_holding_days)
+    dsr_metrics = compute_deflated_sharpe_ratio(
+        pnl_values,
+        benchmark_sr=0.5,
+        n_trials=1,
+        avg_holding_days=avg_holding_days,
+    )
 
     scored = [r for r in records if r.pnl_pct is not None]
     best_trade = max(scored, key=lambda r: r.pnl_pct) if scored else None  # type: ignore[arg-type]
@@ -103,7 +112,10 @@ def compute_metrics(
         avg_pnl_pct=avg_pnl_pct,
         avg_holding_days=avg_holding_days,
         sharpe_ratio=sharpe_ratio,
-        deflated_sr=deflated_sr,
+        deflated_sr=dsr_metrics["deflated_sr"] if dsr_metrics else None,
+        probabilistic_sr=dsr_metrics["probabilistic_sr"] if dsr_metrics else None,
+        min_track_record_days=dsr_metrics["min_track_record_days"] if dsr_metrics else None,
+        dsr_trials=1,
         best_trade=best_trade,
         worst_trade=worst_trade,
         by_ticker=by_ticker,
@@ -148,24 +160,124 @@ def _compute_deflated_sharpe(
     the Probabilistic SR — the probability the true SR exceeds 0.5 (swing benchmark).
     Requires at least 4 trades.
     """
-    if len(pnl_values) < 4:
-        return None
-    avg_hold = (
-        avg_holding_days if (avg_holding_days and avg_holding_days >= 1) else _IDX_SWING_AVG_HOLD_DAYS
+    result = compute_deflated_sharpe_ratio(
+        pnl_values,
+        benchmark_sr=0.5,
+        n_trials=1,
+        avg_holding_days=avg_holding_days,
     )
-    freq = int(round(252.0 / avg_hold))
-    try:
-        from src.evaluation.backtest_metrics import calculate_deflated_sharpe_ratio
+    return result["deflated_sr"] if result else None
 
-        result = calculate_deflated_sharpe_ratio(
-            np.array(pnl_values, dtype=float),
-            benchmark_sr=0.5,
-            n_trials=1,
-            freq=freq,
-        )
-        return result["deflated_sr"]
-    except Exception:
+
+def calculate_deflated_sharpe_ratio(
+    returns: list[float] | np.ndarray,
+    *,
+    benchmark_sr: float = 0.0,
+    n_trials: int = 1,
+    freq: int | float | None = None,
+) -> dict[str, float | int | bool] | None:
+    """Compatibility API for callers that pass annualization frequency."""
+    avg_holding_days = None if freq is None or freq <= 0 else 252.0 / float(freq)
+    return compute_deflated_sharpe_ratio(
+        returns,
+        benchmark_sr=benchmark_sr,
+        n_trials=n_trials,
+        avg_holding_days=avg_holding_days,
+    )
+
+
+def compute_deflated_sharpe_ratio(
+    returns: list[float] | np.ndarray,
+    *,
+    benchmark_sr: float = 0.0,
+    n_trials: int = 1,
+    avg_holding_days: float | None = None,
+    confidence_level: float = 0.95,
+) -> dict[str, float | int | bool] | None:
+    """Compute Probabilistic SR and Deflated SR on per-trade returns."""
+    values = np.asarray(returns, dtype=float)
+    values = values[np.isfinite(values)]
+    n = int(values.size)
+    if n < 4:
         return None
+
+    sample_std = float(values.std(ddof=1))
+    if sample_std <= 1e-10:
+        return None
+
+    avg_hold = (
+        avg_holding_days
+        if avg_holding_days is not None and avg_holding_days >= 1
+        else _IDX_SWING_AVG_HOLD_DAYS
+    )
+    freq = max(1.0, 252.0 / avg_hold)
+
+    # Per-period SR for the formula; annualized SR for display.
+    # Bailey & Lopez de Prado (2014) eq. 5 requires per-period units throughout.
+    # benchmark_sr is accepted in annualized units and converted here.
+    sharpe_period = float(values.mean() / sample_std)
+    sharpe_annual = sharpe_period * math.sqrt(freq)
+    benchmark_sr_period = benchmark_sr / math.sqrt(freq)
+
+    centered = values - float(values.mean())
+    moment_std = float(np.sqrt(np.mean(centered**2)))
+    if moment_std <= 1e-10:
+        return None
+    standardized = centered / moment_std
+    skew = float(np.mean(standardized**3))
+    kurtosis = float(np.mean(standardized**4))
+
+    denom_sq = 1.0 - skew * sharpe_period + ((kurtosis - 1.0) / 4.0) * sharpe_period**2
+    if not math.isfinite(denom_sq) or denom_sq <= 0:
+        return None
+
+    denom = math.sqrt(denom_sq)
+    psr_z = (sharpe_period - benchmark_sr_period) * math.sqrt(n - 1) / denom
+    probabilistic_sr = _normal_cdf(psr_z)
+
+    trials = max(1, int(n_trials))
+    benchmark_adjusted_period = benchmark_sr_period
+    if trials > 1:
+        sr_std = denom / math.sqrt(n - 1)
+        euler_gamma = 0.5772156649015329
+        z1 = _normal_ppf(1.0 - 1.0 / trials)
+        z2 = _normal_ppf(1.0 - 1.0 / (trials * math.e))
+        benchmark_adjusted_period = benchmark_sr_period + sr_std * (
+            (1 - euler_gamma) * z1 + euler_gamma * z2
+        )
+
+    dsr_z = (sharpe_period - benchmark_adjusted_period) * math.sqrt(n - 1) / denom
+    deflated_sr = _normal_cdf(dsr_z)
+
+    min_track_record_days: float | None = None
+    delta = sharpe_period - benchmark_adjusted_period
+    if delta > 1e-12:
+        z_conf = _normal_ppf(confidence_level)
+        min_observations = 1.0 + denom_sq * (z_conf / delta) ** 2
+        min_track_record_days = float(math.ceil(min_observations * avg_hold))
+
+    return {
+        "sharpe_ratio": round(sharpe_annual, 6),
+        "probabilistic_sr": round(probabilistic_sr, 6),
+        "deflated_sr": round(deflated_sr, 6),
+        "expected_max_sr": round(benchmark_adjusted_period * math.sqrt(freq), 6),
+        "min_track_record_days": min_track_record_days,
+        "n_trials": trials,
+        "n_observations": n,
+        "skew": round(skew, 6),
+        "kurtosis": round(kurtosis, 6),
+        "is_significant": deflated_sr >= confidence_level,
+    }
+
+
+def _normal_cdf(value: float) -> float:
+    return float(_scipy_norm.cdf(value))
+
+
+def _normal_ppf(probability: float) -> float:
+    if probability <= 0.0 or probability >= 1.0:
+        raise ValueError("probability must be between 0 and 1")
+    return float(_scipy_norm.ppf(probability))
 
 
 def _compute_tiers(records: list[TradeOutcome]) -> list[TierMetrics]:

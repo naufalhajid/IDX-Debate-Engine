@@ -17,6 +17,8 @@ import xml.etree.ElementTree as ET
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from services.indonesian_nlp import detect_language, preprocess_indonesian_text
+
 NEWS_LOOKBACK_DAYS = 60
 MAX_NEWS_ITEMS = 10
 BREAKING_NEWS_HOURS = 48
@@ -768,6 +770,12 @@ class NewsFetcher:
                 ]
             )
 
+        if bundle.items:
+            titles_sample = " ".join(item.title for item in bundle.items)
+            lang = detect_language(titles_sample)
+            lang_label = {"id": "Bahasa Indonesia", "mixed": "ID/EN", "en": "English"}.get(lang, "mixed")
+            lines.append(f"Language: {lang_label}")
+
         lines.extend(["", "TOP NEWS:"])
         for index, item in enumerate(bundle.items[:5], 1):
             published = item.published_at[:10] if item.published_at else "unknown"
@@ -912,7 +920,7 @@ def _extract_text(raw: dict) -> str:
         add(content.get("description"))
     add(raw.get("summary"))
     add(raw.get("description"))
-    return " ".join(parts)
+    return preprocess_indonesian_text(" ".join(parts))
 
 
 def _extract_url(raw: dict) -> str | None:

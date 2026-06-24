@@ -12,6 +12,8 @@ from datetime import date
 # Source: Damodaran Online country risk premium spreadsheet.
 # Last updated: 2026-06-23, using Damodaran April 1, 2026 country ERP table.
 DAMODARAN_COUNTRY_RISK_UPDATE = date(2026, 4, 1)
+DAMODARAN_ANNUAL_REVIEW_MONTH = 1
+DAMODARAN_ANNUAL_REVIEW_DAY = 15
 
 MATURE_MARKET_PREMIUM = 0.0477
 INDONESIA_CRP = 0.027801136981829278
@@ -65,3 +67,19 @@ def idx_tick_size(price: float) -> int:
     if price < 5000:
         return TICK_2000_5000
     return TICK_ABOVE_5000
+
+
+def next_damodaran_review_date(last_update: date | None = None) -> date:
+    """Return the January review date after the latest recorded Damodaran update."""
+    ref = last_update or DAMODARAN_COUNTRY_RISK_UPDATE
+    next_year = ref.year + 1
+    return date(
+        next_year,
+        DAMODARAN_ANNUAL_REVIEW_MONTH,
+        DAMODARAN_ANNUAL_REVIEW_DAY,
+    )
+
+
+def damodaran_review_due(today: date | None = None) -> bool:
+    """True once the annual January ERP refresh should be re-checked."""
+    return (today or date.today()) >= next_damodaran_review_date()

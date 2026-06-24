@@ -178,14 +178,24 @@ def refresh_macro_rates(stockbit_client: Any | None = None) -> dict:
     return result
 
 
-def get_live_sbn_10y() -> float:
+def get_live_sbn_10y(
+    *,
+    refresh_if_stale: bool = False,
+    stockbit_client: Any | None = None,
+) -> float:
     """
     Return the best available SBN 10Y yield estimate.
-    Reads from cache if fresh, else falls back to settings.SBN_10Y_YIELD.
+    Reads from cache if fresh. If refresh_if_stale=True, refreshes the cache
+    before falling back to settings.SBN_10Y_YIELD.
     """
     cached = load_cached_macro_rates()
     if cached:
         val = cached.get("sbn_10y")
         if val is not None and 0.01 < float(val) < 0.30:  # sanity: 1%–30%
+            return float(val)
+    if refresh_if_stale:
+        refreshed = refresh_macro_rates(stockbit_client=stockbit_client)
+        val = refreshed.get("sbn_10y")
+        if val is not None and 0.01 < float(val) < 0.30:
             return float(val)
     return get_settings().SBN_10Y_YIELD

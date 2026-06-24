@@ -159,6 +159,7 @@ CONFIG = {
     "min_adt_20d": 10_000_000_000,   # Rp 10B — still 2x original, opens mid-caps
     "max_atr_pct": 0.05,             # 5% — IDX mid-caps naturally more volatile
     "USE_GARCH_ATR": True,           # use GARCH(1,1) dynamic ATR (utils.dynamic_atr); falls back to classic on non-convergence
+    "DYNAMIC_ATR_MODEL": "garch",     # set "tgarch" to validate asymmetric-vol sizing
     "min_bars": 60,
     # ── Volume Filter
     # Volume Surge Scoring Tiers (masuk ke scoring, bukan sekadar gate)
@@ -207,6 +208,8 @@ CONFIG = {
     "weight_price_momentum": int(BULL_MOMENTUM_WEIGHT * 100) - 8,
     "value_ocf_weight": 0.50,
     "value_graham_pe_weight": 0.50,
+    "value_ocf_absolute_weight": 0.65,
+    "value_ocf_sector_pctile_weight": 0.35,
     "profitability_rnoa_weight": 0.70,
     "profitability_roe_weight": 0.30,
     "ocf_yield_tier1": 0.15,

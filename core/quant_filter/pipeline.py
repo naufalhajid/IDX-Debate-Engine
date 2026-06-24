@@ -136,6 +136,31 @@ def _ocf_price_ratio_from_row(row: pd.Series | dict) -> float:
     return calculate_ocf_price_ratio(ocf, shares, price)
 
 
+def _ocf_sector_percentile_tier(percentile: float) -> float:
+    """Convert sector-relative OCF/Price percentile into the same 0.10-1.00 tier scale."""
+    if percentile > 1.0:
+        percentile = percentile / 100.0
+    if percentile >= 0.80:
+        return 1.00
+    if percentile >= 0.60:
+        return 0.70
+    if percentile >= 0.40:
+        return 0.40
+    return 0.10
+
+
+def _compute_sector_ocf_percentiles(frame: pd.DataFrame) -> pd.Series:
+    """Rank positive OCF/Price values within each IDX sector; missing/non-positive stays 0."""
+    if frame.empty or "OCF_Price_Ratio" not in frame.columns or "Sector" not in frame.columns:
+        return pd.Series(0.0, index=frame.index)
+
+    def _rank_positive(series: pd.Series) -> pd.Series:
+        positive = series.where(series > 0)
+        return positive.rank(pct=True, ascending=True).fillna(0.0)
+
+    return frame.groupby("Sector")["OCF_Price_Ratio"].transform(_rank_positive)
+
+
 def _profitability_data_from_row(row: pd.Series | dict) -> dict:
     return {
         "rnoa": _row_float(row, "RNOA", "Return on Net Operating Assets", default=0.0),
@@ -723,7 +748,13 @@ def _analyze_ticker(
     # GARCH(1,1) dynamic ATR uses period=1 to produce a daily volatility estimate
     # in Rupiah, directly comparable to classic Wilder ATR-14.
     if cfg.get("USE_GARCH_ATR", False):
-        atr_14 = calculate_dynamic_atr(close, period=1, use_garch=True, fit_window=cfg.get("garch_fit_window", 120))
+        atr_14 = calculate_dynamic_atr(
+            close,
+            period=1,
+            use_garch=True,
+            fit_window=cfg.get("garch_fit_window", 120),
+            model_type=cfg.get("DYNAMIC_ATR_MODEL", "garch"),
+        )
         if atr_14 <= 0:
             return None
     else:
@@ -986,6 +1017,10 @@ def _analyze_ticker(
         "ROE (TTM)": row["Return on Equity (TTM)"],
         "ROA/RNOA Proxy": round(float(row.get("RNOA_Estimate", 0) or 0), 4),
         "OCF/Price": round(float(row.get("OCF_Price_Ratio", 0) or 0), 4),
+        "OCF/Price Sector Percentile": round(
+            float(row.get("OCF_Price_Sector_Pctile", 0) or 0) * 100,
+            1,
+        ),
         "DER (Quarter)": row["Debt to Equity Ratio (Quarter)"],
         "max_der_allowed": max_der,
         "PBV": pbv_current,
@@ -1086,6 +1121,20 @@ def _compute_val_score(row: pd.Series, cfg: dict) -> float:
         if ocf_yield > 0
         else None
     )
+    ocf_sector_pctile = _row_float(
+        row,
+        "OCF_Price_Sector_Pctile",
+        "OCF/Price Sector Percentile",
+        default=0.0,
+    )
+    if ocf_tier is not None and ocf_sector_pctile > 0:
+        sector_tier = _ocf_sector_percentile_tier(ocf_sector_pctile)
+        w_abs = cfg.get("value_ocf_absolute_weight", 0.65)
+        w_pct = cfg.get("value_ocf_sector_pctile_weight", 0.35)
+        total_w = w_abs + w_pct
+        ocf_tier = (
+            (w_abs * ocf_tier + w_pct * sector_tier) / total_w
+        )
 
     # Graham gap (70%) blended with PE-vs-sector-median gap (30%).
     # If EPS is unavailable or negative, fall back to Graham-only (existing behaviour).
@@ -1545,6 +1594,7 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
     )
 
     filtered["OCF_Price_Ratio"] = filtered.apply(_ocf_price_ratio_from_row, axis=1)
+    filtered["OCF_Price_Sector_Pctile"] = _compute_sector_ocf_percentiles(filtered)
     filtered["RNOA_Estimate"] = filtered.apply(
         lambda r: _row_float(r, "RNOA", "Return on Net Operating Assets")
         or _row_float(r, "Return on Assets (TTM)", "ROA (TTM)", "ROA"),

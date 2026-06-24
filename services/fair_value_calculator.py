@@ -285,6 +285,7 @@ class KeyStats:
     operating_cash_flow_ttm: float = 0.0
     ocf_per_share: float = 0.0
     ocf_price_ratio: float = 0.0
+    ocf_stability_score: float | None = None
 
     # Historical P/E dan P/B (rata-rata 3-5 tahun, hardcode per sektor atau ambil dari API)
     # Default ini adalah nilai historis konservatif untuk sektor perbankan IHSG
@@ -981,6 +982,22 @@ class FairValueCalculator:
     _DCF_TERMINAL_GROWTH: float = 0.04  # IDX nominal GDP long-run proxy
     _DCF_STAGE1_YEARS: int = 5
 
+    def _ocf_data_is_stable(self, ocf_per_share: float) -> bool:
+        """Gate OCF-DCF to cases where cash-flow data is usable, not just positive."""
+        if self.stats.ocf_stability_score is not None:
+            return self.stats.ocf_stability_score >= 0.60
+        if self.stats.keystats_age_days is not None and self.stats.keystats_age_days > _STALE_KEYSTATS_DAYS:
+            return False
+        if self.stats.current_price > 0:
+            ocf_yield = ocf_per_share / self.stats.current_price
+            if ocf_yield < 0.01 or ocf_yield > 0.50:
+                return False
+        if self.stats.eps_ttm > 0:
+            cash_conversion = ocf_per_share / self.stats.eps_ttm
+            if cash_conversion < 0.25 or cash_conversion > 4.0:
+                return False
+        return True
+
     def fair_value_dcf(self) -> float | None:
         """2-stage OCF-based DCF. Fires only for consumer and default (industrials) sectors.
 
@@ -996,6 +1013,8 @@ class FairValueCalculator:
         if ocf_ps <= 0 and self.stats.operating_cash_flow_ttm > 0 and self.stats.shares_outstanding > 0:
             ocf_ps = self.stats.operating_cash_flow_ttm / self.stats.shares_outstanding
         if ocf_ps <= 0:
+            return None
+        if not self._ocf_data_is_stable(ocf_ps):
             return None
 
         ke = self.stats.cost_of_equity
@@ -1364,6 +1383,19 @@ class FairValueCalculator:
             else:
                 lines.append(
                     "  EV/EBITDA Band  : TIDAK VALID (EV/EBITDA tidak tersedia)"
+                )
+
+        if "dcf" in self.weights:
+            if "dcf" in bdown:
+                lines.append(
+                    f"  OCF-DCF         : OCF/Share {ocf_per_share_text} "
+                    f"diskonto ke {self.stats.cost_of_equity * 100:.1f}% "
+                    f"= Rp {bdown['dcf']:,}"
+                )
+            else:
+                lines.append(
+                    "  OCF-DCF         : TIDAK VALID "
+                    "(OCF kosong/tidak stabil/di luar sanity band)"
                 )
 
         fv_str = (

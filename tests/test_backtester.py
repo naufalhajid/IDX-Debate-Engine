@@ -20,10 +20,13 @@ from core.backtester.signal_loader import (
 )
 from core.backtester.metrics_calculator import (
     _compute_by_regime,
+    _compute_deflated_sharpe,
     _compute_open_by_age,
     _compute_sharpe,
     _confidence_tier_key,
     _parse_regime_from_notes,
+    calculate_deflated_sharpe_ratio,
+    compute_deflated_sharpe_ratio,
     compute_metrics,
 )
 from core.backtest_outcome_evaluator import PriceBar, evaluate_trade_outcome
@@ -270,6 +273,46 @@ def test_compute_sharpe_falls_back_to_default_when_hold_none():
 
 
 # ─── _confidence_tier_key ─────────────────────────────────────────────────────
+
+
+def test_compute_deflated_sharpe_ratio_returns_probability_metrics():
+    pnl = [2.0, 3.0, -1.0, 4.0, 1.5, 2.5, -0.5, 3.5]
+
+    result = compute_deflated_sharpe_ratio(pnl, benchmark_sr=0.0, n_trials=1)
+
+    assert result is not None
+    assert 0.0 <= result["deflated_sr"] <= 1.0
+    assert 0.0 <= result["probabilistic_sr"] <= 1.0
+    assert result["n_observations"] == len(pnl)
+
+
+def test_deflated_sharpe_penalizes_multiple_trials():
+    pnl = [2.0, 3.0, -1.0, 4.0, 1.5, 2.5, -0.5, 3.5]
+
+    single = compute_deflated_sharpe_ratio(pnl, benchmark_sr=0.0, n_trials=1)
+    many = compute_deflated_sharpe_ratio(pnl, benchmark_sr=0.0, n_trials=20)
+
+    assert single is not None and many is not None
+    assert many["deflated_sr"] <= single["deflated_sr"]
+
+
+def test_calculate_deflated_sharpe_ratio_accepts_frequency():
+    result = calculate_deflated_sharpe_ratio(
+        [2.0, 3.0, -1.0, 4.0, 1.5, 2.5],
+        benchmark_sr=0.0,
+        n_trials=1,
+        freq=25,
+    )
+
+    assert result is not None
+    assert result["n_trials"] == 1
+
+
+def test_compute_deflated_sharpe_wrapper_returns_probability():
+    value = _compute_deflated_sharpe([2.0, 3.0, -1.0, 4.0, 1.5, 2.5])
+
+    assert value is not None
+    assert 0.0 <= value <= 1.0
 
 
 def test_confidence_tier_high():

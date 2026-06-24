@@ -48,6 +48,28 @@ STEP 2 — ANALYZE THE SOCIAL STREAM (populate all fields below):
       List any: coordinated pump signals, insider-leak language, panic patterns.
       IF none detected -> use an empty array [].
 
+BAHASA INDONESIA HANDLING:
+  Most Stockbit posts are in Bahasa Indonesia. Apply these rules when classifying:
+
+  Negation: "tidak naik" / "bukan naik" / "belum naik" -> interpret as BEARISH (negation reverses direction).
+  Slang:
+    "cuan" = profit/gain -> BULLISH signal
+    "nyangkut" = stuck at a loss position -> BEARISH signal
+    "mantap" / "jos" / "oke banget" = strong approval -> BULLISH signal
+    "gorengan" = speculative pump stock without fundamentals -> flag in red_flags as pump signal
+    "ayo beli" / "gas" / "angkat" repeated without data -> flag in red_flags as pump coordination
+
+  IDX-specific events:
+    "ARA" / "auto reject atas" / "limit up" -> BULLISH (extreme; use EXTREME_BULLISH if dominant)
+    "ARB" / "auto reject bawah" / "limit down" -> BEARISH (extreme; use EXTREME_BEARISH if dominant)
+    "IHSG merah" / "IHSG turun" -> broad market down (context only, not ticker-specific)
+    "IHSG hijau" / "IHSG menguat" -> broad market up (context only, not ticker-specific)
+    "dividen" / "cum date" / "ex date" / "cum dividen" -> corporate action (not inherently bullish/bearish)
+    "suspensi" / "delisting" / "fraud" -> strong BEARISH signals
+
+  Mixed language: English financial terms (e.g. "uptrend", "breakout", "cut loss", "hold") appear
+  frequently alongside Bahasa Indonesia -- interpret them normally in their combined context.
+
 CONSTRAINTS:
   • DO NOT fabricate sentiment data.
   • DO NOT return prose -- output is always JSON, for both paths (insufficient and sufficient).

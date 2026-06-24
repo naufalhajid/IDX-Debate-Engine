@@ -1,5 +1,36 @@
 # Prompt Migration Log
 
+## 2026-06-24 — `id-sentiment-bilingual-v26`
+
+**Files changed:**
+- `services/debate_prompts/sentiment.txt` (BAHASA INDONESIA HANDLING block added)
+- `services/debate_prompts/manifest.json` (version → `2026-06-24-id-sentiment-bilingual-v26`)
+- `tests/test_debate_chamber_reliability.py` (version assertion updated)
+- `services/indonesian_nlp.py` (new: `preprocess_indonesian_text`, `detect_language`)
+- `services/news_fetcher.py` (`_extract_text` uses `preprocess_indonesian_text`; `bundle_to_prompt_string` annotates language)
+
+### Changes
+
+**`sentiment.txt`** — Added `BAHASA INDONESIA HANDLING` section before CONSTRAINTS.
+
+New guidance covers:
+- **Negation**: "tidak naik" / "bukan naik" → BEARISH (negation reverses direction)
+- **Slang**: "cuan" = profit (BULLISH), "nyangkut" = stuck at loss (BEARISH), "mantap"/"jos" = approval (BULLISH), "gorengan" = pump stock (red_flag)
+- **Pump coordination**: "ayo beli" / "gas" / "angkat" repeated without data → flag in red_flags
+- **IDX events**: ARA/limit-up → BULLISH; ARB/limit-down → BEARISH; IHSG direction = context only; suspensi/delisting/fraud → BEARISH
+- **Mixed language**: English terms (uptrend, breakout, cut loss) alongside Indonesian → interpret normally
+
+**`services/indonesian_nlp.py`** (NEW) — Indonesian NLP utilities wired into the production flow:
+- `preprocess_indonesian_text(text)`: Unicode NFKC normalization, URL removal, whitespace normalization. Applied to all text assembled by `_extract_text()` before keyword matching.
+- `detect_language(text)`: Ratio-based heuristic using Indonesian marker words. Returns 'id', 'en', or 'mixed'. Applied in `bundle_to_prompt_string()` to annotate language of news headlines.
+- `INDONESIAN_FINANCIAL_STOPWORDS`: Documented only — NOT stripped before keyword matching (would break INSIDER_SELLING detection for "jual saham", "menjual saham", etc.).
+
+**Why:** Stockbit social posts are predominantly Bahasa Indonesia, but `sentiment.txt` was English-only with no Indonesian-specific guidance. Negation ("tidak naik" ≠ "naik"), IDX slang ("cuan", "nyangkut", "gorengan"), and pump coordination signals ("ayo beli") were not recognized. Gemini already handles Indonesian natively; these instructions activate its existing capability for IDX-specific financial language.
+
+**Behavioral change:** Sentiment LLM will now correctly classify negated Indonesian phrases, recognize IDX-specific slang, and flag pump coordination patterns. News brief gains a `Language:` annotation from `detect_language`.
+
+---
+
 ## 2026-06-24 — `fibonacci-low-confidence-v25`
 
 **Files changed:**
