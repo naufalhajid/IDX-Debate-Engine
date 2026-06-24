@@ -14,9 +14,13 @@ Reference:
 from __future__ import annotations
 
 import math
+from typing import TYPE_CHECKING
 
 import numpy as np
 from scipy import stats
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 # ── Euler-Mascheroni constant ─────────────────────────────────────────────────
 _EULER_GAMMA = 0.5772156649
@@ -159,8 +163,8 @@ def calculate_transaction_cost(
 
 
 def walk_forward_backtest(
-    signals_df: "pd.DataFrame",
-    prices_df: "pd.DataFrame",
+    signals_df: pd.DataFrame,
+    prices_df: pd.DataFrame,
     insample_days: int = 252,
     oos_days: int = 63,
 ) -> dict:
@@ -184,7 +188,6 @@ def walk_forward_backtest(
           aggregate – pooled DSR across all OOS returns
           n_windows – number of complete OOS periods evaluated
     """
-    import pandas as pd  # lazy import — avoid loading pandas for DSR-only callers
 
     if signals_df.empty or prices_df.empty:
         return {"windows": [], "aggregate": None, "n_windows": 0}
