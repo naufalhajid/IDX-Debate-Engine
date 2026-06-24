@@ -15,7 +15,6 @@ from datetime import datetime, timezone
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from services.news_fetcher import NewsFetcher
-from services.news_fetcher import NewsSentiment
 from services.indonesian_nlp import detect_language, preprocess_indonesian_text
 
 
