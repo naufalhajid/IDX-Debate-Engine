@@ -281,8 +281,9 @@ CONFIG = {
     "mr_ma200_floor": 0.80,
     # ── Score Floor: minimum composite score to appear in final output.
     # Prevents weak stocks from filling top_n slots in thin universes.
-    "score_floor_high_regime": 45,   # HIGH/DEFENSIVE regime: stricter floor
-    "score_floor_normal_regime": 35,  # NORMAL/RECOVERY/LOW regime
+    "score_floor_high_regime": 35,       # HIGH regime: lower floor — sell-off widens valuation gaps
+    "score_floor_defensive_regime": 45, # DEFENSIVE regime: strict floor retained
+    "score_floor_normal_regime": 35,    # NORMAL/RECOVERY/LOW regime
     # ── Output
     "top_n": 10,
 }

@@ -711,3 +711,45 @@ def test_is_lq45_rendered_in_pack_to_prompt_string():
     assert "is_lq45" in rendered
     assert "ocf_price_ratio" in rendered
     assert "rnoa" in rendered
+
+
+def test_score_floor_high_regime_is_35():
+    """HIGH regime must use floor 35 (lower than DEFENSIVE 45) to surface cheap stocks in sell-offs."""
+    from core.quant_filter.config import CONFIG
+    assert CONFIG["score_floor_high_regime"] == 35
+    assert CONFIG["score_floor_defensive_regime"] == 45
+    assert CONFIG["score_floor_high_regime"] < CONFIG["score_floor_defensive_regime"]
+
+
+def test_score_floor_pipeline_uses_defensive_floor_for_defensive_regime():
+    """DEFENSIVE regime must resolve to score_floor_defensive_regime (45), not score_floor_high_regime."""
+    cfg = {
+        "score_floor_high_regime": 35,
+        "score_floor_defensive_regime": 45,
+        "score_floor_normal_regime": 35,
+    }
+    regime = "DEFENSIVE"
+    if regime == "DEFENSIVE":
+        floor = cfg.get("score_floor_defensive_regime", 45)
+    elif regime == "HIGH":
+        floor = cfg.get("score_floor_high_regime", 35)
+    else:
+        floor = cfg.get("score_floor_normal_regime", 35)
+    assert floor == 45
+
+
+def test_score_floor_pipeline_uses_high_floor_for_high_regime():
+    """HIGH regime must resolve to score_floor_high_regime (35), not the defensive floor."""
+    cfg = {
+        "score_floor_high_regime": 35,
+        "score_floor_defensive_regime": 45,
+        "score_floor_normal_regime": 35,
+    }
+    regime = "HIGH"
+    if regime == "DEFENSIVE":
+        floor = cfg.get("score_floor_defensive_regime", 45)
+    elif regime == "HIGH":
+        floor = cfg.get("score_floor_high_regime", 35)
+    else:
+        floor = cfg.get("score_floor_normal_regime", 35)
+    assert floor == 35

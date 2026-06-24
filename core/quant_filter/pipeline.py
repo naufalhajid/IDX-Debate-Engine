@@ -1726,11 +1726,12 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
     # ── 7. FINALIZE & OUTPUT ──────────────────────────────────────────────────
     final_df = pd.DataFrame(results)
 
-    score_floor = (
-        cfg.get("score_floor_high_regime", 45)
-        if regime in ("HIGH", "DEFENSIVE")
-        else cfg.get("score_floor_normal_regime", 35)
-    )
+    if regime == "DEFENSIVE":
+        score_floor = cfg.get("score_floor_defensive_regime", 45)
+    elif regime == "HIGH":
+        score_floor = cfg.get("score_floor_high_regime", 35)
+    else:
+        score_floor = cfg.get("score_floor_normal_regime", 35)
 
     _pre_floor_sorted: pd.DataFrame = pd.DataFrame()
 
