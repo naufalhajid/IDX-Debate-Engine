@@ -5,6 +5,8 @@ from typing import Literal, Optional
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from core.idx_market_params import INDONESIA_RISK_FREE, INDONESIA_TOTAL_ERP
+
 ROOT_PATH = Path(__file__).resolve().parents[1]
 BASE_PATH = ROOT_PATH
 
@@ -157,8 +159,8 @@ class Settings(BaseSettings):
     TRADE_ENVELOPE_CONDITIONAL_CONFIDENCE_CAP: float = 0.60
 
     # ── Fair Value / CAPM Calibration ─────────────────────────────────────────
-    SBN_10Y_YIELD: float = 0.0714   # SBN 10-year risk-free yield (June 2026)
-    IDX_ERP: float = 0.0923         # Indonesia ERP via Damodaran (June 2026)
+    SBN_10Y_YIELD: float = INDONESIA_RISK_FREE  # SBN 10-year fallback; live cache can override
+    IDX_ERP: float = INDONESIA_TOTAL_ERP  # Damodaran Indonesia total ERP, Apr 2026
     DEFAULT_BETA: float = 1.0       # beta for unknown tickers (market weight)
 
     @property

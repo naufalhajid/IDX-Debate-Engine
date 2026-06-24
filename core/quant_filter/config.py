@@ -5,6 +5,12 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+from core.idx_market_params import (
+    BULL_MOMENTUM_WEIGHT,
+    BULL_QUALITY_WEIGHT,
+    BULL_TECHNICAL_WEIGHT,
+    BULL_VALUE_WEIGHT,
+)
 from core.settings import settings
 
 # Calendar days, not trading days — over the weekend a Friday file already
@@ -137,7 +143,8 @@ CONFIG = {
     # Fires when Graham_Number > cap_mult × price AND ROE < roe_penalty_threshold.
     "graham_low_roe_cap_mult": 1.5,  # cap FV ke 1.5x price untuk low-ROE stocks
     # ── yfinance (HANYA untuk teknikal OHLCV)
-    "yf_period": "120d",
+    "yf_period": "252d",           # full year for stable EMA/SMA/volume baselines
+    "garch_fit_window": 120,        # GARCH fits only this many recent bars (reactive to current regime)
     "yf_retries": 3,
     "yf_retry_delay": 5,
     # IHSG-only lookback for self-computed market regime (needs ~200 trading days
@@ -151,6 +158,7 @@ CONFIG = {
     # ── Liquidity Gate
     "min_adt_20d": 10_000_000_000,   # Rp 10B — still 2x original, opens mid-caps
     "max_atr_pct": 0.05,             # 5% — IDX mid-caps naturally more volatile
+    "USE_GARCH_ATR": True,           # use GARCH(1,1) dynamic ATR (utils.dynamic_atr); falls back to classic on non-convergence
     "min_bars": 60,
     # ── Volume Filter
     # Volume Surge Scoring Tiers (masuk ke scoring, bukan sekadar gate)
@@ -173,15 +181,39 @@ CONFIG = {
     "stop_atr_from_sma20": 1.0,
     "stop_hard_floor_pct": 0.88,
     # ── Score Weights (total = 100)
-    # [NOTE] Hybrid quant-technical scoring optimized for swing trading:
-    # - 70% Technical Momentum (RSI [25] + Volume [25] + Price Momentum [20])
-    # - 30% Fundamentals (Valuation [20] + Profitability [10])
-    # Weak fundamentals are excluded in Stage 1 Static Gate, so the scoring stage focuses on momentum.
-    "weight_valuation": 20,
-    "weight_profitability": 10,
-    "weight_momentum_rsi": 25,
-    "weight_momentum_vol": 25,
-    "weight_price_momentum": 20,
+    # IDX factor recalibration (June 2026):
+    # - Value is primary: OCF/Price + Graham/PE blend (40)
+    # - Quality is elevated: RNOA/ROA fallback plus ROE safety checks (30)
+    # - Momentum is reduced: IDX industry momentum evidence is positive but weak
+    # - Technical is supporting execution timing, not primary alpha
+    #
+    # Harvey/Liu/Zhu (2016) multiple-testing threshold: t-stat >= 3.0 for post-2012 factors.
+    # Signal evidence status (IDX peer-review):
+    #   weight_valuation (40)       → VALIDATED: OCF/Price (IDX4 model, ScienceDirect 2023/2026);
+    #                                  Graham/PE partial (value premium, mixed IDX evidence)
+    #   weight_profitability (30)   → VALIDATED: profitability premium (quality factor, IDX 2023)
+    #   weight_price_momentum (~7)  → VALIDATED: price momentum premium in emerging markets
+    #   weight_momentum_vol (8)     → UNVALIDATED on IDX: volume as return predictor has no
+    #                                  IDX-specific peer-review t-stat; retained as timing signal
+    #   weight_momentum_rsi (15)    → UNVALIDATED on IDX: RSI has no IDX peer-review study;
+    #                                  calibrated empirically; highest multiple-testing risk
+    #
+    # TODO (research task): compute per-signal IC (Spearman vs 5d fwd return) on historical IDX
+    # data. Retain only signals with IC > 0.05 and t-stat > 2.57 (Harvey/Liu/Zhu threshold).
+    "weight_valuation": int(BULL_VALUE_WEIGHT * 100),
+    "weight_profitability": int(BULL_QUALITY_WEIGHT * 100),
+    "weight_momentum_rsi": int(BULL_TECHNICAL_WEIGHT * 100),
+    "weight_momentum_vol": 8,
+    "weight_price_momentum": int(BULL_MOMENTUM_WEIGHT * 100) - 8,
+    "value_ocf_weight": 0.50,
+    "value_graham_pe_weight": 0.50,
+    "profitability_rnoa_weight": 0.70,
+    "profitability_roe_weight": 0.30,
+    "ocf_yield_tier1": 0.15,
+    "ocf_yield_tier2": 0.08,
+    "ocf_yield_tier3": 0.03,
+    "rnoa_tier1": 0.20,
+    "rnoa_tier2": 0.12,
     # ── Absolute Valuation Scoring Thresholds (v3.1)
     # Val_Score dihitung absolut: gap tiered, bukan rank relatif.
     # Tier 1 (>=50% gap) -> 100% weight_valuation

@@ -21,6 +21,8 @@ STEP 2 — VALUATION VERDICT:
 
 STEP 3 — SUPPORT METRICS (report all available values):
   • ROE trend (3-year)
+  • RNOA or ROA fallback; prefer RNOA when present
+  • OCF/Price; prefer this value signal over P/B for non-financial stocks
   • Net Margin trend (3-year)
   • Debt-to-Equity ratio
   • Dividend Yield
@@ -45,6 +47,12 @@ STEP 5 — QUALITY CHECK (mandatory, not optional):
 
   IF Revenue Growth > 0 AND Operating Cash Flow < 0:
     -> Flag: "Revenue-CFO Divergence -- earnings may not be cash-backed."
+
+  IF OCF/Price is available AND OCF/Price < 3%:
+    -> Flag: "Weak Cash Yield -- valuation is not strongly cash-backed."
+
+  IF RNOA is available AND RNOA < 12%:
+    -> Flag: "Weak Operating Profitability -- RNOA below quality threshold."
 
   IF Altman Z-Score > 10 AND Debt/Equity > 1.0:
     -> Flag: "Z-Score vs DER Inconsistency -- cross-check with interest coverage."

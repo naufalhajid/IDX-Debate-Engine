@@ -172,13 +172,18 @@ STEP 14 — ANCHORED VWAP (AVWAP):
 
   State: "AVWAP (anchored [avwap_anchor_bars_ago]d): Rp [avwap] | Price [above/at/below] by [price_to_avwap_pct]%."
 
-STEP 15 — FIBONACCI RETRACEMENT:
+STEP 15 — FIBONACCI RETRACEMENT [LOW CONFIDENCE — CONTEXT ONLY]:
+  CAUTION: Fibonacci retracement has no peer-reviewed IDX-specific validation.
+  Use as supplementary context only — NOT as a primary entry/exit signal.
+  Weight below: MA200 (STEP 2), structural swing-low support (STEP 3), and volume (STEP 4).
+
   Read fib_context, fib_trend, fib_swing_low, fib_swing_high, fib_38_2, fib_50_0, fib_61_8,
   nearest_fib_label, and price_to_nearest_fib_pct from PRE-COMPUTED TECHNICALS.
 
   INSUFFICIENT_DATA -> Skip Fibonacci commentary.
 
   State the swing range first: "Fibonacci range: Rp [fib_swing_low] → Rp [fib_swing_high] ([fib_trend])."
+  Prefix all Fibonacci commentary with "[Unvalidated on IDX]".
 
   Then interpret fib_context:
     ABOVE_SWING_HIGH  -> "Price broke above the swing high — Fibonacci structure invalidated upward.

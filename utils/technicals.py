@@ -10,6 +10,8 @@ from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 
+from core.idx_market_params import idx_tick_size
+
 _WIB = timezone(timedelta(hours=7))
 
 # Stop-loss ATR multiplier keyed on core.regime.RegimeType ("DEFENSIVE", "RECOVERY",
@@ -72,16 +74,8 @@ def snap_to_tick(price: float) -> float:
         return 0.0
     if price <= 0:
         return 0.0
-    if price < 200:
-        return float(round(price))
-    elif price < 500:
-        return float(round(price / 2) * 2)
-    elif price < 2000:
-        return float(round(price / 5) * 5)
-    elif price < 5000:
-        return float(round(price / 10) * 10)
-    else:
-        return float(round(price / 25) * 25)
+    tick = idx_tick_size(price)
+    return float(round(price / tick) * tick)
 
 
 def compute_swing_low(low: pd.Series, window: int = 20) -> float:

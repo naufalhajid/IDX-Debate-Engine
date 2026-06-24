@@ -8,6 +8,10 @@ from unittest.mock import mock_open
 import pandas as pd
 import pytest
 
+from core.fundamental_factors import (
+    calculate_ocf_price_ratio,
+    calculate_profitability_score,
+)
 from core.quant_filter import pipeline
 from core.quant_filter.config import CONFIG, SECTOR_MEDIAN_PE, SECTOR_PBV_BENCHMARK
 from core.quant_filter.reporting import _build_markdown_report
@@ -461,6 +465,31 @@ def test_compute_val_score_pe_uses_sector_specific_median():
     assert score == pytest.approx(w * (0.70 * 0.40 + 0.30 * 1.00))
 
 
+def test_calculate_ocf_price_ratio_uses_cash_flow_per_share_yield():
+    """OCF/Price = (operating cash flow / shares) / market price."""
+    assert calculate_ocf_price_ratio(1_200_000, 100_000, 100.0) == pytest.approx(0.12)
+    assert calculate_ocf_price_ratio(0.0, 100_000, 100.0) == 0.0
+
+
+def test_compute_val_score_ocf_price_primary_when_available():
+    """OCF/Price is blended into non-financial value scoring when present."""
+    cfg = _analysis_cfg()
+    w = cfg["weight_valuation"]
+    row = pd.Series(
+        {
+            "Sector": "default",
+            "Valuation_Gap_Pct": 2.0,  # Graham tier4 = 0.10
+            "Current EPS (TTM)": 10.0,
+            "Close Price": 200.0,      # PE tier4 vs default sector median
+            "OCF/Price": 0.15,         # OCF tier1 = 1.00
+        }
+    )
+
+    score = pipeline._compute_val_score(row, cfg)
+
+    assert score == pytest.approx(w * (0.50 * 1.00 + 0.50 * 0.10))
+
+
 def test_compute_prof_score_roe_tiers():
     """Prof_Score follows the absolute ROE tiers; non-positive ROE scores 0."""
     cfg = _analysis_cfg()
@@ -471,6 +500,27 @@ def test_compute_prof_score_roe_tiers():
     assert pipeline._compute_prof_score(0.30, cfg) == pytest.approx(w * 1.00)
     assert pipeline._compute_prof_score(0.20, cfg) == pytest.approx(w * 0.70)
     assert pipeline._compute_prof_score(0.12, cfg) == pytest.approx(w * 0.40)
+
+
+def test_calculate_profitability_score_prefers_rnoa_then_roa_fallback():
+    assert calculate_profitability_score({"rnoa": 0.20, "roa": 0.02}) == pytest.approx(1.00)
+    assert calculate_profitability_score({"roa": 0.12}) == pytest.approx(0.70)
+    assert calculate_profitability_score({}) == 0.0
+
+
+def test_compute_prof_score_blends_rnoa_proxy_with_roe():
+    cfg = _analysis_cfg()
+    w = cfg["weight_profitability"]
+    row = pd.Series(
+        {
+            "Return on Equity (TTM)": 0.05,  # ROE tier3 = 0.40
+            "RNOA": 0.20,                    # RNOA tier1 = 1.00
+        }
+    )
+
+    score = pipeline._compute_prof_score(row, cfg)
+
+    assert score == pytest.approx(w * (0.70 * 1.00 + 0.30 * 0.40))
 
 
 @pytest.mark.parametrize(
@@ -609,6 +659,11 @@ def test_is_lq45_rendered_in_pack_to_prompt_string():
         "rr": 2.5,
         "rating": "BUY",
         "confidence": 0.72,
+        "fundamentals": {
+            "ocf_price_ratio": 0.124,
+            "rnoa": 0.184,
+            "profitability_factor_score": 0.70,
+        },
         "entry_low": 9900.0,
         "entry_high": 10050.0,
         "target": 10500.0,
@@ -617,3 +672,5 @@ def test_is_lq45_rendered_in_pack_to_prompt_string():
     pack = build_context_pack("BBCA", raw)
     rendered = pack_to_prompt_string(pack)
     assert "is_lq45" in rendered
+    assert "ocf_price_ratio" in rendered
+    assert "rnoa" in rendered

@@ -10,6 +10,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from core.fundamental_factors import (
+    calculate_ocf_price_ratio,
+    calculate_profitability_score,
+)
 from core.quant_filter.config import (
     FINANCIAL_SECTORS,
     FREE_FLOAT_ESTIMATES,
@@ -33,6 +37,7 @@ from utils.exdate_scanner import (
 )
 from utils.logger_config import logger
 from utils.trade_math import is_lq45_ticker
+from utils.dynamic_atr import calculate_dynamic_atr
 from utils.technicals import (
     REGIME_ATR_STOP_MULTIPLIER,
     REGIME_ATR_STOP_MULTIPLIER_DEFAULT,
@@ -60,6 +65,102 @@ def _get_yfinance():
     import yfinance as yf
 
     return yf
+
+
+def _row_float(row: pd.Series | dict, *keys: str, default: float = 0.0) -> float:
+    """Read the first present numeric value from a row-like object."""
+    for key in keys:
+        try:
+            value = row.get(key)  # type: ignore[attr-defined]
+        except AttributeError:
+            value = None
+        if value is None or pd.isna(value):
+            continue
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            continue
+    return default
+
+
+def _tier_score(value: float, tier1: float, tier2: float, tier3: float) -> float:
+    if value >= tier1:
+        return 1.00
+    if value >= tier2:
+        return 0.70
+    if value >= tier3:
+        return 0.40
+    return 0.10
+
+
+def _ocf_price_ratio_from_row(row: pd.Series | dict) -> float:
+    direct = _row_float(
+        row,
+        "OCF/Price",
+        "OCF_Price_Ratio",
+        "Operating Cash Flow Yield",
+        default=0.0,
+    )
+    if direct > 0:
+        return direct / 100.0 if direct > 1.0 else direct
+
+    ocf_per_share = _row_float(
+        row,
+        "Operating Cash Flow Per Share",
+        "OCF Per Share",
+        "Cash Flow from Operations Per Share",
+        default=0.0,
+    )
+    price = _row_float(row, "Close Price", "Current Price", default=0.0)
+    if ocf_per_share > 0 and price > 0:
+        return ocf_per_share / price
+
+    ocf = _row_float(
+        row,
+        "Operating Cash Flow (TTM)",
+        "Cash From Operations (TTM)",
+        "Cash From Operations",
+        "Cash Flow from Operations (TTM)",
+        "Cash Flow from Operations",
+        "Operating Cash Flow",
+        "CFO (TTM)",
+        default=0.0,
+    )
+    shares = _row_float(
+        row,
+        "Current Share Outstanding",
+        "Shares Outstanding",
+        "shares_outstanding",
+        default=0.0,
+    )
+    return calculate_ocf_price_ratio(ocf, shares, price)
+
+
+def _profitability_data_from_row(row: pd.Series | dict) -> dict:
+    return {
+        "rnoa": _row_float(row, "RNOA", "Return on Net Operating Assets", default=0.0),
+        "roa": _row_float(
+            row,
+            "Return on Assets (TTM)",
+            "ROA (TTM)",
+            "ROA",
+            default=0.0,
+        ),
+        "operating_income": _row_float(
+            row,
+            "Operating Income (TTM)",
+            "Operating Profit (TTM)",
+            "EBIT (TTM)",
+            default=0.0,
+        ),
+        "tax_rate": _row_float(row, "Tax Rate", "Effective Tax Rate", default=0.22),
+        "average_net_operating_assets": _row_float(
+            row,
+            "Average Net Operating Assets",
+            "Net Operating Assets",
+            default=0.0,
+        ),
+    }
 
 
 # ── Task 2: Weekly OHLCV + Trend ─────────────────────────────────────────────
@@ -619,10 +720,17 @@ def _analyze_ticker(
     sma20_latest: float = float(sma20.iloc[-1])
 
     # ── ATR (14) ──────────────────────────────────────────────────────────────
-    atr_series = compute_atr(high, low, close)
-    if pd.isna(atr_series.iloc[-1]):
-        return None
-    atr_14: float = float(atr_series.iloc[-1])
+    # GARCH(1,1) dynamic ATR uses period=1 to produce a daily volatility estimate
+    # in Rupiah, directly comparable to classic Wilder ATR-14.
+    if cfg.get("USE_GARCH_ATR", False):
+        atr_14 = calculate_dynamic_atr(close, period=1, use_garch=True, fit_window=cfg.get("garch_fit_window", 120))
+        if atr_14 <= 0:
+            return None
+    else:
+        atr_series = compute_atr(high, low, close)
+        if pd.isna(atr_series.iloc[-1]):
+            return None
+        atr_14 = float(atr_series.iloc[-1])
 
     # ── Liquidity Gate: ADT 20d ───────────────────────────────────────────────
     adt_20: float = float((close * vol).tail(20).mean())
@@ -876,6 +984,8 @@ def _analyze_ticker(
         "ma200_context": ma200_context,
         "ATR (14)": atr_14,
         "ROE (TTM)": row["Return on Equity (TTM)"],
+        "ROA/RNOA Proxy": round(float(row.get("RNOA_Estimate", 0) or 0), 4),
+        "OCF/Price": round(float(row.get("OCF_Price_Ratio", 0) or 0), 4),
         "DER (Quarter)": row["Debt to Equity Ratio (Quarter)"],
         "max_der_allowed": max_der,
         "PBV": pbv_current,
@@ -963,7 +1073,21 @@ def _compute_val_score(row: pd.Series, cfg: dict) -> float:
             return w * 0.40
         return w * 0.10  # di atas fair_lo = tidak menarik
 
-    # Non-finansial: Graham gap (70%) blended with PE-vs-sector-median gap (30%).
+    # Non-finansial: OCF/Price (primary when available) plus Graham/PE blend.
+    # OCF/Price is the IDX4 value proxy; Graham/PE remains fallback when OCF is absent.
+    ocf_yield = _ocf_price_ratio_from_row(row)
+    ocf_tier = (
+        _tier_score(
+            ocf_yield,
+            cfg["ocf_yield_tier1"],
+            cfg["ocf_yield_tier2"],
+            cfg["ocf_yield_tier3"],
+        )
+        if ocf_yield > 0
+        else None
+    )
+
+    # Graham gap (70%) blended with PE-vs-sector-median gap (30%).
     # If EPS is unavailable or negative, fall back to Graham-only (existing behaviour).
     gap = float(row.get("Valuation_Gap_Pct", 0) or 0)
     if gap >= cfg["val_tier1_gap"]:
@@ -989,14 +1113,47 @@ def _compute_val_score(row: pd.Series, cfg: dict) -> float:
             pe_tier = 0.40
         else:
             pe_tier = 0.10
-        return w * (0.70 * graham_tier + 0.30 * pe_tier)
+        graham_pe_tier = 0.70 * graham_tier + 0.30 * pe_tier
+        if ocf_tier is not None:
+            return w * (
+                cfg["value_ocf_weight"] * ocf_tier
+                + cfg["value_graham_pe_weight"] * graham_pe_tier
+            )
+        return w * graham_pe_tier
 
+    if ocf_tier is not None:
+        return w * (
+            cfg["value_ocf_weight"] * ocf_tier
+            + cfg["value_graham_pe_weight"] * graham_tier
+        )
     return w * graham_tier
 
 
 # [v3.1 FIX] Absolute threshold-based Prof_Score — tidak lagi rank(pct=True).
-def _compute_prof_score(roe: float, cfg: dict) -> float:
+def _compute_prof_score(roe: float | pd.Series | dict, cfg: dict) -> float:
     w = cfg["weight_profitability"]
+    if isinstance(roe, (pd.Series, dict)):
+        row = roe
+        roe_value = _row_float(row, "Return on Equity (TTM)", "ROE (TTM)", "ROE")
+        if roe_value > 1.0:
+            roe_value = roe_value / 100.0
+        if pd.isna(roe_value) or roe_value <= 0:
+            roe_score = 0.0
+        elif roe_value >= cfg["prof_roe_tier1"]:
+            roe_score = 1.00
+        elif roe_value >= cfg["prof_roe_tier2"]:
+            roe_score = 0.70
+        else:
+            roe_score = 0.40
+
+        rnoa_score = calculate_profitability_score(_profitability_data_from_row(row))
+        if rnoa_score > 0:
+            return w * (
+                cfg["profitability_rnoa_weight"] * rnoa_score
+                + cfg["profitability_roe_weight"] * roe_score
+            )
+        return w * roe_score
+
     if pd.isna(roe) or roe <= 0:
         return 0.0
     if roe >= cfg["prof_roe_tier1"]:
@@ -1254,6 +1411,16 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         "Altman Z-Score (Modified)",
         "Price to Equity Discount (%)",
         "Current Book Value Per Share",
+        "Current Share Outstanding",
+        "Shares Outstanding",
+        "Operating Cash Flow (TTM)",
+        "Cash From Operations (TTM)",
+        "Cash Flow from Operations (TTM)",
+        "Operating Cash Flow Per Share",
+        "Return on Assets (TTM)",
+        "RNOA",
+        "Operating Income (TTM)",
+        "Average Net Operating Assets",
     ]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
@@ -1377,12 +1544,16 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         * 100
     )
 
+    filtered["OCF_Price_Ratio"] = filtered.apply(_ocf_price_ratio_from_row, axis=1)
+    filtered["RNOA_Estimate"] = filtered.apply(
+        lambda r: _row_float(r, "RNOA", "Return on Net Operating Assets")
+        or _row_float(r, "Return on Assets (TTM)", "ROA (TTM)", "ROA"),
+        axis=1,
+    )
     filtered["Val_Score"] = filtered.apply(lambda r: _compute_val_score(r, cfg), axis=1)
 
     # ── 5. PROFITABILITY SCORING ──────────────────────────────────────────────
-    filtered["Prof_Score"] = filtered["Return on Equity (TTM)"].apply(
-        lambda r: _compute_prof_score(r, cfg)
-    )
+    filtered["Prof_Score"] = filtered.apply(lambda r: _compute_prof_score(r, cfg), axis=1)
 
     # ── 6. DYNAMIC TECHNICALS VIA YFINANCE ───────────────────────────────────
     valid_tickers = filtered["Ticker"].tolist()

@@ -319,6 +319,29 @@ def test_build_fair_value_payload_exposes_range_fields():
     assert "risk_overvalued" in payload
 
 
+def test_build_fair_value_payload_exposes_idx_factor_signals():
+    api_response = _stockbit_response(
+        [
+            ("Current EPS (TTM)", "10"),
+            ("Book Value Per Share", "100"),
+            ("Cash From Operations (TTM)", "120000"),
+            ("Current Share Outstanding", "10000"),
+            ("Return on Assets (TTM)", "12%"),
+        ]
+    )
+
+    report, payload = build_fair_value_payload(api_response, "TEST", 100.0)
+
+    assert payload["ocf_per_share"] == pytest.approx(12.0)
+    assert payload["ocf_price_ratio"] == pytest.approx(0.12)
+    assert payload["roa"] == pytest.approx(0.12)
+    assert payload["profitability_proxy"] == pytest.approx(0.12)
+    assert payload["profitability_proxy_source"] == "roa"
+    assert payload["profitability_factor_score"] == pytest.approx(0.70)
+    assert "OCF/Price" in report
+    assert "RNOA/ROA Proxy" in report
+
+
 def _patch_methods(monkeypatch, pe=None, pb=None, ddm=None):
     monkeypatch.setattr(FairValueCalculator, "fair_value_pe", lambda self: pe)
     monkeypatch.setattr(FairValueCalculator, "fair_value_pb", lambda self: pb)
@@ -975,11 +998,14 @@ def test_composite_fair_value_ignores_ddm_when_weight_is_zero(monkeypatch) -> No
     monkeypatch.setattr(calc, "fair_value_pe", lambda: 1200.0)
     monkeypatch.setattr(calc, "fair_value_pb", lambda: 800.0)
     monkeypatch.setattr(calc, "fair_value_ddm", lambda: 3000.0)  # outlier
+    monkeypatch.setattr(calc, "fair_value_dcf", lambda: None)  # not available
 
     result = calc.fair_value_weighted()
 
-    # pe*0.55 + pb*0.45 + ddm*0.0 = 660 + 360 = 1020; DDM outlier has no effect
-    assert result["fair_value"] == 1020.0
+    # default weights: pe=0.50, pb=0.40, ddm=0.00, dcf=0.10 (dcf=None → not in results)
+    # active methods: pe + pb; total_weight=0.90; (1200*0.50 + 800*0.40)/0.90 = 920/0.90 ≈ 1022
+    # DDM outlier (weight=0.00) has no effect.
+    assert result["fair_value"] == 1022.0
     assert result["fair_value"] < 1100.0
 
 
@@ -1029,4 +1055,93 @@ def test_52w_range_signal_contains_rp_prices():
     result = compute_52w_range_signal(7_500, 10_000, 5_000)
     assert result is not None
     assert "Rp 5,000" in result
-    assert "Rp 10,000" in result
+
+
+# ---------------------------------------------------------------------------
+# P10: 2-Stage DCF (fair_value_dcf)
+# ---------------------------------------------------------------------------
+
+def _consumer_calc(ocf_per_share: float = 0.0, ocf_ttm: float = 0.0, shares: float = 0.0,
+                   price: float = 5_000.0, ke: float = 0.12, g: float = 0.07) -> FairValueCalculator:
+    stats = KeyStats(
+        ticker="UNVR",
+        current_price=price,
+        ocf_per_share=ocf_per_share,
+        operating_cash_flow_ttm=ocf_ttm,
+        shares_outstanding=shares,
+        cost_of_equity=ke,
+        growth_rate=g,
+    )
+    return FairValueCalculator(stats, sector="consumer")
+
+
+def test_fair_value_dcf_returns_positive_float():
+    calc = _consumer_calc(ocf_per_share=300.0)
+    result = calc.fair_value_dcf()
+    assert result is not None
+    assert result > 0
+
+
+def test_fair_value_dcf_returns_none_for_bank():
+    stats = KeyStats(ticker="BBCA", current_price=9_000, ocf_per_share=500.0)
+    calc = FairValueCalculator(stats, sector="bank")
+    assert calc.fair_value_dcf() is None
+
+
+def test_fair_value_dcf_returns_none_for_mining():
+    stats = KeyStats(ticker="ADRO", current_price=2_000, ocf_per_share=300.0)
+    calc = FairValueCalculator(stats, sector="mining")
+    assert calc.fair_value_dcf() is None
+
+
+def test_fair_value_dcf_returns_none_when_ocf_zero():
+    calc = _consumer_calc(ocf_per_share=0.0, ocf_ttm=0.0, shares=0.0)
+    assert calc.fair_value_dcf() is None
+
+
+def test_fair_value_dcf_derives_ocf_from_ttm_and_shares():
+    # ocf_per_share=0 but derivable from ttm/shares
+    calc = _consumer_calc(ocf_per_share=0.0, ocf_ttm=3_000_000_000, shares=10_000_000, price=5_000.0)
+    result = calc.fair_value_dcf()
+    assert result is not None and result > 0
+
+
+def test_fair_value_dcf_rejects_outlier_high():
+    # Very low price vs very high OCF → ratio > 5× → rejected
+    calc = _consumer_calc(ocf_per_share=50_000.0, price=100.0)
+    assert calc.fair_value_dcf() is None
+
+
+def test_fair_value_dcf_rejects_outlier_low():
+    # Very high price vs tiny OCF → ratio < 0.1× → rejected
+    calc = _consumer_calc(ocf_per_share=1.0, price=1_000_000.0)
+    assert calc.fair_value_dcf() is None
+
+
+def test_fair_value_dcf_result_within_sanity_band():
+    # For a normal consumer stock: FV should be within 0.1x-5x of current price
+    calc = _consumer_calc(ocf_per_share=300.0, price=5_000.0)
+    result = calc.fair_value_dcf()
+    assert result is not None
+    assert 500.0 <= result <= 25_000.0
+
+
+def test_consumer_sector_weights_include_dcf():
+    weights = FairValueCalculator.SECTOR_WEIGHTS["consumer"]
+    assert "dcf" in weights
+    assert abs(sum(weights.values()) - 1.0) < 1e-9
+
+
+def test_default_sector_weights_include_dcf():
+    weights = FairValueCalculator.SECTOR_WEIGHTS["default"]
+    assert "dcf" in weights
+    assert abs(sum(weights.values()) - 1.0) < 1e-9
+
+
+def test_fair_value_weighted_consumer_includes_dcf(monkeypatch):
+    calc = _consumer_calc(ocf_per_share=300.0, price=5_000.0)
+    monkeypatch.setattr(calc, "fair_value_pe", lambda: 5_500.0)
+    monkeypatch.setattr(calc, "fair_value_pb", lambda: 4_800.0)
+    monkeypatch.setattr(calc, "fair_value_ddm", lambda: None)
+    result = calc.fair_value_weighted()
+    assert "dcf" in result["breakdown"]

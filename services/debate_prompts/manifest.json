@@ -1,5 +1,5 @@
 {
-  "prompt_version": "2026-06-22-s1a-fundamental-scout-abstain-v23",
+  "prompt_version": "2026-06-24-fibonacci-low-confidence-v25",
   "prompts": {
     "FUNDAMENTAL_SCOUT_PROMPT": "fundamental_scout.txt",
     "CHARTIST_PROMPT": "chartist.txt",

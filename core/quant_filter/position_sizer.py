@@ -5,14 +5,42 @@ from __future__ import annotations
 from math import floor
 from typing import Any
 
+from core.idx_market_params import LOT_SIZE
 from utils.logger_config import logger
 from utils.trade_math import compute_trailing_stop
 
 
-LOT_SIZE = 100
 BUY_COMMISSION = 0.0015
 SELL_COMMISSION = 0.0025
 PPH_FINAL = 0.001
+
+_DEFAULT_KELLY_FRACTION = 0.5
+
+
+def compute_kelly_fraction(
+    win_prob: float,
+    rr: float,
+    kelly_fraction: float = _DEFAULT_KELLY_FRACTION,
+) -> float:
+    """Half-Kelly position fraction for a swing trade setup.
+
+    Kelly formula: f* = (p × b − q) / b
+      p = win_prob (CIO confidence as proxy)
+      b = rr (reward-to-risk ratio)
+      q = 1 − p
+
+    Returns portfolio fraction in [0, 1]. Returns 0.0 for negative-EV setups.
+
+    Args:
+        win_prob:      Win probability estimate (e.g., CIO confidence 0.60–0.85).
+        rr:            Reward-to-risk ratio (e.g., 2.0).
+        kelly_fraction: Scale applied to full Kelly (default 0.5 = half-Kelly).
+    """
+    if rr <= 0 or win_prob <= 0 or win_prob >= 1:
+        return 0.0
+    q = 1.0 - win_prob
+    f_full = (win_prob * rr - q) / rr
+    return max(0.0, round(f_full * kelly_fraction, 4))
 
 _RATING_BASE_ALLOCATION = {
     "STRONG_BUY": 0.30,
@@ -338,6 +366,7 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
             * max(confidence, 0.10)
             * max(min(rr_ratio, 3.0), 0.50)
         )
+        kelly_f = compute_kelly_fraction(confidence, rr_ratio)
         atr14 = _to_float(
             candidate.get("atr14") or candidate.get("ATR (14)"), None
         )
@@ -353,6 +382,7 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
                 "risk_per_share": risk_per_share,
                 "expected_return_pct": expected_return_pct,
                 "weight": weight,
+                "kelly_fraction": kelly_f,
                 "atr14": atr14,
                 "market_regime": market_regime,
             }
@@ -381,6 +411,7 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
             "position_value": 0.0,
             "allocation_pct": 0.0,
             "target_allocation_pct": allocation_pct,
+            "kelly_fraction": item["kelly_fraction"],
             "max_loss_rp": 0.0,
             "max_drawdown_pct": 0.0,
             "expected_return_pct": item["expected_return_pct"],
@@ -482,4 +513,4 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
     }
 
 
-__all__ = ["calculate_positions"]
+__all__ = ["calculate_positions", "compute_kelly_fraction"]

@@ -7,6 +7,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from core.idx_market_params import MIN_HOLD_DAYS, ara_upper_limit
 from utils.logger_config import logger
 from utils.trade_math import apply_regime_rr_scaling, calculate_rr, get_rr_resolution
 
@@ -627,6 +628,15 @@ def _verdict_reason_codes(
     if ara_code:
         reason_codes.append(ara_code)
 
+    # T+2: minimum hold enforcement — IDX settlement is T+2; if verdict explicitly
+    # declares a hold_days shorter than MIN_HOLD_DAYS, flag unsettled-share risk.
+    # Only fires when LLM or upstream system sets hold_days field on the candidate.
+    _hold_days = _first_float(
+        candidate.get("hold_days") or verdict.get("hold_days")
+    )
+    if _hold_days is not None and 0 < _hold_days < MIN_HOLD_DAYS:
+        reason_codes.append("t2_hold_warning")
+
     # C4: target beyond ARA reach within swing horizon — soft flag
     if entry_high and target_price and entry_high > 0:
         sessions = _ara_sessions_needed(entry_high, target_price)
@@ -853,7 +863,7 @@ def _ara_sessions_needed(entry: float, target: float) -> int:
     import math
     if target <= entry or entry <= 0:
         return 0
-    ara = 0.35 if entry < 200 else (0.25 if entry <= 5000 else 0.20)
+    ara = ara_upper_limit(entry)
     return math.ceil(math.log(target / entry) / math.log(1 + ara))
 
 
@@ -949,6 +959,7 @@ def _is_conditional_setup(
         or "counter_trend_setup" in reason_codes
         or "fv_unmeasurable" in reason_codes
         or "historically_expensive" in reason_codes
+        or "t2_hold_warning" in reason_codes
     )
 
 

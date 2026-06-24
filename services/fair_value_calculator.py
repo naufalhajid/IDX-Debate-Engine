@@ -13,6 +13,10 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable
 
+from core.fundamental_factors import (
+    calculate_ocf_price_ratio,
+    calculate_profitability_score,
+)
 from utils.logger_config import logger
 from utils.trade_math import calculate_rr
 
@@ -272,10 +276,15 @@ class KeyStats:
     roe: float = 0.0  # Return on Equity (desimal: 0.22 = 22%)
     net_margin: float = 0.0  # Net Profit Margin (desimal)
     roa: float = 0.0
+    rnoa: float = 0.0
+    profitability_factor_score: float = 0.0
 
     # Market
     current_price: float = 0.0
     shares_outstanding: float = 0.0  # lembar saham beredar (dalam unit, bukan miliar)
+    operating_cash_flow_ttm: float = 0.0
+    ocf_per_share: float = 0.0
+    ocf_price_ratio: float = 0.0
 
     # Historical P/E dan P/B (rata-rata 3-5 tahun, hardcode per sektor atau ambil dari API)
     # Default ini adalah nilai historis konservatif untuk sektor perbankan IHSG
@@ -522,6 +531,43 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
             pct=True,
         )
 
+        stats.rnoa = _lookup(
+            [
+                "Return on Net Operating Assets",
+                "RNOA",
+            ],
+            pct=True,
+        )
+
+        stats.operating_cash_flow_ttm = _lookup(
+            [
+                "Operating Cash Flow (TTM)",
+                "Cash From Operations (TTM)",
+                "Cash From Operations",
+                "Cash Flow from Operations (TTM)",
+                "Cash Flow from Operations",
+                "Net Cash Provided by Operating Activities",
+                "CFO (TTM)",
+            ]
+        )
+
+        stats.ocf_per_share = _lookup(
+            [
+                "Operating Cash Flow Per Share",
+                "OCF Per Share",
+                "Cash Flow from Operations Per Share",
+            ]
+        )
+
+        stats.shares_outstanding = _lookup(
+            [
+                "Current Share Outstanding",
+                "Shares Outstanding",
+                "Outstanding Shares",
+                "Share Outstanding",
+            ]
+        )
+
         # ── Valuation multiples ──────────────────────────────────────────────
         stats.raw_pe_current = stats.raw_pe_current or _lookup(
             [
@@ -607,6 +653,21 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
             ["netMargin", "net_margin", "data.Current.NetProfitMargin"]
         )
         stats.roa = _get_legacy(["roa", "returnOnAssets", "data.Current.ROA"])
+        stats.rnoa = _get_legacy(["rnoa", "returnOnNetOperatingAssets", "data.Current.RNOA"])
+        stats.operating_cash_flow_ttm = _get_legacy(
+            [
+                "operatingCashFlow",
+                "operating_cash_flow",
+                "cashFlowFromOperations",
+                "data.Current.OperatingCashFlow",
+            ]
+        )
+        stats.ocf_per_share = _get_legacy(
+            ["ocfPerShare", "operatingCashFlowPerShare", "data.Current.OCFPS"]
+        )
+        stats.shares_outstanding = _get_legacy(
+            ["sharesOutstanding", "shareOutstanding", "data.Current.SharesOutstanding"]
+        )
         stats.raw_pe_current = _get_legacy(
             ["pe", "priceEarnings", "data.Current.PE", "PE"]
         )
@@ -620,6 +681,8 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
             stats.net_margin = stats.net_margin / 100.0
         if stats.roa > 1.0:
             stats.roa = stats.roa / 100.0
+        if stats.rnoa > 1.0:
+            stats.rnoa = stats.rnoa / 100.0
 
     # ── Derive DPS from dividend yield × price if DPS still missing ──────────
     # BBCA dan bank besar lain kadang tidak expose DPS langsung di keystats
@@ -734,10 +797,10 @@ class FairValueCalculator:
         # 3–15 day swing trades. Bank/property retain a small weight (5%) as
         # dividend yield is a genuine sector signal for those; all others zero.
         "bank":     {"pe": 0.45, "pb": 0.50, "ddm": 0.05},
-        "consumer": {"pe": 0.60, "pb": 0.40, "ddm": 0.00},
+        "consumer": {"pe": 0.50, "pb": 0.35, "ddm": 0.00, "dcf": 0.15},
         "mining":   {"pe": 0.35, "pb": 0.25, "ddm": 0.00, "ev_ebitda": 0.40},
         "property": {"pe": 0.35, "pb": 0.60, "ddm": 0.05},
-        "default":  {"pe": 0.55, "pb": 0.45, "ddm": 0.00},
+        "default":  {"pe": 0.50, "pb": 0.40, "ddm": 0.00, "dcf": 0.10},
     }
 
     # Ticker → sektor mapping untuk emiten populer IHSG
@@ -913,6 +976,52 @@ class FairValueCalculator:
             return None
         return fv
 
+    # ── Metode 5: 2-Stage DCF using OCF/Share (consumer/industrials) ─────────
+
+    _DCF_TERMINAL_GROWTH: float = 0.04  # IDX nominal GDP long-run proxy
+    _DCF_STAGE1_YEARS: int = 5
+
+    def fair_value_dcf(self) -> float | None:
+        """2-stage OCF-based DCF. Fires only for consumer and default (industrials) sectors.
+
+        Banks: OCF/share doesn't translate to equity value cleanly (interest income structure).
+        Mining: EV/EBITDA (Method 4) is preferred for commodity cycle stocks.
+        Stage 1 (years 1–5): OCF grows at stats.growth_rate.
+        Terminal value: OCF_5 × (1 + g_t) / (ke − g_t), perpetuity at long-run IDX GDP.
+        """
+        if self.sector in ("bank", "mining"):
+            return None
+
+        ocf_ps = self.stats.ocf_per_share
+        if ocf_ps <= 0 and self.stats.operating_cash_flow_ttm > 0 and self.stats.shares_outstanding > 0:
+            ocf_ps = self.stats.operating_cash_flow_ttm / self.stats.shares_outstanding
+        if ocf_ps <= 0:
+            return None
+
+        ke = self.stats.cost_of_equity
+        g = min(self.stats.growth_rate, ke - 0.02)  # ensure spread ≥ 2% for Stage 1
+        g_t = self._DCF_TERMINAL_GROWTH
+
+        if ke <= g_t:
+            return None
+
+        pv_stage1 = sum(
+            ocf_ps * ((1 + g) ** t) / ((1 + ke) ** t)
+            for t in range(1, self._DCF_STAGE1_YEARS + 1)
+        )
+        ocf_terminal = ocf_ps * ((1 + g) ** self._DCF_STAGE1_YEARS)
+        tv = ocf_terminal * (1 + g_t) / (ke - g_t)
+        pv_tv = tv / ((1 + ke) ** self._DCF_STAGE1_YEARS)
+
+        fv = round(pv_stage1 + pv_tv, 0)
+
+        if self.stats.current_price > 0:
+            ratio = fv / self.stats.current_price
+            if ratio > 5.0 or ratio < 0.1:
+                return None
+
+        return fv
+
     # ── Task 27: Sector Peer Comparison ──────────────────────────────────────
 
     def build_sector_comparison(self) -> str:
@@ -958,6 +1067,42 @@ class FairValueCalculator:
             )
         return "\n".join(lines)
 
+    def _fundamental_factor_payload(self) -> dict[str, Any]:
+        """Expose IDX-calibrated factor signals to downstream agents/reports."""
+        ocf_per_share = self.stats.ocf_per_share
+        if ocf_per_share <= 0 and self.stats.operating_cash_flow_ttm > 0:
+            if self.stats.shares_outstanding > 0:
+                ocf_per_share = self.stats.operating_cash_flow_ttm / self.stats.shares_outstanding
+
+        ocf_price_ratio = self.stats.ocf_price_ratio
+        if ocf_price_ratio <= 0:
+            if ocf_per_share > 0 and self.stats.current_price > 0:
+                ocf_price_ratio = ocf_per_share / self.stats.current_price
+            else:
+                ocf_price_ratio = calculate_ocf_price_ratio(
+                    self.stats.operating_cash_flow_ttm,
+                    self.stats.shares_outstanding,
+                    self.stats.current_price,
+                )
+
+        proxy = self.stats.rnoa if self.stats.rnoa > 0 else self.stats.roa
+        proxy_source = "rnoa" if self.stats.rnoa > 0 else ("roa" if self.stats.roa > 0 else None)
+        quality_score = self.stats.profitability_factor_score
+        if quality_score <= 0 and proxy > 0:
+            quality_score = calculate_profitability_score(
+                {"rnoa": self.stats.rnoa, "roa": self.stats.roa}
+            )
+
+        return {
+            "ocf_price_ratio": round(ocf_price_ratio, 4) if ocf_price_ratio > 0 else None,
+            "ocf_per_share": round(ocf_per_share, 2) if ocf_per_share > 0 else None,
+            "rnoa": round(self.stats.rnoa, 4) if self.stats.rnoa > 0 else None,
+            "roa": round(self.stats.roa, 4) if self.stats.roa > 0 else None,
+            "profitability_proxy": round(proxy, 4) if proxy > 0 else None,
+            "profitability_proxy_source": proxy_source,
+            "profitability_factor_score": round(quality_score, 2) if quality_score > 0 else None,
+        }
+
     # ── Weighted Average ─────────────────────────────────────────────────────
 
     def fair_value_weighted(self) -> dict:
@@ -965,6 +1110,7 @@ class FairValueCalculator:
         pb_fv = self.fair_value_pb()
         ddm_fv = self.fair_value_ddm()
         ev_ebitda_fv = self.fair_value_ev_ebitda()
+        dcf_fv = self.fair_value_dcf()
 
         results = {}
         if pe_fv is not None:
@@ -975,6 +1121,8 @@ class FairValueCalculator:
             results["ddm"] = ddm_fv
         if ev_ebitda_fv is not None:
             results["ev_ebitda"] = ev_ebitda_fv
+        if dcf_fv is not None:
+            results["dcf"] = dcf_fv
 
         is_soe = _normalize_ticker_key(self.stats.ticker) in _SOE_TICKERS
 
@@ -1000,6 +1148,7 @@ class FairValueCalculator:
                     "governance_discount_pct": None,
                     "keystats_stale": keystats_stale,
                     "keystats_age_days": self.stats.keystats_age_days,
+                    **self._fundamental_factor_payload(),
                 }
             )
 
@@ -1070,6 +1219,7 @@ class FairValueCalculator:
                 "governance_discount_pct": _SOE_DISCOUNT_PCT if is_soe else None,
                 "keystats_stale": keystats_stale,
                 "keystats_age_days": self.stats.keystats_age_days,
+                **self._fundamental_factor_payload(),
             }
         )
 
@@ -1115,6 +1265,30 @@ class FairValueCalculator:
         conf = result["confidence"]
         verdict = result["valuation_verdict"]
         dps_text = f"Rp {self.stats.dps:,.0f}" if self.stats.dps is not None else "N/A"
+        ocf_price_ratio = result.get("ocf_price_ratio") or self.stats.ocf_price_ratio
+        ocf_per_share = result.get("ocf_per_share") or self.stats.ocf_per_share
+        ocf_price_text = (
+            f"{ocf_price_ratio * 100:.1f}%"
+            if ocf_price_ratio and ocf_price_ratio > 0
+            else "N/A"
+        )
+        ocf_per_share_text = (
+            f"Rp {ocf_per_share:,.0f}" if ocf_per_share and ocf_per_share > 0 else "N/A"
+        )
+        proxy_value = result.get("profitability_proxy") or 0.0
+        proxy_source_key = result.get("profitability_proxy_source")
+        proxy_source = (
+            "RNOA"
+            if proxy_source_key == "rnoa"
+            else ("ROA fallback" if proxy_source_key == "roa" else "N/A")
+        )
+        proxy_text = f"{proxy_value * 100:.1f}% ({proxy_source})" if proxy_value > 0 else "N/A"
+        quality_score = result.get("profitability_factor_score") or 0.0
+        quality_text = (
+            f"{quality_score:.2f}/1.00"
+            if quality_score > 0
+            else "N/A"
+        )
 
         lines = [
             "╔══════════════════════════════════════════════════════════════╗",
@@ -1263,7 +1437,11 @@ class FairValueCalculator:
             f"  BVPS            : Rp {self.stats.book_value_per_share:,.0f}",
             f"  DPS             : {dps_text}",
             f"  ROE             : {self.stats.roe * 100:.1f}%",
+            f"  RNOA/ROA Proxy  : {proxy_text}",
+            f"  Quality Factor  : {quality_text}",
             f"  Net Margin      : {self.stats.net_margin * 100:.1f}%",
+            f"  OCF/Share       : {ocf_per_share_text}",
+            f"  OCF/Price       : {ocf_price_text}",
             f"  P/E saat ini    : {self.stats.raw_pe_current:.1f}x "
             f"(hist avg: {self.stats.historical_pe_avg:.1f}x)",
             f"  P/B saat ini    : {self.stats.raw_pb_current:.1f}x "
@@ -1547,6 +1725,21 @@ def build_fair_value_payload(
         stats.growth_rate = multiples["growth_rate"]
 
     stats.current_price = current_price
+    if stats.ocf_per_share <= 0 and stats.operating_cash_flow_ttm > 0:
+        if stats.shares_outstanding > 0:
+            stats.ocf_per_share = stats.operating_cash_flow_ttm / stats.shares_outstanding
+    if stats.ocf_price_ratio <= 0:
+        if stats.ocf_per_share > 0 and current_price > 0:
+            stats.ocf_price_ratio = stats.ocf_per_share / current_price
+        else:
+            stats.ocf_price_ratio = calculate_ocf_price_ratio(
+                stats.operating_cash_flow_ttm,
+                stats.shares_outstanding,
+                current_price,
+            )
+    stats.profitability_factor_score = calculate_profitability_score(
+        {"rnoa": stats.rnoa, "roa": stats.roa}
+    )
 
     # ── EPS back-calculation from PE × price ──────────────────────────────
     # The Stockbit closure_fin_items endpoint often includes PE but not EPS

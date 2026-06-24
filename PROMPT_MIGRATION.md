@@ -1,5 +1,59 @@
 # Prompt Migration Log
 
+## 2026-06-24 — `fibonacci-low-confidence-v25`
+
+**Files changed:**
+- `services/debate_prompts/chartist.txt` (STEP 15 header + caution block updated)
+- `services/debate_prompts/manifest.json` (version → `2026-06-24-fibonacci-low-confidence-v25`)
+- `tests/test_debate_chamber_reliability.py` (version assertion updated)
+
+### Changes
+
+**`chartist.txt`** — STEP 15 (Fibonacci Retracement) labelled as low-confidence context only.
+
+Before: `STEP 15 — FIBONACCI RETRACEMENT:` with authoritative interpretation language.
+
+After: `STEP 15 — FIBONACCI RETRACEMENT [LOW CONFIDENCE — CONTEXT ONLY]:` with explicit caution:
+- `CAUTION: Fibonacci retracement has no peer-reviewed IDX-specific validation.`
+- `Use as supplementary context only — NOT as a primary entry/exit signal.`
+- `Weight below: MA200 (STEP 2), structural swing-low support (STEP 3), and volume (STEP 4).`
+- All Fibonacci commentary prefixed with `[Unvalidated on IDX]`.
+
+**Why:** Gap analysis audit (GAP-09, 2026-06-23) found no peer-reviewed IDX study validating Fibonacci retracement as a predictive signal on BEI securities. Structural support/resistance from swing lows and ATR-based stops are better empirically validated. Leaving Fibonacci without caveat risked the chartist LLM treating it as a primary signal, introducing unvalidated noise into the debate.
+
+**Behavioral change:** Chartist output will prefix Fibonacci commentary with `[Unvalidated on IDX]`, signaling to downstream agents (CIO judge, bull/bear) that this evidence is lower-weight than MA200/volume/momentum signals.
+
+---
+
+## 2026-06-24 — `ocf-rnoa-factor-v24`
+
+**Files changed:**
+- `services/debate_prompts/fundamental_scout.txt` (STEP 3 + STEP 5 extended)
+- `services/debate_prompts/bull_r1.txt` (DATA AUDIT + FUNDAMENTAL FLOOR updated)
+- `services/debate_prompts/bear_r1.txt` (DATA AUDIT + OVERVALUATION CHECK updated)
+- `services/debate_prompts/manifest.json` (version → `2026-06-24-ocf-rnoa-factor-v24`)
+- `tests/test_debate_chamber_reliability.py` (version assertion updated)
+
+### Changes
+
+**`fundamental_scout.txt`** — RNOA and OCF/Price wired into STEP 3 (Support Metrics) and STEP 5 (Quality Check).
+
+STEP 3 additions:
+- `RNOA or ROA fallback; prefer RNOA when present`
+- `OCF/Price; prefer this value signal over P/B for non-financial stocks`
+
+STEP 5 new quality gates:
+- `IF OCF/Price < 3% → Flag: "Weak Cash Yield -- valuation is not strongly cash-backed."`
+- `IF RNOA < 12% → Flag: "Weak Operating Profitability -- RNOA below quality threshold."`
+
+**`bull_r1.txt`** — DATA AUDIT prefers OCF/Price and RNOA as primary fundamental citation. FUNDAMENTAL FLOOR instructs bull agent: `Prefer OCF/Price and RNOA/ROA evidence over momentum-only arguments`.
+
+**`bear_r1.txt`** — DATA AUDIT includes OCF/Price and RNOA as risk metrics. OVERVALUATION CHECK adds: `Do not over-credit price momentum if OCF/Price or RNOA/ROA quality is weak.`
+
+**Why:** `core/fundamental_factors.py` (IDX4 factor model) introduced RNOA and OCF/Price as higher-fidelity signals than ROE and P/B, but the debate agents still cited legacy metrics. This wires the new signals into LLM context.
+
+---
+
 ## 2026-06-22 — `s1a-fundamental-scout-abstain-v23`
 
 **Files changed:**
