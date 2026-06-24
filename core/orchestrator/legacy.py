@@ -3671,6 +3671,44 @@ def _record_ticker_telemetry(
         logger.warning(f"[Telemetry] {ticker}: failed: {e}")
 
 
+async def _inject_forecast_reports(results: list[dict]) -> None:
+    """Enrich successful debate results with a forward-looking ForecastReport.
+
+    Called after _enhance_completed_results so verdict dict is fully populated.
+    Graceful: ImportError or any per-ticker exception leaves result unchanged.
+    """
+    import asyncio
+
+    try:
+        from core.forecasting import ForecastingService
+        service = ForecastingService()
+    except ImportError:
+        return
+
+    from schemas.debate import CIOVerdict
+
+    for result in results:
+        ticker = str(result.get("ticker") or "").upper()
+        if not ticker or _result_status(result) != "success":
+            continue
+        verdict_dict = result.get("verdict") if isinstance(result.get("verdict"), dict) else {}
+        if not verdict_dict:
+            continue
+        try:
+            cio = CIOVerdict.model_validate(verdict_dict)
+        except Exception:
+            cio = None
+        try:
+            report = await asyncio.to_thread(
+                service.predict, ticker, None, (10,), "ensemble", cio
+            )
+            result["forecast_report"] = report.model_dump()
+            if report.expected_value is not None:
+                result["forecast_ev_pct"] = report.expected_value * 100
+        except Exception as exc:
+            logger.warning(f"[Forecast] {ticker}: {exc}")
+
+
 def _enhance_completed_results(
     results: list[dict],
     run_id: str,
@@ -4507,6 +4545,7 @@ def compute_conviction_score(
     ticker: str | None = None,
     debate_records: list[dict] | None = None,
     realized_outcomes: list[TradeOutcome] | None = None,
+    forecast_ev_pct: float | None = None,
 ) -> tuple[float, str | None]:
     """
     Metric note: this returns trade_conviction, a risk-adjusted score on 0.0-1.0.
@@ -4581,6 +4620,11 @@ def compute_conviction_score(
         n_hist = sum(1 for r in debate_records if r.get("ticker") == ticker)
         base_score = apply_historical_adjustment(base_score, win_rate, n=n_hist)
 
+    # Forward EV fallback — used when no realized historical data is available
+    if forecast_ev_pct is not None and realized_outcomes is None:
+        forecast_ev_fraction = forecast_ev_pct / 100.0
+        base_score = apply_ev_adjustment(base_score, forecast_ev_fraction, n=1)
+
     return base_score, warning
 
 
@@ -4629,6 +4673,7 @@ def select_top_n(
             verdict,
             ticker=entry.get("ticker"),
             debate_records=debate_records,
+            forecast_ev_pct=entry.get("forecast_ev_pct"),
             realized_outcomes=realized_outcomes,
         )
         entry["conviction_score"] = round(score, 4)
@@ -5923,6 +5968,7 @@ async def main(
                     candidates_by_ticker=candidates_by_ticker,
                 )
             _enhance_completed_results(results, ledger_run_id, fetch_news=not dry_run)
+            await _inject_forecast_reports(results)
             _log_risk_warn_distribution(results)
             for result in results:
                 _cli_renderer.update_batch_progress_from_result(result)

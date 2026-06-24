@@ -49,6 +49,15 @@ dependencies = [
     "scipy>=1.13.0",
 ]
 
+[project.optional-dependencies]
+forecasting = [
+    "statsmodels>=0.14.0",
+    "xgboost>=2.0.0",
+    "scikit-learn>=1.4.0",
+    "prophet>=1.1.5",
+    "torch>=2.3.0",
+]
+
 [project.scripts]
 idx = "app.cli.main:app"
 

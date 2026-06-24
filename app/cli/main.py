@@ -22,7 +22,7 @@ import typer
 from rich.panel import Panel
 from rich.table import Table
 
-from app.cli.commands import debate, filter, pipeline, scan, sector, model, auth, backtest
+from app.cli.commands import debate, filter, forecast, pipeline, scan, sector, model, auth, backtest
 from app.cli.ui.console import console
 
 
@@ -139,6 +139,7 @@ app.command(name="model")(model.model_command)
 app.command(name="backtest")(backtest.backtest_command)
 app.add_typer(sector.app, name="sector")
 app.add_typer(auth.app, name="auth")
+app.add_typer(forecast.app, name="forecast")
 
 if __name__ == "__main__":
     app()
