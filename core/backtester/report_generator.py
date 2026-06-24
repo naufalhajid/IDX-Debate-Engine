@@ -28,6 +28,10 @@ def generate_rich_table(metrics: BacktestMetrics) -> Table:
     avg_pnl_str = f"{metrics.avg_pnl_pct:+.2f}%" if metrics.avg_pnl_pct is not None else "N/A"
     sharpe_str = f"{metrics.sharpe_ratio:.2f}" if metrics.sharpe_ratio is not None else "N/A"
     hold_str = f"{metrics.avg_holding_days:.0f} days" if metrics.avg_holding_days is not None else "N/A"
+    dsr_val = getattr(metrics, "deflated_sr", None)
+    dsr_str = f"{dsr_val:.3f}" if dsr_val is not None else "N/A (need ≥4 trades)"
+    dsr_style = "[idx.ok]" if (dsr_val is not None and dsr_val > 0.95) else ""
+    dsr_style_close = "[/idx.ok]" if dsr_style else ""
 
     table.add_row("Total Trades", str(metrics.total_trades))
     table.add_row("Wins", f"[idx.ok]{metrics.wins}[/idx.ok]")
@@ -38,6 +42,7 @@ def generate_rich_table(metrics: BacktestMetrics) -> Table:
     table.add_row("Avg PnL", avg_pnl_str)
     table.add_row("Avg Holding", hold_str)
     table.add_row("Sharpe (proxy)", sharpe_str)
+    table.add_row("Deflated SR (n=1)", f"{dsr_style}{dsr_str}{dsr_style_close}")
 
     return table
 
@@ -99,6 +104,7 @@ def generate_markdown_report(
     generated_at: str | None = None,
 ) -> str:
     ts = generated_at or datetime.now().strftime("%Y-%m-%d %H:%M")
+    dsr_v = getattr(metrics, "deflated_sr", None)
     lines: list[str] = [
         f"# {title}",
         f"> Generated: {ts}",
@@ -116,6 +122,7 @@ def generate_markdown_report(
         f"| Avg PnL | {f'{metrics.avg_pnl_pct:+.2f}%' if metrics.avg_pnl_pct is not None else 'N/A'} |",
         f"| Avg Holding | {f'{metrics.avg_holding_days:.0f} days' if metrics.avg_holding_days is not None else 'N/A'} |",
         f"| Sharpe (proxy) | {f'{metrics.sharpe_ratio:.2f}' if metrics.sharpe_ratio is not None else 'N/A'} |",
+        f"| Deflated SR (n=1) | {f'{dsr_v:.3f}' if dsr_v is not None else 'N/A (need ≥4 trades)'} |",
         "",
     ]
 
@@ -202,7 +209,9 @@ def generate_markdown_report(
 
     lines += [
         "---",
-        "_Sharpe ratio uses per-trade total returns as a proxy (not daily returns). "
+        "_Sharpe (proxy) uses per-trade total returns (not daily returns). "
+        "Deflated SR = Probabilistic SR vs 0.5 benchmark (Bailey & Lopez de Prado, 2014); "
+        ">0.95 = significant after multiple-testing correction. "
         "Timeout outcome uses the horizon close price vs entry price._",
     ]
 

@@ -45,6 +45,8 @@ dependencies = [
     "aiofiles>=25.1.0",
     "langchain-anthropic>=1.4.4",
     "langchain-openai>=1.2.2",
+    "arch>=6.0.0",
+    "scipy>=1.13.0",
 ]
 
 [project.scripts]
@@ -73,6 +75,7 @@ include = [
     "providers*",
     "schemas*",
     "services*",
+    "src*",
     "utils*",
 ]
 exclude = ["scratch*", "tests*"]

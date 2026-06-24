@@ -7,6 +7,8 @@ import re
 from dataclasses import dataclass, field
 from datetime import date
 
+import numpy as np
+
 from core.backtest_memory import TradeOutcome
 
 
@@ -33,6 +35,7 @@ class BacktestMetrics:
     sharpe_ratio: float | None
     best_trade: TradeOutcome | None
     worst_trade: TradeOutcome | None
+    deflated_sr: float | None = None  # DSR per Bailey & Lopez de Prado (2014)
     by_ticker: dict[str, dict] = field(default_factory=dict)
     by_confidence_tier: list[TierMetrics] = field(default_factory=list)
     by_regime: dict[str, dict] = field(default_factory=dict)
@@ -64,6 +67,7 @@ def compute_metrics(
     avg_holding_days = sum(holding_days) / len(holding_days) if holding_days else None
 
     sharpe_ratio = _compute_sharpe(pnl_values, avg_holding_days)
+    deflated_sr = _compute_deflated_sharpe(pnl_values, avg_holding_days)
 
     scored = [r for r in records if r.pnl_pct is not None]
     best_trade = max(scored, key=lambda r: r.pnl_pct) if scored else None  # type: ignore[arg-type]
@@ -99,6 +103,7 @@ def compute_metrics(
         avg_pnl_pct=avg_pnl_pct,
         avg_holding_days=avg_holding_days,
         sharpe_ratio=sharpe_ratio,
+        deflated_sr=deflated_sr,
         best_trade=best_trade,
         worst_trade=worst_trade,
         by_ticker=by_ticker,
@@ -131,6 +136,36 @@ def _compute_sharpe(
         return None
     avg_hold = avg_holding_days if (avg_holding_days and avg_holding_days >= 1) else _IDX_SWING_AVG_HOLD_DAYS
     return (mean / std) * math.sqrt(252 / avg_hold)
+
+
+def _compute_deflated_sharpe(
+    pnl_values: list[float],
+    avg_holding_days: float | None = None,
+) -> float | None:
+    """Deflated Sharpe Ratio (Bailey & Lopez de Prado 2014) on per-trade returns.
+
+    Uses n_trials=1 (single strategy, no parameter search), so deflated_sr equals
+    the Probabilistic SR — the probability the true SR exceeds 0.5 (swing benchmark).
+    Requires at least 4 trades.
+    """
+    if len(pnl_values) < 4:
+        return None
+    avg_hold = (
+        avg_holding_days if (avg_holding_days and avg_holding_days >= 1) else _IDX_SWING_AVG_HOLD_DAYS
+    )
+    freq = int(round(252.0 / avg_hold))
+    try:
+        from src.evaluation.backtest_metrics import calculate_deflated_sharpe_ratio
+
+        result = calculate_deflated_sharpe_ratio(
+            np.array(pnl_values, dtype=float),
+            benchmark_sr=0.5,
+            n_trials=1,
+            freq=freq,
+        )
+        return result["deflated_sr"]
+    except Exception:
+        return None
 
 
 def _compute_tiers(records: list[TradeOutcome]) -> list[TierMetrics]:
