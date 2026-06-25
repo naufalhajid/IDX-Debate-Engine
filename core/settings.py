@@ -160,7 +160,7 @@ class Settings(BaseSettings):
 
     # ── Fair Value / CAPM Calibration ─────────────────────────────────────────
     SBN_10Y_YIELD: float = INDONESIA_RISK_FREE  # SBN 10-year fallback; live cache can override
-    IDX_ERP: float = INDONESIA_TOTAL_ERP  # Damodaran Indonesia total ERP, Apr 2026
+    IDX_ERP: float = INDONESIA_TOTAL_ERP  # Damodaran Indonesia total ERP, Jan 5 2026
     DEFAULT_BETA: float = 1.0       # beta for unknown tickers (market weight)
 
     @property

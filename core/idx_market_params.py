@@ -9,18 +9,24 @@ from __future__ import annotations
 from datetime import date
 
 # === IDX Market Parameters ===
-# Source: Damodaran Online country risk premium spreadsheet.
-# Last updated: 2026-06-23, using Damodaran April 1, 2026 country ERP table.
-DAMODARAN_COUNTRY_RISK_UPDATE = date(2026, 4, 1)
+# Source: Damodaran Online country risk premium spreadsheet, Jan 5 2026.
+# MATURE_MARKET_ERP: implied S&P 500 ERP (Damodaran Jan 2026) = 4.23%
+# INDONESIA_CRP: country risk premium Indonesia (Damodaran Jan 2026) = 2.46%
+# INDONESIA_TOTAL_ERP = MATURE_MARKET_ERP + INDONESIA_CRP = 6.69%
+DAMODARAN_COUNTRY_RISK_UPDATE = date(2026, 1, 5)
 DAMODARAN_ANNUAL_REVIEW_MONTH = 1
 DAMODARAN_ANNUAL_REVIEW_DAY = 15
 
-MATURE_MARKET_PREMIUM = 0.0477
-INDONESIA_CRP = 0.027801136981829278
-INDONESIA_TOTAL_ERP = 0.07550113698182928
+MATURE_MARKET_ERP = 0.0423
+INDONESIA_CRP = 0.0246
+INDONESIA_TOTAL_ERP = 0.0669
 
-# SBN 10-year yield fallback. Live macro_refresh cache can override this.
-INDONESIA_RISK_FREE = 0.0714
+# SBN 10-year yield fallback (~6.5% Juni 2026). Live macro_refresh cache can override.
+INDONESIA_RISK_FREE = 0.065
+
+# BI Rate (cut cycle mid-2025, per Juni 2026) and corporate tax rate (PPh Badan)
+BI_RATE = 0.0575
+INDONESIA_TAX_RATE = 0.22
 
 # === IDX Trading Constraints ===
 T_PLUS_SETTLEMENT = 2
