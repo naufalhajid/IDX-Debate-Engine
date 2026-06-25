@@ -1766,17 +1766,18 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         _n_final = len(final_df)
         logger.info(f"Top {_n_final} kandidat berhasil disaring.")
 
+    _sep = "-" * 52
     print(
-        f"\n{'─' * 52}\n"
+        f"\n{_sep}\n"
         f"  Filter Funnel  [{regime} regime]\n"
-        f"{'─' * 52}\n"
+        f"{_sep}\n"
         f"  Universe (XLSX)            : {_n_universe:>4}\n"
         f"  Setelah exclude PEMANTAUAN : {_n_after_pemantauan:>4}\n"
         f"  Setelah static filter      : {_n_after_static:>4}  (DER, PBV, harga)\n"
         f"  Setelah technical scoring  : {_n_after_technical:>4}  (EMA, RSI, yfinance)\n"
         f"  Setelah score floor        : {_n_after_floor:>4}  (score >= {score_floor})\n"
         f"  Final output               : {_n_final:>4}\n"
-        f"{'─' * 52}"
+        f"{_sep}"
     )
 
     # Export JSON (untuk orchestrator.py)

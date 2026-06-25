@@ -3702,7 +3702,7 @@ async def _inject_forecast_reports(results: list[dict]) -> None:
             report = await asyncio.to_thread(
                 service.predict, ticker, None, (10,), "ensemble", cio
             )
-            result["forecast_report"] = report.model_dump()
+            result["forecast_report"] = report.model_dump(mode="json")
             if report.expected_value is not None:
                 result["forecast_ev_pct"] = report.expected_value * 100
         except Exception as exc:
