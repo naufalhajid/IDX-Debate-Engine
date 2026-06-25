@@ -95,6 +95,37 @@ def benjamini_hochberg(p_values: list[float], q: float = 0.10) -> list[bool]:
     return rejected
 
 
+def batch_bh_correction(
+    validations: dict[str, ValidationSummary],
+    q: float = 0.10,
+) -> dict[str, ValidationSummary]:
+    """Apply BH correction across all models simultaneously.
+
+    Replaces the provisional per-model bh_q_value_passed flags with proper
+    multi-testing correction (m = number of models). Call this after
+    validate_model() for all models in the ensemble.
+    """
+    from scipy.stats import norm as _norm  # noqa: PLC0415
+
+    names = list(validations.keys())
+    p_values = []
+    for name in names:
+        vs = validations[name]
+        if vs.ic_t_stat is not None and math.isfinite(vs.ic_t_stat):
+            p_values.append(float(2 * _norm.sf(abs(vs.ic_t_stat))))
+        else:
+            p_values.append(1.0)
+
+    bh_results = benjamini_hochberg(p_values, q=q)
+
+    return {
+        name: ValidationSummary(
+            **{**vs.model_dump(), "bh_q_value_passed": bh_results[i]}
+        )
+        for i, (name, vs) in enumerate(validations.items())
+    }
+
+
 def validate_model(
     model: "ModelBase",
     splits: list[tuple[pd.DataFrame, pd.DataFrame]],
@@ -140,7 +171,13 @@ def validate_model(
 
         if "y_up" in test_df.columns:
             y_bin = test_df["y_up"].values
-            p_hat = np.clip((y_pred - y_pred.min()) / (y_pred.ptp() + 1e-10), 0, 1)
+            # Standardized sigmoid — graceful for constant predictions (NaiveModel → p_hat=0.5)
+            y_std = float(np.std(y_pred))
+            if y_std < 1e-10:
+                p_hat = np.full(len(y_pred), 0.5)
+            else:
+                y_z = (y_pred - float(np.mean(y_pred))) / y_std
+                p_hat = 1.0 / (1.0 + np.exp(-np.clip(y_z, -10.0, 10.0)))
             brier = float(np.mean((p_hat - y_bin) ** 2))
             brier_scores.append(brier)
 
@@ -160,12 +197,14 @@ def validate_model(
         dsr_result = compute_deflated_sharpe_ratio(pnl_values, benchmark_sr=0.0, n_trials=1)
         dsr = dsr_result["deflated_sr"] if dsr_result else None
 
-    # BH correction over IC p-values (approximate: p ≈ 2*Φ(-|t|))
+    # Provisional single-model BH flag. With m=1, BH(q=0.10) reduces to p<0.10 (no
+    # correction). Use stricter p<0.05 here; call batch_bh_correction() across all
+    # models for proper multi-testing correction.
     bh_passed = False
     if ic_t_stat is not None and math.isfinite(ic_t_stat):
         from scipy.stats import norm as _norm  # noqa: PLC0415
         p_val = float(2 * _norm.sf(abs(ic_t_stat)))
-        bh_passed = benjamini_hochberg([p_val], q=0.10)[0]
+        bh_passed = p_val < 0.05
 
     # Status
     if ic_mean is not None and ic_mean >= 0.03 and ic_t_stat is not None and ic_t_stat >= 2.57:

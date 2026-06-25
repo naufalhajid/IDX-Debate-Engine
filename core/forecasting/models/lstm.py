@@ -69,13 +69,35 @@ class LSTMForecaster(ModelBase):
         optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
         loss_fn = nn.MSELoss()
 
-        net.train()
-        for _ in range(30):
+        # Chronological 80/20 train/val split for early stopping.
+        split_idx = max(int(len(X_t) * 0.8), 1)
+        X_train, y_train = X_t[:split_idx], y_t[:split_idx]
+        X_val, y_val = X_t[split_idx:], y_t[split_idx:]
+        use_val = len(X_val) >= 5
+
+        best_val_loss = float("inf")
+        patience_count = 0
+        _PATIENCE = 5
+        _MAX_EPOCHS = 100
+
+        for _ in range(_MAX_EPOCHS):
+            net.train()
             optimizer.zero_grad()
-            pred = net(X_t)
-            loss = loss_fn(pred, y_t)
+            loss = loss_fn(net(X_train), y_train)
             loss.backward()
             optimizer.step()
+
+            if use_val:
+                net.eval()
+                with torch.no_grad():
+                    val_loss = float(loss_fn(net(X_val), y_val))
+                if val_loss < best_val_loss - 1e-4:
+                    best_val_loss = val_loss
+                    patience_count = 0
+                else:
+                    patience_count += 1
+                    if patience_count >= _PATIENCE:
+                        break
 
         net.eval()
         self._model = net

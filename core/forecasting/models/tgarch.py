@@ -23,7 +23,7 @@ class TGARCHForecaster(ModelBase):
 
     name = "tgarch"
 
-    def __init__(self, model_type: str = "tgarch", fit_window: int = 120) -> None:
+    def __init__(self, model_type: str = "tgarch", fit_window: int = 250) -> None:
         self._model_type = "tgarch" if model_type.lower() in {"tgarch", "tarch", "gjr"} else "garch"
         self._fit_window = fit_window
 
