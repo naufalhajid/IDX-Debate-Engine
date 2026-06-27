@@ -104,6 +104,7 @@ class IDXRegimeDetector:
         self.state_label_map: dict[int, str] = {}
         self._feature_names: list[str] = []      # mutable — set by build_features() each call
         self._fit_feature_names: list[str] = []  # frozen snapshot set only by fit()
+        self._last_built_features: Optional[np.ndarray] = None  # one-shot cache for predict()
 
     # ─────────────────────────────────────────────────────────────────────────
     # Feature engineering
@@ -244,6 +245,7 @@ class IDXRegimeDetector:
         self.scaler = _candidate_scaler  # promote only on success (Fix 1)
         self.last_trained = datetime.now()
         self._fit_feature_names = list(self._feature_names)  # freeze at fit time
+        self._last_built_features = features  # full sequence; predict() consumes once
         self._assign_state_labels()
         self._save_model()
 
@@ -299,7 +301,13 @@ class IDXRegimeDetector:
         if self.model is None:
             return self._unknown_state("HMM fit failed — insufficient data")
 
-        features, _ = self.build_features(ihsg_prices, usd_idr, foreign_flow)
+        # Reuse the feature array cached by fit() when it just ran; avoids a
+        # redundant O(N) rolling-window pass on first-run and retrain paths.
+        if self._last_built_features is not None:
+            features = self._last_built_features
+            self._last_built_features = None  # consume — cleared so subsequent calls rebuild
+        else:
+            features, _ = self.build_features(ihsg_prices, usd_idr, foreign_flow)
 
         # C1 fix: catch same-count but different-column misalignment.
         # build_features() just overwrote self._feature_names with the predict-time

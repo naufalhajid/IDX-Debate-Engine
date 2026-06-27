@@ -63,21 +63,6 @@ IHSG_PE_CURRENT = 10.15       # P/E as of Jun 18 2026 (vs historical 13–14x me
 # annual review extended to Nov 2026. Set False after Nov 2026 review resolves.
 MSCI_REVIEW_ACTIVE = True
 
-# === HMM → Legacy Regime Bridge ===
-# Single source of truth for mapping the new 3-state HMM vocabulary
-# (BULL/SIDEWAYS/BEAR_STRESS) to the old 5-state vol-threshold vocabulary
-# (DEFENSIVE/RECOVERY/HIGH/NORMAL/LOW) used by risk_governor, trade_math,
-# and technicals.  Consumers that only know the old labels should call:
-#   legacy = HMM_TO_LEGACY_REGIME.get(hmm_label, "NORMAL")
-# SIDEWAYS maps to HIGH (not NORMAL) so ATR/R-R scaling stays cautious;
-# UNKNOWN maps to DEFENSIVE so the system defaults to maximum caution.
-HMM_TO_LEGACY_REGIME: dict[str, str] = {
-    "BULL":        "NORMAL",
-    "SIDEWAYS":    "HIGH",
-    "BEAR_STRESS": "DEFENSIVE",
-    "UNKNOWN":     "DEFENSIVE",
-}
-
 # === Regime-Aware Trading Rules ===
 # Consumed by IDXRegimeDetector.get_trading_rules() and the LangGraph regime_gate node.
 # Research basis: MARCD (arXiv 2510.10807) K=3 BIC optimum + IDX crash context Jun 2026.

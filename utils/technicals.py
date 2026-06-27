@@ -26,7 +26,7 @@ REGIME_ATR_STOP_MULTIPLIER: dict[str, float] = {
     "HIGH":        2.5,
     "RECOVERY":    2.5,
     "DEFENSIVE":   3.0,
-    # HMM 3-state aliases (core/idx_market_params.HMM_TO_LEGACY_REGIME)
+    # HMM 3-state labels (accepted directly)
     "BULL":        2.5,
     "SIDEWAYS":    2.5,
     "BEAR_STRESS": 3.0,

@@ -32,7 +32,7 @@ REGIME_RR_SCALING: dict[str, float] = {
     "HIGH":        1.2,
     "RECOVERY":    1.1,
     "DEFENSIVE":   1.3,
-    # HMM 3-state aliases (core/idx_market_params.HMM_TO_LEGACY_REGIME)
+    # HMM 3-state labels (accepted directly)
     "BULL":        1.0,
     "SIDEWAYS":    1.2,
     "BEAR_STRESS": 1.3,
