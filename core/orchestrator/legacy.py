@@ -4127,6 +4127,7 @@ async def _run_single_debate(ticker: str, chamber: Any, sector: str = "") -> dic
             "raw_data_summary": result.get("raw_data", ""),
             "metadata": metadata,
             "regime": result.get("regime"),  # HMM regime dict; read by apply_defensive_guard
+            "trading_params": result.get("trading_params"),  # REGIME_RULES entry for current label
             "error": None,
             "status": "success",
             "conviction_score": 0.0,  # Diisi oleh select_top3
@@ -6006,6 +6007,16 @@ async def main(
     if not _apply_circuit_breaker(top_n, _portfolio_state):
         _annotate_risk_governor(top_n)
     sizing_candidates = _build_sizing_candidates(top_n)
+    _regime_tp = next(
+        (e.get("trading_params") for e in top_n if isinstance(e.get("trading_params"), dict)),
+        None,
+    )
+    _regime_lbl = next(
+        (str((e.get("regime") or {}).get("label", "")).upper() for e in top_n if e.get("regime")),
+        "",
+    )
+    if _regime_tp:
+        user_config = {**user_config, "regime_params": {**_regime_tp, "label": _regime_lbl}}
     logger.debug(f"[Sizing DEBUG] user_config masuk: {user_config}")
     logger.debug(f"[Sizing DEBUG] jumlah candidates: {len(sizing_candidates)}")
     for c in sizing_candidates:

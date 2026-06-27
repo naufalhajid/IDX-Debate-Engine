@@ -316,6 +316,13 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
     if max_positions <= 0:
         raise ValueError("max_positions must be greater than 0.")
 
+    regime_params = user_config.get("regime_params") or {}
+    _regime_max_concurrent = _to_int(regime_params.get("max_concurrent_positions", 0))
+    _regime_max_pct = _to_float(regime_params.get("max_position_pct"), None)
+    _regime_label = str(regime_params.get("label", "")).upper() or "N/A"
+    if _regime_max_concurrent > 0:
+        max_positions = min(max_positions, _regime_max_concurrent)
+
     allocation_cap = 1 / max_positions
     target_deployment_pct = _normalise_pct(
         user_config.get("target_deployment_pct"),
@@ -390,6 +397,8 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
 
     total_weight = sum(item["weight"] for item in eligible) or 1.0
     per_position_risk_budget = max_loss_budget / max_positions
+    if _regime_max_pct is not None and _regime_max_pct > 0:
+        per_position_risk_budget = min(per_position_risk_budget, total_capital * _regime_max_pct)
 
     for item in eligible:
         allocation_pct = min(
@@ -481,6 +490,8 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
         "target_deployment_pct": target_deployment_pct,
         "total_positions": len(positions),
         "total_cost_est": total_cost_est,
+        "regime_label": _regime_label,
+        "regime_max_position_pct": _regime_max_pct,
     }
 
     if summary["total_deployed"] > user_config["total_capital"]:
