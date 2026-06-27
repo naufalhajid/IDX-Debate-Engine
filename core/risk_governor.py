@@ -421,17 +421,18 @@ def apply_defensive_guard(
     """Downgrade executable setups to watchlist-only during DEFENSIVE regimes."""
     if decision.status != "deployable" or not decision.sizing_allowed:
         return decision
-    if _market_regime(candidate) != "DEFENSIVE":
+    _regime = _market_regime(candidate)
+    if _regime not in ("DEFENSIVE", "BEAR_STRESS"):
         return decision
+    _reason = "market_regime_bear_stress" if _regime == "BEAR_STRESS" else "market_regime_defensive"
+    _display = _regime
     return decision.model_copy(
         update={
             "status": "watchlist_only",
             "sizing_allowed": False,
-            "reason_codes": _dedupe(
-                [*decision.reason_codes, "market_regime_defensive"]
-            ),
+            "reason_codes": _dedupe([*decision.reason_codes, _reason]),
             "message": (
-                "Market regime DEFENSIVE; setup tetap valid sebagai watchlist, "
+                f"Market regime {_display}; setup tetap valid sebagai watchlist, "
                 "tetapi sizing/eksekusi ditahan sampai IHSG membaik."
             ),
         }
@@ -457,6 +458,13 @@ def _clean_ticker(value: Any) -> str:
 
 
 def _market_regime(candidate: dict[str, Any]) -> str:
+    # HMM regime dict written by regime_gate_node (new pipeline).
+    # Checked first so BEAR_STRESS/BULL/SIDEWAYS from HMM takes precedence.
+    _hmm = candidate.get("regime")
+    if isinstance(_hmm, dict):
+        _label = str(_hmm.get("label", "")).upper()
+        if _label:
+            return _label
     for source in (
         candidate.get("market_regime"),
         _dict_value(candidate.get("risk_context"), "market_regime"),

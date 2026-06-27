@@ -128,7 +128,7 @@ def filter_command(
                     f"  [{_w.get('Weekly Trend', '?')}]"
                 )
             console.print(
-                "\n[idx.muted]→ Jalankan ulang jika IHSG volatility turun atau score naik.[/idx.muted]"
+                "\n[idx.muted]>> Jalankan ulang jika IHSG volatility turun atau score naik.[/idx.muted]"
             )
         else:
             console.print("[idx.warn]No candidates passed all filters.[/idx.warn]")

@@ -1,10 +1,13 @@
 """LSTM sequence forecaster — experimental (optional dep: torch)."""
 from __future__ import annotations
 
+import logging
 import numpy as np
 import pandas as pd
 
 from core.forecasting.models import ModelBase
+
+logger = logging.getLogger(__name__)
 
 _WINDOW: int = 60
 _HIDDEN: int = 64
@@ -118,5 +121,6 @@ class LSTMForecaster(ModelBase):
             with torch.no_grad():
                 pred = float(self._model(seq).item())
             return np.full(len(X), pred)
-        except Exception:
+        except Exception as e:
+            logger.warning("[LSTM] predict failed: %s", e)
             return np.zeros(len(X))

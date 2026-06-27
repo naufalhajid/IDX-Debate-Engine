@@ -21,11 +21,16 @@ _WIB = timezone(timedelta(hours=7))
 # taxonomy. Differentiating RECOVERY/HIGH/LOW from NORMAL is a separate,
 # evidence-gated calibration decision, not bundled here.
 REGIME_ATR_STOP_MULTIPLIER: dict[str, float] = {
-    "LOW": 2.5,
-    "NORMAL": 2.5,
-    "HIGH": 2.5,
-    "RECOVERY": 2.5,
-    "DEFENSIVE": 3.0,
+    "LOW":         2.5,
+    "NORMAL":      2.5,
+    "HIGH":        2.5,
+    "RECOVERY":    2.5,
+    "DEFENSIVE":   3.0,
+    # HMM 3-state aliases (core/idx_market_params.HMM_TO_LEGACY_REGIME)
+    "BULL":        2.5,
+    "SIDEWAYS":    2.5,
+    "BEAR_STRESS": 3.0,
+    "UNKNOWN":     3.0,
 }
 REGIME_ATR_STOP_MULTIPLIER_DEFAULT: float = 2.5
 

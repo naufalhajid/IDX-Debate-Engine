@@ -47,6 +47,8 @@ dependencies = [
     "langchain-openai>=1.2.2",
     "arch>=6.0.0",
     "scipy>=1.13.0",
+    "hmmlearn>=0.3.3",
+    "scikit-learn>=1.9.0",
 ]
 
 [project.optional-dependencies]

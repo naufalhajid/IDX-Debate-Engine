@@ -52,6 +52,79 @@ BULL_VALUE_WEIGHT = 0.40
 BULL_QUALITY_WEIGHT = 0.30
 BULL_TECHNICAL_WEIGHT = 0.15
 
+# === IHSG Market Context 2026 ===
+# Update IHSG_CURRENT manually each session; other values are historical facts.
+IHSG_ATH_2026 = 9174.47       # All-time high, Jan 9 2026
+IHSG_LOW_2026 = 5317.91       # Year low, Jun 8 2026 (bottom of crash)
+IHSG_CURRENT = 6137.0         # Estimated Jun 2026; update manually each session
+IHSG_YTD_RETURN_2026 = -0.29  # -29% YTD through May 2026
+IHSG_PE_CURRENT = 10.15       # P/E as of Jun 18 2026 (vs historical 13–14x mean)
+# MSCI Global Accessibility Review: Indonesia retained EM status Jun 19 2026,
+# annual review extended to Nov 2026. Set False after Nov 2026 review resolves.
+MSCI_REVIEW_ACTIVE = True
+
+# === HMM → Legacy Regime Bridge ===
+# Single source of truth for mapping the new 3-state HMM vocabulary
+# (BULL/SIDEWAYS/BEAR_STRESS) to the old 5-state vol-threshold vocabulary
+# (DEFENSIVE/RECOVERY/HIGH/NORMAL/LOW) used by risk_governor, trade_math,
+# and technicals.  Consumers that only know the old labels should call:
+#   legacy = HMM_TO_LEGACY_REGIME.get(hmm_label, "NORMAL")
+# SIDEWAYS maps to HIGH (not NORMAL) so ATR/R-R scaling stays cautious;
+# UNKNOWN maps to DEFENSIVE so the system defaults to maximum caution.
+HMM_TO_LEGACY_REGIME: dict[str, str] = {
+    "BULL":        "NORMAL",
+    "SIDEWAYS":    "HIGH",
+    "BEAR_STRESS": "DEFENSIVE",
+    "UNKNOWN":     "DEFENSIVE",
+}
+
+# === Regime-Aware Trading Rules ===
+# Consumed by IDXRegimeDetector.get_trading_rules() and the LangGraph regime_gate node.
+# Research basis: MARCD (arXiv 2510.10807) K=3 BIC optimum + IDX crash context Jun 2026.
+REGIME_RULES: dict[str, dict] = {
+    "BULL": {
+        "description": "IHSG uptrend, low volatility, foreign net buy",
+        "max_position_pct": 0.020,       # 2% per position
+        "min_risk_reward": 1.5,
+        "consensus_threshold": 0.60,     # 60% agent agreement required
+        "max_concurrent_positions": 3,
+        "devil_advocate_weight": 0.20,
+        "regime_multiplier": 1.0,        # bull-analyst confidence multiplier
+        "trading_allowed": True,
+    },
+    "SIDEWAYS": {
+        "description": "IHSG flat, moderate volatility",
+        "max_position_pct": 0.010,
+        "min_risk_reward": 2.0,
+        "consensus_threshold": 0.70,
+        "max_concurrent_positions": 2,
+        "devil_advocate_weight": 0.30,
+        "regime_multiplier": 0.85,
+        "trading_allowed": True,
+    },
+    "BEAR_STRESS": {
+        "description": "IHSG downtrend, high volatility, foreign net sell",
+        "max_position_pct": 0.005,       # 0.5% per position — very tight
+        "min_risk_reward": 2.5,
+        "consensus_threshold": 0.80,     # 80% agreement — highest bar
+        "max_concurrent_positions": 1,
+        "devil_advocate_weight": 0.40,
+        "regime_multiplier": 0.60,
+        "trading_allowed": True,
+        "note": "Log warning if bear_stress confidence > 0.85",
+    },
+    "UNKNOWN": {
+        "description": "Regime undetermined — insufficient data",
+        "max_position_pct": 0.005,
+        "min_risk_reward": 2.5,
+        "consensus_threshold": 0.80,
+        "max_concurrent_positions": 0,  # pause trading
+        "devil_advocate_weight": 0.50,
+        "regime_multiplier": 0.50,
+        "trading_allowed": False,
+    },
+}
+
 
 def ara_upper_limit(price: float) -> float:
     """Return the daily ARA upper limit for a given IDX price."""

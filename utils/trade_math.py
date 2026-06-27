@@ -24,12 +24,19 @@ DEFAULT_RR_MINIMUM: float = 1.62
 
 # ATR stops widen in DEFENSIVE/HIGH regimes; R/R minimums scale up to match.
 # LOW and NORMAL use no scaling — base thresholds are calibrated for calm markets.
+# HMM labels (BULL/SIDEWAYS/BEAR_STRESS) mirror their legacy equivalents so
+# callers need not translate before passing the regime string.
 REGIME_RR_SCALING: dict[str, float] = {
-    "LOW":       1.0,
-    "NORMAL":    1.0,
-    "HIGH":      1.2,
-    "RECOVERY":  1.1,
-    "DEFENSIVE": 1.3,
+    "LOW":         1.0,
+    "NORMAL":      1.0,
+    "HIGH":        1.2,
+    "RECOVERY":    1.1,
+    "DEFENSIVE":   1.3,
+    # HMM 3-state aliases (core/idx_market_params.HMM_TO_LEGACY_REGIME)
+    "BULL":        1.0,
+    "SIDEWAYS":    1.2,
+    "BEAR_STRESS": 1.3,
+    "UNKNOWN":     1.3,
 }
 
 

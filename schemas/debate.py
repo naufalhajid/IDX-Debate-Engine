@@ -12,12 +12,15 @@ Swing Trade update (this session):
 - SwingTradeValidator helper: standalone function for the Synthesizer / CIO nodes
 """
 
+import logging
 import re
-from typing import Annotated, Any, Literal, TypedDict
+from typing import Annotated, Any, Literal, NotRequired, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from utils.trade_math import calculate_rr
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -524,8 +527,8 @@ def validate_swing_targets(
                     f"⚠️ AGGRESSIVE TARGET: Projected gain ({gain_pct:.1f}%) exceeds "
                     "10%. Verify target is below a strong resistance level."
                 )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("[SwingTradeValidator] profit-range gate skipped: %s", e)
 
     # R/R check
     if stop_loss > 0 and fair_value > 0:
@@ -538,8 +541,8 @@ def validate_swing_targets(
                     f"⚠️ POOR R/R: Risk/Reward ratio is {rr:.2f} (below 1.0). "
                     "The potential loss exceeds the potential gain."
                 )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("[SwingTradeValidator] R/R gate skipped: %s", e)
 
     return {
         "is_valid": len(warnings) == 0,
@@ -677,6 +680,14 @@ class DebateChamberState(TypedDict):
     # Final output
     final_verdict: str  # JSON-serialized CIOVerdict
     metadata: Annotated[dict, metadata_updater]
+
+    # Regime detection — populated by regime_gate node (Phase 5) before scouts run.
+    # regime holds RegimeState fields as a plain dict for LangGraph serialization.
+    # trading_params is REGIME_RULES[regime["label"]] — position limits and thresholds.
+    # should_trade is False when trading_allowed=False or max_concurrent_positions=0.
+    regime: NotRequired[dict]
+    trading_params: NotRequired[dict]
+    should_trade: NotRequired[bool]
 
     # Error propagation
     error: str | None

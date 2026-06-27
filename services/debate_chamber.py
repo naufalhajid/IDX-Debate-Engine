@@ -106,6 +106,7 @@ from utils.technicals import (
     validate_ohlcv,
 )
 from core.quant_filter.pipeline import compute_weekly_trend, fetch_weekly_data
+from core.regime_gate import regime_gate_node, regime_gate_router
 from utils.trade_math import LARGE_CAP_RR_MINIMUM, calculate_rr
 
 
@@ -212,6 +213,14 @@ def _extract_regime_str(market_regime: Any) -> str:
     if isinstance(market_regime, dict):
         return str(market_regime.get("regime", "")).upper()
     return str(market_regime or "").upper()
+
+
+def _regime_label_from_state(state: "DebateChamberState") -> str:
+    """Return the active regime label from HMM dict (new pipeline) or legacy metadata string."""
+    hmm_label = str((state.get("regime") or {}).get("label", "")).upper()
+    if hmm_label:
+        return hmm_label
+    return _extract_regime_str((state.get("metadata") or {}).get("regime", ""))
 
 
 def _exception_message(exc: BaseException) -> str:
@@ -3256,12 +3265,18 @@ Current Date (Asia/Jakarta): {current_date}
                 f"[Bull] Suspiciously short response for {ticker} R{rc + 1} "
                 f"({len(content)} chars) — may indicate a safety filter hit"
             )
+        _bull_confidence = signal.get("confidence")
+        _regime_mult = float(
+            (state.get("trading_params") or {}).get("regime_multiplier", 1.0)
+        )
+        if _bull_confidence is not None and _regime_mult < 1.0:
+            _bull_confidence = round(_bull_confidence * _regime_mult, 3)
         msg = DebateMessage(
             role="bull",
             content=content,
             round_num=rc + 1,
             position=str(signal.get("position", "UNKNOWN")),
-            confidence=signal.get("confidence"),
+            confidence=_bull_confidence,
         )
         self._record_observation(state, "bull", content, signal)
         return {"debate_history": [msg]}
@@ -3325,6 +3340,34 @@ Current Date (Asia/Jakarta): {current_date}
         logger.info("[Consensus] Evaluating 5-agent votes")
         votes = self._collect_agent_votes(state)
         result = self._evaluate_consensus_votes(votes, state["round_count"])
+
+        # Regime-aware threshold: BEAR_STRESS/SIDEWAYS raise the bar above CONSENSUS_THRESHOLD.
+        # If a voting consensus was reached but winner's effective confidence falls below the
+        # regime floor, cancel the consensus so the debate continues.
+        _regime_threshold = float(
+            (state.get("trading_params") or {}).get("consensus_threshold", CONSENSUS_THRESHOLD)
+        )
+        if (
+            (result.get("consensus_reached") or result.get("consensus_method") == "confidence_winner")
+            and _regime_threshold > CONSENSUS_THRESHOLD
+        ):
+            winner = result.get("consensus_winner") or {}
+            eff_conf = float(
+                winner.get("effective_confidence") or winner.get("confidence") or 0.0
+            )
+            if eff_conf < _regime_threshold:
+                result = {
+                    **result,
+                    "consensus_reached": False,
+                    "consensus_method": None,
+                    "consensus_winner": None,
+                }
+                logger.info(
+                    "[Consensus] Regime threshold %.0f%% not met (eff_conf=%.0f%%) — continuing debate.",
+                    _regime_threshold * 100,
+                    eff_conf * 100,
+                )
+
         if result.get("consensus_method") == "confidence_winner":
             winner = result.get("consensus_winner") or {}
             raw_confidence = float(winner.get("confidence", 0.0) or 0.0)
@@ -4217,18 +4260,19 @@ Current Date (Asia/Jakarta): {current_date}
         return self._apply_defensive_clamp(p, state)
 
     def _apply_defensive_clamp(self, p: dict, state: DebateChamberState) -> dict:
-        """Clamp BUY/STRONG_BUY to HOLD when market is in DEFENSIVE regime.
+        """Clamp BUY/STRONG_BUY to HOLD when market is DEFENSIVE or BEAR_STRESS.
 
         Applied as the final step of _apply_consensus_override so no downstream
         override path can re-introduce a long-entry verdict during a crash.
         """
-        _regime = _extract_regime_str((state.get("metadata") or {}).get("regime", ""))
-        if _regime == "DEFENSIVE" and str(p.get("rating", "")).upper() in ("BUY", "STRONG_BUY"):
+        _active_regime = _regime_label_from_state(state)
+        is_defensive = _active_regime in ("DEFENSIVE", "BEAR_STRESS")
+        if is_defensive and str(p.get("rating", "")).upper() in ("BUY", "STRONG_BUY"):
             p["rating"] = "HOLD"
             p["confidence"] = min(float(p.get("confidence") or 0.0), 0.55)
             p["weighted_reasoning"] = self._append_reason(
                 p.get("weighted_reasoning"),
-                "DEFENSIVE regime: BUY clamped to HOLD — no new long entries during market correction.",
+                "DEFENSIVE/BEAR_STRESS regime: BUY clamped to HOLD — no new long entries during market correction.",
             )
         return p
 
@@ -4741,6 +4785,14 @@ Start your response with '{' and end with '}'. Nothing else."""
             parsed = _apply_news_adjustment(parsed)
             parsed = _apply_staleness_adjustment(parsed)
             parsed = _apply_citation_guard(parsed)
+            # Dampen CIO confidence in cautious regimes before the hard ceiling is applied.
+            _cio_regime_mult = float(
+                (state.get("trading_params") or {}).get("regime_multiplier", 1.0)
+            )
+            if _cio_regime_mult < 1.0 and "confidence" in parsed:
+                parsed["confidence"] = round(
+                    float(parsed.get("confidence") or 0.0) * _cio_regime_mult, 3
+                )
             parsed = _apply_noise_cap(parsed)  # must be last — enforces hard ceiling on confidence/rating
             verdict_json = CIOVerdict(**parsed).model_dump_json()
             logger.info(f"[CIO] JSON parsed successfully for {ticker}")
@@ -4806,12 +4858,52 @@ Start your response with '{' and end with '}'. Nothing else."""
             _meta_out["valuation_band_context"] = _vbc
         return {"final_verdict": verdict_json, "metadata": _meta_out}
 
+    # ── Regime gate helper nodes ─────────────────────────────────────────────
+
+    async def _scout_dispatcher_node(
+        self, state: DebateChamberState
+    ) -> dict:
+        """Zero-op pass-through enabling parallel fan-out after regime_gate."""
+        return {}
+
+    async def _trading_halted_node(
+        self, state: DebateChamberState
+    ) -> dict:
+        """Terminal node when regime gate blocks trading. Emits a HOLD verdict."""
+        regime = state.get("regime", {})
+        label = regime.get("label", "UNKNOWN")
+        confidence = regime.get("confidence", 0.0)
+        msci = regime.get("msci_override", False)
+        ticker = state.get("ticker", "")
+        verdict = CIOVerdict(
+            ticker=ticker,
+            rating="HOLD",
+            confidence=0.0,
+            summary=(
+                f"Trading halted: {label} regime detected "
+                f"(confidence {confidence:.0%}). No positions opened."
+            ),
+            critical_risk_factor=f"Market regime: {label}",
+            weighted_reasoning=(
+                f"Regime gate blocked execution. "
+                f"label={label}, confidence={confidence:.1%}, "
+                f"msci_override={msci}."
+            ),
+            current_price=state.get("current_price"),
+        )
+        return {"final_verdict": verdict.model_dump_json()}
+
     # ── Graph Assembly ───────────────────────────────────────────────────────
 
     def _build_graph(self) -> StateGraph:
         graph = StateGraph(DebateChamberState)
 
-        # Register nodes
+        # Regime gate (runs first, before any scouts)
+        graph.add_node("regime_gate", regime_gate_node)
+        graph.add_node("scout_dispatcher", self._scout_dispatcher_node)
+        graph.add_node("trading_halted", self._trading_halted_node)
+
+        # Scout + debate nodes
         graph.add_node("fundamental", self._fundamental_node)
         graph.add_node("chartist", self._chartist_node)
         graph.add_node("sentiment", self._sentiment_node)
@@ -4823,10 +4915,17 @@ Start your response with '{' and end with '}'. Nothing else."""
         graph.add_node("devils_advocate", self._devils_advocate_node)
         graph.add_node("cio_judge", self._cio_judge_node)
 
-        # Phase 1: Parallel fan-out from START
-        graph.add_edge(START, "fundamental")
-        graph.add_edge(START, "chartist")
-        graph.add_edge(START, "sentiment")
+        # Phase 0: Regime gate → conditional routing
+        graph.add_edge(START, "regime_gate")
+        graph.add_conditional_edges("regime_gate", regime_gate_router)
+
+        # trading_halted short-circuits to END (no LLM work)
+        graph.add_edge("trading_halted", END)
+
+        # Phase 1: Parallel fan-out from scout_dispatcher
+        graph.add_edge("scout_dispatcher", "fundamental")
+        graph.add_edge("scout_dispatcher", "chartist")
+        graph.add_edge("scout_dispatcher", "sentiment")
 
         # Phase 1: Fan-in to synthesizer
         graph.add_edge("fundamental", "synthesizer")

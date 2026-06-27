@@ -117,7 +117,6 @@ def get_usage() -> dict:
 def reset_budget() -> None:
     """Reset all counters. Intended for test fixtures and batch starts."""
 
-    global _pro_call_counter, _flash_call_counter, _counter_lock
+    global _pro_call_counter, _flash_call_counter
     _pro_call_counter = 0
     _flash_call_counter = 0
-    _counter_lock = None

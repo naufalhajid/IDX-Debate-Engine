@@ -4126,6 +4126,7 @@ async def _run_single_debate(ticker: str, chamber: Any, sector: str = "") -> dic
             ],
             "raw_data_summary": result.get("raw_data", ""),
             "metadata": metadata,
+            "regime": result.get("regime"),  # HMM regime dict; read by apply_defensive_guard
             "error": None,
             "status": "success",
             "conviction_score": 0.0,  # Diisi oleh select_top3

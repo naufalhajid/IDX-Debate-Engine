@@ -1,10 +1,13 @@
 """XGBoost tabular forecasting model (optional deps: xgboost, scikit-learn)."""
 from __future__ import annotations
 
+import logging
 import numpy as np
 import pandas as pd
 
 from core.forecasting.models import ModelBase
+
+logger = logging.getLogger(__name__)
 
 # Label columns that must never appear in the feature matrix.
 _LABEL_COLS: frozenset[str] = frozenset(
@@ -77,7 +80,8 @@ class XGBoostForecaster(ModelBase):
             return np.zeros(len(X))
         try:
             return self._reg.predict(self._feature_matrix(X))
-        except Exception:
+        except Exception as e:
+            logger.warning("[XGBoost] predict failed: %s", e)
             return np.zeros(len(X))
 
     def predict_proba_target(self, X: pd.DataFrame) -> np.ndarray | None:
@@ -85,7 +89,8 @@ class XGBoostForecaster(ModelBase):
             return None
         try:
             return self._clf_target.predict_proba(self._feature_matrix(X))[:, 1]
-        except Exception:
+        except Exception as e:
+            logger.warning("[XGBoost] predict_proba_target failed: %s", e)
             return None
 
     def predict_proba_stop(self, X: pd.DataFrame) -> np.ndarray | None:
@@ -93,5 +98,6 @@ class XGBoostForecaster(ModelBase):
             return None
         try:
             return self._clf_stop.predict_proba(self._feature_matrix(X))[:, 1]
-        except Exception:
+        except Exception as e:
+            logger.warning("[XGBoost] predict_proba_stop failed: %s", e)
             return None

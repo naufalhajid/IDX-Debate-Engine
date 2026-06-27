@@ -1,6 +1,7 @@
 """ForecastingService — public entry point for the IDX forecasting layer."""
 from __future__ import annotations
 
+import logging
 import math
 from datetime import date, timedelta
 from typing import TYPE_CHECKING, Literal
@@ -16,6 +17,8 @@ from core.forecasting.validation import validate_model, walk_forward_splits
 
 if TYPE_CHECKING:
     from schemas.debate import CIOVerdict
+
+logger = logging.getLogger(__name__)
 
 _DEFAULT_HORIZONS: tuple[int, ...] = (5, 10, 20)
 _HISTORY_DAYS: int = 500
@@ -95,7 +98,8 @@ class ForecastingService:
             self._naive.fit(X, y)
             r_hat_arr = self._naive.predict(X.tail(1) if len(X) > 0 else X)
             r_hat_net = float(r_hat_arr[0]) if len(r_hat_arr) > 0 else None
-        except Exception:
+        except Exception as e:
+            logger.warning("[ForecastSvc] naive predict failed for %s: %s", ticker, e)
             r_hat_net = None
             flags.append("naive_predict_failed")
 
@@ -119,7 +123,8 @@ class ForecastingService:
                 if splits:
                     validation = validate_model(self._naive, splits, horizon)
                     flags.append(f"validation_status:{validation.status}")
-            except Exception:
+            except Exception as e:
+                logger.warning("[ForecastSvc] walk-forward validation failed for %s: %s", ticker, e)
                 flags.append("validation_failed")
 
         # --- 8. Ensemble weights ---
@@ -214,7 +219,8 @@ def _compute_probs(
         p_target = max(0.0, min(1.0, p_target))
         p_stop = max(0.0, min(1.0, p_stop))
         return p_target, p_stop
-    except Exception:
+    except Exception as e:
+        logger.warning("[ForecastSvc] _compute_probs failed: %s", e)
         return None, None
 
 

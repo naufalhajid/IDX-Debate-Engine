@@ -1,10 +1,13 @@
 """Prophet forecaster for trend/seasonality (optional dep: prophet)."""
 from __future__ import annotations
 
+import logging
 import numpy as np
 import pandas as pd
 
 from core.forecasting.models import ModelBase
+
+logger = logging.getLogger(__name__)
 
 
 class ProphetForecaster(ModelBase):
@@ -39,5 +42,6 @@ class ProphetForecaster(ModelBase):
             future = pd.DataFrame({"ds": X.index})
             forecast = self._model.predict(future)
             return forecast["yhat"].values
-        except Exception:
+        except Exception as e:
+            logger.warning("[Prophet] predict failed: %s", e)
             return np.zeros(len(X))

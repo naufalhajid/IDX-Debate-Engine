@@ -1,10 +1,13 @@
 """ARIMA/SARIMAX forecaster (optional dep: statsmodels)."""
 from __future__ import annotations
 
+import logging
 import numpy as np
 import pandas as pd
 
 from core.forecasting.models import ModelBase
+
+logger = logging.getLogger(__name__)
 
 _MIN_BARS: int = 252
 # Candidate orders ranked simplest to most complex.
@@ -56,7 +59,8 @@ class ARIMAForecaster(ModelBase):
                         best_aic = result.aic
                         best_result = result
                         best_order = order
-                except Exception:
+                except Exception as e:
+                    logger.debug("[ARIMA] order %s failed: %s", order, e)
                     continue
 
         self._result = best_result
@@ -68,5 +72,6 @@ class ARIMAForecaster(ModelBase):
         try:
             forecast = self._result.forecast(steps=len(X))
             return np.array(forecast)
-        except Exception:
+        except Exception as e:
+            logger.warning("[ARIMA] predict failed: %s", e)
             return np.zeros(len(X))
