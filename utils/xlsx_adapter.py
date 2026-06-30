@@ -314,7 +314,7 @@ class XlsxDataAdapter:
         Tidak ada fallback ke API — jika ticker tidak ada di xlsx,
         kembalikan KeyStats default (semua 0.0) dengan warning log.
         """
-        from fair_value_calculator import KeyStats
+        from services.fair_value_calculator import KeyStats
 
         ks = self._ks_row(ticker)
         if ks is None:

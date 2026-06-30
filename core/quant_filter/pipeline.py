@@ -93,37 +93,49 @@ def _tier_score(value: float, tier1: float, tier2: float, tier3: float) -> float
     return 0.10
 
 
-def _compute_multimethod_mos_pct(row: pd.Series | dict) -> float | None:
-    """Multi-method MoS % via FairValueCalculator. Returns None when confidence=LOW."""
+def _compute_multimethod_mos_pct(row: pd.Series | dict, adapter=None) -> float | None:
+    """Multi-method MoS % via FairValueCalculator.
+
+    When adapter is provided and ticker is known, uses adapter.extract_keystats()
+    which supplies sector-correct historical multiples, normalised ratios, and SOE
+    ticker for the 15% governance discount.  Falls back to inline KeyStats build
+    when adapter is unavailable (e.g. tests, non-xlsx mode).
+    Returns None when margin_of_safety_pct cannot be computed.
+    """
     from services.fair_value_calculator import FairValueCalculator, KeyStats
 
     try:
         price = _row_float(row, "Close Price", "Current Price")
         if price <= 0:
             return None
-        _dps_raw = row.get("Dividend (TTM)") if hasattr(row, "get") else None
-        dps_val = (
-            None
-            if (_dps_raw is None or (isinstance(_dps_raw, float) and pd.isna(_dps_raw)))
-            else float(_dps_raw)
-        )
-        _roe = _row_float(row, "Return on Equity (TTM)")
-        if _roe > 1.0:
-            _roe /= 100.0
-        stats = KeyStats(
-            eps_ttm=_row_float(row, "Current EPS (TTM)"),
-            book_value_per_share=_row_float(row, "Current Book Value Per Share"),
-            roe=_roe,
-            dps=dps_val,
-            current_price=price,
-            operating_cash_flow_ttm=_row_float(
-                row,
-                "Operating Cash Flow (TTM)",
-                "Cash From Operations (TTM)",
-                "Cash From Operations",
-            ),
-            shares_outstanding=_row_float(row, "Current Share Outstanding"),
-        )
+        ticker = str(row.get("Ticker", "")) if hasattr(row, "get") else ""
+        if adapter is not None and ticker:
+            stats = adapter.extract_keystats(ticker, price)
+        else:
+            _dps_raw = row.get("Dividend (TTM)") if hasattr(row, "get") else None
+            dps_val = (
+                None
+                if (_dps_raw is None or (isinstance(_dps_raw, float) and pd.isna(_dps_raw)))
+                else float(_dps_raw)
+            )
+            _roe = _row_float(row, "Return on Equity (TTM)")
+            if _roe > 1.0:
+                _roe /= 100.0
+            stats = KeyStats(
+                ticker=ticker,
+                eps_ttm=_row_float(row, "Current EPS (TTM)"),
+                book_value_per_share=_row_float(row, "Current Book Value Per Share"),
+                roe=_roe,
+                dps=dps_val,
+                current_price=price,
+                operating_cash_flow_ttm=_row_float(
+                    row,
+                    "Operating Cash Flow (TTM)",
+                    "Cash From Operations (TTM)",
+                    "Cash From Operations",
+                ),
+                shares_outstanding=_row_float(row, "Current Share Outstanding"),
+            )
         sector = (
             str(row.get("Sector", "default") or "default")
             if hasattr(row, "get")
@@ -1678,7 +1690,9 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         / filtered["Close Price"]
         * 100
     )
-    filtered["MultiMethod_MoS_Pct"] = filtered.apply(_compute_multimethod_mos_pct, axis=1)
+    filtered["MultiMethod_MoS_Pct"] = filtered.apply(
+        lambda row: _compute_multimethod_mos_pct(row, adapter), axis=1
+    )
 
     filtered["OCF_Price_Ratio"] = filtered.apply(_ocf_price_ratio_from_row, axis=1)
     _high_ocf = filtered[filtered["OCF_Price_Ratio"] > 0.40]
