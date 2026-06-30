@@ -262,7 +262,7 @@ class XlsxDataAdapter:
         biasanya ditrade di PE rendah akan menghasilkan fair value yang terlalu
         optimistis. IHSG PE Median (8.83 saat ini) adalah reality-check yang bagus.
         """
-        from fair_value_calculator import get_historical_multiples
+        from services.fair_value_calculator import get_historical_multiples
 
         base = get_historical_multiples(ticker)
 
@@ -351,6 +351,8 @@ class XlsxDataAdapter:
             roe=f(ks, "Return on Equity (TTM)"),  # sudah dalam desimal (0.17)
             net_margin=f(ks, "Net Profit Margin (Quarter)"),  # sudah dalam desimal
             roa=f(ks, "Return on Assets (TTM)"),  # sudah dalam desimal
+            # ── Cash flow ──
+            operating_cash_flow_ttm=f(ks, "Cash From Operations (TTM)"),
             # ── Market ──
             current_price=current_price,
             shares_outstanding=f(ks, "Current Share Outstanding"),
@@ -457,7 +459,7 @@ class XlsxDataAdapter:
             fair_value_float = 0.0 jika semua metode gagal (bukan None,
             agar caller tidak crash saat unpack).
         """
-        from fair_value_calculator import FairValueCalculator
+        from services.fair_value_calculator import FairValueCalculator
 
         stats = self.extract_keystats(ticker, current_price)
         sektor = _TICKER_SECTOR.get(ticker.upper(), "default")
@@ -513,7 +515,7 @@ class XlsxDataAdapter:
         Bobot EV/EBITDA: 15% (diambil proporsional dari PE dan PB).
         Bank tidak menggunakan EV/EBITDA sehingga bobot tetap 3 metode.
         """
-        from fair_value_calculator import FairValueCalculator
+        from services.fair_value_calculator import FairValueCalculator
 
         # Jika tidak ada EV/EBITDA atau sektor bank, pakai calc standar
         if ev_fv is None or sektor == "bank":
