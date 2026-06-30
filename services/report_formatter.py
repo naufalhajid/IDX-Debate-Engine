@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import re
 from datetime import datetime
 from typing import Any
@@ -123,7 +125,8 @@ def _safe_float(value: Any) -> float | None:
     if value is None or value == "":
         return None
     if isinstance(value, int | float):
-        return float(value)
+        parsed = float(value)
+        return parsed if math.isfinite(parsed) else None
     text = str(value).strip()
     if not text:
         return None
@@ -146,7 +149,8 @@ def _safe_float(value: Any) -> float | None:
         if len(parts[-1]) == 3 and all(part.isdigit() for part in parts):
             cleaned = cleaned.replace(".", "")
     try:
-        return float(cleaned)
+        parsed = float(cleaned)
+        return parsed if math.isfinite(parsed) else None
     except ValueError:
         return None
 
@@ -411,6 +415,15 @@ def _data_quality_warning_lines(result: dict[str, Any]) -> list[str]:
     guard_errors = _list_or_empty(citation_guard.get("errors"))
     if citation_guard and citation_guard.get("valid") is False and guard_errors:
         lines.append(f"RAG citation guard: {_short_text(guard_errors[0], limit=96)}")
+
+    forecast_report = _dict_or_empty(result.get("forecast_report"))
+    forecast_flags = _list_or_empty(forecast_report.get("data_quality_flags"))
+    if forecast_flags:
+        flags = ", ".join(str(flag) for flag in forecast_flags[:4])
+        lines.append(f"Forecast data quality: {_short_text(flags, limit=96)}")
+    ignored_reason = str(result.get("forecast_ev_ignored_reason") or "").strip()
+    if ignored_reason:
+        lines.append(f"Forecast EV ignored: {ignored_reason}")
 
     return lines[:6]
 
@@ -945,6 +958,8 @@ class RichFormatter:
             value = max(0.0, min(float(confidence), 1.0))
         except (TypeError, ValueError):
             value = 0.0
+        if not math.isfinite(value):
+            value = 0.0
         filled = round(value * width)
         bar = "█" * filled + "░" * (width - filled)
         return f"{bar} {value:.0%}"
@@ -955,6 +970,8 @@ class RichFormatter:
         try:
             value = max(0.0, min(float(confidence), 1.0))
         except (TypeError, ValueError):
+            value = 0.0
+        if not math.isfinite(value):
             value = 0.0
         filled = round(value * width)
         bar = "#" * filled + "-" * (width - filled)

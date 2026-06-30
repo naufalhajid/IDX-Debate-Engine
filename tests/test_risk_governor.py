@@ -150,6 +150,35 @@ def test_invalid_or_missing_entry_range_rejects() -> None:
     assert "invalid_entry_range" in decision.reason_codes
 
 
+def test_invalid_price_reject_preserves_upstream_rr_reason() -> None:
+    decision = evaluate_risk(
+        _candidate(
+            metadata={"reason_codes": ["rr_too_low"]},
+            verdict={"entry_price_range": None, "target_price": None},
+        )
+    )
+
+    assert decision.status == "reject"
+    assert "rr_too_low" in decision.reason_codes
+    assert "invalid_entry_range" in decision.reason_codes
+    assert "missing_target_price" in decision.reason_codes
+
+
+def test_non_finite_prices_are_rejected_as_missing() -> None:
+    decision = evaluate_risk(
+        _candidate(
+            verdict={
+                "current_price": float("nan"),
+                "entry_price_range": "950 - 1050",
+                "target_price": float("inf"),
+            }
+        )
+    )
+
+    assert decision.status == "reject"
+    assert "missing_current_price" in decision.reason_codes
+    assert "missing_target_price" in decision.reason_codes
+
 def test_preflight_noise_reject_does_not_report_missing_trade_levels() -> None:
     decision = evaluate_risk(
         _candidate(

@@ -132,7 +132,7 @@ def predict_command(
     console.print(f"[idx.header]Forecast: {report.ticker}[/idx.header]  as_of={report.as_of}  h={report.horizon_days}d")
     console.print(f"  decision: [bold]{report.decision}[/bold]  confidence: {report.confidence}")
     console.print(f"  EV: {report.expected_value}  p_target: {report.p_target}  p_stop: {report.p_stop}")
-    console.print(f"  σ forecast (annualized): {report.volatility_forecast}")
+    console.print(f"  sigma forecast (annualized): {report.volatility_forecast}")
     console.print(f"  r_hat_net: {report.expected_return_net}")
     if report.data_quality_flags:
         console.print(f"  [idx.warn]flags:[/idx.warn] {report.data_quality_flags}")

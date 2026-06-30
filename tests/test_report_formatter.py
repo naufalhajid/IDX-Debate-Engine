@@ -298,6 +298,18 @@ def test_generate_ticker_report_shows_data_quality_warnings() -> None:
     assert "rag evidence log locked" in report
 
 
+def test_generate_ticker_report_shows_forecast_quality_flags() -> None:
+    result = _mock_result()
+    result["forecast_report"] = {
+        "data_quality_flags": ["ocf_missing", "validation_status:failed"],
+    }
+    result["forecast_ev_ignored_reason"] = "validation_failed"
+
+    report = MarkdownFormatter().generate_ticker_report(result)
+
+    assert "Forecast data quality: ocf_missing, validation_status:failed" in report
+    assert "Forecast EV ignored: validation_failed" in report
+
 def test_render_ticker_panel_shows_data_quality_warnings() -> None:
     console = Console(record=True, width=140)
     formatter = RichFormatter(console=console)
@@ -314,6 +326,22 @@ def test_render_ticker_panel_shows_data_quality_warnings() -> None:
     assert "Data Quality" in output
     assert "CIO parse fallback: json_parse/JSONDecodeError" in output
     assert "invalid JSON" in output
+
+
+def test_render_ticker_panel_shows_forecast_quality_flags() -> None:
+    console = Console(record=True, width=140)
+    formatter = RichFormatter(console=console)
+    result = _mock_result()
+    result["forecast_report"] = {
+        "data_quality_flags": ["validation_status:failed"],
+    }
+    result["forecast_ev_ignored_reason"] = "validation_failed"
+
+    formatter.render_ticker_panel(result)
+    output = console.export_text()
+
+    assert "Forecast data quality: validation_status:failed" in output
+    assert "Forecast EV ignored: validation_failed" in output
 
 
 def test_generate_batch_summary_contains_run_id_and_title() -> None:

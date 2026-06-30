@@ -379,7 +379,13 @@ async def stream_debate(
             return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
         class StreamingDebateChamber(DebateChamber):
-            async def run(self, ticker: str, current_price: float = 0.0) -> dict:
+            async def run(
+                self,
+                ticker: str,
+                current_price: float = 0.0,
+                sector: str | None = None,
+                **kwargs: Any,
+            ) -> dict:
                 final_result = {}
                 async for event in self.stream_run(ticker):
                     if event.get("type") != "done":

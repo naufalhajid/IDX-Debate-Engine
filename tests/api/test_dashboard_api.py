@@ -1,4 +1,4 @@
-import json
+﻿import json
 import sys
 import types
 
@@ -166,16 +166,28 @@ def test_results_prefers_merged_ticker_state_when_present(monkeypatch, tmp_path)
 
 
 def test_debate_stream_uses_stream_run(monkeypatch):
+    from core.orchestrator import pipeline
+
     class FakeDebateChamber:
         async def stream_run(self, ticker):
             yield {"type": "progress", "ticker": ticker, "phase": "scouting", "pct": 10}
             yield {"type": "done", "ticker": ticker}
+
+    async def fake_orchestrator_main(**kwargs):
+        chamber = kwargs["chamber_factory"]()
+        await chamber.run("BBCA")
+        return []
+
+    async def fake_load_results():
+        return {"BBCA": {"ticker": "BBCA", "rating": "HOLD"}}
 
     monkeypatch.setitem(
         sys.modules,
         "services.debate_chamber",
         types.SimpleNamespace(DebateChamber=FakeDebateChamber),
     )
+    monkeypatch.setattr(pipeline, "main", fake_orchestrator_main)
+    monkeypatch.setattr(stocks_router, "_load_results", fake_load_results)
 
     with client.stream(
         "POST",
@@ -188,6 +200,7 @@ def test_debate_stream_uses_stream_run(monkeypatch):
     assert response.status_code == 200
     assert '"ticker": "BBCA"' in body
     assert '"type": "progress"' in body
+    assert '"phase": "scouting"' in body
     assert "data: [DONE]" in body
 
 
@@ -249,3 +262,4 @@ def test_debate_stream_forwards_dashboard_config(monkeypatch):
         "max_positions": 3,
     }
     assert '"stage": "final"' in body
+

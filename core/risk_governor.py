@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import re
 from typing import Any, Literal
 
@@ -162,6 +164,7 @@ def evaluate_risk(candidate: dict[str, Any]) -> RiskDecision:
             )
         )
 
+    upstream_reason_codes = _upstream_reason_codes(candidate, verdict)
     reason_codes: list[str] = []
     if current_price is None or current_price <= 0:
         reason_codes.append("missing_current_price")
@@ -180,7 +183,7 @@ def evaluate_risk(candidate: dict[str, Any]) -> RiskDecision:
                 ticker=ticker,
                 status="reject",
                 sizing_allowed=False,
-                reason_codes=reason_codes,
+                reason_codes=_dedupe([*upstream_reason_codes, *reason_codes]),
                 message="Setup ditolak karena data harga kunci belum valid.",
                 current_price=current_price,
                 entry_low=entry_low,
@@ -507,7 +510,8 @@ def _to_float(value: Any, *, idr_price: bool = False) -> float | None:
     if value is None:
         return None
     if isinstance(value, int | float):
-        return float(value)
+        parsed = float(value)
+        return parsed if math.isfinite(parsed) else None
     text = str(value).strip()
     if not text:
         return None
@@ -521,7 +525,8 @@ def _to_float(value: Any, *, idr_price: bool = False) -> float | None:
         raw = re.sub(r"\.(?=\d{3}(?!\d))", "", raw)
     cleaned = raw.replace(",", "")
     try:
-        return float(cleaned)
+        parsed = float(cleaned)
+        return parsed if math.isfinite(parsed) else None
     except ValueError:
         return None
 
@@ -580,7 +585,7 @@ def _verdict_reason_codes(
     target_price: float | None,
     stop_loss: float | None,
 ) -> list[str]:
-    reason_codes: list[str] = []
+    reason_codes: list[str] = _upstream_reason_codes(candidate, verdict)
     ticker = _clean_ticker(candidate.get("ticker") or verdict.get("ticker"))
     rating = _clean_rating(verdict.get("rating") or candidate.get("rating"))
     if rating in UNBUYABLE_RATINGS:
@@ -659,6 +664,27 @@ def _verdict_reason_codes(
     if _vbc and "HISTORICALLY_EXPENSIVE" in str(_vbc).upper():
         reason_codes.append("historically_expensive")
 
+    return _dedupe(reason_codes)
+
+
+def _upstream_reason_codes(candidate: dict[str, Any], verdict: dict[str, Any]) -> list[str]:
+    """Preserve root rejection reasons emitted before risk-governor normalization."""
+    reason_codes: list[str] = []
+    for source in (
+        candidate,
+        verdict,
+        candidate.get("metadata") if isinstance(candidate.get("metadata"), dict) else {},
+        verdict.get("metadata") if isinstance(verdict.get("metadata"), dict) else {},
+        candidate.get("risk_governor") if isinstance(candidate.get("risk_governor"), dict) else {},
+    ):
+        if not isinstance(source, dict):
+            continue
+        for key in ("reason_codes", "reasons", "rejection_reasons"):
+            raw = source.get(key)
+            if isinstance(raw, list):
+                reason_codes.extend(str(code) for code in raw if str(code).strip())
+            elif isinstance(raw, str) and raw.strip():
+                reason_codes.append(raw)
     return _dedupe(reason_codes)
 
 

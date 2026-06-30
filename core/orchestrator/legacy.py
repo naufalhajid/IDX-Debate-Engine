@@ -35,6 +35,7 @@ import asyncio
 import ast
 from contextlib import contextmanager
 import json
+import math
 import os
 import random
 import re
@@ -3122,7 +3123,8 @@ def _parse_price_value(value: Any) -> float | None:
     if value is None:
         return None
     if isinstance(value, int | float):
-        return float(value)
+        parsed = float(value)
+        return parsed if math.isfinite(parsed) else None
     text = str(value).strip().replace("Rp", "").replace("rp", "").replace(" ", "")
     if not text:
         return None
@@ -3131,7 +3133,8 @@ def _parse_price_value(value: Any) -> float | None:
     else:
         text = text.replace(",", "").replace(".", "")
     try:
-        return float(text)
+        parsed = float(text)
+        return parsed if math.isfinite(parsed) else None
     except ValueError:
         return None
 
@@ -3157,10 +3160,54 @@ def _coerce_confidence(value: Any) -> float | None:
         confidence = float(value)
     except (TypeError, ValueError):
         return None
+    if not math.isfinite(confidence):
+        return None
     if confidence > 1.0:
         confidence = confidence / 100.0
     return max(0.0, min(confidence, 1.0))
 
+
+
+FORECAST_RESEARCH_EV_DOWNWEIGHT = 0.35
+
+
+def _forecast_validation_status(report_payload: dict[str, Any]) -> str:
+    validation = report_payload.get("validation_summary")
+    if isinstance(validation, dict):
+        status = str(validation.get("status") or "").strip().lower()
+        if status in {"production", "research_only", "failed"}:
+            return status
+    flags = report_payload.get("data_quality_flags")
+    if isinstance(flags, list):
+        for flag in flags:
+            text = str(flag).strip().lower()
+            if text.startswith("validation_status:"):
+                status = text.split(":", maxsplit=1)[1]
+                if status in {"production", "research_only", "failed"}:
+                    return status
+    return "failed"
+
+
+def _forecast_float(value: Any) -> float | None:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if math.isfinite(parsed) else None
+
+
+def _forecast_ranking_ev(report_payload: dict[str, Any]) -> tuple[float | None, float | None, str | None]:
+    status = _forecast_validation_status(report_payload)
+    ev = _forecast_float(report_payload.get("risk_adjusted_expected_value"))
+    if status == "production":
+        if ev is None:
+            return None, None, "risk_adjusted_ev_missing"
+        return ev, None, None
+    if status == "research_only":
+        if ev is None:
+            return None, None, "risk_adjusted_ev_missing"
+        return ev * FORECAST_RESEARCH_EV_DOWNWEIGHT, FORECAST_RESEARCH_EV_DOWNWEIGHT, None
+    return None, None, "validation_failed"
 
 class SetupCoherenceError(ValueError):
     """Raised when a generated trade setup violates basic price geometry."""
@@ -3702,9 +3749,18 @@ async def _inject_forecast_reports(results: list[dict]) -> None:
             report = await asyncio.to_thread(
                 service.predict, ticker, None, (10,), "ensemble", cio
             )
-            result["forecast_report"] = report.model_dump(mode="json")
-            if report.expected_value is not None:
-                result["forecast_ev_pct"] = report.expected_value * 100
+            report_payload = report.model_dump(mode="json")
+            result["forecast_report"] = report_payload
+            result.pop("forecast_ev_pct", None)
+            result.pop("forecast_ev_downweight", None)
+            result.pop("forecast_ev_ignored_reason", None)
+            ranking_ev, downweight, ignored_reason = _forecast_ranking_ev(report_payload)
+            if ignored_reason:
+                result["forecast_ev_ignored_reason"] = ignored_reason
+            elif ranking_ev is not None:
+                result["forecast_ev_pct"] = ranking_ev * 100
+                if downweight is not None:
+                    result["forecast_ev_downweight"] = downweight
         except Exception as exc:
             logger.warning(f"[Forecast] {ticker}: {exc}")
 

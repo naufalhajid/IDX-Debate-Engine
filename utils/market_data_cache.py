@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 from datetime import datetime, timezone
 from typing import Any
 
@@ -41,7 +42,7 @@ def _first_float(*values: Any) -> float:
             result = float(value)
         except (TypeError, ValueError):
             continue
-        if result > 0:
+        if math.isfinite(result) and result > 0:
             return result
     return 0.0
 
