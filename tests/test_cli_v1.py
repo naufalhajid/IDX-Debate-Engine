@@ -292,6 +292,7 @@ def test_pipeline_preserves_legacy_flags(monkeypatch):
             "mode": "compare",
             "screener_mode": "momentum",
             "verbose": True,
+            "portfolio_loss_pct": None,
         }
     ]
 

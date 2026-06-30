@@ -74,9 +74,10 @@ def _run_cli(argv: list[str] | None = None) -> None:
         else None
     )
     cli_portfolio_state: dict | None = None
-    if args.portfolio_loss_pct is not None:
+    _loss_pct = getattr(args, "portfolio_loss_pct", None)
+    if _loss_pct is not None:
         cli_portfolio_state = {
-            "realized_loss_pct": -abs(float(args.portfolio_loss_pct) / 100.0)
+            "realized_loss_pct": -abs(float(_loss_pct) / 100.0)
         }
     # Codex-only: batch runs (no explicit tickers, or more than the deep-mode
     # cap) drop reasoning effort for speed; other providers are unaffected.
