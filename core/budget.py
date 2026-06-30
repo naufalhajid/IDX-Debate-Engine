@@ -117,6 +117,7 @@ def get_usage() -> dict:
 def reset_budget() -> None:
     """Reset all counters. Intended for test fixtures and batch starts."""
 
-    global _pro_call_counter, _flash_call_counter
+    global _pro_call_counter, _flash_call_counter, _counter_lock
     _pro_call_counter = 0
     _flash_call_counter = 0
+    _counter_lock = None  # force re-init so a fresh event loop gets its own Lock
