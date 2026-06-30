@@ -107,10 +107,13 @@ def _compute_multimethod_mos_pct(row: pd.Series | dict) -> float | None:
             if (_dps_raw is None or (isinstance(_dps_raw, float) and pd.isna(_dps_raw)))
             else float(_dps_raw)
         )
+        _roe = _row_float(row, "Return on Equity (TTM)")
+        if _roe > 1.0:
+            _roe /= 100.0
         stats = KeyStats(
             eps_ttm=_row_float(row, "Current EPS (TTM)"),
             book_value_per_share=_row_float(row, "Current Book Value Per Share"),
-            roe=_row_float(row, "Return on Equity (TTM)"),
+            roe=_roe,
             dps=dps_val,
             current_price=price,
             operating_cash_flow_ttm=_row_float(
@@ -128,10 +131,16 @@ def _compute_multimethod_mos_pct(row: pd.Series | dict) -> float | None:
         )
         calc = FairValueCalculator(stats, sector=sector)
         result = calc.fair_value_weighted()
-        if result.get("confidence") == "LOW":
+        mos = result.get("margin_of_safety_pct")
+        if mos is None:
             return None
-        return result.get("margin_of_safety_pct")
-    except Exception:
+        return mos
+    except Exception as e:
+        logger.debug(
+            "[MultiMoS] %s: %s",
+            row.get("Ticker", "?") if hasattr(row, "get") else "?",
+            type(e).__name__,
+        )
         return None
 
 
@@ -992,6 +1001,8 @@ def _analyze_ticker(
     # Prefer multi-method FV (PE/PB/DDM/DCF weighted); fall back to Graham if unavailable.
     try:
         _mm = row.get("MultiMethod_MoS_Pct")
+        if _mm is not None and pd.isna(_mm):
+            _mm = None
         gap_pct = float(_mm) if _mm is not None else float(row.get("Valuation_Gap_Pct", 0) or 0)
         _gap_src = "multi-method" if _mm is not None else "graham"
     except Exception:
