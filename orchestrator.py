@@ -73,6 +73,11 @@ def _run_cli(argv: list[str] | None = None) -> None:
         if args.no_interactive
         else None
     )
+    cli_portfolio_state: dict | None = None
+    if args.portfolio_loss_pct is not None:
+        cli_portfolio_state = {
+            "realized_loss_pct": -abs(float(args.portfolio_loss_pct) / 100.0)
+        }
     # Codex-only: batch runs (no explicit tickers, or more than the deep-mode
     # cap) drop reasoning effort for speed; other providers are unaffected.
     reasoning_context = nullcontext()
@@ -91,6 +96,7 @@ def _run_cli(argv: list[str] | None = None) -> None:
             _pipeline.main(
                 dry_run=args.dry_run,
                 output_dir=_pipeline.OUTPUT_DIR,
+                portfolio_state=cli_portfolio_state,
                 user_config=user_config,
                 raise_on_error=True,
             )

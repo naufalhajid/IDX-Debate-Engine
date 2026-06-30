@@ -244,3 +244,16 @@ def test_check_circuit_breaker_standalone() -> None:
     assert check_circuit_breaker({"realized_loss_pct": -0.02}) is False
     assert check_circuit_breaker({"realized_loss_pct": 0.05}) is False  # profit
     assert check_circuit_breaker({}) is False
+
+
+def test_circuit_breaker_fires_then_build_sizing_candidates_is_empty() -> None:
+    """End-to-end: breaker fires → _build_sizing_candidates returns empty list."""
+    top_n = [
+        _entry("BBRI", current_price=1000, entry_range="950 - 1050", target=1290),
+        _entry("BBCA", current_price=8000, entry_range="7800 - 8200", target=9000),
+    ]
+    fired = _apply_circuit_breaker(top_n, {"realized_loss_pct": -0.04})
+    candidates = _build_sizing_candidates(top_n)
+
+    assert fired is True
+    assert candidates == []

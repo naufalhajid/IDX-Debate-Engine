@@ -153,6 +153,7 @@ def run_pipeline_cli(
     mode: str,
     screener_mode: str,
     verbose: bool,
+    portfolio_loss_pct: float | None = None,
 ) -> None:
     import orchestrator
 
@@ -175,6 +176,8 @@ def run_pipeline_cli(
     if tickers:
         argv.append("--tickers")
         argv.extend(ticker.strip().upper() for ticker in tickers if ticker.strip())
+    if portfolio_loss_pct is not None:
+        argv.extend(["--portfolio-loss-pct", str(portfolio_loss_pct)])
     orchestrator._run_cli(argv)
 
 
@@ -233,6 +236,17 @@ def pipeline_command(
         bool,
         typer.Option("--verbose", help="Enable verbose orchestrator logging."),
     ] = False,
+    portfolio_loss_pct: Annotated[
+        float | None,
+        typer.Option(
+            "--portfolio-loss-pct",
+            help=(
+                "Today's realized portfolio loss as a positive percentage "
+                "(e.g. 3.5 = -3.5%%). At >= 3%% the daily-loss circuit breaker "
+                "halts all position sizing for this batch."
+            ),
+        ),
+    ] = None,
 ) -> None:
     """Full automated pipeline: quant filter + AI debate + risk gate + TOP_3 report."""
     selected_mode, selected_screener_mode, positional_tickers = (
@@ -310,6 +324,7 @@ def pipeline_command(
         mode=selected_mode,
         screener_mode=selected_screener_mode,
         verbose=verbose or global_verbose,
+        portfolio_loss_pct=portfolio_loss_pct,
     )
 
     # Post-pipeline: show verdict summary from batch results

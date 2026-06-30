@@ -5656,6 +5656,7 @@ async def main(
     *,
     dry_run: bool = False,
     output_dir: Path = OUTPUT_DIR,
+    portfolio_state: dict | None = None,
     user_config: dict | None = None,
     mode: str | None = None,
     screener_mode: str | None = None,
@@ -6003,7 +6004,7 @@ async def main(
         debate_records=debate_records,
         realized_outcomes=realized_outcomes,
     )
-    _portfolio_state = (user_config or {}).get("portfolio_state", {})
+    _portfolio_state = portfolio_state or (user_config or {}).get("portfolio_state", {})
     if not _apply_circuit_breaker(top_n, _portfolio_state):
         _annotate_risk_governor(top_n)
     sizing_candidates = _build_sizing_candidates(top_n)
@@ -6757,6 +6758,17 @@ def _parse_cli_args(argv: list[str] | None = None) -> argparse.Namespace:
             "Quant-filter strategy when the pipeline (re)runs the screener:\n"
             "momentum (default, trend-following) or mean-reversion "
             "(oversold pullbacks in an uptrend). Forces a screener rerun."
+        ),
+    )
+    parser.add_argument(
+        "--portfolio-loss-pct",
+        type=float,
+        default=None,
+        metavar="PCT",
+        help=(
+            "Today's realized portfolio loss as a positive percentage "
+            "(e.g. 3.5 means -3.5%%). "
+            "At >= 3%% the daily-loss circuit breaker halts all position sizing."
         ),
     )
     args = parser.parse_args(argv)
