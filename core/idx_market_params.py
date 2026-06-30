@@ -37,7 +37,8 @@ LOT_SIZE = 100
 ARB_LOWER_LIMIT = 0.15
 ARA_UPPER_PRICE_BELOW_50 = 0.35
 ARA_UPPER_PRICE_50_200 = 0.25
-ARA_UPPER_PRICE_ABOVE_200 = 0.20
+ARA_UPPER_PRICE_200_5000 = 0.25
+ARA_UPPER_PRICE_ABOVE_5000 = 0.20
 
 # === Tick Size (Fraksi Harga) ===
 TICK_BELOW_200 = 1
@@ -112,12 +113,14 @@ REGIME_RULES: dict[str, dict] = {
 
 
 def ara_upper_limit(price: float) -> float:
-    """Return the daily ARA upper limit for a given IDX price."""
+    """Return the daily ARA upper limit for a given IDX price (Kep-00002/BEI/04-2025)."""
     if price <= 50:
         return ARA_UPPER_PRICE_BELOW_50
     if price <= 200:
         return ARA_UPPER_PRICE_50_200
-    return ARA_UPPER_PRICE_ABOVE_200
+    if price <= 5000:
+        return ARA_UPPER_PRICE_200_5000
+    return ARA_UPPER_PRICE_ABOVE_5000
 
 
 def idx_tick_size(price: float) -> int:

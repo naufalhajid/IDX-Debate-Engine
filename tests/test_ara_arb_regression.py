@@ -105,9 +105,10 @@ def test_output_fields_unchanged():
 
 def test_ara_sessions_needed_uses_current_idx_price_boundaries():
     """Rp100/Rp250 must use 25%/20% ARA, not the older broad 35%/<200 rule."""
-    assert _ara_sessions_needed(50.0, 67.0) == 1     # <=50: 35% ARA
-    assert _ara_sessions_needed(100.0, 126.0) == 2   # 50-200: 25% ARA
-    assert _ara_sessions_needed(250.0, 310.0) == 2   # >200: 20% ARA
+    assert _ara_sessions_needed(50.0, 67.0) == 1       # <=50: 35% ARA
+    assert _ara_sessions_needed(100.0, 126.0) == 2    # 50-200: 25% ARA
+    assert _ara_sessions_needed(250.0, 310.0) == 1    # 200-5000: 25% ARA (250*1.25=312.5 > 310)
+    assert _ara_sessions_needed(6000.0, 7300.0) == 2  # >5000: 20% ARA (6000*1.20=7200 < 7300)
 
 
 # ── Task 2 regression test ─────────────────────────────────────────────────────
