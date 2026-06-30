@@ -174,8 +174,9 @@ def _quality_penalty(row: pd.Series, cfg: dict) -> float:
     if roe < cfg["roe_penalty_threshold"]:
         penalty += cfg.get("penalty_roe_fail", -30)
 
-    if _numeric(row.get("Valuation_Gap_Pct")) <= 0:
-        penalty -= 10
+    _gap_pct = _numeric(row.get("Valuation_Gap_Pct"))
+    if _gap_pct < 0.0:
+        penalty += max(-20, round(_gap_pct))
 
     return penalty
 

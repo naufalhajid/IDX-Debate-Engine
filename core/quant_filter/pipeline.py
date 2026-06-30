@@ -946,14 +946,15 @@ def _analyze_ticker(
         logger.debug(f"[{t}] Triple-fail hard reject: Altman-Z + Piotroski + ROE all fail")
         return None
 
-    # Penalti jika tidak ada margin of safety (Valuation gap == 0)
+    # Proportional MoS penalty: 1pt per 1% overvalued, capped at -20
     try:
         gap_pct = float(row.get("Valuation_Gap_Pct", 0) or 0)
     except Exception:
         gap_pct = 0.0
-    if gap_pct <= 0.0:
-        total_score -= 10
-        mom_note.append("Penalty: no margin of safety (-10)")
+    if gap_pct < 0.0:
+        mos_penalty = max(-20, round(gap_pct))
+        total_score += mos_penalty
+        mom_note.append(f"Penalty: overvalued {gap_pct:.1f}% ({mos_penalty:+d})")
 
     # ── Task 6: Free Float Manipulation Penalty ───────────────────────────────
     ff_result = check_free_float(t)
@@ -1622,6 +1623,15 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
     )
 
     filtered["OCF_Price_Ratio"] = filtered.apply(_ocf_price_ratio_from_row, axis=1)
+    _high_ocf = filtered[filtered["OCF_Price_Ratio"] > 0.40]
+    if not _high_ocf.empty:
+        _hi_tickers = _high_ocf["Ticker"].tolist() if "Ticker" in _high_ocf.columns else list(_high_ocf.index)
+        logger.warning(
+            "[OCF/Price] %d ticker(s) report OCF/Price > 40%% — possible data anomaly "
+            "(stale, aggregated, or mis-scaled OCF): %s",
+            len(_hi_tickers),
+            _hi_tickers,
+        )
     filtered["OCF_Price_Sector_Pctile"] = _compute_sector_ocf_percentiles(filtered)
     filtered["RNOA_Estimate"] = filtered.apply(
         lambda r: _row_float(r, "RNOA", "Return on Net Operating Assets")

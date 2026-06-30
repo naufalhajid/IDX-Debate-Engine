@@ -818,3 +818,45 @@ def test_garch_amplified_atr_does_not_block_inclusion_gate(monkeypatch: pytest.M
     )
     assert result is not None, "classic ATR% 2.5% should pass gate despite GARCH amplification"
     assert gate_counters.get("atr_pct", 0) == 0
+
+
+# ── V8: Proportional MoS penalty ──────────────────────────────────────────────
+
+def test_mos_penalty_is_proportional_not_flat(monkeypatch: pytest.MonkeyPatch) -> None:
+    """V8 regression: MoS penalty is 1pt/1% overvalued capped at -20, not flat -10.
+
+    A stock 5% overvalued gets -5 (not -10).
+    A stock 25% overvalued gets -20 (cap, not -10).
+    Exactly at fair value (gap=0%) gets no penalty.
+    """
+    _stub_indicators(monkeypatch)
+    logger = logging.getLogger("test.mos_penalty")
+    cfg = _analysis_cfg()
+
+    # 5% overvalued → "Penalty: overvalued -5.0% (-5)" must appear, NOT "-10"
+    row_5 = _analysis_row(Valuation_Gap_Pct=-5.0)
+    result_5 = pipeline._analyze_ticker(row_5, _market_frame(), cfg, logger)
+    if result_5 is not None:
+        strategy = result_5.get("Entry Strategy", "")
+        assert "overvalued -5.0% (-5)" in strategy, (
+            f"Expected proportional -5 penalty for -5% gap, got: {strategy}"
+        )
+        assert "no margin of safety (-10)" not in strategy
+
+    # 25% overvalued → penalty must be capped at -20
+    row_25 = _analysis_row(Valuation_Gap_Pct=-25.0)
+    result_25 = pipeline._analyze_ticker(row_25, _market_frame(), cfg, logger)
+    if result_25 is not None:
+        strategy = result_25.get("Entry Strategy", "")
+        assert "(-20)" in strategy, (
+            f"Expected cap at -20 for -25% gap, got: {strategy}"
+        )
+
+    # exactly at fair value → no MoS penalty
+    row_0 = _analysis_row(Valuation_Gap_Pct=0.0)
+    result_0 = pipeline._analyze_ticker(row_0, _market_frame(), cfg, logger)
+    if result_0 is not None:
+        strategy = result_0.get("Entry Strategy", "")
+        assert "overvalued" not in strategy, (
+            f"Gap=0% should not trigger MoS penalty, got: {strategy}"
+        )
