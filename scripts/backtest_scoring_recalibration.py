@@ -29,6 +29,7 @@ import pandas as pd
 from core.quant_filter.config import CONFIG, FINANCIAL_SECTORS, SECTOR_MEDIAN_PE, SECTOR_PBV_BENCHMARK
 from core.quant_filter.pipeline import (
     _build_sector_map,
+    _compute_multimethod_mos_pct,
     _compute_prof_score,
     _compute_val_score,
     _ocf_price_ratio_from_row,
@@ -174,9 +175,12 @@ def _quality_penalty(row: pd.Series, cfg: dict) -> float:
     if roe < cfg["roe_penalty_threshold"]:
         penalty += cfg.get("penalty_roe_fail", -30)
 
-    _gap_pct = _numeric(row.get("Valuation_Gap_Pct"))
+    _mm = row.get("MultiMethod_MoS_Pct")
+    if _mm is not None and pd.isna(_mm):
+        _mm = None
+    _gap_pct = float(_mm) if _mm is not None else _numeric(row.get("Valuation_Gap_Pct"))
     if _gap_pct < 0.0:
-        penalty += max(-20, round(_gap_pct))
+        penalty += max(-20, int(_gap_pct))
 
     return penalty
 
@@ -320,6 +324,7 @@ def _load_snapshot(path: Path, cfg: dict) -> Snapshot:
         * 100
     )
     filtered["OCF_Price_Ratio"] = filtered.apply(_ocf_price_ratio_from_row, axis=1)
+    filtered["MultiMethod_MoS_Pct"] = filtered.apply(_compute_multimethod_mos_pct, axis=1)
     filtered["RNOA_Estimate"] = filtered.apply(
         lambda row: _row_float(row, "RNOA", "Return on Net Operating Assets")
         or _row_float(row, "Return on Assets (TTM)", "ROA (TTM)", "ROA"),

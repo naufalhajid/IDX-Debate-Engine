@@ -1020,7 +1020,7 @@ def _analyze_ticker(
     except Exception:
         gap_pct, _gap_src = 0.0, "graham"
     if gap_pct < 0.0:
-        mos_penalty = max(-20, round(gap_pct))
+        mos_penalty = max(-20, int(gap_pct))
         total_score += mos_penalty
         mom_note.append(f"Penalty: overvalued {gap_pct:.1f}% [{_gap_src}] ({mos_penalty:+d})")
 

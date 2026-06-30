@@ -47,6 +47,8 @@ _SECTOR_REPRESENTATIVE_TICKERS: dict[str, list[str]] = {
 # Static fallback — used when the cache is absent or stale.
 # 5 bucket keys = used by FairValueCalculator SECTOR_WEIGHTS.
 # 12 raw IDX sector keys = used by build_sector_comparison() raw_sector lookup.
+_DYNAMIC_SECTOR_BENCHMARKS_INMEM: dict | None = None
+
 _SECTOR_MEDIAN_PROFILES_DEFAULT: dict[str, dict] = {
     # ── 5 FairValueCalculator bucket keys ─────────────────────────────────────
     "bank":     {"pe": 10.0, "pb": 1.5, "roe": 0.14, "net_margin": 0.25},
@@ -69,7 +71,16 @@ _SECTOR_MEDIAN_PROFILES_DEFAULT: dict[str, dict] = {
 
 
 def _load_dynamic_sector_benchmarks() -> dict[str, dict]:
-    """Return sector PE/PB/ROE/margin medians from cache if ≤7 days old."""
+    """Return sector PE/PB/ROE/margin medians from cache if ≤7 days old.
+
+    Result is memoised in-process after the first successful disk read to avoid
+    per-ticker file I/O during a pipeline run (957 tickers × N FairValueCalculator
+    instantiations).  Falls through to _SECTOR_MEDIAN_PROFILES_DEFAULT without
+    caching so that a stale/missing file retries on the next call.
+    """
+    global _DYNAMIC_SECTOR_BENCHMARKS_INMEM
+    if _DYNAMIC_SECTOR_BENCHMARKS_INMEM is not None:
+        return _DYNAMIC_SECTOR_BENCHMARKS_INMEM
     try:
         if _SECTOR_BENCHMARKS_CACHE_PATH.exists():
             raw = json.loads(_SECTOR_BENCHMARKS_CACHE_PATH.read_text(encoding="utf-8"))
@@ -81,6 +92,7 @@ def _load_dynamic_sector_benchmarks() -> dict[str, dict]:
                     logger.debug(
                         "[FV-5] Loaded dynamic sector benchmarks (age {} days).", age_days
                     )
+                    _DYNAMIC_SECTOR_BENCHMARKS_INMEM = benchmarks
                     return benchmarks
     except Exception as exc:
         logger.debug("[FV-5] _load_dynamic_sector_benchmarks failed: {}", exc)

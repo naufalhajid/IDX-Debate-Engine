@@ -35,6 +35,14 @@ def reset_budget_state():
     reset_budget()
 
 
+@pytest.fixture(autouse=True)
+def reset_sector_benchmark_cache():
+    import services.fair_value_calculator as _fvc
+    _fvc._DYNAMIC_SECTOR_BENCHMARKS_INMEM = None
+    yield
+    _fvc._DYNAMIC_SECTOR_BENCHMARKS_INMEM = None
+
+
 @pytest.fixture
 def stock_factory() -> Callable[..., StockModel]:
     def _create_stock(
