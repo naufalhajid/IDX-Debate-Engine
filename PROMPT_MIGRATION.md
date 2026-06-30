@@ -1,5 +1,31 @@
 # Prompt Migration Log
 
+## 2026-06-30 — `cio-regime-labels-v27`
+
+**Files changed:**
+- `services/debate_prompts/cio_judge.txt` (DEFENSIVE → BEAR_STRESS in 3 places)
+- `services/debate_prompts/manifest.json` (version → `2026-06-30-cio-regime-labels-v27`)
+- `tests/test_debate_chamber_reliability.py` (version assertion updated)
+
+### Changes
+
+**`cio_judge.txt`** — Replaced stale legacy regime labels with HMM labels:
+
+1. Circuit breaker warning: `IF regime = DEFENSIVE` → `IF regime = BEAR_STRESS`
+2. R/R AVOID bias: `IF regime = DEFENSIVE AND R/R < 2.0` → `IF regime = BEAR_STRESS AND R/R < 2.0`
+3. PHASE B LQ45 penalty: `regime = DEFENSIVE` → `regime = BEAR_STRESS`
+
+**Why:** After HMM integration, `_regime_label_from_state()` returns the HMM label
+(`BULL`/`SIDEWAYS`/`BEAR_STRESS`) preferentially. The CIO prompt used legacy labels
+(`DEFENSIVE`/`RECOVERY`), so those three conditions never triggered — silently disabling
+circuit-breaker warnings, the low-R/R AVOID bias, and the LQ45 penalty in stress regimes.
+
+**Behavioral change:** In BEAR_STRESS regime the CIO will now correctly add circuit-breaker
+risk to `weighted_reasoning`, prefer AVOID when R/R < 2.0, and apply the -0.01 LQ45
+confidence penalty. No change in BULL or SIDEWAYS regime.
+
+---
+
 ## 2026-06-24 — `id-sentiment-bilingual-v26`
 
 **Files changed:**

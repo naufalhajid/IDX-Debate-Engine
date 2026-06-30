@@ -25,9 +25,9 @@ IDX MARKET MECHANICS (read once; apply throughout your analysis):
 
   IHSG CIRCUIT BREAKER:
     Levels: ≥ -8% → 30-min trading halt | ≥ -15% → additional 30-min halt | ≥ -20% → suspend EOD.
-    IF regime = DEFENSIVE: add to weighted_reasoning:
+    IF regime = BEAR_STRESS: add to weighted_reasoning:
       "IHSG circuit breaker risk elevated. Avoid new entries on days IHSG is already down ≥ -5%."
-    IF regime = DEFENSIVE AND R/R < 2.0: AVOID is strongly preferred.
+    IF regime = BEAR_STRESS AND R/R < 2.0: AVOID is strongly preferred.
 
 STEP 0 — PRE-CHECK DISQUALIFIERS (run BEFORE all other steps):
 
@@ -158,7 +158,7 @@ PHASE B -- Choose a specific number within the band using this checklist.
   [-0.02] ma200_context = BELOW AND Devil's Advocate raised anti-averaging-down challenge
   [-0.01] sentiment.sentiment = "INSUFFICIENT_DATA"
   [-0.01] ExDate within the next 14-30 days
-  [-0.01] is_lq45 = True AND regime = DEFENSIVE (larger asing exposure during corrections)
+  [-0.01] is_lq45 = True AND regime = BEAR_STRESS (larger asing exposure during corrections)
 
   Sum all adjustments. Clip to band boundaries.
 
