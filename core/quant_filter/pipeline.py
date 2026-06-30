@@ -93,6 +93,48 @@ def _tier_score(value: float, tier1: float, tier2: float, tier3: float) -> float
     return 0.10
 
 
+def _compute_multimethod_mos_pct(row: pd.Series | dict) -> float | None:
+    """Multi-method MoS % via FairValueCalculator. Returns None when confidence=LOW."""
+    from services.fair_value_calculator import FairValueCalculator, KeyStats
+
+    try:
+        price = _row_float(row, "Close Price", "Current Price")
+        if price <= 0:
+            return None
+        _dps_raw = row.get("Dividend (TTM)") if hasattr(row, "get") else None
+        dps_val = (
+            None
+            if (_dps_raw is None or (isinstance(_dps_raw, float) and pd.isna(_dps_raw)))
+            else float(_dps_raw)
+        )
+        stats = KeyStats(
+            eps_ttm=_row_float(row, "Current EPS (TTM)"),
+            book_value_per_share=_row_float(row, "Current Book Value Per Share"),
+            roe=_row_float(row, "Return on Equity (TTM)"),
+            dps=dps_val,
+            current_price=price,
+            operating_cash_flow_ttm=_row_float(
+                row,
+                "Operating Cash Flow (TTM)",
+                "Cash From Operations (TTM)",
+                "Cash From Operations",
+            ),
+            shares_outstanding=_row_float(row, "Current Share Outstanding"),
+        )
+        sector = (
+            str(row.get("Sector", "default") or "default")
+            if hasattr(row, "get")
+            else "default"
+        )
+        calc = FairValueCalculator(stats, sector=sector)
+        result = calc.fair_value_weighted()
+        if result.get("confidence") == "LOW":
+            return None
+        return result.get("margin_of_safety_pct")
+    except Exception:
+        return None
+
+
 def _ocf_price_ratio_from_row(row: pd.Series | dict) -> float:
     direct = _row_float(
         row,
@@ -947,14 +989,17 @@ def _analyze_ticker(
         return None
 
     # Proportional MoS penalty: 1pt per 1% overvalued, capped at -20
+    # Prefer multi-method FV (PE/PB/DDM/DCF weighted); fall back to Graham if unavailable.
     try:
-        gap_pct = float(row.get("Valuation_Gap_Pct", 0) or 0)
+        _mm = row.get("MultiMethod_MoS_Pct")
+        gap_pct = float(_mm) if _mm is not None else float(row.get("Valuation_Gap_Pct", 0) or 0)
+        _gap_src = "multi-method" if _mm is not None else "graham"
     except Exception:
-        gap_pct = 0.0
+        gap_pct, _gap_src = 0.0, "graham"
     if gap_pct < 0.0:
         mos_penalty = max(-20, round(gap_pct))
         total_score += mos_penalty
-        mom_note.append(f"Penalty: overvalued {gap_pct:.1f}% ({mos_penalty:+d})")
+        mom_note.append(f"Penalty: overvalued {gap_pct:.1f}% [{_gap_src}] ({mos_penalty:+d})")
 
     # ── Task 6: Free Float Manipulation Penalty ───────────────────────────────
     ff_result = check_free_float(t)
@@ -1034,6 +1079,7 @@ def _analyze_ticker(
         "graham_fv_capped": bool(row.get("graham_fv_capped", False)),
         "graham_low_roe_capped": bool(row.get("graham_low_roe_capped", False)),
         "Valuation Gap (%)": row["Valuation_Gap_Pct"],
+        "Multi-Method MoS (%)": row.get("MultiMethod_MoS_Pct"),
         "Price to Equity Discount": row.get("Price to Equity Discount (%)", 0),
         "RSI (14)": rsi_latest,
         "SMA 20": sma20_latest,
@@ -1621,6 +1667,7 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         / filtered["Close Price"]
         * 100
     )
+    filtered["MultiMethod_MoS_Pct"] = filtered.apply(_compute_multimethod_mos_pct, axis=1)
 
     filtered["OCF_Price_Ratio"] = filtered.apply(_ocf_price_ratio_from_row, axis=1)
     _high_ocf = filtered[filtered["OCF_Price_Ratio"] > 0.40]

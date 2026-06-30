@@ -833,12 +833,12 @@ def test_mos_penalty_is_proportional_not_flat(monkeypatch: pytest.MonkeyPatch) -
     logger = logging.getLogger("test.mos_penalty")
     cfg = _analysis_cfg()
 
-    # 5% overvalued → "Penalty: overvalued -5.0% (-5)" must appear, NOT "-10"
+    # 5% overvalued → penalty note must contain "-5.0%" and "(-5)", NOT the old flat "-10"
     row_5 = _analysis_row(Valuation_Gap_Pct=-5.0)
     result_5 = pipeline._analyze_ticker(row_5, _market_frame(), cfg, logger)
     if result_5 is not None:
         strategy = result_5.get("Entry Strategy", "")
-        assert "overvalued -5.0% (-5)" in strategy, (
+        assert "-5.0%" in strategy and "(-5)" in strategy, (
             f"Expected proportional -5 penalty for -5% gap, got: {strategy}"
         )
         assert "no margin of safety (-10)" not in strategy
@@ -859,4 +859,46 @@ def test_mos_penalty_is_proportional_not_flat(monkeypatch: pytest.MonkeyPatch) -
         strategy = result_0.get("Entry Strategy", "")
         assert "overvalued" not in strategy, (
             f"Gap=0% should not trigger MoS penalty, got: {strategy}"
+        )
+
+
+def test_multimethod_mos_suppresses_penalty_when_positive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Opsi B regression: multi-method MoS positive (undervalued by FV) overrides
+    Graham's always-negative gap — no penalty should fire even when Graham says overvalued."""
+    _stub_indicators(monkeypatch)
+    logger = logging.getLogger("test.multimethod_mos_positive")
+    cfg = _analysis_cfg()
+
+    # Graham says -25% overvalued, but multi-method FV says +15% undervalued
+    row = _analysis_row(Valuation_Gap_Pct=-25.0, MultiMethod_MoS_Pct=15.0)
+    result = pipeline._analyze_ticker(row, _market_frame(), cfg, logger)
+    if result is not None:
+        strategy = result.get("Entry Strategy", "")
+        assert "overvalued" not in strategy, (
+            f"Positive multi-method MoS should suppress penalty; got: {strategy}"
+        )
+        assert result.get("Multi-Method MoS (%)") == 15.0
+
+
+def test_multimethod_mos_falls_back_to_graham_when_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Opsi B regression: when MultiMethod_MoS_Pct is None (LOW confidence),
+    the penalty falls back to Valuation_Gap_Pct (Graham) and labels it '[graham]'."""
+    _stub_indicators(monkeypatch)
+    logger = logging.getLogger("test.multimethod_mos_none")
+    cfg = _analysis_cfg()
+
+    # No multi-method data; Graham says -10% overvalued → penalty -10 with [graham] label
+    row = _analysis_row(Valuation_Gap_Pct=-10.0, MultiMethod_MoS_Pct=None)
+    result = pipeline._analyze_ticker(row, _market_frame(), cfg, logger)
+    if result is not None:
+        strategy = result.get("Entry Strategy", "")
+        assert "[graham]" in strategy, (
+            f"Expected [graham] fallback label when MultiMethod_MoS_Pct=None; got: {strategy}"
+        )
+        assert "-10.0%" in strategy and "(-10)" in strategy, (
+            f"Expected -10 penalty from Graham fallback; got: {strategy}"
         )
