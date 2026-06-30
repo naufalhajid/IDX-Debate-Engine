@@ -704,3 +704,34 @@ def test_t2_hold_not_triggered_when_hold_days_meets_minimum() -> None:
     # hold_days=2 equals MIN_HOLD_DAYS → no warning
     decision = evaluate_risk(_candidate(hold_days=2))
     assert "t2_hold_warning" not in decision.reason_codes
+
+
+# ---------------------------------------------------------------------------
+# P12: ARA entry-risk hard reject
+# ---------------------------------------------------------------------------
+
+
+def test_ara_entry_risk_high_is_hard_rejected() -> None:
+    """ara_entry_risk=HIGH is in HARD_REJECT_CODES → sizing_allowed=False."""
+    decision = evaluate_risk(_candidate(ara_entry_risk="HIGH"))
+
+    assert decision.status == "reject"
+    assert decision.sizing_allowed is False
+    assert "ara_entry_risk_high" in decision.reason_codes
+
+
+def test_ara_entry_risk_high_via_metadata_is_hard_rejected() -> None:
+    """ara_entry_risk HIGH in candidate['metadata'] is read and hard-rejected."""
+    decision = evaluate_risk(_candidate(metadata={"ara_entry_risk": "HIGH"}))
+
+    assert decision.status == "reject"
+    assert decision.sizing_allowed is False
+    assert "ara_entry_risk_high" in decision.reason_codes
+
+
+def test_ara_entry_risk_medium_is_not_hard_rejected() -> None:
+    """MEDIUM ara_entry_risk is a soft signal, not a hard reject."""
+    decision = evaluate_risk(_candidate(ara_entry_risk="MEDIUM"))
+
+    assert decision.sizing_allowed is True
+    assert "ara_entry_risk_high" not in decision.reason_codes
