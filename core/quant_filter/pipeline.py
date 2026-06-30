@@ -1883,7 +1883,7 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
     if gate_counters:
         _gc_sorted = sorted(gate_counters.items(), key=lambda x: -x[1])
         _gate_line = (
-            f"\n  Gate rejections (technical):\n"
+            "\n  Gate rejections (technical):\n"
             + "".join(f"    {k:<20}: {v:>4}\n" for k, v in _gc_sorted)
         )
     print(
