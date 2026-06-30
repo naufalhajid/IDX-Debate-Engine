@@ -78,7 +78,7 @@ def _load_dynamic_sector_benchmarks() -> dict[str, dict]:
             if age_days <= _SECTOR_BENCHMARK_MAX_AGE_DAYS:
                 benchmarks = raw.get("benchmarks", {})
                 if benchmarks:
-                    logger.info(
+                    logger.debug(
                         "[FV-5] Loaded dynamic sector benchmarks (age {} days).", age_days
                     )
                     return benchmarks
