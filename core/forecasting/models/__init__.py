@@ -31,9 +31,17 @@ class ModelBase(ABC):
         validation_passed: bool = False,
         ic: float | None = None,
         brier_target: float | None = None,
+        status: str = "active",
+        reason: str | None = None,
+        rmse: float | None = None,
+        mae: float | None = None,
+        mape: float | None = None,
+        directional_accuracy: float | None = None,
     ) -> ModelVote:
         return ModelVote(
             model_name=self.name,
+            status=status,  # type: ignore[arg-type]
+            reason=reason,
             r_hat_net=r_hat_net,
             p_target=p_target,
             p_stop=p_stop,
@@ -42,4 +50,8 @@ class ModelBase(ABC):
             validation_passed=validation_passed,
             ic=ic,
             brier_target=brier_target,
+            rmse=rmse,
+            mae=mae,
+            mape=mape,
+            directional_accuracy=directional_accuracy,
         )

@@ -143,10 +143,17 @@ def validate_model(
     ic_series: list[float] = []
     brier_scores: list[float] = []
     rmse_scores: list[float] = []
+    mae_scores: list[float] = []
+    mape_scores: list[float] = []
+    directional_scores: list[float] = []
     pnl_values: list[float] = []
     n_obs = 0
 
-    feature_cols = [c for c in (splits[0][0].columns if splits else []) if not c.startswith(("y_", "r_net", "sigma"))]
+    feature_cols = [
+        c
+        for c in (splits[0][0].columns if splits else [])
+        if not c.startswith(("y_", "r_net", "sigma"))
+    ]
 
     for train_df, test_df in splits:
         if target_col not in train_df.columns or target_col not in test_df.columns:
@@ -165,13 +172,22 @@ def validate_model(
         except Exception:
             continue
 
-        ic = compute_ic(y_test.values, y_pred)
+        y_true = y_test.values.astype(float)
+        y_pred = np.asarray(y_pred, dtype=float)
+        if len(y_pred) != len(y_true):
+            continue
+        finite_mask = np.isfinite(y_true) & np.isfinite(y_pred)
+        if not finite_mask.any():
+            continue
+        y_true = y_true[finite_mask]
+        y_pred = y_pred[finite_mask]
+
+        ic = compute_ic(y_true, y_pred)
         if not math.isnan(ic):
             ic_series.append(ic)
 
         if "y_up" in test_df.columns:
-            y_bin = test_df["y_up"].values
-            # Standardized sigmoid — graceful for constant predictions (NaiveModel → p_hat=0.5)
+            y_bin = np.asarray(test_df["y_up"].values, dtype=float)[finite_mask]
             y_std = float(np.std(y_pred))
             if y_std < 1e-10:
                 p_hat = np.full(len(y_pred), 0.5)
@@ -179,34 +195,59 @@ def validate_model(
                 y_z = (y_pred - float(np.mean(y_pred))) / y_std
                 p_hat = 1.0 / (1.0 + np.exp(-np.clip(y_z, -10.0, 10.0)))
             brier = float(np.mean((p_hat - y_bin) ** 2))
-            brier_scores.append(brier)
+            if math.isfinite(brier):
+                brier_scores.append(brier)
 
-        rmse = float(np.sqrt(np.mean((y_pred - y_test.values) ** 2)))
-        rmse_scores.append(rmse)
-        pnl_values.extend(y_test.tolist())
-        n_obs += len(y_test)
+        errors = y_pred - y_true
+        rmse = float(np.sqrt(np.mean(errors**2)))
+        mae = float(np.mean(np.abs(errors)))
+        if math.isfinite(rmse):
+            rmse_scores.append(rmse)
+        if math.isfinite(mae):
+            mae_scores.append(mae)
+
+        mape_mask = np.abs(y_true) > 1e-6
+        if mape_mask.any():
+            mape = float(np.mean(np.abs(errors[mape_mask] / y_true[mape_mask])))
+            if math.isfinite(mape):
+                mape_scores.append(mape)
+
+        direction_mask = np.abs(y_true) > 1e-12
+        if direction_mask.any():
+            directional = float(
+                np.mean(np.sign(y_true[direction_mask]) == np.sign(y_pred[direction_mask]))
+            )
+            if math.isfinite(directional):
+                directional_scores.append(directional)
+
+        pnl_values.extend(y_true.tolist())
+        n_obs += len(y_true)
 
     ic_mean = sum(ic_series) / len(ic_series) if ic_series else None
     ic_t_stat = compute_ic_t_stat(ic_series) if ic_series else None
     brier = sum(brier_scores) / len(brier_scores) if brier_scores else None
     rmse = sum(rmse_scores) / len(rmse_scores) if rmse_scores else None
+    mae = sum(mae_scores) / len(mae_scores) if mae_scores else None
+    mape = sum(mape_scores) / len(mape_scores) if mape_scores else None
+    directional_accuracy = (
+        sum(directional_scores) / len(directional_scores) if directional_scores else None
+    )
 
-    # DSR via metrics_calculator
     dsr: float | None = None
     if len(pnl_values) >= 4:
-        dsr_result = compute_deflated_sharpe_ratio(pnl_values, benchmark_sr=0.0, n_trials=1)
+        dsr_result = compute_deflated_sharpe_ratio(
+            pnl_values,
+            benchmark_sr=0.0,
+            n_trials=1,
+        )
         dsr = dsr_result["deflated_sr"] if dsr_result else None
 
-    # Provisional single-model BH flag. With m=1, BH(q=0.10) reduces to p<0.10 (no
-    # correction). Use stricter p<0.05 here; call batch_bh_correction() across all
-    # models for proper multi-testing correction.
     bh_passed = False
     if ic_t_stat is not None and math.isfinite(ic_t_stat):
         from scipy.stats import norm as _norm  # noqa: PLC0415
         p_val = float(2 * _norm.sf(abs(ic_t_stat)))
         bh_passed = p_val < 0.05
 
-    # Status
     if ic_mean is not None and ic_mean >= 0.03 and ic_t_stat is not None and ic_t_stat >= 2.57:
         status: str = "production"
     elif ic_mean is not None and ic_mean > 0:
@@ -221,6 +262,9 @@ def validate_model(
         ic_t_stat=ic_t_stat,
         brier=brier,
         rmse=rmse,
+        mae=mae,
+        mape=mape,
+        directional_accuracy=directional_accuracy,
         dsr=dsr,
         bh_q_value_passed=bh_passed,
         status=status,  # type: ignore[arg-type]
