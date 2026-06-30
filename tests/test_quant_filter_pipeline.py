@@ -753,3 +753,68 @@ def test_score_floor_pipeline_uses_high_floor_for_high_regime():
     else:
         floor = cfg.get("score_floor_normal_regime", 35)
     assert floor == 35
+
+
+def test_gate_counters_track_atr_pct_rejections(monkeypatch: pytest.MonkeyPatch) -> None:
+    """gate_counters['atr_pct'] increments when classic ATR% exceeds max_atr_pct."""
+    monkeypatch.setattr(pipeline, "_resolve_exdate", _flat_exdate)
+    monkeypatch.setattr(
+        pipeline,
+        "compute_rsi",
+        lambda close: pd.Series([50.0] * len(close), index=close.index),
+    )
+    # classic ATR = 8.0 on price ~120 → ~6.6% > 5% ceiling
+    monkeypatch.setattr(
+        pipeline,
+        "compute_atr",
+        lambda high, low, close: pd.Series([8.0] * len(close), index=close.index),
+    )
+    cfg = _analysis_cfg()
+    cfg["max_atr_pct"] = 0.05
+    cfg["USE_GARCH_ATR"] = False
+    gate_counters: dict = {}
+    result = pipeline._analyze_ticker(
+        _analysis_row(),
+        _market_frame(),
+        cfg,
+        logging.getLogger("test.gate_counters"),
+        gate_counters=gate_counters,
+    )
+    assert result is None
+    assert gate_counters.get("atr_pct", 0) == 1
+
+
+def test_garch_amplified_atr_does_not_block_inclusion_gate(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Classic ATR governs the max_atr_pct gate regardless of GARCH amplification.
+
+    Regression guard for V1: GARCH capped at 3x classic was blocking stocks where
+    classic ATR% was under 5% but GARCH ATR% would have exceeded it.
+    """
+    monkeypatch.setattr(pipeline, "_resolve_exdate", _flat_exdate)
+    monkeypatch.setattr(
+        pipeline,
+        "compute_rsi",
+        lambda close: pd.Series([50.0] * len(close), index=close.index),
+    )
+    # classic ATR = 3.0 on price ~120 → ~2.5% — well under the 5% ceiling
+    monkeypatch.setattr(
+        pipeline,
+        "compute_atr",
+        lambda high, low, close: pd.Series([3.0] * len(close), index=close.index),
+    )
+    # GARCH ATR = 15.0 → ~12.5% — would have blocked under old code
+    monkeypatch.setattr(pipeline, "calculate_dynamic_atr", lambda *_a, **_kw: 15.0)
+    cfg = _analysis_cfg()
+    cfg["max_atr_pct"] = 0.05
+    cfg["USE_GARCH_ATR"] = True
+    gate_counters: dict = {}
+    result = pipeline._analyze_ticker(
+        _analysis_row(),
+        _market_frame(),
+        cfg,
+        logging.getLogger("test.gate_counters.garch"),
+        regime="DEFENSIVE",
+        gate_counters=gate_counters,
+    )
+    assert result is not None, "classic ATR% 2.5% should pass gate despite GARCH amplification"
+    assert gate_counters.get("atr_pct", 0) == 0

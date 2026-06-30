@@ -610,6 +610,7 @@ def _analyze_ticker(
     regime: str = "NORMAL",
     adapter: "XlsxDataAdapter | None" = None,
     weekly_df: "pd.DataFrame | None" = None,
+    gate_counters: "dict[str, int] | None" = None,
 ) -> dict | None:
     """
     Analisis teknikal + fundamental satu ticker.
@@ -628,6 +629,8 @@ def _analyze_ticker(
     if (vol.tail(20) == 0).sum() > cfg["max_zero_vol_days"] or (
         avg_vol_20d > 0 and (recent_vol / avg_vol_20d) < 0.10
     ):
+        if gate_counters is not None:
+            gate_counters["suspended_fca"] = gate_counters.get("suspended_fca", 0) + 1
         logger.info(f"[{t}] Excluded: suspek suspended/FCA (volume anomali)")
         return None
 
@@ -684,10 +687,18 @@ def _analyze_ticker(
             )
             return None
     else:
-        min_price_vs_ema20 = cfg.get(
-            "min_price_vs_ema20", cfg.get("min_price_vs_sma50", 1.0)
-        )
+        if str(regime).upper() in ("DEFENSIVE", "HIGH", "BEAR_STRESS"):
+            min_price_vs_ema20 = cfg.get(
+                "min_price_vs_ema20_defensive",
+                cfg.get("min_price_vs_ema20", cfg.get("min_price_vs_sma50", 1.0)),
+            )
+        else:
+            min_price_vs_ema20 = cfg.get(
+                "min_price_vs_ema20", cfg.get("min_price_vs_sma50", 1.0)
+            )
         if current_px < ema20_latest * min_price_vs_ema20:
+            if gate_counters is not None:
+                gate_counters["ema20"] = gate_counters.get("ema20", 0) + 1
             logger.debug(f"[{t}] Price below EMA20 trend filter, skip")
             return None
 
@@ -705,6 +716,8 @@ def _analyze_ticker(
             logger.debug(f"[{t}] MR: 1m drop {price_return_1m:.1%} too deep, skip")
             return None
     elif rs_vs_ihsg < cfg["min_rs_vs_ihsg_1m"]:
+        if gate_counters is not None:
+            gate_counters["rs_vs_ihsg"] = gate_counters.get("rs_vs_ihsg", 0) + 1
         logger.debug(f"[{t}] RS vs IHSG {rs_vs_ihsg:.2%} < threshold, skip")
         return None
 
@@ -733,6 +746,8 @@ def _analyze_ticker(
             )
             return None
     elif rsi_latest > cfg["rsi_hard_reject"]:
+        if gate_counters is not None:
+            gate_counters["rsi_hard_reject"] = gate_counters.get("rsi_hard_reject", 0) + 1
         logger.debug(
             f"[{t}] RSI {rsi_latest:.1f} > {cfg['rsi_hard_reject']}, hard reject"
         )
@@ -745,8 +760,16 @@ def _analyze_ticker(
     sma20_latest: float = float(sma20.iloc[-1])
 
     # ── ATR (14) ──────────────────────────────────────────────────────────────
-    # GARCH(1,1) dynamic ATR uses period=1 to produce a daily volatility estimate
-    # in Rupiah, directly comparable to classic Wilder ATR-14.
+    # Classic Wilder ATR is always computed and used for the max_atr_pct inclusion
+    # gate. GARCH ATR (when enabled) is reserved for stop-loss sizing only: its
+    # regime-reactive amplification (capped at 3× classic by _GARCH_CAP_MULTIPLIER)
+    # is appropriate for sizing but would mass-reject normal stocks in DEFENSIVE
+    # regime through the 5% ceiling if used as the gate signal.
+    classic_atr_series = compute_atr(high, low, close)
+    if pd.isna(classic_atr_series.iloc[-1]):
+        return None
+    classic_atr_14: float = float(classic_atr_series.iloc[-1])
+
     if cfg.get("USE_GARCH_ATR", False):
         atr_14 = calculate_dynamic_atr(
             close,
@@ -756,21 +779,22 @@ def _analyze_ticker(
             model_type=cfg.get("DYNAMIC_ATR_MODEL", "garch"),
         )
         if atr_14 <= 0:
-            return None
+            atr_14 = classic_atr_14
     else:
-        atr_series = compute_atr(high, low, close)
-        if pd.isna(atr_series.iloc[-1]):
-            return None
-        atr_14 = float(atr_series.iloc[-1])
+        atr_14 = classic_atr_14
 
     # ── Liquidity Gate: ADT 20d ───────────────────────────────────────────────
     adt_20: float = float((close * vol).tail(20).mean())
     if adt_20 < cfg["min_adt_20d"]:
+        if gate_counters is not None:
+            gate_counters["adt_liquidity"] = gate_counters.get("adt_liquidity", 0) + 1
         logger.debug(f"[{t}] ADT Rp {adt_20:,.0f} < threshold, skip")
         return None
-    atr_pct = atr_14 / float(close.iloc[-1]) if float(close.iloc[-1]) > 0 else 0.0
+    atr_pct = classic_atr_14 / float(close.iloc[-1]) if float(close.iloc[-1]) > 0 else 0.0
     if atr_pct > cfg.get("max_atr_pct", 0.04):
-        logger.debug(f"[{t}] ATR% {atr_pct:.1%} > max, skip")
+        if gate_counters is not None:
+            gate_counters["atr_pct"] = gate_counters.get("atr_pct", 0) + 1
+        logger.debug(f"[{t}] ATR% (classic) {atr_pct:.1%} > max, skip")
         return None
 
     # ── Volume Confirmation ───────────────────────────────────────────────────
@@ -778,6 +802,8 @@ def _analyze_ticker(
     curr_vol: float = float(vol.iloc[-1])
     vol_surge_ratio: float = curr_vol / vol_20d_avg if vol_20d_avg > 0 else 0.0
     if vol_surge_ratio < cfg.get("min_volume_surge_for_candidate", 0.30):
+        if gate_counters is not None:
+            gate_counters["volume_surge"] = gate_counters.get("volume_surge", 0) + 1
         logger.debug(f"[{t}] Volume anemia: {vol_surge_ratio:.2f}x < min, skip")
         return None
 
@@ -1273,6 +1299,7 @@ def _safe_analyze_price_candidate(
     failures: list[dict[str, str]],
     regime: str = "NORMAL",
     weekly_data: "pd.DataFrame | None" = None,
+    gate_counters: "dict[str, int] | None" = None,
 ) -> dict | None:
     ticker = str(row["Ticker"])
     t_yf = f"{ticker}.JK"
@@ -1369,6 +1396,7 @@ def _safe_analyze_price_candidate(
             regime=regime,
             adapter=adapter,
             weekly_df=weekly_df_t,
+            gate_counters=gate_counters,
         )
     except (KeyError, TypeError, ValueError, IndexError) as exc:
         _record_price_failure(
@@ -1703,6 +1731,7 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
             logger.warning(f"Gagal hitung regime, fallback NORMAL: {e}")
             regime = "NORMAL"
 
+    gate_counters: dict[str, int] = {}
     results = []
     price_failures: list[dict[str, str]] = []
     for _, row in filtered.iterrows():
@@ -1717,6 +1746,7 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
             adapter=adapter,
             failures=price_failures,
             weekly_data=weekly_data_batch,
+            gate_counters=gate_counters,
         )
         if result:
             results.append(result)
@@ -1767,6 +1797,13 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         logger.info(f"Top {_n_final} kandidat berhasil disaring.")
 
     _sep = "-" * 52
+    _gate_line = ""
+    if gate_counters:
+        _gc_sorted = sorted(gate_counters.items(), key=lambda x: -x[1])
+        _gate_line = (
+            f"\n  Gate rejections (technical):\n"
+            + "".join(f"    {k:<20}: {v:>4}\n" for k, v in _gc_sorted)
+        )
     print(
         f"\n{_sep}\n"
         f"  Filter Funnel  [{regime} regime]\n"
@@ -1778,6 +1815,7 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         f"  Setelah score floor        : {_n_after_floor:>4}  (score >= {score_floor})\n"
         f"  Final output               : {_n_final:>4}\n"
         f"{_sep}"
+        f"{_gate_line}"
     )
 
     # Export JSON (untuk orchestrator.py)

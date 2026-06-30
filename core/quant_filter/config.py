@@ -128,6 +128,9 @@ CONFIG = {
     "min_price_vs_sma50": 1.0,  # price >= SMA50 (1.0 = tepat di SMA50, boleh set 0.98 untuk toleransi)
     # Trend Filter — harga harus di atas EMA20 saat entry
     "min_price_vs_ema20": 1.0,  # price >= EMA20 (1.0 = tepat di EMA20, boleh set 0.98 untuk toleransi)
+    # In DEFENSIVE/HIGH/BEAR_STRESS regime, relax EMA20 to allow mild pullbacks.
+    # 0.97 = up to 3% below EMA20. Recoveries often start below EMA20 in a broad selloff.
+    "min_price_vs_ema20_defensive": 0.97,
     # Relative Strength vs IHSG
     "min_rs_vs_ihsg_1m": 0.0,  # return 1 bulan saham >= return IHSG 1 bulan (outperform atau minimal setara)
     # ── Graham Number (IHSG-calibrated)
