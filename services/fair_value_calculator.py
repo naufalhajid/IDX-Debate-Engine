@@ -260,6 +260,24 @@ def _capm_cost_of_equity(beta: float = 1.0) -> float:
     return get_live_sbn_10y() + beta * s.IDX_ERP
 
 
+# Illiquidity/cyclicality premium layered on top of CAPM Ke for DDM and DCF
+# only.  PBV justified-value already handles bank via ROE/Ke; DCF returns None
+# for banking sector (~line 1021), so bank=0% is a no-op in practice.
+# Mining uses EV/EBITDA as primary method — 1.5% fires only when DDM/DCF
+# are invoked (rare for miners).
+_SECTOR_EQUITY_PREMIUM: dict[str, float] = {
+    "bank":     0.000,
+    "consumer": 0.005,
+    "mining":   0.015,
+    "property": 0.010,
+    "default":  0.008,
+}
+
+
+def _sector_ke(base_ke: float, sector: str) -> float:
+    return base_ke + _SECTOR_EQUITY_PREMIUM.get(sector, _SECTOR_EQUITY_PREMIUM["default"])
+
+
 # ---------------------------------------------------------------------------
 # Data container — diisi dari response API Stockbit keystats
 # ---------------------------------------------------------------------------
@@ -947,7 +965,7 @@ class FairValueCalculator:
         Fair value = DPS / (cost_of_equity - growth_rate)
         """
         dps = self.stats.dps
-        ke = self.stats.cost_of_equity
+        ke = _sector_ke(self.stats.cost_of_equity, self.sector)
         g = self.stats.growth_rate
 
         if dps is None or dps <= 0:
@@ -1029,7 +1047,7 @@ class FairValueCalculator:
         if not self._ocf_data_is_stable(ocf_ps):
             return None
 
-        ke = self.stats.cost_of_equity
+        ke = _sector_ke(self.stats.cost_of_equity, self.sector)
         g = min(self.stats.growth_rate, ke - 0.02)  # ensure spread ≥ 2% for Stage 1
         g_t = self._DCF_TERMINAL_GROWTH
 
