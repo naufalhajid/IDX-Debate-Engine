@@ -50,7 +50,7 @@ def _fmt(v: float | None, decimals: int = 4) -> str:
 
 
 def _date_ago(days: int) -> datetime.date:
-    return (datetime.datetime.utcnow() - datetime.timedelta(days=days)).date()
+    return (datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=days)).date()
 
 
 def run_backtest(
