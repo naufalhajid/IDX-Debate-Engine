@@ -2085,6 +2085,10 @@ _REASON_LABELS = {
     "weekly_return_below_threshold": "IHSG 5d drop",
     "close_below_ma20_ma50_ma200": "below MA20/50/200",
     "ihsg_data_unavailable_fallback_to_volatility": "IHSG data fallback",
+    "rr_too_low": "R/R too low",
+    "stop_inside_noise": "stop in noise",
+    "target_collapsed": "target collapsed",
+    "no_momentum_confirmation": "no momentum",
 }
 
 

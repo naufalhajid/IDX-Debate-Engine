@@ -3767,6 +3767,7 @@ Current Date (Asia/Jakarta): {current_date}
             if rsi14 > 40.0 and return_5d < 0.0:
                 return {
                     "rejected": True,
+                    "reason_code": "no_momentum_confirmation",
                     "reason": (
                         f"no_momentum_confirmation: return_5d {return_5d:.1f}%"
                         f" < 0 at RSI {rsi14:.1f}"
@@ -3829,6 +3830,7 @@ Current Date (Asia/Jakarta): {current_date}
             if _stop_distance < _hard_floor_atr:
                 return {
                     "rejected": True,
+                    "reason_code": "stop_inside_noise",
                     "reason": (
                         f"stop_inside_noise: gap {_stop_distance:.0f}"
                         f" < {settings.TRADE_ENVELOPE_HARD_NOISE_ATR_MULTIPLIER:.1f}xATR"
@@ -3877,6 +3879,7 @@ Current Date (Asia/Jakarta): {current_date}
         if target <= entry_high:
             return {
                 "rejected": True,
+                "reason_code": "target_collapsed",
                 "reason": (
                     f"target_collapsed: target {target} ≤ entry_high {entry_high}"
                     f" after ceiling(s): {target_basis}"
@@ -3898,6 +3901,7 @@ Current Date (Asia/Jakarta): {current_date}
         if rr_ratio < LARGE_CAP_RR_MINIMUM:
             return {
                 "rejected": True,
+                "reason_code": "rr_too_low",
                 "reason": (
                     f"rr_too_low: R/R {rr_ratio:.2f} < {LARGE_CAP_RR_MINIMUM}"
                     f" (target {target}, entry_high {entry_high}, stop {stop})"
@@ -4402,6 +4406,9 @@ Current Date (Asia/Jakarta): {current_date}
                 consensus_reached=bool(state.get("consensus_reached", False)),
                 consensus_method=state.get("consensus_method"),
                 dissenting_agents=list(state.get("dissenting_agents") or []),
+                reason_codes=(
+                    [envelope["reason_code"]] if envelope.get("reason_code") else []
+                ),
             )
             _ledger_stage_success(
                 state,

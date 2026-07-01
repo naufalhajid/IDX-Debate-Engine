@@ -11,6 +11,7 @@ import pytest
 from tenacity import stop_after_attempt, wait_fixed
 
 from core.budget import BudgetExhaustedError
+from core.risk_governor import evaluate_risk
 from schemas.debate import CIOVerdict, DebateMessage
 from services import debate_chamber as dc
 from services import debate_prompt_registry
@@ -851,6 +852,41 @@ async def test_cio_invalid_current_price_fallback_has_no_trade_levels():
     assert verdict["entry_price_range"] is None
     assert verdict["target_price"] is None
     assert verdict["stop_loss"] is None
+
+
+@pytest.mark.asyncio
+async def test_cio_envelope_rejection_carries_structured_reason_code():
+    """When _compute_trade_envelope() rejects a setup, the noise_verdict must
+    carry the real cause in reason_codes — not just a free-text summary —
+    so risk_governor.py can report the true reason instead of a generic
+    missing-price code."""
+    chamber = _chamber()
+
+    result = await chamber._cio_judge_node(
+        {
+            "ticker": "TOTL",
+            "current_price": 1000.0,
+            "technical_indicators": {"rsi14": 50.0, "return_5d_pct": -2.0},
+            "fair_value_estimate": 1000.0,
+            "debate_history": [],
+            "raw_data": "",
+            "devils_advocate_question": "",
+        }
+    )
+    verdict = json.loads(result["final_verdict"])
+
+    assert verdict["rating"] == "HOLD"
+    assert verdict["reason_codes"] == ["no_momentum_confirmation"]
+
+    # Cross the full integration boundary: reparse through CIOVerdict exactly
+    # as core/orchestrator/legacy.py does (final_verdict JSON -> CIOVerdict ->
+    # model_dump() -> entry["verdict"]), then confirm risk_governor surfaces
+    # the real cause instead of a generic missing-price code.
+    verdict_dict = CIOVerdict(**verdict).model_dump()
+    decision = evaluate_risk({"ticker": "TOTL", "verdict": verdict_dict})
+
+    assert decision.status == "reject"
+    assert "no_momentum_confirmation" in decision.reason_codes
 
 
 def test_trade_envelope_proceeds_when_price_above_fair_value():

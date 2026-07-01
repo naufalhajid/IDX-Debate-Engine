@@ -460,6 +460,33 @@ def test_missing_rr_is_recomputed_and_passes_above_floor() -> None:
     assert "rr_too_low" not in decision.reason_codes
 
 
+def test_upstream_envelope_rejection_code_is_preserved_when_prices_are_null() -> None:
+    # Regression: when the CIO node's trade envelope rejects a setup before
+    # computing prices (rr_too_low / stop_inside_noise / target_collapsed /
+    # no_momentum_confirmation), entry/target/stop are all null and the
+    # governor's own _recompute_rr has nothing to work with. Without the
+    # verdict's reason_codes being surfaced via _upstream_reason_codes, the
+    # final decision only showed generic missing-price codes with no trace
+    # of the real cause.
+    decision = evaluate_risk(
+        _candidate(
+            verdict={
+                "rating": "HOLD",
+                "confidence": 0.40,
+                "entry_price_range": None,
+                "target_price": None,
+                "stop_loss": None,
+                "risk_reward_ratio": None,
+                "reason_codes": ["rr_too_low"],
+            }
+        )
+    )
+
+    assert decision.status == "reject"
+    assert "rr_too_low" in decision.reason_codes
+    assert "missing_target_price" in decision.reason_codes
+
+
 def test_unspaced_entry_range_parses_as_positive_bounds() -> None:
     # Regression: "950-1050" used to parse the second bound as -1050 and
     # false-reject the setup with invalid_entry_range.

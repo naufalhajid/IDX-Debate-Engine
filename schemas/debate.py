@@ -223,6 +223,18 @@ class CIOVerdict(BaseDataClass):
         description="Agents whose position differed from the consensus or winner position.",
     )
 
+    reason_codes: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Structured machine-readable rejection codes (e.g. 'rr_too_low', "
+            "'stop_inside_noise', 'target_collapsed', 'no_momentum_confirmation') "
+            "set when _compute_trade_envelope() rejects a setup before the LLM "
+            "is called. Empty for normal verdicts. Downstream consumers like "
+            "risk_governor.py read this so the final rejection reason reflects "
+            "the true upstream cause instead of a generic missing-price code."
+        ),
+    )
+
     # ── Task 8: Trailing Stop Fields ─────────────────────────────────────────
     trailing_stop_pct: float | None = Field(
         default=None,
