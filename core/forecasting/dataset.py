@@ -16,6 +16,10 @@ if TYPE_CHECKING:
 
 _YF_TIMEOUT_S: int = 15
 _MIN_BARS: int = 60
+_REGIME_HIGH_THRESHOLD: float = 0.02
+_REGIME_LOW_THRESHOLD: float = 0.01
+_REGIME_DEFENSIVE_WEEKLY_DROP: float = 0.05
+_REGIME_RECOVERY_WEEKLY_BOUNCE: float = 0.10
 
 
 def _get_yf():
@@ -76,8 +80,8 @@ class DatasetBuilder:
 
     Returns a (ticker, date) MultiIndex DataFrame with columns:
       Technical: rsi14, atr_pct, log_return, volume_surge (NaN when unavailable)
-      Fundamental: pe_ratio, pb_ratio, ocf_price_pct (NaN — DB source needed)
-      Regime: regime (str categorical)
+      Fundamental: pe_ratio, pb_ratio, ocf_price_pct (NaN when DB has no coverage)
+      Regime: regime_high, regime_defensive, regime_recovery, regime_low (one-hot)
       Forward: close_t{h} for each horizon in horizons (removed by build_labels)
     """
 
@@ -88,10 +92,13 @@ class DatasetBuilder:
         end: date,
         horizons: tuple[int, ...] = (5, 10, 20),
     ) -> pd.DataFrame:
+        # Download IHSG once for the full window — shared across all tickers
+        ihsg_regimes = _compute_ihsg_regimes(start, end)
+
         frames: list[pd.DataFrame] = []
         for ticker in tickers:
             try:
-                df = self._build_ticker(ticker, start, end, horizons)
+                df = self._build_ticker(ticker, start, end, horizons, ihsg_regimes)
                 if df is not None and len(df) >= _MIN_BARS:
                     frames.append(df)
             except Exception:
@@ -108,6 +115,7 @@ class DatasetBuilder:
         start: date,
         end: date,
         horizons: tuple[int, ...],
+        ihsg_regimes: pd.DataFrame | None = None,
     ) -> pd.DataFrame | None:
         raw = _download_ohlcv(ticker, start - timedelta(days=100), end)
         if raw.empty or len(raw) < _MIN_BARS:
@@ -126,13 +134,11 @@ class DatasetBuilder:
         # Technical features
         df = self._add_technicals(df)
 
-        # Fundamental placeholders (filled from DB by caller if needed)
-        df["pe_ratio"] = np.nan
-        df["pb_ratio"] = np.nan
-        df["ocf_price_pct"] = np.nan   # flag added by service when missing
+        # Fundamental features — point-in-time join from DB
+        _fill_fundamentals(df, ticker)
 
-        # Regime feature
-        df["regime"] = self._get_regime()
+        # Regime one-hot from IHSG rolling history (time-varying, not current snapshot)
+        _fill_regime_onehot(df, ihsg_regimes)
 
         # Forward close prices for label generation
         for h in horizons:
@@ -185,13 +191,6 @@ class DatasetBuilder:
 
         return df
 
-    def _get_regime(self) -> str:
-        try:
-            from core.regime import get_current_regime
-            return get_current_regime()
-        except Exception:
-            return "NORMAL"
-
 
 def _compute_rsi(prices: pd.Series, period: int = 14) -> pd.Series:
     delta = prices.diff()
@@ -209,3 +208,182 @@ def _compute_atr(high: pd.Series, low: pd.Series, close: pd.Series, period: int 
         (low - prev_close).abs(),
     ], axis=1).max(axis=1)
     return tr.ewm(alpha=1 / period, min_periods=period, adjust=False).mean()
+
+
+def _compute_ihsg_regimes(start: date, end: date) -> pd.DataFrame | None:
+    """Download ^JKSE and compute a per-date one-hot regime DataFrame.
+
+    Regime logic mirrors core/regime.py:
+      DEFENSIVE: 5d drop ≤ -5% OR close < MA20 AND MA50 AND MA200
+      RECOVERY:  HIGH vol + NOT defensive + 5d bounce ≥ +10%
+      HIGH:      rolling20_std ≥ 2%
+      LOW:       rolling20_std < 1%
+      NORMAL:    otherwise (baseline — all columns zero)
+    """
+    try:
+        # Need extra lookback for MA200
+        extra_start = start - timedelta(days=280)
+        with (
+            contextlib.redirect_stderr(io.StringIO()),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            yf = _get_yf()
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                raw = yf.download(
+                    "^JKSE",
+                    start=extra_start.isoformat(),
+                    end=(end + timedelta(days=1)).isoformat(),
+                    progress=False,
+                    auto_adjust=True,
+                    threads=False,
+                    timeout=_YF_TIMEOUT_S,
+                )
+        if raw is None or getattr(raw, "empty", True):
+            return None
+
+        # Flatten MultiIndex columns if present
+        if hasattr(raw.columns, "nlevels") and raw.columns.nlevels > 1:
+            raw.columns = [col[0] if isinstance(col, tuple) else col for col in raw.columns.to_flat_index()]
+        raw.columns = [str(c).lower() for c in raw.columns]
+
+        close = raw["close"].squeeze().dropna().sort_index()
+        if len(close) < 20:
+            return None
+
+        # Rolling 20-day realized volatility (daily std of returns)
+        daily_ret = close.pct_change()
+        rolling_vol = daily_ret.rolling(20).std()
+        ret5d = close.pct_change(5)
+        ma20 = close.rolling(20).mean()
+        ma50 = close.rolling(50).mean()
+        ma200 = close.rolling(200).mean()
+
+        defensive = (ret5d <= -_REGIME_DEFENSIVE_WEEKLY_DROP) | (
+            (close < ma20) & (close < ma50) & (close < ma200)
+        )
+        # Fill NaN from rolling windows as False
+        defensive = defensive.fillna(False)
+        vol_high = rolling_vol >= _REGIME_HIGH_THRESHOLD
+
+        recovery = (
+            ~defensive
+            & vol_high
+            & (ret5d >= _REGIME_RECOVERY_WEEKLY_BOUNCE)
+        ).fillna(False)
+        high = (~defensive & ~recovery & vol_high).fillna(False)
+        low = (
+            ~defensive & ~recovery & ~high & (rolling_vol < _REGIME_LOW_THRESHOLD)
+        ).fillna(False)
+
+        out = pd.DataFrame({
+            "regime_defensive": defensive.astype(int),
+            "regime_recovery": recovery.astype(int),
+            "regime_high": high.astype(int),
+            "regime_low": low.astype(int),
+        }, index=close.index)
+
+        # Restrict to requested window
+        out.index = pd.to_datetime(out.index)
+        out = out[(out.index.date >= start) & (out.index.date <= end)]  # type: ignore[operator]
+        return out if not out.empty else None
+
+    except Exception:
+        return None
+
+
+def _fill_regime_onehot(df: pd.DataFrame, ihsg_regimes: pd.DataFrame | None) -> None:
+    """Add regime one-hot columns to df in-place. Falls back to all zeros."""
+    regime_cols = ["regime_defensive", "regime_recovery", "regime_high", "regime_low"]
+    if ihsg_regimes is None or ihsg_regimes.empty:
+        for col in regime_cols:
+            df[col] = 0
+        return
+
+    df.index = pd.to_datetime(df.index)
+    ihsg_regimes.index = pd.to_datetime(ihsg_regimes.index)
+
+    # Left-join on date; forward-fill gaps (weekends, holidays)
+    joined = df[[]].join(ihsg_regimes, how="left").ffill()
+    for col in regime_cols:
+        df[col] = joined[col].fillna(0).astype(int) if col in joined.columns else 0
+
+
+def _fill_fundamentals(df: pd.DataFrame, ticker: str) -> None:
+    """Point-in-time join of DB fundamental snapshot into df in-place.
+
+    For each OHLCV row date, uses the latest DB row whose created_at <= row date.
+    Rows prior to the first DB entry remain NaN (→ 0 via fillna in feature frame).
+    ocf_price_pct = (cash_from_operations_ttm / shares_outstanding) / close_price
+    """
+    df["pe_ratio"] = np.nan
+    df["pb_ratio"] = np.nan
+    df["ocf_price_pct"] = np.nan
+
+    try:
+        from db.session import get_session
+        from db.models.fundamental import Fundamental
+        from db.models.stock import Stock
+        from sqlalchemy import select
+        from sqlalchemy.orm import joinedload
+
+        with get_session() as session:
+            stmt = (
+                select(Fundamental)
+                .options(
+                    joinedload(Fundamental.current_valuation),
+                    joinedload(Fundamental.cash_flow_statement),
+                    joinedload(Fundamental.stat),
+                )
+                .join(Fundamental.stock)
+                .where(Stock.ticker == ticker.upper())
+                .order_by(Fundamental.created_at)
+            )
+            rows = session.execute(stmt).scalars().all()
+
+        if not rows:
+            return
+
+        # Build sorted list of (date, pe, pb, ocf_ttm, shares)
+        snapshots: list[tuple[date, float | None, float | None, float | None, float | None]] = []
+        for row in rows:
+            snap_date = row.created_at.date()
+            cv = row.current_valuation
+            cf = row.cash_flow_statement
+            st = row.stat
+            pe = float(cv.current_pe_ratio_ttm) if cv and cv.current_pe_ratio_ttm else None
+            pb = float(cv.current_price_to_book_value) if cv and cv.current_price_to_book_value else None
+            ocf = float(cf.cash_from_operations_ttm) if cf and cf.cash_from_operations_ttm else None
+            shares = float(st.current_share_outstanding) if st and st.current_share_outstanding else None
+            snapshots.append((snap_date, pe, pb, ocf, shares))
+
+        if not snapshots:
+            return
+
+        snap_dates = [s[0] for s in snapshots]
+        snap_pe = [s[1] for s in snapshots]
+        snap_pb = [s[2] for s in snapshots]
+        snap_ocf = [s[3] for s in snapshots]
+        snap_shares = [s[4] for s in snapshots]
+
+        df.index = pd.to_datetime(df.index)
+        for idx, row_date in enumerate(pd.to_datetime(df.index).date):
+            # Find last snapshot with created_at <= row_date
+            best = -1
+            for i, sd in enumerate(snap_dates):
+                if sd <= row_date:
+                    best = i
+                else:
+                    break
+            if best < 0:
+                continue
+            df.iloc[idx, df.columns.get_loc("pe_ratio")] = snap_pe[best]
+            df.iloc[idx, df.columns.get_loc("pb_ratio")] = snap_pb[best]
+            ocf = snap_ocf[best]
+            shares = snap_shares[best]
+            close_val = float(df.iloc[idx]["close"])
+            if ocf and shares and shares > 0 and close_val > 0:
+                df.iloc[idx, df.columns.get_loc("ocf_price_pct")] = (ocf / shares) / close_val
+
+    except Exception:
+        pass
