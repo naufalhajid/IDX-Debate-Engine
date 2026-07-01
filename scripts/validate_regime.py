@@ -56,18 +56,33 @@ def _fetch_ihsg(period: str = "4y") -> pd.Series:
     )
 
 
+def _fetch_usd_idr(period: str = "4y") -> "pd.Series | None":
+    """Fetch IDR=X (USD/IDR rate) from yfinance. Returns None on failure."""
+    try:
+        import yfinance as yf
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            raw = yf.download("IDR=X", period=period, progress=False,
+                              auto_adjust=True, timeout=20)
+        if raw is not None and not raw.empty:
+            return raw["Close"].squeeze().dropna()
+    except Exception as exc:
+        logging.warning("IDR=X fetch failed (%s) — usd_idr feature disabled.", exc)
+    return None
+
+
 # ---------------------------------------------------------------------------
 # V1 — Feature stationarity (ADF test)
 # ---------------------------------------------------------------------------
 
-def validate_feature_stationarity(prices: pd.Series) -> bool:
+def validate_feature_stationarity(prices: pd.Series, usd_idr=None) -> bool:
     """All HMM features should be stationary (ADF p-value < 0.05)."""
     print("\n-- V1: Feature Stationarity (ADF test) --")
     from statsmodels.tsa.stattools import adfuller
     from core.regime_hmm import IDXRegimeDetector
 
     det = IDXRegimeDetector()
-    features, _ = det.build_features(prices)
+    features, _ = det.build_features(prices, usd_idr=usd_idr)
     passed = True
     for i, name in enumerate(det._feature_names):
         col = features[:, i]
@@ -88,18 +103,18 @@ def validate_feature_stationarity(prices: pd.Series) -> bool:
 # V2 — State persistence (regime autocorrelation)
 # ---------------------------------------------------------------------------
 
-def validate_state_persistence(prices: pd.Series) -> bool:
+def validate_state_persistence(prices: pd.Series, usd_idr=None) -> bool:
     """Lag-1 autocorrelation of the decoded regime sequence must exceed 0.30."""
     print("\n-- V2: State Persistence (regime autocorrelation) --")
     from core.regime_hmm import IDXRegimeDetector
 
     det = IDXRegimeDetector(msci_review_active=False)
-    det.fit(prices, force_retrain=True)
+    det.fit(prices, usd_idr=usd_idr, force_retrain=True)
     if det.model is None:
         print(f"  {FAIL} Model fit failed.")
         return False
 
-    features, _ = det.build_features(prices)
+    features, _ = det.build_features(prices, usd_idr=usd_idr)
     X = det.scaler.transform(features)
     states = det.model.predict(X)
 
@@ -181,7 +196,7 @@ def validate_msci_override() -> bool:
 # V4 — Walk-forward integrity (scaler must not re-fit at predict time)
 # ---------------------------------------------------------------------------
 
-def validate_walk_forward(prices: pd.Series) -> bool:
+def validate_walk_forward(prices: pd.Series, usd_idr=None) -> bool:
     """
     After fitting on 60% of data, calling predict() on the full sequence
     must not change the scaler's mean/var (that would introduce lookahead bias).
@@ -191,9 +206,13 @@ def validate_walk_forward(prices: pd.Series) -> bool:
 
     split = int(len(prices) * 0.60)
     train_prices = prices.iloc[:split]
+    train_usd_idr = (
+        usd_idr[usd_idr.index <= train_prices.index[-1]]
+        if usd_idr is not None else None
+    )
 
     det = IDXRegimeDetector(msci_review_active=False)
-    det.fit(train_prices, force_retrain=True)
+    det.fit(train_prices, usd_idr=train_usd_idr, force_retrain=True)
     if det.model is None:
         print(f"  {FAIL} Model fit failed on train window.")
         return False
@@ -201,7 +220,7 @@ def validate_walk_forward(prices: pd.Series) -> bool:
     mean_before = det.scaler.mean_.copy()
     var_before  = det.scaler.var_.copy()
 
-    det.predict(prices)  # full sequence — scaler must remain unchanged
+    det.predict(prices, usd_idr=usd_idr)  # full sequence — scaler must remain unchanged
 
     drift_mean = float(np.max(np.abs(det.scaler.mean_ - mean_before)))
     drift_var  = float(np.max(np.abs(det.scaler.var_  - var_before)))
@@ -217,7 +236,7 @@ def validate_walk_forward(prices: pd.Series) -> bool:
 # V5 — Regime-drawdown alignment
 # ---------------------------------------------------------------------------
 
-def validate_drawdown_alignment(prices: pd.Series) -> bool:
+def validate_drawdown_alignment(prices: pd.Series, usd_idr=None) -> bool:
     """
     mean_return(BEAR_STRESS) < mean_return(SIDEWAYS) < mean_return(BULL).
     Failure means state labeling is inverted.
@@ -226,12 +245,12 @@ def validate_drawdown_alignment(prices: pd.Series) -> bool:
     from core.regime_hmm import IDXRegimeDetector
 
     det = IDXRegimeDetector(msci_review_active=False)
-    det.fit(prices, force_retrain=True)
+    det.fit(prices, usd_idr=usd_idr, force_retrain=True)
     if det.model is None:
         print(f"  {FAIL} Model fit failed.")
         return False
 
-    features, feat_idx = det.build_features(prices)
+    features, feat_idx = det.build_features(prices, usd_idr=usd_idr)
     X = det.scaler.transform(features)
     raw_states = det.model.predict(X)
     labels = [det.state_label_map.get(s, "UNKNOWN") for s in raw_states]
@@ -270,15 +289,21 @@ def main() -> int:
     print("=" * 60)
 
     prices = _fetch_ihsg()
+    usd_idr = _fetch_usd_idr()
     print(f"\nData: {len(prices)} trading days  "
           f"({prices.index[0].date()} -> {prices.index[-1].date()})")
+    if usd_idr is not None:
+        print(f"USD/IDR: {len(usd_idr)} trading days  "
+              f"({usd_idr.index[0].date()} -> {usd_idr.index[-1].date()})")
+    else:
+        print("USD/IDR: unavailable — running 3-feature model")
 
     results = {
-        "V1 Feature Stationarity":   validate_feature_stationarity(prices),
-        "V2 State Persistence":      validate_state_persistence(prices),
+        "V1 Feature Stationarity":   validate_feature_stationarity(prices, usd_idr=usd_idr),
+        "V2 State Persistence":      validate_state_persistence(prices, usd_idr=usd_idr),
         "V3 MSCI Override":          validate_msci_override(),
-        "V4 Walk-Forward Integrity": validate_walk_forward(prices),
-        "V5 Drawdown Alignment":     validate_drawdown_alignment(prices),
+        "V4 Walk-Forward Integrity": validate_walk_forward(prices, usd_idr=usd_idr),
+        "V5 Drawdown Alignment":     validate_drawdown_alignment(prices, usd_idr=usd_idr),
     }
 
     print("\n" + "=" * 60)

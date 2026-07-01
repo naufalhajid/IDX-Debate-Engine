@@ -357,9 +357,6 @@ def _fill_fundamentals(df: pd.DataFrame, ticker: str) -> None:
         if not snapshots:
             return
 
-        if not snapshots:
-            return
-
         snap_dates = [s[0] for s in snapshots]
         snap_pe = [s[1] for s in snapshots]
         snap_pb = [s[2] for s in snapshots]

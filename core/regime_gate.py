@@ -29,12 +29,14 @@ logger = logging.getLogger(__name__)
 # Module-level detector singleton — not re-fitted on every pipeline run.
 _detector: IDXRegimeDetector | None = None
 
-# Module-level IHSG price cache — shared across all tickers in a batch (W5 fix).
+# Module-level price caches — shared across all tickers in a batch (W5 fix).
 # Re-downloaded only after _IHSG_CACHE_TTL elapses, so a 10-ticker batch pays
 # one network round-trip rather than ten.  Falls back to stale data on transient
 # network failure rather than silently returning should_trade=False for all tickers.
 _ihsg_prices_cache: pd.Series | None = None
 _ihsg_cache_time: datetime | None = None
+_usd_idr_cache: pd.Series | None = None
+_usd_idr_cache_time: datetime | None = None
 _IHSG_CACHE_TTL = timedelta(hours=4)
 
 
@@ -59,7 +61,7 @@ async def regime_gate_node(state: "DebateChamberState") -> dict:
     try:
         import yfinance as yf
 
-        global _ihsg_prices_cache, _ihsg_cache_time
+        global _ihsg_prices_cache, _ihsg_cache_time, _usd_idr_cache, _usd_idr_cache_time
         now = datetime.now()
         cache_fresh = (
             _ihsg_prices_cache is not None
@@ -101,11 +103,51 @@ async def regime_gate_node(state: "DebateChamberState") -> dict:
                 else:
                     raise  # no fallback available — propagate to outer except
 
+        # USD/IDR feature: IDR weakening precedes IHSG drops 1-2 days.
+        # Cache lifetime matches IHSG; degrades gracefully to None (3-feature model) on failure.
+        usd_idr: pd.Series | None = None
+        usd_idr_fresh = (
+            _usd_idr_cache is not None
+            and _usd_idr_cache_time is not None
+            and (now - _usd_idr_cache_time) < _IHSG_CACHE_TTL
+        )
+        if usd_idr_fresh:
+            usd_idr = _usd_idr_cache
+        else:
+            try:
+                _idr_loop = asyncio.get_running_loop()
+                raw_idr = await _idr_loop.run_in_executor(
+                    None,
+                    lambda: yf.download(
+                        "IDR=X",
+                        period="4y",
+                        progress=False,
+                        auto_adjust=True,
+                        timeout=20,
+                    ),
+                )
+                if raw_idr is not None and not raw_idr.empty:
+                    usd_idr = raw_idr["Close"].squeeze()
+                    _usd_idr_cache = usd_idr
+                    _usd_idr_cache_time = now
+                    logger.info("[RegimeGate] IDR=X fetched and cached (%d rows).", len(usd_idr))
+                else:
+                    usd_idr = _usd_idr_cache
+                    logger.warning("[RegimeGate] IDR=X download empty — usd_idr feature disabled.")
+            except Exception as idr_exc:
+                usd_idr = _usd_idr_cache
+                logger.warning(
+                    "[RegimeGate] IDR=X fetch failed (%s) — usd_idr feature disabled.", idr_exc
+                )
+
         detector = _get_detector()
         # predict() may trigger CPU-bound HMM fit; run in executor to avoid
         # blocking the event loop (Fix 3).
         _loop = asyncio.get_running_loop()
-        regime_state = await _loop.run_in_executor(None, lambda: detector.predict(prices))
+        _usd = usd_idr
+        regime_state = await _loop.run_in_executor(
+            None, lambda: detector.predict(prices, usd_idr=_usd)
+        )
         rules = detector.get_trading_rules(regime_state)
         should_trade = (
             rules.get("trading_allowed", False)
