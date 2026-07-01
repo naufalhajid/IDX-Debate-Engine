@@ -341,21 +341,21 @@ def _fill_fundamentals(df: pd.DataFrame, ticker: str) -> None:
             )
             rows = session.execute(stmt).scalars().all()
 
-        if not rows:
-            return
+            # Build snapshot list inside the session while objects are still attached
+            snapshots: list[tuple[date, float | None, float | None, float | None, float | None]] = []
+            for row in rows:
+                snap_date = row.created_at.date()
+                cv = row.current_valuation
+                cf = row.cash_flow_statement
+                st = row.stat
+                pe = float(cv.current_pe_ratio_ttm) if cv and cv.current_pe_ratio_ttm else None
+                pb = float(cv.current_price_to_book_value) if cv and cv.current_price_to_book_value else None
+                ocf = float(cf.cash_from_operations_ttm) if cf and cf.cash_from_operations_ttm else None
+                shares = float(st.current_share_outstanding) if st and st.current_share_outstanding else None
+                snapshots.append((snap_date, pe, pb, ocf, shares))
 
-        # Build sorted list of (date, pe, pb, ocf_ttm, shares)
-        snapshots: list[tuple[date, float | None, float | None, float | None, float | None]] = []
-        for row in rows:
-            snap_date = row.created_at.date()
-            cv = row.current_valuation
-            cf = row.cash_flow_statement
-            st = row.stat
-            pe = float(cv.current_pe_ratio_ttm) if cv and cv.current_pe_ratio_ttm else None
-            pb = float(cv.current_price_to_book_value) if cv and cv.current_price_to_book_value else None
-            ocf = float(cf.cash_from_operations_ttm) if cf and cf.cash_from_operations_ttm else None
-            shares = float(st.current_share_outstanding) if st and st.current_share_outstanding else None
-            snapshots.append((snap_date, pe, pb, ocf, shares))
+        if not snapshots:
+            return
 
         if not snapshots:
             return

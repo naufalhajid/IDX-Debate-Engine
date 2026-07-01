@@ -141,7 +141,7 @@ def validate_model(
 ) -> ValidationSummary:
     """Walk-forward validation → ValidationSummary.
 
-    Production pass: IC >= 0.03 AND t_IC >= 2.57
+    Production pass: IC >= 0.03 AND t_IC >= 1.96
     Research-only:   IC > 0 but BH q-value not passed
     Failed:          IC <= 0 OR Brier >= naive Brier
     """
