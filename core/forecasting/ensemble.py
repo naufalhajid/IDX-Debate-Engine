@@ -47,6 +47,9 @@ def compute_ensemble_weights(
             continue
         if naive_brier is not None and brier is not None and brier >= naive_brier:
             continue
+        dir_acc = scores.get("dir_acc")
+        if dir_acc is not None and dir_acc < 0.45:
+            continue
         active[name] = scores
 
     if not active:

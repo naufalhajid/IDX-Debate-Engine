@@ -14,7 +14,6 @@ from core.forecasting.dataset import DatasetBuilder
 from core.forecasting.ensemble import blend_votes, compute_ensemble_weights
 from core.forecasting.labels import TRANSACTION_COST, TAU_H, build_labels
 from core.forecasting.models import ModelBase
-from core.forecasting.models.arima import ARIMAForecaster
 from core.forecasting.models.naive import NaiveModel
 from core.forecasting.models.tgarch import TGARCHForecaster
 from core.forecasting.models.xgboost_model import XGBoostForecaster
@@ -33,7 +32,7 @@ logger = logging.getLogger(__name__)
 ForecastMode = Literal["ensemble", "tgarch", "naive"]
 
 _DEFAULT_HORIZONS: tuple[int, ...] = (5, 10, 20)
-_HISTORY_DAYS: int = 500
+_HISTORY_DAYS: int = 756
 _RETURN_LABEL_COLS: frozenset[str] = frozenset(
     {"r_net_h", "y_up", "y_target_hit", "y_stop_hit", "sigma_realized"}
 )
@@ -53,7 +52,6 @@ class ForecastingService:
     def _return_model_factories(self) -> dict[str, Callable[[], ModelBase]]:
         return {
             "naive": NaiveModel,
-            "arima": ARIMAForecaster,
             "xgboost": XGBoostForecaster,
         }
 
@@ -251,7 +249,7 @@ class ForecastingService:
         unavailable: dict[str, str] = {}
         validations: dict[str, ValidationSummary] = {}
 
-        splits = walk_forward_splits(labeled, n_splits=3, test_size_days=30) if len(labeled) >= 60 else []
+        splits = walk_forward_splits(labeled, n_splits=5, test_size_days=30) if len(labeled) >= 60 else []
         if not splits:
             flags.append("validation_unavailable")
 
@@ -280,6 +278,8 @@ class ForecastingService:
             validations = batch_bh_correction(validations)
 
         weights = _model_weights(mode, validations, predictions)
+        if mode != "naive" and predictions and sum(weights.values()) <= 1e-12:
+            flags.append("no_validated_return_model")
         votes: list[ModelVote] = []
         for name in factories:
             if name in unavailable:
@@ -366,6 +366,7 @@ def _model_weights(
             "brier": validation.brier,
             "dsr": validation.dsr,
             "bh_passed": validation.bh_q_value_passed,
+            "dir_acc": validation.directional_accuracy,
         }
         for name, validation in validations.items()
         if name in predictions
@@ -373,10 +374,7 @@ def _model_weights(
     weights = compute_ensemble_weights(scores) if scores else {}
     if sum(weights.values()) > 1e-12:
         return weights
-    if "naive" in predictions:
-        return {name: 1.0 if name == "naive" else 0.0 for name in predictions}
-    first = next(iter(predictions))
-    return {name: 1.0 if name == first else 0.0 for name in predictions}
+    return {name: 0.0 for name in predictions}
 
 
 def _vote_status(validation: ValidationSummary | None) -> tuple[str, str | None]:
@@ -412,8 +410,10 @@ def _aggregate_validation(
             return sum(value * weight for value, weight in used) / sum(weight for _, weight in used)
         return sum(value for value, _ in values) / len(values)
 
-    if any(v.status == "production" for v in ordered):
-        status: str = "production"
+    if total_weight <= 1e-12:
+        status: str = "failed"
+    elif any(v.status == "production" for v in ordered):
+        status = "production"
     elif any(v.status == "research_only" for v in ordered):
         status = "research_only"
     else:

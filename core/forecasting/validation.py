@@ -56,7 +56,14 @@ def walk_forward_splits(
 
 def compute_ic(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     """Spearman rank IC between true and predicted returns."""
-    if len(y_true) < 3:
+    y_true = np.asarray(y_true, dtype=float)
+    y_pred = np.asarray(y_pred, dtype=float)
+    finite_mask = np.isfinite(y_true) & np.isfinite(y_pred)
+    if int(finite_mask.sum()) < 3:
+        return float("nan")
+    y_true = y_true[finite_mask]
+    y_pred = y_pred[finite_mask]
+    if float(np.ptp(y_true)) < 1e-12 or float(np.ptp(y_pred)) < 1e-12:
         return float("nan")
     r, _ = spearmanr(y_true, y_pred, nan_policy="omit")
     return float(r) if math.isfinite(float(r)) else float("nan")
@@ -248,7 +255,7 @@ def validate_model(
         p_val = float(2 * _norm.sf(abs(ic_t_stat)))
         bh_passed = p_val < 0.05
 
-    if ic_mean is not None and ic_mean >= 0.03 and ic_t_stat is not None and ic_t_stat >= 2.57:
+    if ic_mean is not None and ic_mean >= 0.03 and ic_t_stat is not None and ic_t_stat >= 1.96:
         status: str = "production"
     elif ic_mean is not None and ic_mean > 0:
         status = "research_only"

@@ -1,6 +1,9 @@
 """Tests for ForecastingService decision logic and graceful fallback."""
 from __future__ import annotations
 
+import math
+import warnings
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -13,7 +16,7 @@ from core.forecasting.service import (
     _make_decision,
     _model_disagreement_penalty,
 )
-from core.forecasting.validation import validate_model
+from core.forecasting.validation import compute_ic, validate_model
 
 
 class TestDecisionThresholds:
@@ -248,10 +251,10 @@ class _FixedReturnModel(ModelBase):
 
 
 class _FailingReturnModel(ModelBase):
-    name = "arima"
+    name = "xgboost"
 
     def fit(self, X: pd.DataFrame, y: pd.Series) -> None:
-        raise ImportError("statsmodels missing")
+        raise ImportError("xgboost missing")
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         return np.zeros(len(X), dtype=float)
@@ -297,7 +300,6 @@ def _service_with_fakes(monkeypatch, factories=None, status_map=None):
     service._tgarch = _FakeTGarch()
     default_factories = {
         "naive": lambda: _FixedReturnModel("naive", 0.020),
-        "arima": lambda: _FixedReturnModel("arima", 0.018),
         "xgboost": lambda: _FixedReturnModel("xgboost", 0.024),
     }
     service._return_model_factories = lambda: factories or default_factories
@@ -357,6 +359,15 @@ def test_validate_model_reports_error_and_direction_metrics() -> None:
     assert summary.directional_accuracy == pytest.approx(0.8)
 
 
+def test_compute_ic_returns_nan_for_constant_prediction_without_warning() -> None:
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        ic = compute_ic(np.array([0.01, -0.02, 0.03]), np.array([0.0, 0.0, 0.0]))
+
+    assert math.isnan(ic)
+    assert not caught
+
+
 def test_predict_modes_have_distinct_model_composition(monkeypatch) -> None:
     service = _service_with_fakes(monkeypatch)
 
@@ -371,7 +382,7 @@ def test_predict_modes_have_distinct_model_composition(monkeypatch) -> None:
     assert tgarch.risk_adjusted_expected_value is None
 
     names = {vote.model_name for vote in ensemble.model_votes}
-    assert {"naive", "arima", "xgboost", "tgarch", "lstm", "prophet"}.issubset(names)
+    assert {"naive", "xgboost", "tgarch", "lstm", "prophet"}.issubset(names)
     statuses = {vote.model_name: vote.status for vote in ensemble.model_votes}
     assert statuses["lstm"] == "experimental_unused"
     assert statuses["prophet"] == "experimental_unused"
@@ -380,16 +391,53 @@ def test_predict_modes_have_distinct_model_composition(monkeypatch) -> None:
 def test_predict_marks_unavailable_optional_models(monkeypatch) -> None:
     factories = {
         "naive": lambda: _FixedReturnModel("naive", 0.020),
-        "arima": _FailingReturnModel,
-        "xgboost": lambda: _FixedReturnModel("xgboost", 0.024),
+        "xgboost": _FailingReturnModel,
     }
     service = _service_with_fakes(monkeypatch, factories=factories)
 
     report = service.predict("BBCA", mode="ensemble")
-    arima_vote = next(vote for vote in report.model_votes if vote.model_name == "arima")
+    xgboost_vote = next(vote for vote in report.model_votes if vote.model_name == "xgboost")
 
-    assert arima_vote.status == "unavailable"
-    assert "model_unavailable:arima" in report.data_quality_flags
+    assert xgboost_vote.status == "unavailable"
+    assert "model_unavailable:xgboost" in report.data_quality_flags
+
+
+def test_ensemble_does_not_blend_failed_return_models(monkeypatch) -> None:
+    service = _service_with_fakes(
+        monkeypatch,
+        status_map={"naive": "failed", "xgboost": "failed"},
+    )
+
+    report = service.predict("BBCA", mode="ensemble")
+    return_votes = [
+        vote
+        for vote in report.model_votes
+        if vote.model_name in {"naive", "xgboost"}
+    ]
+
+    assert {vote.status for vote in return_votes} == {"validation_failed"}
+    assert all(vote.weight == 0.0 for vote in return_votes)
+    assert report.expected_return_net is None
+    assert report.p_target is None
+    assert report.p_stop is None
+    assert report.expected_value is None
+    assert report.risk_adjusted_expected_value is None
+    assert report.decision == "AVOID"
+    assert "no_validated_return_model" in report.data_quality_flags
+
+
+def test_explicit_naive_mode_can_still_emit_failed_baseline(monkeypatch) -> None:
+    service = _service_with_fakes(monkeypatch, status_map={"naive": "failed"})
+
+    report = service.predict("BBCA", mode="naive")
+    naive_vote = report.model_votes[0]
+
+    assert naive_vote.model_name == "naive"
+    assert naive_vote.status == "validation_failed"
+    assert naive_vote.weight == 1.0
+    assert report.expected_return_net == pytest.approx(0.020)
+    assert report.risk_adjusted_expected_value is None
+    assert "no_validated_return_model" not in report.data_quality_flags
 
 
 def test_model_disagreement_penalty_detects_direction_conflict() -> None:

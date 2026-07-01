@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import logging
+import warnings
+
 import numpy as np
 import pandas as pd
 
@@ -44,7 +46,6 @@ class ARIMAForecaster(ModelBase):
             self._result = None
             return
 
-        import warnings
         best_aic = float("inf")
         best_result = None
         best_order = None
@@ -70,7 +71,18 @@ class ARIMAForecaster(ModelBase):
         if self._result is None:
             return np.zeros(len(X))
         try:
-            forecast = self._result.forecast(steps=len(X))
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    message="No supported index.*",
+                    category=Warning,
+                )
+                warnings.filterwarnings(
+                    "ignore",
+                    message=".*without a supported index.*",
+                    category=FutureWarning,
+                )
+                forecast = self._result.forecast(steps=len(X))
             return np.array(forecast)
         except Exception as e:
             logger.warning("[ARIMA] predict failed: %s", e)

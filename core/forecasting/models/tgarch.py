@@ -102,7 +102,16 @@ class TGARCHForecaster(ModelBase):
         last_insample_vol_pct = float(result.conditional_volatility.iloc[-1])
 
         try:
-            forecast = result.forecast(horizon=horizon, reindex=False)
+            # power=1.0 (TARCH/GJR-GARCH) does not support analytic multi-step forecasts;
+            # simulation is required. power=2.0 (standard GARCH) uses the analytic path.
+            method = "simulation" if use_tgarch else "analytic"
+            simulations = 500 if use_tgarch else 1
+            forecast = result.forecast(
+                horizon=horizon,
+                method=method,
+                simulations=simulations,
+                reindex=False,
+            )
             variance_path = forecast.variance.iloc[-1].values  # shape (horizon,)
         except Exception:
             return self._classic_fallback(returns, horizon), True

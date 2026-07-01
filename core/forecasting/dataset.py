@@ -178,6 +178,11 @@ class DatasetBuilder:
         else:
             df["volume_surge"] = np.nan
 
+        # Multi-horizon momentum — top features for XGBoost on emerging markets
+        for lag in (5, 10, 20):
+            df[f"return_{lag}d"] = close.pct_change(lag)
+        df["price_above_ma20"] = (close > close.rolling(20).mean()).astype(int)
+
         return df
 
     def _get_regime(self) -> str:
