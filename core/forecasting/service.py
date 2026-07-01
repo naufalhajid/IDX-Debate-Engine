@@ -1,10 +1,12 @@
 """ForecastingService - public entry point for the IDX forecasting layer."""
 from __future__ import annotations
 
+import json
 import logging
 import math
 from collections.abc import Callable
 from datetime import date, timedelta
+from pathlib import Path
 from typing import TYPE_CHECKING, Literal, cast
 
 import numpy as np
@@ -39,6 +41,30 @@ _RETURN_LABEL_COLS: frozenset[str] = frozenset(
 _DIRECTIONAL_DISAGREEMENT_PENALTY: float = 0.10
 _MAX_DISAGREEMENT_PENALTY: float = 0.35
 _DISPERSION_REFERENCE_RETURN: float = 0.05
+
+_BLOCKLIST_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "forecast_blocklist.json"
+_blocklist_cache: dict[str, list[int]] | None = None
+
+
+def _load_blocklist() -> dict[str, list[int]]:
+    global _blocklist_cache
+    if _blocklist_cache is not None:
+        return _blocklist_cache
+    try:
+        data = json.loads(_BLOCKLIST_PATH.read_text(encoding="utf-8"))
+        _blocklist_cache = {
+            k.upper().removesuffix(".JK"): [int(h) for h in v]
+            for k, v in data.items()
+            if not k.startswith("_")
+        }
+    except Exception:
+        _blocklist_cache = {}
+    return _blocklist_cache
+
+
+def _is_blocked(ticker: str, horizon: int) -> bool:
+    blocked = _load_blocklist()
+    return horizon in blocked.get(ticker.upper().removesuffix(".JK"), [])
 
 
 class ForecastingService:
@@ -78,6 +104,10 @@ class ForecastingService:
         end = as_of
         start = end - timedelta(days=_HISTORY_DAYS)
         horizon = min(horizons)
+
+        if _is_blocked(ticker, horizon):
+            flags.append(f"blocked:forecast_blocklist:h{horizon}")
+            return _error_report(ticker, as_of, horizon, flags)
 
         try:
             dataset = self._dataset_builder.build([ticker], start, end, horizons=(horizon,))
