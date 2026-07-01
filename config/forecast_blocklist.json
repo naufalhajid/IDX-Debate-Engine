@@ -1,0 +1,22 @@
+{
+  "_meta": {
+    "source": "scripts/backtest_walkforward.py",
+    "generated": "2026-07-01",
+    "criterion": "IC < 0 in walk-forward backtest (43 LQ45 tickers, 756d window, 5 splits x 60d test)",
+    "note_isat_h20": "ISAT h=20 excluded despite IC=-0.019 because WRL=0.65 — positive drift stock, not a ranking anti-signal"
+  },
+  "ADRO.JK": [5],
+  "BSDE.JK": [10, 20],
+  "EMTK.JK": [5, 10],
+  "EXCL.JK": [5],
+  "INCO.JK": [20],
+  "INDF.JK": [5],
+  "INKP.JK": [5, 10, 20],
+  "INTP.JK": [20],
+  "KLBF.JK": [5, 10],
+  "MEDC.JK": [5],
+  "PGEO.JK": [5, 10],
+  "PTBA.JK": [5],
+  "TOWR.JK": [5],
+  "UNVR.JK": [20]
+}
