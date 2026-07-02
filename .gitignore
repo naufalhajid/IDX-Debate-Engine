@@ -46,6 +46,22 @@ build/
 .coverage
 htmlcov/
 
+# Binary & junk artifacts — never needed by the pipeline
+*.exe
+*.dll
+*.msi
+*.pyd
+*.so
+*.zip
+*.7z
+*.rar
+*.pkl
+*.whl
+*.tmp
+*.bak
+*~
+desktop.ini
+
 # Scratch runtime artifacts; keep scratch scripts reviewable if needed.
 scratch/**/*.json
 scratch/**/*.md
