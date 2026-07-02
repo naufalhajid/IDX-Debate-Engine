@@ -5,12 +5,6 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from core.idx_market_params import (
-    BULL_MOMENTUM_WEIGHT,
-    BULL_QUALITY_WEIGHT,
-    BULL_TECHNICAL_WEIGHT,
-    BULL_VALUE_WEIGHT,
-)
 from core.settings import settings
 
 # Calendar days, not trading days — over the weekend a Friday file already
@@ -90,8 +84,9 @@ def _find_latest_xlsx(output_dir: str = "output") -> str:
 # ══════════════════════════════════════════════════════════════════════════════
 
 CONFIG = {
+    # v3.4 — IC-recalibrated score weights (RSI 15→8, volume scoring 8→0);
     # v3.3 — PE-to-sector blend + triple-fail reject + volume gate tightened
-    "version": "v3.3",
+    "version": "v3.4",
     # ── Path
     # input_file = None → auto-detect xlsx terbaru di output_dir saat runtime
     "input_file": None,
@@ -185,30 +180,34 @@ CONFIG = {
     "stop_atr_from_sma20": 1.0,
     "stop_hard_floor_pct": 0.88,
     # ── Score Weights (total = 100)
-    # IDX factor recalibration (June 2026):
-    # - Value is primary: OCF/Price + Graham/PE blend (40)
-    # - Quality is elevated: RNOA/ROA fallback plus ROE safety checks (30)
-    # - Momentum is reduced: IDX industry momentum evidence is positive but weak
-    # - Technical is supporting execution timing, not primary alpha
-    #
-    # Harvey/Liu/Zhu (2016) multiple-testing threshold: t-stat >= 3.0 for post-2012 factors.
-    # Signal evidence status (IDX peer-review):
-    #   weight_valuation (40)       → VALIDATED: OCF/Price (IDX4 model, ScienceDirect 2023/2026);
-    #                                  Graham/PE partial (value premium, mixed IDX evidence)
-    #   weight_profitability (30)   → VALIDATED: profitability premium (quality factor, IDX 2023)
-    #   weight_price_momentum (~7)  → VALIDATED: price momentum premium in emerging markets
-    #   weight_momentum_vol (8)     → UNVALIDATED on IDX: volume as return predictor has no
-    #                                  IDX-specific peer-review t-stat; retained as timing signal
-    #   weight_momentum_rsi (15)    → UNVALIDATED on IDX: RSI has no IDX peer-review study;
-    #                                  calibrated empirically; highest multiple-testing risk
-    #
-    # TODO (research task): compute per-signal IC (Spearman vs 5d fwd return) on historical IDX
-    # data. Retain only signals with IC > 0.05 and t-stat > 2.57 (Harvey/Liu/Zhu threshold).
-    "weight_valuation": int(BULL_VALUE_WEIGHT * 100),
-    "weight_profitability": int(BULL_QUALITY_WEIGHT * 100),
-    "weight_momentum_rsi": int(BULL_TECHNICAL_WEIGHT * 100),
-    "weight_momentum_vol": 8,
-    "weight_price_momentum": int(BULL_MOMENTUM_WEIGHT * 100) - 8,
+    # v3.4 IC recalibration (2026-07-02) — per-signal Spearman IC on 19 XLSX
+    # snapshots (Apr 23 – Jun 26 2026) + yfinance 5d-forward panel; BH FDR
+    # across the combined family. Full results:
+    # docs/research/screener_signal_ic_2026-07-02.md
+    # Harvey/Liu/Zhu bar (mean IC > 0.05, |t| >= 2.57): NO signal passed in
+    # this crash-dominated window — it validates nothing, but flags harm:
+    #   weight_valuation (48)      → VALIDATED (literature: OCF/Price IDX4 model);
+    #                                 in-sample IC ~0 (neutral)
+    #   weight_profitability (37)  → VALIDATED (literature: IDX quality premium);
+    #                                 in-sample pbv_x_roe IC +0.018 (neutral)
+    #   weight_price_momentum (7)  → VALIDATED (literature: EM momentum premium);
+    #                                 in-sample -0.048 (crash inversion; kept small)
+    #   weight_momentum_rsi (8)    → REDUCED 15→8: tiered score IC +0.018 (t 0.64),
+    #                                 raw RSI -0.029 — no alpha evidence either way;
+    #                                 small timing weight kept, RSI-70 hard gate stays
+    #   weight_momentum_vol (0)    → CUT 8→0: vol_surge IC -0.148 (t -1.47), tiered
+    #                                 -0.106 — negative lean + zero IDX evidence.
+    #                                 Volume keeps its GATE role (min_volume_surge,
+    #                                 ADT liquidity); only the score contribution is
+    #                                 removed. Weights are explicit ints now —
+    #                                 decoupled from BULL_* debate constants.
+    # Re-run scripts/validate_screener_signal_ic.py once the archive spans
+    # >= 6 months and >= 2 regimes; restore weights only on an HLZ pass.
+    "weight_valuation": 48,
+    "weight_profitability": 37,
+    "weight_momentum_rsi": 8,
+    "weight_momentum_vol": 0,
+    "weight_price_momentum": 7,
     "value_ocf_weight": 0.50,
     "value_graham_pe_weight": 0.50,
     "value_ocf_absolute_weight": 0.65,
