@@ -59,6 +59,11 @@ forecasting = [
     "prophet>=1.1.5",
     "torch>=2.3.0",
 ]
+# IndoBERT sentiment prior (SENTIMENT_INDOBERT_ENABLED) — task D1 / Gap P7
+sentiment = [
+    "transformers>=4.44.0",
+    "torch>=2.3.0",
+]
 
 [project.scripts]
 idx = "app.cli.main:app"

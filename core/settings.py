@@ -103,6 +103,13 @@ class Settings(BaseSettings):
     # Stockbit API
     STOCKBIT_MAX_WORKERS: int = 10
 
+    # ── IndoBERT sentiment prior (Gap P7 Tier 2 / task D1) ───────────────────
+    # Opt-in: first use downloads the model (~500 MB) from HuggingFace and
+    # requires `uv sync --extra sentiment` (transformers + torch). When the
+    # model cannot load, the sentiment scout degrades to LLM-only behavior.
+    SENTIMENT_INDOBERT_ENABLED: bool = False
+    SENTIMENT_INDOBERT_MODEL: str = "mdhugol/indonesia-bert-sentiment-classification"
+
     # ── Market Holidays ──────────────────────────────────────────────────────────
     # IDX_ADDITIONAL_HOLIDAYS: Comma-separated list of YYYY-MM-DD dates to exclude from RAG staleness
     IDX_ADDITIONAL_HOLIDAYS: str = ""

@@ -76,6 +76,7 @@ from services.evidence_ranker import (
     guard_evidence_citation_ids,
 )
 from services.fair_value_calculator import build_fair_value_payload, compute_52w_range_signal
+from services.indobert_sentiment import sentiment_prior as indobert_sentiment_prior
 from services.debate_prompt_registry import PROMPT_REGISTRY, PROMPT_VERSION
 from services.debate_run_guard import run_with_guard
 from utils.logger_config import logger
@@ -2784,6 +2785,15 @@ Current Date (Asia/Jakarta): {current_date}
                 if news_headlines
                 else serialized_posts
             )
+            # D1 (Gap P7): deterministic IndoBERT prior for Bahasa Indonesia
+            # posts. Empty string when disabled/unavailable — no-op by default.
+            indobert_stats: dict[str, Any] = {}
+            if settings.SENTIMENT_INDOBERT_ENABLED:
+                indobert_block, indobert_stats = await asyncio.to_thread(
+                    indobert_sentiment_prior, combined_posts
+                )
+                if indobert_block:
+                    human_content = f"{human_content}\n\n{indobert_block}"
             messages = [
                 SystemMessage(
                     content=(
@@ -2817,6 +2827,7 @@ Current Date (Asia/Jakarta): {current_date}
                     "unique_posts": len(combined_posts),
                     "verified_posts": verified_count,
                     "truncated_posts": truncated_count,
+                    **({"indobert": indobert_stats} if indobert_stats else {}),
                 },
             )
             news_update = await _news_context_for_state(
