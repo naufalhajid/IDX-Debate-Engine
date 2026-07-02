@@ -145,3 +145,65 @@ def test_select_top_n_excludes_governor_rejected_entries() -> None:
     assert "BBBB" not in tickers  # hard reject may not occupy a slot
     assert "AAAA" in tickers
     assert "CCCC" in tickers  # soft holds still rank (watchlist semantics)
+
+
+def test_forecast_ev_applies_when_realized_list_is_empty() -> None:
+    # main() always passes a list from load_realized_outcomes() — an empty
+    # ledger must not disable the forward-EV fallback (the old guard compared
+    # against None and never fired in the pipeline path). 5.0 is percent and
+    # must clear apply_ev_adjustment's +3.0 threshold without rescaling.
+    verdict = {"confidence": 0.60, "risk_reward_ratio": 1.5}
+    base_score, _ = compute_conviction_score(verdict)
+
+    score, _ = compute_conviction_score(
+        verdict,
+        ticker="BBCA",
+        realized_outcomes=[],
+        forecast_ev_pct=5.0,
+    )
+
+    assert score == pytest.approx(base_score + 0.025)  # half bonus at n=1
+
+
+def test_forecast_ev_applies_when_ticker_has_no_realized_records() -> None:
+    verdict = {"confidence": 0.60, "risk_reward_ratio": 1.5}
+    base_score, _ = compute_conviction_score(verdict)
+
+    score, _ = compute_conviction_score(
+        verdict,
+        ticker="BBCA",
+        realized_outcomes=[_outcome("BBRI", "win")] * 15,  # other ticker only
+        forecast_ev_pct=5.0,
+    )
+
+    assert score == pytest.approx(base_score + 0.025)
+
+
+def test_negative_forecast_ev_penalises_conviction() -> None:
+    verdict = {"confidence": 0.60, "risk_reward_ratio": 1.5}
+    base_score, _ = compute_conviction_score(verdict)
+
+    score, _ = compute_conviction_score(
+        verdict,
+        ticker="BBCA",
+        realized_outcomes=[],
+        forecast_ev_pct=-3.0,  # below the -2.0 penalty threshold
+    )
+
+    assert score == pytest.approx(base_score - 0.025)
+
+
+def test_forecast_ev_does_not_stack_on_realized_adjustment() -> None:
+    verdict = {"confidence": 0.60, "risk_reward_ratio": 1.5}
+    base_score, _ = compute_conviction_score(verdict)
+
+    # 15 realized wins fire the realized win-rate bonus and return early;
+    # the contradictory forecast penalty must be ignored.
+    score, _ = compute_conviction_score(
+        verdict,
+        ticker="BBCA",
+        realized_outcomes=[_outcome("BBCA", "win")] * 15,
+        forecast_ev_pct=-50.0,
+    )
+
+    assert score == pytest.approx(base_score + 0.05)

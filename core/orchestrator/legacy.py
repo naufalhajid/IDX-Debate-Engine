@@ -4682,10 +4682,12 @@ def compute_conviction_score(
         n_hist = sum(1 for r in debate_records if r.get("ticker") == ticker)
         base_score = apply_historical_adjustment(base_score, win_rate, n=n_hist)
 
-    # Forward EV fallback — used when no realized historical data is available
-    if forecast_ev_pct is not None and realized_outcomes is None:
-        forecast_ev_fraction = forecast_ev_pct / 100.0
-        base_score = apply_ev_adjustment(base_score, forecast_ev_fraction, n=1)
+    # Forward EV fallback — only reachable when no realized adjustment was
+    # applied for this ticker (realized branches return early above).
+    # forecast_ev_pct is already in percent, the same unit as realized pnl_pct
+    # and apply_ev_adjustment's +3.0/-2.0 thresholds — do not rescale it.
+    if forecast_ev_pct is not None:
+        base_score = apply_ev_adjustment(base_score, forecast_ev_pct, n=1)
 
     return base_score, warning
 
