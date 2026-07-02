@@ -61,6 +61,7 @@ htmlcov/
 *.bak
 *~
 desktop.ini
+*.ps1
 
 # Scratch runtime artifacts; keep scratch scripts reviewable if needed.
 scratch/**/*.json
@@ -112,5 +113,3 @@ claude.md
 
 
 everything-claude-code/
-
-run_pipeline.ps1
