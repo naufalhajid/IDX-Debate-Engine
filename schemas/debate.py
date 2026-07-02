@@ -235,6 +235,19 @@ class CIOVerdict(BaseDataClass):
         ),
     )
 
+    hypothetical_envelope: dict[str, Any] | None = Field(
+        default=None,
+        description=(
+            "As-computed trade levels (entry_low, entry_high, target_price, "
+            "target_basis, stop_loss, risk_reward_ratio) captured when "
+            "_compute_trade_envelope() rejects a setup. NOT tradeable — a "
+            "collapsed target or sub-floor R/R is recorded exactly as the "
+            "gates saw it. Written to the watchlist counterfactual ledger so "
+            "gate calibration can later score rejected candidates. None for "
+            "accepted envelopes."
+        ),
+    )
+
     # ── Task 8: Trailing Stop Fields ─────────────────────────────────────────
     trailing_stop_pct: float | None = Field(
         default=None,

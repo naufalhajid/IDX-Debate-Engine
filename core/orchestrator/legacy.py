@@ -3930,6 +3930,11 @@ def _record_backtest_memory(
                     "target_price": verdict.get("target_price"),
                     "stop_loss": verdict.get("stop_loss"),
                     "risk_reward_ratio": verdict.get("risk_reward_ratio"),
+                    # Counterfactual fields: why the gate said no, and the
+                    # non-tradeable levels it computed — lets the weekly runs
+                    # accumulate gate-calibration data instead of null rows.
+                    "reason_codes": list(verdict.get("reason_codes") or []),
+                    "hypothetical_envelope": verdict.get("hypothetical_envelope"),
                 },
             )
             logger.info(

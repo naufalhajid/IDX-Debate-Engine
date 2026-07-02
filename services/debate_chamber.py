@@ -3762,7 +3762,12 @@ Current Date (Asia/Jakarta): {current_date}
         fair_value: float,
         tech: dict,
     ) -> dict:
-        """Compute entry/target/stop in Python. All prices snapped to IHSG tick sizes."""
+        """Compute entry/target/stop in Python. All prices snapped to IHSG tick sizes.
+
+        On gate failure returns {rejected, reason_code, reason, hypothetical_envelope}
+        where hypothetical_envelope carries the as-computed (non-tradeable) levels
+        for the counterfactual watchlist ledger.
+        """
         sma20 = tech.get("sma20", current_price)
         ma50 = tech.get("ma50")
         sector = tech.get("sector")
@@ -3770,20 +3775,24 @@ Current Date (Asia/Jakarta): {current_date}
         rsi14 = tech.get("rsi14")
         return_5d = tech.get("return_5d_pct")
 
+        # Gate failures do not return early: level computation continues so a
+        # rejected setup still carries a full hypothetical envelope for the
+        # counterfactual watchlist ledger. The first gate hit owns reason_code.
+        rejections: list[tuple[str, str]] = []
+
         # Momentum confirmation (F12): in momentum mode (RSI > 40) the pullback must
         # have stabilised — require flat-to-positive 5-day return before entry.
         # Skipped when RSI <= 40 (mean-reversion setups) where the oversold level
         # itself is the entry signal and a negative recent return is expected.
         if rsi14 is not None and return_5d is not None:
             if rsi14 > 40.0 and return_5d < 0.0:
-                return {
-                    "rejected": True,
-                    "reason_code": "no_momentum_confirmation",
-                    "reason": (
+                rejections.append((
+                    "no_momentum_confirmation",
+                    (
                         f"no_momentum_confirmation: return_5d {return_5d:.1f}%"
                         f" < 0 at RSI {rsi14:.1f}"
                     ),
-                }
+                ))
 
         # Entry zone: near MA50 support (pullback entry for swing)
         if ma50 and ma50 > 0 and current_price > 0:
@@ -3839,15 +3848,14 @@ Current Date (Asia/Jakarta): {current_date}
             _hard_floor_atr = settings.TRADE_ENVELOPE_HARD_NOISE_ATR_MULTIPLIER * atr14
             _clean_floor_atr = settings.TRADE_ENVELOPE_CLEAN_NOISE_ATR_MULTIPLIER * atr14
             if _stop_distance < _hard_floor_atr:
-                return {
-                    "rejected": True,
-                    "reason_code": "stop_inside_noise",
-                    "reason": (
+                rejections.append((
+                    "stop_inside_noise",
+                    (
                         f"stop_inside_noise: gap {_stop_distance:.0f}"
                         f" < {settings.TRADE_ENVELOPE_HARD_NOISE_ATR_MULTIPLIER:.1f}xATR"
                         f" {_hard_floor_atr:.0f}"
                     ),
-                }
+                ))
             _stop_near_noise = _stop_distance < _clean_floor_atr
 
         # Floor: minimal 4% from entry for worthwhile swing
@@ -3888,14 +3896,13 @@ Current Date (Asia/Jakarta): {current_date}
             target_basis += " (Swing Cap)"
 
         if target <= entry_high:
-            return {
-                "rejected": True,
-                "reason_code": "target_collapsed",
-                "reason": (
+            rejections.append((
+                "target_collapsed",
+                (
                     f"target_collapsed: target {target} ≤ entry_high {entry_high}"
                     f" after ceiling(s): {target_basis}"
                 ),
-            }
+            ))
 
         # Compute display percentages from entry_mid, but canonical R/R from entry_high.
         gain_pct = ((target - entry_mid) / entry_mid) * 100 if entry_mid > 0 else 0
@@ -3910,13 +3917,31 @@ Current Date (Asia/Jakarta): {current_date}
         # silently. Non-large-cap stocks face a higher threshold (1.5x) in the
         # governor; this catches the worst cases early.
         if rr_ratio < LARGE_CAP_RR_MINIMUM:
-            return {
-                "rejected": True,
-                "reason_code": "rr_too_low",
-                "reason": (
+            rejections.append((
+                "rr_too_low",
+                (
                     f"rr_too_low: R/R {rr_ratio:.2f} < {LARGE_CAP_RR_MINIMUM}"
                     f" (target {target}, entry_high {entry_high}, stop {stop})"
                 ),
+            ))
+
+        if rejections:
+            reason_code, reason = rejections[0]
+            return {
+                "rejected": True,
+                "reason_code": reason_code,
+                "reason": reason,
+                # As-computed levels, NOT tradeable: a collapsed target or
+                # sub-floor R/R is recorded exactly as the gates saw it so the
+                # watchlist ledger can later score rejected setups.
+                "hypothetical_envelope": {
+                    "entry_low": entry_low,
+                    "entry_high": entry_high,
+                    "target_price": target,
+                    "target_basis": target_basis,
+                    "stop_loss": stop,
+                    "risk_reward_ratio": rr_ratio,
+                },
             }
 
         return {
@@ -4420,6 +4445,7 @@ Current Date (Asia/Jakarta): {current_date}
                 reason_codes=(
                     [envelope["reason_code"]] if envelope.get("reason_code") else []
                 ),
+                hypothetical_envelope=envelope.get("hypothetical_envelope"),
             )
             _ledger_stage_success(
                 state,

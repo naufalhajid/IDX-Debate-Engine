@@ -889,6 +889,42 @@ async def test_cio_envelope_rejection_carries_structured_reason_code():
     assert "no_momentum_confirmation" in decision.reason_codes
 
 
+@pytest.mark.asyncio
+async def test_cio_envelope_rejection_carries_hypothetical_envelope():
+    """The noise_verdict must carry the as-computed levels of the rejected
+    setup so the watchlist counterfactual ledger records what the gates saw
+    instead of an all-null row — while the actionable price fields stay null
+    (a HOLD must never expose tradeable-looking levels)."""
+    chamber = _chamber()
+
+    result = await chamber._cio_judge_node(
+        {
+            "ticker": "TOTL",
+            "current_price": 1000.0,
+            "technical_indicators": {"rsi14": 50.0, "return_5d_pct": -2.0},
+            "fair_value_estimate": 1000.0,
+            "debate_history": [],
+            "raw_data": "",
+            "devils_advocate_question": "",
+        }
+    )
+    verdict = json.loads(result["final_verdict"])
+
+    hypo = verdict["hypothetical_envelope"]
+    assert hypo is not None
+    assert hypo["entry_low"] < hypo["entry_high"]
+    assert hypo["stop_loss"] < hypo["entry_low"]
+    assert hypo["target_price"] > 0
+    assert verdict["entry_price_range"] is None
+    assert verdict["target_price"] is None
+    assert verdict["stop_loss"] is None
+
+    # Survive the orchestrator's reparse (final_verdict JSON -> CIOVerdict ->
+    # model_dump() -> entry["verdict"]) so _record_backtest_memory sees it.
+    verdict_dict = CIOVerdict(**verdict).model_dump()
+    assert verdict_dict["hypothetical_envelope"] == hypo
+
+
 def test_trade_envelope_proceeds_when_price_above_fair_value():
     # Task A: FV ceiling removed. A stock trading above its intrinsic-value
     # anchor is exactly the momentum-breakout scenario swing trading targets.
@@ -1821,6 +1857,73 @@ def test_trade_envelope_allows_positive_5d_return_in_momentum_mode():
     }
     result = chamber._compute_trade_envelope(1000.0, 1100.0, tech)
     assert not result.get("rejected"), f"Positive 5d return wrongly rejected: {result}"
+
+
+def test_envelope_rr_rejection_carries_hypothetical_levels():
+    """rr_too_low rejections must carry the as-computed levels so the
+    counterfactual watchlist ledger can later score the miss."""
+    chamber = _chamber()
+    envelope = chamber._compute_trade_envelope(
+        current_price=127.0,
+        fair_value=423.0,
+        tech={"ma50": 140.0, "sma20": 133.0, "atr14": 5.0, "high_20d": 130.0},
+    )
+
+    assert envelope.get("rejected") is True
+    assert envelope["reason_code"] == "rr_too_low"
+    hypo = envelope["hypothetical_envelope"]
+    assert hypo["target_price"] == 130
+    assert hypo["stop_loss"] < hypo["entry_low"] < hypo["entry_high"]
+    assert hypo["risk_reward_ratio"] < 1.4
+
+
+def test_envelope_momentum_rejection_still_computes_hypothetical_levels():
+    """Momentum rejection fires before any level exists; computation must now
+    continue so the ledger sees the setup momentum blocked. Identical inputs
+    with a positive 5d return pass cleanly, so the hypothetical R/R must sit
+    above the floor — proving momentum was the ONLY blocking gate."""
+    chamber = _chamber()
+    tech = {
+        "ma50": 1000.0, "sma20": 980.0, "atr14": 20.0,
+        "rsi14": 55.0, "return_5d_pct": -3.0,
+    }
+    envelope = chamber._compute_trade_envelope(1000.0, 1100.0, tech)
+
+    assert envelope.get("rejected") is True
+    assert envelope["reason_code"] == "no_momentum_confirmation"
+    hypo = envelope["hypothetical_envelope"]
+    assert hypo["stop_loss"] < hypo["entry_low"] < hypo["entry_high"]
+    assert hypo["risk_reward_ratio"] >= 1.4
+
+
+def test_envelope_noise_rejection_keeps_first_reason_code():
+    """stop_inside_noise geometry also fails the later R/R gate once
+    computation continues — the FIRST gate must own reason_code while the
+    hypothetical envelope records the sub-floor R/R."""
+    chamber = _chamber()
+    tech = {"regime": "NORMAL", "atr14": 600.0, "sma20": 500.0}
+    envelope = chamber._compute_trade_envelope(1000.0, 1100.0, tech)
+
+    assert envelope.get("rejected") is True
+    assert envelope["reason_code"] == "stop_inside_noise"
+    hypo = envelope["hypothetical_envelope"]
+    assert hypo["stop_loss"] < hypo["entry_high"]
+    assert hypo["target_price"] > 0
+    assert hypo["risk_reward_ratio"] < 1.4  # later gate fired too, but did not win
+
+
+def test_envelope_accepted_setup_has_no_hypothetical_envelope():
+    """Accepted envelopes must not grow a hypothetical_envelope key — the
+    success-path contract is unchanged."""
+    chamber = _chamber()
+    tech = {
+        "ma50": 1000.0, "sma20": 980.0, "atr14": 20.0,
+        "rsi14": 55.0, "return_5d_pct": 1.5,
+    }
+    envelope = chamber._compute_trade_envelope(1000.0, 1100.0, tech)
+
+    assert not envelope.get("rejected")
+    assert "hypothetical_envelope" not in envelope
 
 
 @pytest.mark.asyncio
