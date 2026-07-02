@@ -43,7 +43,7 @@ ATR_PCT_MAX         = 0.04
 MA50_ENTRY_DISCOUNT = 0.03
 
 # ── Evaluation ────────────────────────────────────────────────────────────────
-HORIZON_TRADING_DAYS = 45
+HORIZON_TRADING_DAYS = 20
 
 
 @dataclass

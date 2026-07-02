@@ -380,6 +380,13 @@ def test_cio_verdict_accepts_deadlock_hold_consensus_method():
     assert verdict.consensus_method == "deadlock_hold"
 
 
+def test_cio_verdict_defaults_to_tactical_swing_horizon():
+    verdict = CIOVerdict(ticker="TEST")
+
+    assert verdict.timeframe == "5-20 Trading Days"
+    assert verdict.execution_horizon_days == 10
+
+
 @pytest.mark.asyncio
 async def test_confidence_winner_uses_effective_calibrated_confidence(monkeypatch):
     chamber = _chamber()
@@ -1081,7 +1088,8 @@ async def test_cio_uses_decision_brief_and_redacts_debate_prices(monkeypatch):
                     "weighted_reasoning": "Envelope-driven decision.",
                     "key_catalysts": ["volume"],
                     "key_risks": ["breakdown"],
-                    "timeframe": "1-3 Months",
+                    "timeframe": "5-20 Trading Days",
+                    "execution_horizon_days": 10,
                     "entry_price_range": "1 - 2",
                     "target_price": 3,
                     "stop_loss": 1,
@@ -1148,7 +1156,8 @@ async def test_cio_records_rag_citation_guard_when_evidence_id_missing(monkeypat
                     "weighted_reasoning": "Envelope-driven decision.",
                     "key_catalysts": ["volume"],
                     "key_risks": ["breakdown"],
-                    "timeframe": "1-3 Months",
+                    "timeframe": "5-20 Trading Days",
+                    "execution_horizon_days": 10,
                     "entry_price_range": "1 - 2",
                     "target_price": 3,
                     "stop_loss": 1,
@@ -1222,7 +1231,8 @@ async def test_cio_records_malformed_rag_citation_metadata(monkeypatch):
                     "weighted_reasoning": "Evidence-backed decision.",
                     "key_catalysts": ["volume"],
                     "key_risks": ["breakdown"],
-                    "timeframe": "1-3 Months",
+                    "timeframe": "5-20 Trading Days",
+                    "execution_horizon_days": 10,
                     "entry_price_range": "1 - 2",
                     "target_price": 3,
                     "stop_loss": 1,
@@ -1408,7 +1418,8 @@ async def test_cio_parses_list_content_response_and_keeps_consensus_override(
         "weighted_reasoning": "Signals are constructive but timing remains mixed.",
         "key_catalysts": ["earnings"],
         "key_risks": ["support break"],
-        "timeframe": "1-3 Months",
+        "timeframe": "5-20 Trading Days",
+        "execution_horizon_days": 10,
         "entry_price_range": "1 - 2",
         "target_price": 3,
         "stop_loss": 1,

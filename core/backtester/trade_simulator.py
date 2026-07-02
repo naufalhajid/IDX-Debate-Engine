@@ -10,6 +10,7 @@ from core.backtest_outcome_evaluator import (
     PriceFetcher,
     evaluate_memory,
 )
+from core.idx_market_params import SWING_MAX_EXECUTION_HORIZON_DAYS
 from core.settings import settings
 
 
@@ -18,7 +19,7 @@ def run_backtest_simulation(
     *,
     memory: BacktestMemory,
     dry_run: bool = False,
-    horizon_trading_days: int = 65,
+    horizon_trading_days: int = SWING_MAX_EXECUTION_HORIZON_DAYS,
     price_fetcher: PriceFetcher | None = None,
     debates_dir: Path | None = None,
     entry_check: bool = True,

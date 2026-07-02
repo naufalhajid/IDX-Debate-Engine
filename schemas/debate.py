@@ -2,7 +2,7 @@
 schemas/debate.py — State & Schema definitions for the IHSG Swing Trade Debate Chamber.
 
 Swing Trade update (this session):
-- CIOVerdict rebuilt for 1-3 month swing trade frame:
+- CIOVerdict rebuilt for 5-20 trading-day swing execution frame:
     • fair_value, entry_price_range, target_price, stop_loss (concrete prices)
     • expected_return auto-calculated from entry midpoint → target_price
     • is_overvalued auto-flag follows risk_overvalued (range-aware when available)
@@ -18,6 +18,12 @@ from typing import Annotated, Any, Literal, NotRequired, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from core.idx_market_params import (
+    MIN_HOLD_DAYS,
+    SWING_EXECUTION_HORIZON_DAYS,
+    SWING_MAX_EXECUTION_HORIZON_DAYS,
+    SWING_TIMEFRAME_LABEL,
+)
 from utils.trade_math import calculate_rr
 
 logger = logging.getLogger(__name__)
@@ -64,7 +70,7 @@ ConsensusMethod = Literal["voting", "confidence_winner", "soft_hold", "deadlock_
 
 class CIOVerdict(BaseDataClass):
     """
-    Structured output from the CIO Judge — Swing Trade frame (1-3 months, 3-10% target).
+    Structured output from the CIO Judge — Swing Trade frame (5-20 trading days).
 
     Auto-computed fields (model_validator, never sent by the LLM):
         expected_return   — % gain from entry_mid to target_price
@@ -125,7 +131,7 @@ class CIOVerdict(BaseDataClass):
 
     target_price: float | None = Field(
         default=None,
-        description="Swing-trade profit target for 1-3 months. Null if void.",
+        description="Swing-trade profit target for the execution horizon. Null if void.",
     )
 
     stop_loss: float | None = Field(
@@ -139,7 +145,16 @@ class CIOVerdict(BaseDataClass):
     )
 
     # ── Narrative fields (LLM must supply these) ──────────────────────────────
-    timeframe: str = Field(default="1-3 Months")
+    timeframe: str = Field(default=SWING_TIMEFRAME_LABEL)
+    execution_horizon_days: int = Field(
+        default=SWING_EXECUTION_HORIZON_DAYS,
+        ge=MIN_HOLD_DAYS,
+        le=SWING_MAX_EXECUTION_HORIZON_DAYS,
+        description=(
+            "Default tactical swing execution horizon in trading days. "
+            "Must stay within IDX T+2 settlement minimum and the 20-day normal swing cap."
+        ),
+    )
 
     weighted_reasoning: str = Field(
         default="",
@@ -156,7 +171,10 @@ class CIOVerdict(BaseDataClass):
 
     key_catalysts: list[str] = Field(
         default_factory=list,
-        description="Top 2-3 reasons the trade should work within 1-3 months.",
+        description=(
+            "Top 2-3 reasons the trade should work within 5-20 trading days; "
+            "1-3 month catalysts are context only unless near-term price action confirms."
+        ),
     )
 
     key_risks: list[str] = Field(
@@ -492,6 +510,8 @@ class CIOVerdict(BaseDataClass):
             "is_overvalued": self.is_overvalued,
             "risk_overvalued": self.risk_overvalued,
             "wait_and_see": self.wait_and_see,
+            "timeframe": self.timeframe,
+            "execution_horizon_days": self.execution_horizon_days,
             "confidence": self.confidence,
             "summary": self.summary,
             "critical_risk": self.critical_risk_factor,

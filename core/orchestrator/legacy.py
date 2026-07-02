@@ -104,6 +104,7 @@ from core.historical_scorer import (
     load_debate_history,
     load_realized_outcomes,
 )
+from core.idx_market_params import SWING_EXECUTION_HORIZON_DAYS, SWING_TIMEFRAME_LABEL
 from core.ops_telemetry import DEFAULT_TELEMETRY, TickerMetric
 from core.quant_filter.config import canonical_screener_mode
 from core.quant_filter.position_sizer import calculate_positions
@@ -5204,7 +5205,7 @@ def _generate_mock_debate_results(
             target_price=target,
             stop_loss=stop_loss,
             current_price=base_price,
-            timeframe="1-3 Months",
+            timeframe=SWING_TIMEFRAME_LABEL,
             weighted_reasoning="Dry-run mock verdict untuk validasi pipeline.",
             critical_risk_factor="Dry-run: bukan rekomendasi investasi aktual.",
             key_catalysts=[
@@ -5502,7 +5503,8 @@ def generate_top3_report(
             _win_rate_row(ticker),
             f"| **Debate Consensus** | {consensus_label} |",
             f"| **Dissenting Agents** | {', '.join(dissenting_agents) if dissenting_agents else '-'} |",
-            f"| **Timeframe** | {v.get('timeframe', '1-3 Months')} |",
+            f"| **Timeframe** | {v.get('timeframe', SWING_TIMEFRAME_LABEL)} |",
+            f"| **Execution Horizon** | {v.get('execution_horizon_days', SWING_EXECUTION_HORIZON_DAYS)} trading days |",
             f"| **Actionability** | {action_status} |",
             f"| **Sizing Allowed** | {sizing_label} |",
             f"| **Actionability Note** | {action_message} |",

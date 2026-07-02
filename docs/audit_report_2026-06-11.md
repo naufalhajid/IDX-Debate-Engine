@@ -706,7 +706,7 @@ def _record_backtest(verdict, ...):
     _append_new_record(verdict, ...)
 ```
 
-### I4-04 MEDIUM — Backtest evaluation horizon 15 days vs 1-3 month trade thesis
+### I4-04 MEDIUM — Backtest evaluation horizon 15 days vs current 5-20 trading-day trade thesis
 
 **File:** `core/backtest_outcome_evaluator.py:20`
 
@@ -717,8 +717,8 @@ EVALUATION_HORIZON_TRADING_DAYS = 15
 
 **AFTER:**
 ```python
-EVALUATION_HORIZON_TRADING_DAYS = 45   # ~2-3 months, matches stated thesis
-# Also add: label "timeout_flat" when position closes at day 45 within +/-2% entry
+EVALUATION_HORIZON_TRADING_DAYS = 20   # max normal 5-20 trading-day swing evaluation
+# Also add: label "timeout_flat" when position closes at day 20 within +/-2% entry
 # (not stop_hit, not target_hit) — distinguished from actual loss
 ```
 
@@ -750,7 +750,7 @@ EVALUATION_HORIZON_TRADING_DAYS = 45   # ~2-3 months, matches stated thesis
 | F20 | Integration | HIGH | Full pipeline debated 1/10 candidates; root cause unconfirmed (budget/filter/batch) | Open → I4-01 |
 | F21 | Integration | HIGH | No portfolio heat cap or drawdown kill-switch | Open → I4-02 |
 | F22 | Integration | HIGH | No dedup in backtest memory; same ticker recorded 2.6x on average | Open → I4-03 |
-| F23 | Integration | MEDIUM | Backtest horizon 15d vs stated 1-3 month thesis | Open → I4-04 |
+| F23 | Integration | MEDIUM | Backtest horizon 15d vs stated 5-20 trading-day thesis | Open → I4-04 |
 | F24 | Realized | SYSTEMIC | 80 trades closed: 1W/79L, avg PnL -3.29%, avg 1.6 days to stop | Systemic |
 | FXX | All | FIXED | Target inflation R/R 22x, FV garbage anchor, voting bypass, tent R/R | FIXED (rr-sanity-v1..v3) |
 
@@ -783,7 +783,7 @@ EVALUATION_HORIZON_TRADING_DAYS = 45   # ~2-3 months, matches stated thesis
 | P1.6 | RSI hard reject -> 70; minimum volume surge 0.30x | `config.py:94`, `pipeline.py:476-495` |
 | P1.7 | Chartist -> flash_llm | `debate_chamber.py:2300` |
 | P1.8 | Devil's advocate vote extraction | `debate_chamber.py:3003-3033` |
-| P1.9 | Backtest horizon -> 45 trading days + timeout_flat label | `backtest_outcome_evaluator.py:20` |
+| P1.9 | Backtest horizon -> 20 trading days + timeout_flat label | `backtest_outcome_evaluator.py:20` |
 | P1.10 | MAX_TARGET_RETURN -> 10%; update cio_judge.txt header | `debate_chamber.py:3189`, `cio_judge.txt:1` |
 
 ### P2 — Strategic (1-2 Months)

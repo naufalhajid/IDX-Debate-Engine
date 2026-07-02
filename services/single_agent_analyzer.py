@@ -19,6 +19,12 @@ from langchain_core.messages import HumanMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, ConfigDict, Field
 
+from core.idx_market_params import (
+    MIN_HOLD_DAYS,
+    SWING_EXECUTION_HORIZON_DAYS,
+    SWING_MAX_EXECUTION_HORIZON_DAYS,
+    SWING_TIMEFRAME_LABEL,
+)
 from providers.gemini import _get_api_key
 from services.context_pack_builder import (
     ContextPack,
@@ -61,7 +67,12 @@ class SingleAgentVerdict(BaseModel):
     reasoning: str
     key_risks: list[str]
     key_catalysts: list[str]
-    timeframe: str
+    timeframe: str = SWING_TIMEFRAME_LABEL
+    execution_horizon_days: int = Field(
+        default=SWING_EXECUTION_HORIZON_DAYS,
+        ge=MIN_HOLD_DAYS,
+        le=SWING_MAX_EXECUTION_HORIZON_DAYS,
+    )
     mode: str = "single_agent"
     model_used: str
     generated_at: str
@@ -184,13 +195,16 @@ You must respond with ONLY a valid JSON object with exactly these fields:
   "reasoning": "<comprehensive explanation max 500 chars>",
   "key_risks": ["<risk1>", "<risk2>", "<risk3>"],
   "key_catalysts": ["<catalyst1>", "<catalyst2>"],
-  "timeframe": "1-3 Months"
+  "timeframe": "5-20 Trading Days",
+  "execution_horizon_days": 10
 }}
 
 Rules:
 - entry_price_range must be BELOW current price for BUY (wait for pullback)
 - stop_loss must be below entry_price_range
 - target_price must be above entry_price_range
+- execution_horizon_days must be 2-20; default to 10 for normal swing setups
+- 1-3 month catalysts are context only; BUY needs a near-term technical/flow trigger
 - confidence reflects your certainty
 - respond with JSON only, no other text
 """.strip()
@@ -237,7 +251,11 @@ Rules:
                 reasoning=str(parsed["reasoning"])[:500],
                 key_risks=list(parsed.get("key_risks") or []),
                 key_catalysts=list(parsed.get("key_catalysts") or []),
-                timeframe=str(parsed.get("timeframe") or "1-3 Months"),
+                timeframe=str(parsed.get("timeframe") or SWING_TIMEFRAME_LABEL),
+                execution_horizon_days=int(
+                    parsed.get("execution_horizon_days")
+                    or SWING_EXECUTION_HORIZON_DAYS
+                ),
                 mode="single_agent",
                 model_used=self.model,
                 generated_at=generated_at,

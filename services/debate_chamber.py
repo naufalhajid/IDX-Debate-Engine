@@ -56,6 +56,7 @@ from core.adaptive_planner import (
 from core.execution_ledger import DEFAULT_LEDGER
 from core.failure_taxonomy import classify_exception
 from core.handoff_envelope import make_envelope
+from core.idx_market_params import SWING_EXECUTION_HORIZON_DAYS, SWING_TIMEFRAME_LABEL
 from core.observation_store import AgentObservation, DEFAULT_STORE
 from core.settings import settings
 from providers.llm_factory import get_llm
@@ -1932,7 +1933,7 @@ Current Date (Asia/Jakarta): {current_date}
 1) TIME AWARENESS
 - Treat any event date strictly relative to Current Date.
 - If event_date < Current Date, label it as PAST_EVENT_NOT_CATALYST.
-- Past events cannot be used as future catalysts for 1-3 month swing thesis.
+- Past events cannot be used as future catalysts or 5-20 trading-day triggers.
 - If date is ambiguous/unparseable, mark DATE_UNCERTAIN and reduce confidence.
 
 2) NULL VS ZERO SEMANTICS
@@ -3724,7 +3725,7 @@ Current Date (Asia/Jakarta): {current_date}
                 break
         return max(base - max(cls._tick_size_for_price(base), 1.0), 0.0)
 
-    #: Max target return (from entry_high) for a 1-3 month swing, applied with or
+    #: Max target return (from entry_high) for a 5-20 trading-day swing, applied with or
     #: without a fair-value anchor. Resistance-based targets can run to a recent
     #: pre-crash high (INDO: 52w high Rp 519 vs spot Rp 165) and the FV anchor
     #: itself can sit far above spot; both inflate R/R past anything tradeable.
@@ -4561,7 +4562,8 @@ no trailing text. The JSON must have exactly these keys:
   "weighted_reasoning": "<string — explain how signals were weighted>",
   "key_catalysts": ["<string>", ...],
   "key_risks": ["<string>", ...],
-  "timeframe": "<string e.g. '1-3 Months'>",
+  "timeframe": "<string e.g. '5-20 Trading Days'>",
+  "execution_horizon_days": <integer 2-20, default 10>,
   "entry_price_range": "<string e.g. '4800 - 5000'>",
   "target_price": <number>,
   "target_basis": "<string>",
@@ -4589,6 +4591,8 @@ Start your response with '{' and end with '}'. Nothing else."""
             """
             p = dict(parsed) if isinstance(parsed, dict) else {}
             p.setdefault("ticker", ticker)
+            p.setdefault("timeframe", SWING_TIMEFRAME_LABEL)
+            p.setdefault("execution_horizon_days", SWING_EXECUTION_HORIZON_DAYS)
             try:
                 p["current_price"] = float(
                     p.get("current_price") or current_price or 0.0
@@ -5300,6 +5304,8 @@ Start your response with '{' and end with '}'. Nothing else."""
                 "confidence": 0.40,
                 "ticker": ticker,
                 "current_price": current_price,
+                "timeframe": SWING_TIMEFRAME_LABEL,
+                "execution_horizon_days": SWING_EXECUTION_HORIZON_DAYS,
                 "risk_flags": ["PREFLIGHT_NOISE_REJECT"],
                 "reasoning": _preflight["reason"],
                 "weighted_reasoning": (

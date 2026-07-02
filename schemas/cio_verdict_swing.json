@@ -7,7 +7,7 @@
   "required": [
     "ticker", "rating", "confidence",
     "fair_value", "entry_price_range", "target_price", "stop_loss", "current_price",
-    "timeframe", "expected_return", "risk_reward_ratio",
+    "timeframe", "execution_horizon_days", "expected_return", "risk_reward_ratio",
     "is_overvalued", "wait_and_see",
     "weighted_reasoning", "critical_risk_factor",
     "key_catalysts", "key_risks", "summary"
@@ -36,7 +36,7 @@
     },
     "target_price": {
       "type": "number",
-      "description": "Swing-trade profit target in IDR. 3-10% above entry midpoint and below nearest resistance."
+      "description": "Swing-trade profit target in IDR for the 5-20 trading-day execution horizon. 3-10% above entry midpoint and below nearest resistance."
     },
     "stop_loss": {
       "type": "number",
@@ -48,7 +48,14 @@
     },
     "timeframe": {
       "type": "string",
-      "default": "1-3 Months"
+      "default": "5-20 Trading Days"
+    },
+    "execution_horizon_days": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 20,
+      "default": 10,
+      "description": "Default tactical swing execution horizon in trading days. Must be at least IDX T+2 settlement and at most the normal 20-day swing cap."
     },
     "expected_return": {
       "type": "string",
@@ -72,11 +79,12 @@
     },
     "critical_risk_factor": {
       "type": "string",
-      "description": "The single factor most likely to invalidate this swing trade within 1-3 months."
+      "description": "The single factor most likely to invalidate this swing trade within 5-20 trading days."
     },
     "key_catalysts": {
       "type": "array", "items": { "type": "string" },
-      "minItems": 1, "maxItems": 5
+      "minItems": 1, "maxItems": 5,
+      "description": "Near-term technical, volume, flow, or event triggers for 5-20 trading days. 1-3 month catalysts are medium-term context only."
     },
     "key_risks": {
       "type": "array", "items": { "type": "string" },
@@ -97,7 +105,9 @@
       "cut_loss":        "stop_loss         — label: 'Cut Loss'",
       "fair_value":      "fair_value        — label: 'Harga Wajar'",
       "expected_return": "expected_return   — label: 'Potensi Profit'",
-      "risk_reward":     "risk_reward_ratio — label: 'R/R Ratio'"
+      "risk_reward":     "risk_reward_ratio — label: 'R/R Ratio'",
+      "timeframe":       "timeframe         — label: 'Timeframe'",
+      "execution_horizon_days": "execution_horizon_days — label: 'Execution Horizon'"
     },
     "rating_color_map": {
       "STRONG_BUY": "#16a34a",
@@ -120,10 +130,12 @@
       "fair_value":      5200,
       "expected_return": "+7.3%",
       "risk_reward":     1.8,
+      "timeframe":       "5-20 Trading Days",
+      "execution_horizon_days": 10,
       "is_overvalued":   false,
       "wait_and_see":    false,
       "confidence":      0.74,
-      "summary":         "BBRI diperdagangkan ~7% di bawah harga wajar Rp 5.200 dengan support kuat di MA50. Target swing 1-3 bulan di Rp 5.280 dengan stop di Rp 4.650.",
+      "summary":         "BBRI diperdagangkan ~7% di bawah harga wajar Rp 5.200 dengan support kuat di MA50. Target swing 5-20 hari bursa di Rp 5.280 dengan stop di Rp 4.650.",
       "critical_risk":   "Kenaikan NPL yang berkelanjutan dapat menekan valuasi jika BI Rate tetap tinggi."
     },
     "example_full_verdict": {
@@ -135,7 +147,8 @@
       "target_price":       5280.0,
       "stop_loss":          4650.0,
       "current_price":      4875.0,
-      "timeframe":          "1-3 Months",
+      "timeframe":          "5-20 Trading Days",
+      "execution_horizon_days": 10,
       "expected_return":    "+7.3%",
       "risk_reward_ratio":  1.8,
       "is_overvalued":      false,
@@ -152,7 +165,7 @@
         "BI Rate tinggi berkepanjangan dapat menekan NIM",
         "Pelemahan Rupiah meningkatkan biaya utang valas"
       ],
-      "summary": "BBRI menawarkan setup swing trade yang menarik dengan harga di bawah nilai wajar dan support teknikal yang kuat. Entry di zona Rp 4.800-4.950 dengan target Rp 5.280 memberikan potensi profit 7,3% dalam 1-3 bulan. Stop loss di Rp 4.650 memberikan R/R ratio 1,8 — layak untuk posisi swing dengan sizing yang terukur."
+      "summary": "BBRI menawarkan setup swing trade yang menarik dengan harga di bawah nilai wajar dan support teknikal yang kuat. Entry di zona Rp 4.800-4.950 dengan target Rp 5.280 memberikan potensi profit 7,3% dalam 5-20 hari bursa. Stop loss di Rp 4.650 memberikan R/R ratio 1,8 — layak untuk posisi swing dengan sizing yang terukur."
     }
   }
 }

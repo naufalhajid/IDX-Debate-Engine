@@ -9,6 +9,7 @@ from typing import Annotated
 import typer
 
 from app.cli.ui.console import console
+from core.idx_market_params import SWING_MAX_EXECUTION_HORIZON_DAYS
 
 
 def backtest_command(
@@ -42,8 +43,8 @@ def backtest_command(
     ] = Path("output/debates"),
     horizon_days: Annotated[
         int,
-        typer.Option("--horizon-days", help="Max trading days per trade (default 65 ~= 3 months)."),
-    ] = 65,
+        typer.Option("--horizon-days", help="Max trading days per trade (default 20 ~= normal swing cap)."),
+    ] = SWING_MAX_EXECUTION_HORIZON_DAYS,
     no_entry_check: Annotated[
         bool,
         typer.Option("--no-entry-check", help="Disable limit-order entry trigger (count trade from signal date)."),

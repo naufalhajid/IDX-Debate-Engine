@@ -5,6 +5,7 @@ import pytest
 
 from core.backtest_memory import BacktestMemory, TradeOutcome
 from core.backtest_outcome_evaluator import (
+    DEFAULT_HORIZON_TRADING_DAYS,
     PriceBar,
     evaluate_memory,
     evaluate_trade_outcome,
@@ -59,6 +60,10 @@ def _create_artifact(debates_dir: Path, record: TradeOutcome) -> None:
     artifact.write_text("{}", encoding="utf-8")
 
 
+def test_default_horizon_is_normal_swing_cap() -> None:
+    assert DEFAULT_HORIZON_TRADING_DAYS == 20
+
+
 def test_target_hit_first_is_win() -> None:
     evaluated = evaluate_trade_outcome(
         _record(),
@@ -100,21 +105,21 @@ def test_same_day_target_and_stop_is_conservative_loss() -> None:
 
 
 def test_horizon_close_above_entry_is_win() -> None:
-    bars = [_bar(day, high=108, low=99, close=105) for day in range(1, 64)]
+    bars = [_bar(day, high=108, low=99, close=105) for day in range(1, 21)]
 
-    evaluated = evaluate_trade_outcome(_record(), bars, horizon_trading_days=63)
+    evaluated = evaluate_trade_outcome(_record(), bars, horizon_trading_days=20)
 
     assert evaluated is not None
     assert evaluated.outcome == "win"
     assert evaluated.exit_price == 105
-    assert evaluated.holding_period_days == 63
+    assert evaluated.holding_period_days == 20
     assert evaluated.evaluation_reason == "horizon_close_above_entry"
 
 
 def test_horizon_close_at_or_below_entry_is_loss() -> None:
-    bars = [_bar(day, high=100, low=96, close=97) for day in range(1, 64)]
+    bars = [_bar(day, high=100, low=96, close=97) for day in range(1, 21)]
 
-    evaluated = evaluate_trade_outcome(_record(), bars, horizon_trading_days=63)
+    evaluated = evaluate_trade_outcome(_record(), bars, horizon_trading_days=20)
 
     assert evaluated is not None
     assert evaluated.outcome == "loss"
@@ -125,7 +130,7 @@ def test_insufficient_horizon_remains_unscored() -> None:
     evaluated = evaluate_trade_outcome(
         _record(),
         [_bar(1, high=105, low=99, close=101)],
-        horizon_trading_days=63,
+        horizon_trading_days=20,
     )
 
     assert evaluated is None

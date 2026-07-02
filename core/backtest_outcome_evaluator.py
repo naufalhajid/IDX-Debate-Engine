@@ -13,11 +13,12 @@ from pathlib import Path
 from typing import Callable, Iterable, Literal
 
 from core.backtest_memory import BacktestMemory, DEFAULT_PATH, TradeOutcome
+from core.idx_market_params import SWING_MAX_EXECUTION_HORIZON_DAYS
 from core.settings import settings
 from utils.logger_config import logger
 
 
-DEFAULT_HORIZON_TRADING_DAYS = 45
+DEFAULT_HORIZON_TRADING_DAYS = SWING_MAX_EXECUTION_HORIZON_DAYS
 EVALUATED_RATINGS = {"BUY", "STRONG_BUY"}
 Outcome = Literal["win", "loss", "timeout_flat"]
 

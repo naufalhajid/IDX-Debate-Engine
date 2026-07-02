@@ -292,7 +292,7 @@ Any stock with less than Rp 1B average daily turnover should require explicit li
 
 **Date:** 2026-06-22
 **Scope:** Every component NOT covered in Part I above: prompt corpus, regime detection, quant filter, evidence ranker, position sizer, portfolio optimizer, historical scorer.
-**Question:** Outside the four areas already fixed or assessed in Part I, does the rest of the system behave like a competent 1–3 month swing trader?
+**Question:** Outside the four areas already fixed or assessed in Part I, does the rest of the system behave like a competent 5-20 trading-day swing trader?
 
 ---
 
@@ -301,21 +301,21 @@ Any stock with less than Rp 1B average daily turnover should require explicit li
 This needs to be stated once and anchored, because every other finding depends on it.
 
 **What the codebase says:**
-- `schemas/debate.py` line 5 docstring: "1-3 month swing trade frame"
-- `CIOVerdict.timeframe` default: `"1-3 Months"`
-- `fundamental_scout.txt` line 1: "1–3 month horizon"
-- `chartist.txt` line 1: "1-3 month frame"
-- Every debate prompt, bull/bear role, CIO judge: "1-3 month horizon, 3-10% target"
+- `schemas/debate.py` docstring: "5-20 trading-day swing execution frame"
+- `CIOVerdict.timeframe` default: `"5-20 Trading Days"`
+- `CIOVerdict.execution_horizon_days` default: `10`
+- `fundamental_scout.txt` keeps medium-term catalysts as context only
+- Every debate prompt, bull/bear role, CIO judge: "5-20 trading-day execution horizon"
 - `CLAUDE.md`: describes the system as "swing trading"
 
 **What "swing trading" means in standard practice:**
 - Classic definition: 2–10 trading days (some extend to 3 weeks)
 - "Position trading": weeks to 3 months
-- What this system implements at 1–3 months is technically *position trading*, not classic swing trading
+- The previous medium-term contract was closer to *position trading* than classic swing trading
 
-**Verdict:** The system is internally consistent at the 1–3 month contract. The word "swing" in CLAUDE.md is informal shorthand, not a calibration target. Every prompt, schema field, and confidence band is built for 1–3 month holds. **All subsequent findings are audited against the 1–3 month stated contract**, not classic 3–15 day swing trading.
+**Verdict:** The system is now anchored to a 5-20 trading-day execution contract. Medium-term catalysts remain context, but BUY requires near-term technical or flow confirmation.
 
-This framing matters: MA200 as a structural trend gate is appropriate for 1–3 month holds (and would be overkill for 1-week trades). Weekly trend filters are appropriate. A catalyst within "1–3 months" is appropriate. None of these are misaligned once you accept the 1–3 month frame as the real contract.
+This framing matters: MA200 and weekly trend filters are structural context for the 5-20 trading-day setup, not standalone reasons to buy. A medium-term catalyst is useful context only when price action, volume, or flow confirms inside the execution window.
 
 ---
 
@@ -332,13 +332,13 @@ BEARISH — current price is OVERVALUED vs fair value; no margin of safety.
 NEUTRAL — price is FAIRLY VALUED, or fair value data unavailable.
 ```
 
-**The problem:** This is a *value investing* output signal, not a *swing timing* signal. A stock can trade at 20% above fair value for 12 consecutive months during a bull cycle and still be the best 1–3 month swing trade available. The scout declaring it BEARISH (overvalued) early in that cycle would systematically bias the entire debate toward HOLD/AVOID for precisely the stock a momentum swing trader most wants to own.
+**The problem:** This is a *value investing* output signal, not a *swing timing* signal. A stock can trade at 20% above fair value for 12 consecutive months during a bull cycle and still be the best 5-20 trading-day continuation setup available. The scout declaring it BEARISH (overvalued) early in that cycle would systematically bias the entire debate toward HOLD/AVOID for precisely the stock a momentum swing trader most wants to own.
 
 The FAIL/PASS matrix in `cio_judge.txt` (Task E) partially corrects this: when Fundamental FAIL + Technical PASS + volume breakout, a momentum BUY is still possible. But the scout's BEARISH output travels through all debate rounds and confidence calculations, creating a structural drag on confidence scores for all above-fair-value setups even when the CIO correctly overrides.
 
 **What would be more aligned:** The scout should output its valuation finding and quality flags without labeling the stock BULLISH/BEARISH on that basis alone. The scout's output is useful context; it should not be a directional verdict. The direction verdict belongs to the chartist and CIO synthesis.
 
-**STEP 4 (Growth Catalyst):** "ONE specific upcoming event within 1–3 months" — well aligned.
+**STEP 4 (Growth Catalyst):** Medium-term catalyst context is useful, but it is not sufficient for BUY without a 5-20 trading-day technical or flow trigger.
 
 **STEP 6 (Post-Earnings Drift, Insider Selling):** Both are genuine swing signals. Insider selling reducing confidence by a forced cap is appropriate; post-earnings drift window is a real short-to-medium term effect. Well aligned.
 
@@ -381,13 +381,13 @@ Every trade envelope arrives pre-computed from Python and the CIO is instructed 
 
 **CIO threshold:** `sentiment.confidence >= 0.7` for the +0.02 bonus. A threshold of 0.70 is high — in practice Stockbit social data is noisy and low-confidence, so most sentiment readings will miss this bonus. The effect is a slight underweight on sentiment in the CIO calibration, which is arguably appropriate given data quality on IDX.
 
-**Verdict: Aligned.** Sentiment as a contrarian signal at extremes is appropriate for 1–3 month swing frames.
+**Verdict: Aligned.** Sentiment as a contrarian signal at extremes is appropriate for 5-20 trading-day swing frames.
 
 ---
 
 ### Bull R1 / Bear R1 / Bull R2 / Bear R2
 
-All four explicitly say "swing trade frame ONLY (1-3 months). DO NOT write long-term narratives." and require:
+All four now anchor the swing execution frame at 5-20 trading days and require:
 - One fundamental metric with actual number
 - One technical metric with actual number
 - One company-specific catalyst (not generic macro)
@@ -398,7 +398,7 @@ The data-citation requirement is the strongest alignment feature: it forces LLMs
 **Bear R2 stress test:**
 > "Maximum 1-week adverse move = 2 × ATR(14). IF 2 × ATR(14) >= Bull's claimed margin of safety → declare: 'Trade is unviable for swing execution'"
 
-For a 1–3 month hold, a 1-week stress test is appropriate as an *entry quality* check (can you survive the first week without being stopped out). It is not a full holding-period stress test, nor is it meant to be. Appropriate.
+For a 5-20 trading-day execution horizon, a 1-week stress test is appropriate as an *entry quality* check (can you survive the first week without being stopped out). It is not a full holding-period stress test, nor is it meant to be. Appropriate.
 
 **Verdict: Well aligned.** Cross-examination structure and specific-citation requirements are genuine improvements over open-ended debate.
 
@@ -406,7 +406,7 @@ For a 1–3 month hold, a 1-week stress test is appropriate as an *entry quality
 
 ### Consensus (`consensus.txt`)
 
-Four disagreement types: `direction`, `timing`, `valuation`, `catalyst`. Note on `timing`: "most common in a sideways IHSG market — use it when both agents agree the stock is good but disagree on entry point or RSI readiness." This is IDX-specific and 1–3 month appropriate.
+Four disagreement types: `direction`, `timing`, `valuation`, `catalyst`. Note on `timing`: "most common in a sideways IHSG market — use it when both agents agree the stock is good but disagree on entry point or RSI readiness." This is IDX-specific and appropriate for a 5-20 trading-day execution horizon.
 
 **Verdict: Aligned.**
 
@@ -418,7 +418,7 @@ Four disagreement types: `direction`, `timing`, `valuation`, `catalyst`. Note on
 Round-trip costs: 0.15% buy + 0.25% sell + 0.10% income tax + 0.15–0.30% slippage = ~0.65–0.80% total.
 Net return threshold: < 2.0% = INSUFFICIENT, 2.0–3.0% = MARGINAL, > 3.0% = VIABLE.
 
-For 1–3 month swing trades targeting 3–10% gains, a 2% net return minimum is appropriate — it ensures transaction costs aren't consuming the majority of the swing gain. For a 3% target swing, 0.8% costs leaves 2.2% net, which clears the threshold. For a 4% target, 3.2% net = VIABLE. Correctly calibrated.
+For 5-20 trading-day swing trades targeting 3–10% gains, a 2% net return minimum is appropriate — it ensures transaction costs aren't consuming the majority of the swing gain. For a 3% target swing, 0.8% costs leaves 2.2% net, which clears the threshold. For a 4% target, 3.2% net = VIABLE. Correctly calibrated.
 
 **Verdict: Well aligned.** The transaction cost challenge is the most IDX-specific and swing-appropriate stress test in the entire system.
 
@@ -432,9 +432,9 @@ For 1–3 month swing trades targeting 3–10% gains, a 2% net return minimum is
 [+0.02] Specific catalyst confirmed within 30 days
 ```
 
-The system's stated horizon is 1–3 months. This +0.02 bonus is awarded only to catalysts in month 1, not months 2–3. A Q3 earnings release in month 2 is equally valid as a catalyst for a 1–3 month trade, but receives no bonus. This creates a systematic short-term bias inside a medium-term frame: trades driven by near-term catalysts score higher than structurally equivalent setups where the catalyst materializes slightly later.
+This finding is superseded by the 5-20 trading-day execution contract. The +0.02 bonus now belongs to a near-term technical or flow trigger, while later catalysts remain medium-term context.
 
-The practical magnitude is small (+0.02 confidence), but the direction is wrong. A correct implementation would award the bonus for any catalyst confirmed within the 1–3 month window, not only within 30 days.
+The practical magnitude is small (+0.02 confidence), but the direction changes under the new contract: catalyst timing alone should not receive execution credit unless near-term price action confirms.
 
 **CONFLICT RESOLUTION MATRIX:** The Task E fix (FAIL/PASS → momentum BUY with volume confirmation) is the right correction. The PASS/FAIL → HOLD is also correct: fundamentally good stocks that haven't confirmed technically should wait for confirmation. The matrix is now properly tiered.
 
@@ -443,7 +443,7 @@ The practical magnitude is small (+0.02 confidence), but the direction is wrong.
 
 This is a meaningful regime-specific constraint. Under DEFENSIVE conditions, the CIO further raises the effective R/R floor through its own AVOID preference. This is additive to the risk governor's regime downgrades — appropriate and swing-aligned.
 
-**Verdict: Mostly aligned**, with one minor calibration issue (30-day catalyst bonus should cover the full 1–3 month window).
+**Verdict: Mostly aligned**, with the catalyst-bonus issue superseded by the 5-20 trading-day trigger rule.
 
 ---
 
@@ -518,7 +518,7 @@ This asymmetry is explicitly documented as "swing-trade aware" and is correct. R
 
 ### Static Filter: PBV < 80th sector percentile
 
-This filter has a notable side effect: it systematically excludes momentum leaders. In a strong sector rally, the stocks with the most price appreciation will be near the 80th percentile PBV or above. The filter removes the strongest stocks precisely because they ran the hardest. For a 1–3 month system targeting continuation setups, this creates tension: the stocks most clearly in an uptrend may be excluded.
+This filter has a notable side effect: it systematically excludes momentum leaders. In a strong sector rally, the stocks with the most price appreciation will be near the 80th percentile PBV or above. The filter removes the strongest stocks precisely because they ran the hardest. For a 5-20 trading-day system targeting continuation setups, this creates tension: the stocks most clearly in an uptrend may be excluded.
 
 The filter was designed to avoid overvalued stocks at peak PBV. But it conflates "high PBV rank" with "overvalued" — a stock can be at the 85th percentile PBV in its sector because it's genuinely a quality business growing faster than peers.
 
@@ -629,7 +629,7 @@ The realized outcome tier is the correct final arbiter. The two-tier approach (f
 
 2. **Chartist stop reference (1.5× ATR) doesn't match Python envelope (2.5× ATR).** LLM debate arguments about stop validity are semantically disconnected from the actual executed stop. Final output is unaffected; debate quality suffers.
 
-3. **CIO catalyst bonus covers 30 days, not 1–3 months.** Minor calibration error in Phase B.
+3. **CIO catalyst bonus now belongs to a 5-20 trading-day technical/flow trigger.** Medium-term catalysts are context only.
 
 4. **Volume gate threshold (0.30×) too permissive.** Candidates with 30–60% of average volume reach the debate engine, diluting momentum quality.
 
@@ -645,8 +645,8 @@ PART II STRATEGIC ALIGNMENT VERDICT
 
 Overall alignment (excluding the 4 Part I areas):   MOSTLY ALIGNED
 
-The 1-3 month frame is consistently applied across
-all prompts, schemas, calibration rules, and exit
+The 5-20 trading-day execution frame is consistently applied across
+prompts, schemas, calibration rules, and exit
 mechanics. The regime pipeline is the best-engineered
 component: end-to-end from detection through position
 sizing with zero gaps.
@@ -679,7 +679,7 @@ Minor gaps:
 
 COMBINED VERDICT (Part I + Part II):
 
-The system has a coherent 1-3 month swing framework
+The system has a coherent 5-20 trading-day swing execution framework
 everywhere except where fundamental fair value was
 allowed to determine trade targets (Part I) and where
 the fundamental scout was given a directional output
@@ -692,7 +692,7 @@ import value investing logic into swing timing slots
 where it doesn't belong.
 
 Fixing these two decisions would produce a genuinely
-consistent 1-3 month swing trading system.
+consistent 5-20 trading-day swing trading system.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
@@ -709,7 +709,7 @@ Remove BULLISH/BEARISH from `fundamental_scout.txt` output format. Replace with 
 ```
 Valuation Context: UNDERVALUED / FAIRLY_VALUED / OVERVALUED
 Quality Flag: PASS / CONDITIONAL / FAIL
-Catalyst: [event within 1-3 months or NONE]
+Catalyst Context: [medium-term event or NONE]
 Agent Confidence: 0.xx
 ```
 This removes the value investing directional vote from the fundamental slot while preserving all the useful information (quality, valuation context, catalyst). The CIO uses these fields directly anyway.
@@ -718,7 +718,7 @@ This removes the value investing directional vote from the fundamental slot whil
 Update `chartist.txt` STEP 4 from "1.5 × ATR" to "2.5 × ATR (or 3.0 × ATR in DEFENSIVE regime)" to match `REGIME_ATR_STOP_MULTIPLIER`.
 
 **P4 — CIO catalyst bonus window:**
-Change Phase B from "within 30 days" to "within 1–3 months" in `cio_judge.txt`.
+Change Phase B from catalyst timing to a specific 5-20 trading-day technical/flow trigger in `cio_judge.txt`.
 
 **P5 — Evidence ranker weights:**
 Adjust `CATEGORY_WEIGHTS` in `services/evidence_ranker.py`:

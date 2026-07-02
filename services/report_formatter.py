@@ -195,6 +195,13 @@ def _ratio(value: Any) -> str:
     return "N/A" if number is None else f"{number:.2f}x"
 
 
+def _execution_horizon(verdict: dict[str, Any]) -> str:
+    days = _safe_float(verdict.get("execution_horizon_days"))
+    if days is None or days <= 0:
+        return "N/A"
+    return f"{days:.0f} trading days"
+
+
 def _method_indonesian(value: Any) -> str:
     method = str(value or "unknown")
     return _METHOD_LABELS.get(method, method)
@@ -1138,6 +1145,7 @@ class RichFormatter:
             )
             left_table.add_row("Risk/Reward", _ratio(verdict.get("risk_reward_ratio")))
             left_table.add_row("Timeframe", str(verdict.get("timeframe") or "N/A"))
+            left_table.add_row("Execution Horizon", _execution_horizon(verdict))
 
             # 3. Right Column: Agent Voting & Integration
             vote_table = self._build_vote_table(data, packet)
@@ -1512,6 +1520,7 @@ class MarkdownFormatter:
                 f"| **Stop Loss** | {_money(stop)} ({_signed_pct(-downside if downside is not None else None)}) |",
                 f"| **Risk/Reward** | {_ratio(verdict.get('risk_reward_ratio'))} |",
                 f"| **Timeframe** | {verdict.get('timeframe') or 'N/A'} |",
+                f"| **Execution Horizon** | {_execution_horizon(verdict)} |",
                 "",
                 "---",
                 "",

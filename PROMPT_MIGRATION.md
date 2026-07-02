@@ -129,7 +129,7 @@ New output format:
 - `Position: HOLD` (always) — scout abstains from directional timing vote
 - `Valuation Context: UNDERVALUED | FAIRLY_VALUED | OVERVALUED` — replaces BULLISH/NEUTRAL/BEARISH
 - `Quality Flag: PASS | CONDITIONAL | FAIL` — explicit financial health signal for CIO context
-- `Catalyst: [event within 1-3 months] | NONE` — structured catalyst field
+- `Catalyst Context: [medium-term event or NONE]` — structured catalyst context field
 
 **Why no parsing changes in `debate_chamber.py`:** `Position: HOLD` routes correctly through the
 existing `_POSITION_RE` → `_normalise_position` path. The CIO conflict matrix (`_classify_signals`)
@@ -198,10 +198,10 @@ but debate quality suffered.
 
 **`cio_judge.txt`** — Phase B confidence checklist item updated.
 
-Previously awarded `[+0.02]` only for catalysts within 30 days — creating a short-term bias inside a 1–3 month trading frame. A catalyst materializing in month 2 or 3 is equally valid for the stated horizon but received no bonus.
+Previously awarded `[+0.02]` only for catalysts within 30 days. This has been superseded by the 5-20 trading-day execution frame, where the bonus belongs to a near-term technical or flow trigger.
 
 **Before:** `[+0.02] Specific catalyst confirmed within 30 days`
-**After:** `[+0.02] Specific catalyst confirmed within 1–3 months`
+**After:** `[+0.02] Specific 5-20 trading-day technical/flow trigger confirmed`
 
 ---
 

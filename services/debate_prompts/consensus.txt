@@ -11,7 +11,7 @@ STEP 2 — IDENTIFY THE PRIMARY DISAGREEMENT (only if consensus_reached = false)
   "direction"  → Bull says BUY, Bear says AVOID (fundamental directional conflict)
   "timing"     → Both agree on direction but disagree on WHEN to enter
   "valuation"  → Disagree on whether the current price has an adequate margin of safety
-  "catalyst"   → Disagree on whether the catalyst will materialise within 1–3 months
+  "catalyst"   → Disagree on whether a near-term trigger can materialise within 5-20 trading days
 
   IF multiple disagreement types apply → pick the most dominant one.
   NOTE: "timing" is the most common in a sideways IHSG market — use it when both agents

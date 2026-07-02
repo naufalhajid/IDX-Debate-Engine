@@ -21,7 +21,8 @@ def _mock_result(rating: str = "BUY") -> dict:
             "target_price": 10200,
             "stop_loss": 8500,
             "risk_reward_ratio": 2.4,
-            "timeframe": "1-3 Months",
+            "timeframe": "5-20 Trading Days",
+            "execution_horizon_days": 10,
             "summary": "BBCA remains attractive with measured risk.",
             "key_risks": ["IHSG volatility", "Margin pressure"],
             "key_catalysts": ["Strong liquidity", "Banking sector rotation"],
@@ -194,6 +195,13 @@ def test_generate_ticker_report_contains_title_and_ticker(tmp_path) -> None:
 
     assert "Analysis Report" in path.read_text(encoding="utf-8")
     assert "BBCA" in report
+
+
+def test_generate_ticker_report_contains_execution_horizon() -> None:
+    report = MarkdownFormatter().generate_ticker_report(_mock_result())
+
+    assert "| **Timeframe** | 5-20 Trading Days |" in report
+    assert "| **Execution Horizon** | 10 trading days |" in report
 
 
 def test_generate_ticker_report_buy_contains_catalyst_section() -> None:

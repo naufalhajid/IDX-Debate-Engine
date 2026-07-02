@@ -67,6 +67,6 @@ uv run python -m core.backtest_outcome_evaluator --write --memory-path output/ba
 
 The evaluator uses a hybrid rule: target hit first is a win, stop hit first is a
 loss, same-day target/stop is treated as a conservative loss, and records that
-reach 63 trading days without either trigger are judged by the horizon close.
+reach 20 trading days without either trigger are judged by the horizon close.
 Records without a matching versioned debate artifact are skipped so mock or
 synthetic rows do not become training data.

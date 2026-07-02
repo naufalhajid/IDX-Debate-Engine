@@ -44,7 +44,8 @@ def _valid_response(rating: str = "BUY") -> str:
                 "Earnings miss",
             ],
             "key_catalysts": ["Volume expansion", "Banking sector rotation"],
-            "timeframe": "1-3 Months",
+            "timeframe": "5-20 Trading Days",
+            "execution_horizon_days": 10,
         }
     )
 
@@ -78,6 +79,8 @@ def test_parse_response_valid_json_returns_success() -> None:
     assert result.status == "success"
     assert result.verdict is not None
     assert result.verdict.ticker == "BBCA"
+    assert result.verdict.timeframe == "5-20 Trading Days"
+    assert result.verdict.execution_horizon_days == 10
 
 
 def test_parse_response_with_json_fences_still_parses() -> None:

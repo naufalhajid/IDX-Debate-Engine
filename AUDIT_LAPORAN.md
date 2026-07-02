@@ -686,7 +686,7 @@ Semua evaluasi berdasarkan pembacaan langsung source code. Kriteria yang tidak d
 | 6.10 | Anti-averaging down warning | ❌ TIDAK ADA | Tidak ada logika yang melarang adding ke posisi rugi |
 | 6.11 | ARA/ARB awareness (post-April 2025 rule: ARB=15%) | ⚠️ PARSIAL | `debate_chamber.py` line 892 dan 2349 menyebutkan ARA/ARB sebagai konteks sentimen/news, tapi tidak ada enforcement/adjustment di risk governor untuk ARA-locked position |
 
-**Dampak gap trailing stop:** Untuk swing trade 1-3 bulan, tanpa trailing stop, profit sering terkikis saat reversal. Di IDX 2025-2026 dengan volatilitas tinggi, sistem "all-in all-out" kehilangan 30-50% profit rata-rata dibanding trailing stop sistem.
+**Dampak gap trailing stop:** Untuk swing trade 5-20 hari bursa, tanpa trailing stop, profit sering terkikis saat reversal. Di IDX 2025-2026 dengan volatilitas tinggi, sistem "all-in all-out" kehilangan 30-50% profit rata-rata dibanding trailing stop sistem.
 
 ---
 
@@ -876,7 +876,7 @@ Post-Debate:
 - **Fix:** Integrasikan IDX JATS data via API pihak ketiga (Phillip Securities, RTI Business, atau scraping IDX.co.id). Field: foreign_net_buy_5d, foreign_net_buy_20d. Tambahkan sebagai HG ke context pack
 
 **GAP-K3: Tidak ada Trailing Stop**
-- **Dampak:** Untuk swing trade 1-3 bulan, profit sering terkikis habis saat reversal hari terakhir. Tanpa trailing, exit harus manual/rekonfigurasi
+- **Dampak:** Untuk swing trade 5-20 hari bursa, profit sering terkikis habis saat reversal hari terakhir. Tanpa trailing, exit harus manual/rekonfigurasi
 - **Contoh konkret:** Saham naik 7% dalam 3 minggu. Tanpa trailing stop, target 8% tercapai hari ke-22. Di hari ke-25, harga turun 4%. Jika trailing stop 3% dipasang saat profit 5%, exit di +4% bukan +3% atau zero
 - **Fix:** Tambahkan trailing_stop_pct ke CIOVerdict schema. Implement di `position_sizer.py`. Sederhananya: trailing = ATR × 1.5 dari highest close sejak entry
 

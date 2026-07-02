@@ -12,7 +12,8 @@
 | CIO Confidence | 68% |
 | Conviction Score | 59% |
 | Debate Consensus | Reached |
-| Timeframe | 1-3 months |
+| Timeframe | 5-20 Trading Days |
+| Execution Horizon | 10 trading days |
 | Actionability | Deployable |
 | Sizing Allowed | Yes |
 

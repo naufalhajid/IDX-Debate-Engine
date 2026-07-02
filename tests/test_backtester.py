@@ -5,19 +5,13 @@ from __future__ import annotations
 import json
 import math
 from datetime import date
+from inspect import signature
 from pathlib import Path
 
 import pytest
 
 from core.backtest_memory import TradeOutcome
-from core.backtester.signal_loader import (
-    _allowed_ratings,
-    _parse_entry_high,
-    _parse_signal_date,
-    build_existing_run_ids,
-    scan_debate_dir,
-    signals_to_outcomes,
-)
+from core.backtest_outcome_evaluator import PriceBar, evaluate_trade_outcome
 from core.backtester.metrics_calculator import (
     _compute_by_regime,
     _compute_deflated_sharpe,
@@ -29,7 +23,15 @@ from core.backtester.metrics_calculator import (
     compute_deflated_sharpe_ratio,
     compute_metrics,
 )
-from core.backtest_outcome_evaluator import PriceBar, evaluate_trade_outcome
+from core.backtester.signal_loader import (
+    _allowed_ratings,
+    _parse_entry_high,
+    _parse_signal_date,
+    build_existing_run_ids,
+    scan_debate_dir,
+    signals_to_outcomes,
+)
+from core.backtester.trade_simulator import run_backtest_simulation
 
 
 # ─── Fixtures ────────────────────────────────────────────────────────────────
@@ -410,7 +412,7 @@ def test_entry_check_triggers_on_first_touch():
         PriceBar(trade_date=date(2026, 6, 2), high=4300.0, low=4200.0, close=4250.0),
         PriceBar(trade_date=date(2026, 6, 3), high=5000.0, low=4300.0, close=4900.0),
     ]
-    result = evaluate_trade_outcome(record, bars, horizon_trading_days=65, entry_check=True)
+    result = evaluate_trade_outcome(record, bars, horizon_trading_days=20, entry_check=True)
     assert result is not None
     assert result.outcome == "win"
 
@@ -423,7 +425,7 @@ def test_entry_check_no_trigger_returns_none():
         PriceBar(trade_date=date(2026, 6, 3), high=4600.0, low=4350.0, close=4500.0),
     ]
     # With only 2 bars (< horizon) entry not triggered and horizon not elapsed
-    result = evaluate_trade_outcome(record, bars, horizon_trading_days=65, entry_check=True)
+    result = evaluate_trade_outcome(record, bars, horizon_trading_days=20, entry_check=True)
     assert result is None
 
 
@@ -433,7 +435,7 @@ def test_entry_check_disabled_does_not_require_trigger():
         PriceBar(trade_date=date(2026, 6, 2), high=4500.0, low=4300.0, close=4400.0),
     ]
     # entry_check=False: doesn't check trigger, only 1 bar so insufficient horizon
-    result = evaluate_trade_outcome(record, bars, horizon_trading_days=65, entry_check=False)
+    result = evaluate_trade_outcome(record, bars, horizon_trading_days=20, entry_check=False)
     assert result is None  # insufficient bars, but no entry trigger error
 
 
@@ -525,3 +527,11 @@ def test_signals_to_outcomes_unknown_regime_when_missing(tmp_path):
     signals = scan_debate_dir(tmp_path)
     outcomes = signals_to_outcomes(signals, existing_run_ids=set())
     assert "regime=UNKNOWN" in (outcomes[0].notes or "")
+
+
+def test_trade_simulator_default_horizon_is_normal_swing_cap():
+    default = signature(run_backtest_simulation).parameters[
+        "horizon_trading_days"
+    ].default
+
+    assert default == 20

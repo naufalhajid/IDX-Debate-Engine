@@ -750,6 +750,14 @@ def test_t2_hold_warning_when_hold_days_below_settlement() -> None:
     assert decision.sizing_allowed is False
 
 
+def test_t2_hold_warning_when_execution_horizon_below_settlement() -> None:
+    decision = evaluate_risk(_candidate(verdict={"execution_horizon_days": 1}))
+
+    assert "t2_hold_warning" in decision.reason_codes
+    assert decision.status == "conditional_deployable"
+    assert decision.sizing_allowed is False
+
+
 def test_t2_hold_not_triggered_when_hold_days_absent() -> None:
     # Default candidate has no hold_days field → T+2 gate silent
     decision = evaluate_risk(_candidate())
@@ -760,6 +768,14 @@ def test_t2_hold_not_triggered_when_hold_days_meets_minimum() -> None:
     # hold_days=2 equals MIN_HOLD_DAYS → no warning
     decision = evaluate_risk(_candidate(hold_days=2))
     assert "t2_hold_warning" not in decision.reason_codes
+
+
+def test_t2_hold_not_triggered_for_normal_execution_horizon_range() -> None:
+    for horizon in (2, 10, 20):
+        decision = evaluate_risk(
+            _candidate(verdict={"execution_horizon_days": horizon})
+        )
+        assert "t2_hold_warning" not in decision.reason_codes
 
 
 # ---------------------------------------------------------------------------
