@@ -72,6 +72,27 @@ Run: `gate_reopen_20260702_162056`, 551 detik, LLM Pro 1/200 + Flash 8/2000.
   tidak ada defensive clamp, tidak ada `trading_halted`.
 - **0 BUY** — tetapi bukan karena lapisan regime.
 
+### Addendum — run user: ADRO (`gate_reopen_20260702_205415`, provider Codex)
+
+Run manual `--debate --tickers ADRO` (ticker eksplisit sengaja mem-bypass
+filter Phase A) menambah kasus komplemen dari CPIN:
+
+- ADRO **lolos preflight** (sudah memantul dari low 20d) tetapi **mati di
+  gate momentum envelope** (`return_5d −0.4% < 0` pada RSI 49.1) — kebalikan
+  CPIN yang lolos envelope tapi mati di preflight. Konfirmasi: kedua gate
+  memotong subset berbeda, dan tape hari ini kosong di irisannya.
+- Debate berjalan (6 flash call, 5/5 agent HOLD; bull & bear NEUTRAL dengan
+  disiplin `PAST_EVENT_NOT_CATALYST`), **0 pro call** — noise verdict envelope
+  memang tidak memanggil CIO LLM. News sentiment POSITIVE (+0.10) tidak bisa
+  menembus gate deterministik — sesuai desain.
+- Reason codes asli terpropagasi sampai governor (E1) dan **ledger
+  counterfactual V0.2 terisi benar** di run pipeline nyata:
+  `reason_codes=["no_momentum_confirmation"]` + `hypothetical_envelope`
+  (entry 2210–2280, target 2350 basis Resistance 20-Day, stop 2100, R/R 0.39).
+- Catatan lingkungan: `xgboost` tidak terpasang di venv → forecast EV
+  `validation_failed` (fallback V0.1 tidak bisa aktif sampai dependency
+  forecasting terpasang — relevan untuk V1.3).
+
 ## Kesimpulan
 
 1. **Lapisan regime bukan satu-satunya penyebab 0 BUY**, dan mekanisme
