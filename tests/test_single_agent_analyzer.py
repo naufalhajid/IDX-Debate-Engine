@@ -252,3 +252,55 @@ async def test_analyze_batch_one_failure_does_not_stop_other_tickers(
     assert len(results) == 3
     assert results[1].status == "failed"
     assert results[2].status == "success"
+
+
+@pytest.mark.asyncio
+async def test_call_llm_routes_through_configured_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: _call_llm previously hardcoded ChatGoogleGenerativeAI, ignoring
+    DEFAULT_LLM_PROVIDER — it must go through the shared llm_factory instead."""
+    captured: dict[str, object] = {}
+
+    class _FakeResponse:
+        content = _valid_response()
+
+    class _FakeLLM:
+        async def ainvoke(self, messages):
+            captured["prompt"] = messages[0].content
+            return _FakeResponse()
+
+    def _fake_get_llm(tier: str):
+        captured["tier"] = tier
+        return _FakeLLM()
+
+    monkeypatch.setattr("services.single_agent_analyzer.get_llm", _fake_get_llm)
+
+    analyzer = SingleAgentAnalyzer()
+    raw = await analyzer._call_llm("test prompt")
+
+    assert captured["tier"] == "flash"
+    assert captured["prompt"] == "test prompt"
+    assert raw == _valid_response()
+
+
+@pytest.mark.asyncio
+async def test_analyze_verdict_model_used_reflects_configured_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from core.settings import settings
+
+    monkeypatch.setattr(settings, "DEFAULT_LLM_PROVIDER", "codex")
+
+    analyzer = SingleAgentAnalyzer()
+    monkeypatch.setattr(analyzer, "_fetch_market_data", lambda ticker: _context(ticker))
+
+    async def fake_llm(prompt: str) -> str:
+        return _valid_response()
+
+    monkeypatch.setattr(analyzer, "_call_llm", fake_llm)
+
+    result = await analyzer.analyze("BBCA", "run-1")
+
+    assert result.verdict is not None
+    assert result.verdict.model_used == "codex-flash"

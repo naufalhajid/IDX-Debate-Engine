@@ -16,7 +16,6 @@ from typing import Any, Literal
 
 import pandas as pd
 from langchain_core.messages import HumanMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, ConfigDict, Field
 
 from core.idx_market_params import (
@@ -25,7 +24,8 @@ from core.idx_market_params import (
     SWING_MAX_EXECUTION_HORIZON_DAYS,
     SWING_TIMEFRAME_LABEL,
 )
-from providers.gemini import _get_api_key
+from core.settings import settings
+from providers.llm_factory import get_llm
 from services.context_pack_builder import (
     ContextPack,
     build_context_pack,
@@ -100,10 +100,8 @@ class SingleAgentAnalyzer:
 
     def __init__(
         self,
-        model: str = "gemini-2.5-flash",
         timeout_seconds: int = 120,
     ) -> None:
-        self.model = model
         self.timeout_seconds = timeout_seconds
         self._stockbit_client: StockbitApiClient | None = None
 
@@ -210,14 +208,8 @@ Rules:
 """.strip()
 
     async def _call_llm(self, prompt: str) -> str:
-        """Call Gemini once and return the raw text response."""
-        llm = ChatGoogleGenerativeAI(
-            model=self.model,
-            google_api_key=_get_api_key(),
-            temperature=0.1,
-            max_tokens=4000,
-            request_timeout=self.timeout_seconds,
-        )
+        """Call the configured LLM provider once and return the raw text response."""
+        llm = get_llm("flash")
         response = await llm.ainvoke([HumanMessage(content=prompt)])
         content = getattr(response, "content", "")
         if not str(content).strip():
@@ -257,7 +249,7 @@ Rules:
                     or SWING_EXECUTION_HORIZON_DAYS
                 ),
                 mode="single_agent",
-                model_used=self.model,
+                model_used=f"{settings.DEFAULT_LLM_PROVIDER}-flash",
                 generated_at=generated_at,
                 run_id=run_id,
                 data_sources=list(context.data_sources),
