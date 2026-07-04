@@ -1160,3 +1160,122 @@ def test_fair_value_weighted_consumer_includes_dcf(monkeypatch):
     monkeypatch.setattr(calc, "fair_value_ddm", lambda: None)
     result = calc.fair_value_weighted()
     assert "dcf" in result["breakdown"]
+
+
+# ---------------------------------------------------------------------------
+# FV-6 (V1.2): cross-method dispersion + implied-PE sanity band
+# ---------------------------------------------------------------------------
+
+def test_dispersion_above_soft_ratio_widens_band(monkeypatch):
+    # pe=100, pb=250 → ratio 2.5 > soft 2.0: band must cover the real spread
+    # instead of the count-based ±15%.
+    result = _calculator_with_methods(
+        monkeypatch, current_price=100, pe=100.0, pb=250.0, ddm=None
+    ).fair_value_weighted()
+
+    assert result["fv_method_dispersion_ratio"] == pytest.approx(2.5)
+    expected_half_spread = (250.0 - 100.0) / (2 * result["fair_value"])
+    assert result["range_pct"] == pytest.approx(expected_half_spread, abs=1e-4)
+    assert result["range_pct"] > 0.15
+
+
+def test_dispersion_downgrades_high_confidence_to_medium(monkeypatch):
+    # 3 weighted methods would be HIGH by count, but a 3.0x spread is not
+    # agreement — confidence must drop to MEDIUM (soft gate; 3.0 is not > hard).
+    calc = _calculator_with_methods(
+        monkeypatch, current_price=100, pe=100.0, pb=240.0, ddm=None
+    )
+    monkeypatch.setattr(calc, "fair_value_dcf", lambda: 300.0)
+    result = calc.fair_value_weighted()
+
+    assert len(result["breakdown"]) == 3
+    assert result["fv_method_dispersion_ratio"] == pytest.approx(3.0)
+    assert result["confidence"] == "MEDIUM"
+    assert result["range_pct"] > 0.10
+
+
+def test_dispersion_benign_keeps_count_based_contract(monkeypatch):
+    # pe=100, pb=120 → ratio 1.2: methods agree, nothing changes.
+    result = _calculator_with_methods(
+        monkeypatch, current_price=100, pe=100.0, pb=120.0, ddm=None
+    ).fair_value_weighted()
+
+    assert result["fv_method_dispersion_ratio"] == pytest.approx(1.2)
+    assert result["range_pct"] == pytest.approx(0.15)
+    assert result["confidence"] == "MEDIUM"
+
+
+def test_zero_weight_ddm_outlier_does_not_trip_dispersion(monkeypatch):
+    # Default profile: ddm weight 0.00 — a wild DDM cannot move the composite
+    # (test_composite_fair_value_ignores_ddm_when_weight_is_zero), so it must
+    # not move the dispersion flags either.
+    result = _calculator_with_methods(
+        monkeypatch, current_price=100, pe=100.0, pb=110.0, ddm=3000.0
+    ).fair_value_weighted()
+
+    assert result["fv_method_dispersion_ratio"] == pytest.approx(1.1)
+    assert result["confidence"] == "HIGH"
+    assert result["range_pct"] == pytest.approx(0.10)
+
+
+def test_quality_gate_rejects_extreme_dispersion(monkeypatch):
+    # pe=100 vs pb=350 → ratio 3.5 > hard 3.0: the anchor must not survive
+    # into the payload (ICBP/UNVR inflation audit).
+    _patch_methods(monkeypatch, pe=100.0, pb=350.0)
+
+    report, result = build_fair_value_payload(
+        _quality_gate_response("12%"), "TEST", 150.0
+    )
+
+    assert result["fair_value"] is None
+    assert result["fv_quality_rejected"] is True
+    assert result["fv_quality_reasons"] == ["fv_dispersion_extreme"]
+    assert result["valuation_verdict"] == "QUALITY_REJECTED"
+    assert "FAIR VALUE QUALITY GATE" in report
+
+
+def test_implied_pe_extreme_flags_icbp_like_inflation(monkeypatch):
+    # ICBP audit shape: price 6,800 at PE 17x, composite FV ~15,900 → implied
+    # PE ~40x, above BOTH the sector cap (15×1.5=22.5) and self cap (17×1.5=25.5).
+    calc = FairValueCalculator(
+        KeyStats(
+            ticker="ICBP",
+            current_price=6_800.0,
+            eps_ttm=400.0,
+            raw_pe_current=17.0,
+        ),
+        sector="default",
+    )
+    monkeypatch.setattr(calc, "sector_medians", {"default": {"pe": 15.0}})
+    monkeypatch.setattr(calc, "fair_value_pe", lambda: 15_500.0)
+    monkeypatch.setattr(calc, "fair_value_pb", lambda: 16_500.0)
+    monkeypatch.setattr(calc, "fair_value_ddm", lambda: None)
+    result = calc.fair_value_weighted()
+
+    assert result["fv_implied_pe"] == pytest.approx(39.9, abs=0.2)
+    assert result["fv_implied_pe_extreme"] is True
+    # Orthogonal to dispersion: the methods agree with each other here.
+    assert result["fv_method_dispersion_ratio"] < 2.0
+
+
+def test_implied_pe_within_self_cap_is_not_extreme(monkeypatch):
+    # A stock already priced at 50x: FV implying ~55x breaches the sector cap
+    # but stays inside its own 1.5x cap — must NOT be flagged, otherwise every
+    # quality name trading above sector median gets rejected.
+    calc = FairValueCalculator(
+        KeyStats(
+            ticker="TEST",
+            current_price=5_000.0,
+            eps_ttm=100.0,
+            raw_pe_current=50.0,
+        ),
+        sector="default",
+    )
+    monkeypatch.setattr(calc, "sector_medians", {"default": {"pe": 15.0}})
+    monkeypatch.setattr(calc, "fair_value_pe", lambda: 5_400.0)
+    monkeypatch.setattr(calc, "fair_value_pb", lambda: 5_600.0)
+    monkeypatch.setattr(calc, "fair_value_ddm", lambda: None)
+    result = calc.fair_value_weighted()
+
+    assert result["fv_implied_pe"] == pytest.approx(54.9, abs=0.2)
+    assert result["fv_implied_pe_extreme"] is False

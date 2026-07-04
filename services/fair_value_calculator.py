@@ -170,6 +170,18 @@ def refresh_sector_benchmarks(
 _STALE_KEYSTATS_DAYS: int = 30
 _STALE_EPS_METHODS: frozenset[str] = frozenset({"pe", "ddm", "ev_ebitda"})
 
+# ── FV-6: Cross-method dispersion + implied-PE sanity band ──────────────────
+# V1.2 audit: ICBP FV 15,970 vs price 6,800 (+135%) and UNVR 6,027 vs 1,775
+# (+240%) shipped as HIGH confidence because confidence and range were
+# functions of method COUNT only, never of method AGREEMENT.
+_FV_DISPERSION_SOFT_RATIO: float = 2.0  # widen band + downgrade confidence
+_FV_DISPERSION_HARD_RATIO: float = 3.0  # payload quality gate drops the anchor
+_FV_IMPLIED_PE_SECTOR_MULT: float = 1.5  # cap vs sector median PE ...
+_FV_IMPLIED_PE_SELF_MULT: float = 1.5  # ... AND vs the stock's own current PE
+# Both implied-PE caps must be breached together: quality names legitimately
+# trade above sector median, so the self-PE cap keeps an honest FV≈price
+# anchor from being rejected.
+
 _SOE_DISCOUNT_PCT: float = 0.15
 
 _SOE_TICKERS: frozenset[str] = frozenset({
@@ -1197,6 +1209,9 @@ class FairValueCalculator:
                     "governance_discount_pct": None,
                     "keystats_stale": keystats_stale,
                     "keystats_age_days": self.stats.keystats_age_days,
+                    "fv_method_dispersion_ratio": None,
+                    "fv_implied_pe": None,
+                    "fv_implied_pe_extreme": False,
                     **self._fundamental_factor_payload(),
                 }
             )
@@ -1224,15 +1239,67 @@ class FairValueCalculator:
         if is_soe:
             weighted_fv = round(weighted_fv * (1 - _SOE_DISCOUNT_PCT), 0)
 
+        # FV-6a: cross-method dispersion. Method count alone is not agreement —
+        # when the weighted methods disagree, the band must cover the real
+        # spread and the confidence label must drop, otherwise a 2-3x method
+        # conflict ships as HIGH confidence with a narrow ±10% band.
+        # Zero-weight methods (e.g. DDM under the default profile) cannot move
+        # the composite, so they must not move the dispersion either.
+        weighted_values = [
+            v for m, v in results.items() if effective_weights.get(m, 0) > 0
+        ]
+        dispersion_ratio = None
+        fv_spread_min = fv_spread_max = 0.0
+        if len(weighted_values) >= 2:
+            fv_spread_min = min(weighted_values)
+            fv_spread_max = max(weighted_values)
+            if fv_spread_min > 0:
+                dispersion_ratio = round(fv_spread_max / fv_spread_min, 2)
+
         n = len(results)
         confidence = "HIGH" if n >= 3 else ("MEDIUM" if n == 2 else "LOW")
         range_pct = _range_pct_for_method_count(n)
+        if (
+            dispersion_ratio is not None
+            and dispersion_ratio > _FV_DISPERSION_SOFT_RATIO
+        ):
+            if confidence == "HIGH":
+                confidence = "MEDIUM"
+            if range_pct is not None and weighted_fv > 0:
+                half_spread_pct = (fv_spread_max - fv_spread_min) / (2 * weighted_fv)
+                range_pct = round(max(range_pct, half_spread_pct), 4)
         if range_pct is None:
             fair_value_low = None
             fair_value_high = None
         else:
             fair_value_low = round(weighted_fv * (1 - range_pct), 0)
             fair_value_high = round(weighted_fv * (1 + range_pct), 0)
+
+        # FV-6b: implied-PE sanity band. Fires only when the composite FV
+        # implies a PE above BOTH the sector cap and the stock's own current
+        # PE cap — either cap alone would over-flag quality names or deep
+        # value setups.
+        implied_pe = None
+        implied_pe_extreme = False
+        if self.stats.eps_ttm > 0 and weighted_fv > 0:
+            implied_pe = round(weighted_fv / self.stats.eps_ttm, 1)
+            if self.stats.raw_pe_current > 0:
+                median_profile = self.sector_medians.get(
+                    self.raw_sector,
+                    self.sector_medians.get(
+                        self.sector,
+                        self.sector_medians.get(
+                            "default", _SECTOR_MEDIAN_PROFILES_DEFAULT["default"]
+                        ),
+                    ),
+                )
+                sector_pe = float(median_profile.get("pe") or 0.0)
+                if sector_pe > 0:
+                    sector_cap = sector_pe * _FV_IMPLIED_PE_SECTOR_MULT
+                    self_cap = self.stats.raw_pe_current * _FV_IMPLIED_PE_SELF_MULT
+                    implied_pe_extreme = (
+                        implied_pe > sector_cap and implied_pe > self_cap
+                    )
 
         mos = None
         verdict = "DATA_UNAVAILABLE"
@@ -1268,6 +1335,9 @@ class FairValueCalculator:
                 "governance_discount_pct": _SOE_DISCOUNT_PCT if is_soe else None,
                 "keystats_stale": keystats_stale,
                 "keystats_age_days": self.stats.keystats_age_days,
+                "fv_method_dispersion_ratio": dispersion_ratio,
+                "fv_implied_pe": implied_pe,
+                "fv_implied_pe_extreme": implied_pe_extreme,
                 **self._fundamental_factor_payload(),
             }
         )
@@ -1860,6 +1930,14 @@ def build_fair_value_payload(
         quality_reasons.append("fv_methods_lt_2")
     if stats.net_margin > 1.0:
         quality_reasons.append("net_margin_gt_100pct")
+    # FV-6: methods that disagree beyond the hard ratio, or an FV implying a
+    # PE above both the sector and self caps, must not anchor the envelope or
+    # a bull "undervalued" narrative (ICBP +135% / UNVR +240% audit).
+    fv_dispersion = result.get("fv_method_dispersion_ratio")
+    if fv_dispersion is not None and fv_dispersion > _FV_DISPERSION_HARD_RATIO:
+        quality_reasons.append("fv_dispersion_extreme")
+    if result.get("fv_implied_pe_extreme"):
+        quality_reasons.append("fv_implied_pe_extreme")
     if quality_reasons and fv is not None:
         logger.warning(
             "[FairValue] {}: anchor ditolak quality gate ({}) — FV {} di-drop",
