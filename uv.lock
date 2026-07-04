@@ -1035,6 +1035,8 @@ forecasting = [
     { name = "scikit-learn" },
     { name = "statsmodels" },
     { name = "torch" },
+]
+forecasting-xgb = [
     { name = "xgboost" },
 ]
 sentiment = [
@@ -1100,10 +1102,10 @@ requires-dist = [
     { name = "typing-extensions", specifier = ">=4.12.0" },
     { name = "undetected-chromedriver", specifier = ">=3.5.5" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30.0" },
-    { name = "xgboost", marker = "extra == 'forecasting'", specifier = ">=2.0.0" },
+    { name = "xgboost", marker = "extra == 'forecasting-xgb'", specifier = ">=2.0.0" },
     { name = "yfinance", specifier = ">=0.2.40" },
 ]
-provides-extras = ["forecasting", "sentiment"]
+provides-extras = ["forecasting-xgb", "forecasting", "sentiment"]
 
 [package.metadata.requires-dev]
 dev = [

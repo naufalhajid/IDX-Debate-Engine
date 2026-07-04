@@ -52,9 +52,17 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# XGBoost is the active forecasting model (core/forecasting/models/xgboost_model.py,
+# wired into ForecastingService). Split into its own extra so installing it doesn't
+# also pull prophet/torch, which Phase 6 of docs/research/forecasting_research.md
+# keeps deliberately unbuilt and no active code path imports.
+forecasting-xgb = [
+    "xgboost>=2.0.0",
+]
+# statsmodels/prophet/torch back the LSTM/Prophet models — experimental_unused
+# per ForecastingService, kept installable for future research only.
 forecasting = [
     "statsmodels>=0.14.0",
-    "xgboost>=2.0.0",
     "scikit-learn>=1.4.0",
     "prophet>=1.1.5",
     "torch>=2.3.0",
