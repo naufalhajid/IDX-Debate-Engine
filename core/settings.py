@@ -165,10 +165,20 @@ class Settings(BaseSettings):
     TRADE_ENVELOPE_CLEAN_NOISE_ATR_MULTIPLIER: float = 1.50
     TRADE_ENVELOPE_CONDITIONAL_CONFIDENCE_CAP: float = 0.60
 
+    # ── Risk Governor: Liquidity Gate (Task F / V4.7 hardening) ──────────────
+    # Default fail-open: missing avg_volume logs a warning and skips the ADT
+    # check (never blocks a valid setup on absent data). Screener-sourced
+    # candidates always carry ADT; a direct `idx debate <TICKER>` call can
+    # bypass the screener and reach risk_governor without it. Set True to
+    # reject instead of skip when avg_volume is unavailable.
+    LIQUIDITY_GATE_FAIL_CLOSED: bool = False
+
     # ── Fair Value / CAPM Calibration ─────────────────────────────────────────
-    SBN_10Y_YIELD: float = INDONESIA_RISK_FREE  # SBN 10-year fallback; live cache can override
+    SBN_10Y_YIELD: float = (
+        INDONESIA_RISK_FREE  # SBN 10-year fallback; live cache can override
+    )
     IDX_ERP: float = INDONESIA_TOTAL_ERP  # Damodaran Indonesia total ERP, Jan 5 2026
-    DEFAULT_BETA: float = 1.0       # beta for unknown tickers (market weight)
+    DEFAULT_BETA: float = 1.0  # beta for unknown tickers (market weight)
 
     @property
     def database_path(self) -> Path:

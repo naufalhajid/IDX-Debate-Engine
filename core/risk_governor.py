@@ -10,6 +10,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict
 
 from core.idx_market_params import MIN_HOLD_DAYS, ara_upper_limit
+from core.settings import settings
 from utils.logger_config import logger
 from utils.trade_math import apply_regime_rr_scaling, calculate_rr, get_rr_resolution
 
@@ -49,6 +50,7 @@ HARD_REJECT_CODES = {
     "insufficient_technical_data",
     "ara_entry_risk_high",
     "insufficient_liquidity",
+    "liquidity_data_unavailable",
     "exdate_imminent",
 }
 
@@ -86,7 +88,9 @@ def check_circuit_breaker(portfolio_state: dict) -> bool:
     total_capital = portfolio_state.get("total_capital")
     if loss_amount is not None and total_capital and float(total_capital) > 0:
         try:
-            return float(loss_amount) <= -(float(total_capital) * CIRCUIT_BREAKER_DAILY_LOSS_PCT)
+            return float(loss_amount) <= -(
+                float(total_capital) * CIRCUIT_BREAKER_DAILY_LOSS_PCT
+            )
         except (TypeError, ValueError):
             pass
 
@@ -257,10 +261,32 @@ def evaluate_risk(candidate: dict[str, Any]) -> RiskDecision:
         )
 
     # Task F: Liquidity gate — uses current_price × avg_volume_20d as ADT proxy.
-    # Missing ADT degrades gracefully (warning + skip); never blocks a valid setup.
+    # Missing ADT degrades gracefully by default (warning + skip); set
+    # settings.LIQUIDITY_GATE_FAIL_CLOSED=True to reject instead (V4.7 — direct
+    # `idx debate <TICKER>` calls can bypass the screener's guaranteed ADT).
     _adt = _compute_adt_approx(candidate, current_price)
     if _adt is None:
-        logger.warning("[Risk] {} avg_volume unavailable — skipping liquidity gate", ticker)
+        if settings.LIQUIDITY_GATE_FAIL_CLOSED:
+            return _log_decision(
+                RiskDecision(
+                    ticker=ticker,
+                    status="reject",
+                    sizing_allowed=False,
+                    reason_codes=[*verdict_reason_codes, "liquidity_data_unavailable"],
+                    message=(
+                        "avg_volume tidak tersedia — LIQUIDITY_GATE_FAIL_CLOSED aktif, "
+                        "entry ditolak karena likuiditas tidak dapat diverifikasi."
+                    ),
+                    current_price=current_price,
+                    entry_low=entry_low,
+                    entry_high=entry_high,
+                    target_price=target_price,
+                    stop_loss=stop_loss,
+                )
+            )
+        logger.warning(
+            "[Risk] {} avg_volume unavailable — skipping liquidity gate", ticker
+        )
     elif _adt < ADT_HARD_REJECT_THRESHOLD_IDR:
         return _log_decision(
             RiskDecision(
@@ -428,7 +454,11 @@ def apply_defensive_guard(
     _regime = _market_regime(candidate)
     if _regime not in ("DEFENSIVE", "BEAR_STRESS"):
         return decision
-    _reason = "market_regime_bear_stress" if _regime == "BEAR_STRESS" else "market_regime_defensive"
+    _reason = (
+        "market_regime_bear_stress"
+        if _regime == "BEAR_STRESS"
+        else "market_regime_defensive"
+    )
     _display = _regime
     return decision.model_copy(
         update={
@@ -553,7 +583,9 @@ def _parse_entry_range(value: Any) -> tuple[float | None, float | None]:
     return parsed[0], parsed[1]
 
 
-def _risk_overvalued_flag(candidate: dict[str, Any], verdict: dict[str, Any]) -> bool | None:
+def _risk_overvalued_flag(
+    candidate: dict[str, Any], verdict: dict[str, Any]
+) -> bool | None:
     for value in (
         verdict.get("risk_overvalued"),
         candidate.get("risk_overvalued"),
@@ -572,8 +604,13 @@ def _preflight_noise_reject(candidate: dict[str, Any], verdict: dict[str, Any]) 
     ):
         return True
     metadata = candidate.get("metadata")
-    preflight = metadata.get("tradeability_preflight") if isinstance(metadata, dict) else None
-    if isinstance(preflight, dict) and str(preflight.get("status") or "").lower() == "reject":
+    preflight = (
+        metadata.get("tradeability_preflight") if isinstance(metadata, dict) else None
+    )
+    if (
+        isinstance(preflight, dict)
+        and str(preflight.get("status") or "").lower() == "reject"
+    ):
         return True
     return False
 
@@ -661,25 +698,30 @@ def _verdict_reason_codes(
             reason_codes.append("target_beyond_ara_reach")
 
     # P8: historically expensive — soft flag, not a hard reject
-    _vbc = (
-        (candidate.get("metadata") or {}).get("valuation_band_context")
-        or verdict.get("valuation_band_context")
-    )
+    _vbc = (candidate.get("metadata") or {}).get(
+        "valuation_band_context"
+    ) or verdict.get("valuation_band_context")
     if _vbc and "HISTORICALLY_EXPENSIVE" in str(_vbc).upper():
         reason_codes.append("historically_expensive")
 
     return _dedupe(reason_codes)
 
 
-def _upstream_reason_codes(candidate: dict[str, Any], verdict: dict[str, Any]) -> list[str]:
+def _upstream_reason_codes(
+    candidate: dict[str, Any], verdict: dict[str, Any]
+) -> list[str]:
     """Preserve root rejection reasons emitted before risk-governor normalization."""
     reason_codes: list[str] = []
     for source in (
         candidate,
         verdict,
-        candidate.get("metadata") if isinstance(candidate.get("metadata"), dict) else {},
+        candidate.get("metadata")
+        if isinstance(candidate.get("metadata"), dict)
+        else {},
         verdict.get("metadata") if isinstance(verdict.get("metadata"), dict) else {},
-        candidate.get("risk_governor") if isinstance(candidate.get("risk_governor"), dict) else {},
+        candidate.get("risk_governor")
+        if isinstance(candidate.get("risk_governor"), dict)
+        else {},
     ):
         if not isinstance(source, dict):
             continue
@@ -778,7 +820,7 @@ def _compute_adt_approx(
     """
     risk_ctx = candidate.get("risk_context") or {}
     tech = candidate.get("technical_indicators") or {}
-    raw_data = (candidate.get("raw_data") or {})
+    raw_data = candidate.get("raw_data") or {}
     if not isinstance(raw_data, dict):
         raw_data = {}
 
@@ -899,6 +941,7 @@ def _counter_trend_setup(
 def _ara_sessions_needed(entry: float, target: float) -> int:
     """How many consecutive ARA sessions are needed to reach target from entry."""
     import math
+
     if target <= entry or entry <= 0:
         return 0
     ara = ara_upper_limit(entry)

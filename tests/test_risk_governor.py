@@ -1,4 +1,7 @@
+import pytest
+
 from core.risk_governor import evaluate_risk
+from core.settings import settings
 
 
 def _candidate(**overrides):
@@ -179,6 +182,7 @@ def test_non_finite_prices_are_rejected_as_missing() -> None:
     assert "missing_current_price" in decision.reason_codes
     assert "missing_target_price" in decision.reason_codes
 
+
 def test_preflight_noise_reject_does_not_report_missing_trade_levels() -> None:
     decision = evaluate_risk(
         _candidate(
@@ -322,7 +326,9 @@ def test_default_tier_rr_below_default_threshold_is_too_low() -> None:
 
 def test_implausible_rr_is_hard_rejected() -> None:
     # target=1700: (1700-1050)/120=5.42x — recomputed from prices, above ceiling.
-    decision = evaluate_risk(_candidate(verdict={"risk_reward_ratio": 22.3, "target_price": 1700}))
+    decision = evaluate_risk(
+        _candidate(verdict={"risk_reward_ratio": 22.3, "target_price": 1700})
+    )
 
     assert decision.status == "reject"
     assert decision.sizing_allowed is False
@@ -341,19 +347,31 @@ def test_recomputed_rr_overrides_llm_inflated_ratio() -> None:
     """P3: price-based recompute wins over LLM-provided ratio when both are available."""
     # LLM claims R/R=5.0; actual from prices (1150-1050)/120=0.83 → rr_too_low.
     decision = evaluate_risk(
-        _candidate(verdict={"risk_reward_ratio": 5.0, "target_price": 1150,
-                            "risk_overvalued": False, "is_overvalued": False})
+        _candidate(
+            verdict={
+                "risk_reward_ratio": 5.0,
+                "target_price": 1150,
+                "risk_overvalued": False,
+                "is_overvalued": False,
+            }
+        )
     )
 
     assert "rr_implausible" not in decision.reason_codes  # 5.0 is NOT used
-    assert "rr_too_low" in decision.reason_codes          # 0.83 IS used
+    assert "rr_too_low" in decision.reason_codes  # 0.83 IS used
     assert decision.sizing_allowed is False
 
 
 def test_buy_low_confidence_is_hard_rejected() -> None:
     """P2: BUY with confidence below threshold → sizing blocked, not conditional."""
     decision = evaluate_risk(
-        _candidate(verdict={"confidence": 0.35, "risk_overvalued": False, "is_overvalued": False})
+        _candidate(
+            verdict={
+                "confidence": 0.35,
+                "risk_overvalued": False,
+                "is_overvalued": False,
+            }
+        )
     )
 
     assert decision.status == "reject"
@@ -387,7 +405,9 @@ def test_fv_explicitly_false_is_not_flagged_as_unmeasurable() -> None:
 
 def test_rr_exactly_at_ceiling_is_rejected() -> None:
     # target=1650: (1650-1050)/120=5.0 exactly — recomputed hits the ceiling.
-    decision = evaluate_risk(_candidate(verdict={"risk_reward_ratio": 5.0, "target_price": 1650}))
+    decision = evaluate_risk(
+        _candidate(verdict={"risk_reward_ratio": 5.0, "target_price": 1650})
+    )
 
     assert decision.status == "reject"
     assert decision.sizing_allowed is False
@@ -598,7 +618,7 @@ def test_counter_trend_hold_llm_rr_diverges_from_recomputed_is_rejected() -> Non
                 "rating": "HOLD",
                 "confidence": 0.75,
                 "entry_price_range": "950 - 1050",
-                "target_price": 1240,   # (1240-1050)/(1050-930) = 1.58x recomputed
+                "target_price": 1240,  # (1240-1050)/(1050-930) = 1.58x recomputed
                 "stop_loss": 930,
                 "risk_reward_ratio": 3.8,  # LLM-inflated; must NOT win
                 "current_price": 1000,
@@ -622,7 +642,7 @@ def test_counter_trend_rr_below_floor_is_rejected() -> None:
                 "rating": "BUY",
                 "confidence": 0.72,
                 "entry_price_range": "950 - 1050",
-                "target_price": 1278,   # (1278-1050)/(1050-930) = 1.9x recomputed
+                "target_price": 1278,  # (1278-1050)/(1050-930) = 1.9x recomputed
                 "stop_loss": 930,
                 "risk_reward_ratio": 1.9,
                 "current_price": 1000,
@@ -645,7 +665,7 @@ def test_counter_trend_rr_above_floor_stays_conditional() -> None:
                 "rating": "BUY",
                 "confidence": 0.72,
                 "entry_price_range": "950 - 1050",
-                "target_price": 1386,   # (1386-1050)/(1050-930) = 2.8x recomputed
+                "target_price": 1386,  # (1386-1050)/(1050-930) = 2.8x recomputed
                 "stop_loss": 930,
                 "risk_reward_ratio": 2.8,
                 "current_price": 1000,
@@ -735,6 +755,32 @@ def test_missing_adt_degrades_gracefully() -> None:
     assert decision.status == "deployable"
     assert "insufficient_liquidity" not in decision.reason_codes
     assert "low_liquidity" not in decision.reason_codes
+
+
+def test_missing_adt_fail_closed_rejects(monkeypatch: pytest.MonkeyPatch) -> None:
+    # V4.7: LIQUIDITY_GATE_FAIL_CLOSED=True turns the same missing-avg_volume
+    # case above into a hard reject instead of a silent skip.
+    monkeypatch.setattr(settings, "LIQUIDITY_GATE_FAIL_CLOSED", True)
+
+    decision = evaluate_risk(_candidate())
+
+    assert decision.status == "reject"
+    assert decision.sizing_allowed is False
+    assert "liquidity_data_unavailable" in decision.reason_codes
+
+
+def test_missing_adt_fail_closed_does_not_affect_known_liquidity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Fail-closed only applies when ADT is unknown — a confirmed-liquid
+    # candidate must stay unaffected.
+    monkeypatch.setattr(settings, "LIQUIDITY_GATE_FAIL_CLOSED", True)
+
+    decision = evaluate_risk(_liquid_candidate(avg_volume=15_000_000))
+
+    assert decision.status == "deployable"
+    assert decision.sizing_allowed is True
+    assert "liquidity_data_unavailable" not in decision.reason_codes
 
 
 # ---------------------------------------------------------------------------
