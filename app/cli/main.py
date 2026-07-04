@@ -22,7 +22,18 @@ import typer
 from rich.panel import Panel
 from rich.table import Table
 
-from app.cli.commands import debate, filter, forecast, pipeline, scan, sector, model, auth, backtest
+from app.cli.commands import (
+    auth,
+    backtest,
+    debate,
+    filter,
+    forecast,
+    model,
+    pipeline,
+    research,
+    scan,
+    sector,
+)
 from app.cli.ui.console import console
 
 
@@ -37,7 +48,8 @@ _PIPELINE_EPILOG = (
     "Examples:\n\n"
     "  idx pipeline                           # auto-select from quant filter\n"
     "  idx pipeline mr                        # mean-reversion screener\n"
-    "  idx pipeline single mr BBCA            # single-agent debate for BBCA\n"
+    "  idx research compare mr BBCA           # explicit research comparison\n"
+    "  idx pipeline compare                   # deprecated alias for research compare\n"
     "  idx pipeline choose                    # interactive mode selector\n"
     "  idx pipeline --tickers BBCA BMRI ADMR  # specific tickers only\n"
     "  idx pipeline --dry-run                 # simulate without writing records\n"
@@ -74,6 +86,10 @@ def _print_workflow_panel() -> None:
     body.add_row(
         "[dim]idx backtest[/dim]",
         "[dim]Score historical CIO verdicts against actual IDX prices[/dim]",
+    )
+    body.add_row(
+        "[dim]idx research[/dim]",
+        "[dim]Run explicit comparison and evaluation workflows[/dim]",
     )
     body.add_row(
         "[dim]idx scan[/dim]", "[dim]Refresh IDX stock data from providers (ETL)[/dim]"
@@ -140,6 +156,7 @@ app.command(name="backtest")(backtest.backtest_command)
 app.add_typer(sector.app, name="sector")
 app.add_typer(auth.app, name="auth")
 app.add_typer(forecast.app, name="forecast")
+app.add_typer(research.app, name="research")
 
 if __name__ == "__main__":
     app()

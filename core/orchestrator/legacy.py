@@ -134,7 +134,6 @@ from services.macro_refresh import (
 from services.explainability_auditor import DEFAULT_AUDITOR
 from services.news_fetcher import DEFAULT_FETCHER
 from services.report_formatter import DEFAULT_MD, MarkdownFormatter, RichFormatter
-from services.single_agent_analyzer import SingleAgentAnalyzer
 from utils.logger_config import logger
 from utils.price_fetcher import fetch_current_price
 from utils.trade_math import (
@@ -3174,6 +3173,7 @@ def _coerce_confidence(value: Any) -> float | None:
 
 
 FORECAST_RESEARCH_EV_DOWNWEIGHT = 0.35
+FORECAST_RANKING_DISABLED_REASON = "forecast_ranking_disabled"
 
 
 def _forecast_validation_status(report_payload: dict[str, Any]) -> str:
@@ -3723,6 +3723,30 @@ def _record_ticker_telemetry(
         logger.warning(f"[Telemetry] {ticker}: failed: {e}")
 
 
+def _maybe_evaluate_backtest_memory() -> None:
+    if not settings.PIPELINE_AUTO_EVALUATE_MEMORY:
+        logger.info(
+            "[BacktestEval] Auto-eval disabled "
+            "(PIPELINE_AUTO_EVALUATE_MEMORY=false)"
+        )
+        return
+
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            eval_summary = evaluate_memory(write=True)
+        if eval_summary.updated_records > 0:
+            logger.info(
+                f"[BacktestEval] Auto-evaluated "
+                f"{eval_summary.updated_records} "
+                f"open trade(s) from history"
+            )
+        else:
+            logger.info("[BacktestEval] No open trades to evaluate")
+    except Exception as e:
+        logger.warning(f"[BacktestEval] Auto-eval failed: {e}")
+
+
 async def _inject_forecast_reports(results: list[dict]) -> None:
     """Enrich successful debate results with a forward-looking ForecastReport.
 
@@ -3759,8 +3783,18 @@ async def _inject_forecast_reports(results: list[dict]) -> None:
             result.pop("forecast_ev_pct", None)
             result.pop("forecast_ev_downweight", None)
             result.pop("forecast_ev_ignored_reason", None)
+            result.pop("forecast_advisory_only", None)
+            ranking_enabled = bool(settings.FORECAST_EV_RANKING_ENABLED)
+            result["forecast_ranking_enabled"] = ranking_enabled
+            if not ranking_enabled:
+                result["forecast_advisory_only"] = True
             ranking_ev, downweight, ignored_reason = _forecast_ranking_ev(report_payload)
-            if ignored_reason:
+            if not ranking_enabled:
+                if ignored_reason:
+                    result["forecast_ev_ignored_reason"] = ignored_reason
+                elif ranking_ev is not None:
+                    result["forecast_ev_ignored_reason"] = FORECAST_RANKING_DISABLED_REASON
+            elif ignored_reason:
                 result["forecast_ev_ignored_reason"] = ignored_reason
             elif ranking_ev is not None:
                 result["forecast_ev_pct"] = ranking_ev * 100
@@ -4739,11 +4773,16 @@ def select_top_n(
             )
             continue
 
+        forecast_ev_pct = (
+            entry.get("forecast_ev_pct")
+            if settings.FORECAST_EV_RANKING_ENABLED
+            else None
+        )
         score, warning = compute_conviction_score(
             verdict,
             ticker=entry.get("ticker"),
             debate_records=debate_records,
-            forecast_ev_pct=entry.get("forecast_ev_pct"),
+            forecast_ev_pct=forecast_ev_pct,
             realized_outcomes=realized_outcomes,
         )
         entry["conviction_score"] = round(score, 4)
@@ -5731,6 +5770,7 @@ async def main(
     screener_mode: str | None = None,
     chamber_factory: Callable[[], Any] | None = None,
     tickers: list[str] | None = None,
+    research_compare: bool = False,
     raise_on_error: bool = False,
 ) -> None:
     """
@@ -5751,8 +5791,20 @@ async def main(
     ledger_run_id = datetime.now(ZoneInfo(settings.DATETIME_TIMEZONE)).strftime(
         "%Y%m%d_%H%M%S"
     )
-    run_mode = mode or CLI_MODE
-    if run_mode not in {"multi", "single", "compare"}:
+    requested_mode = mode or CLI_MODE
+    if requested_mode == "single":
+        raise ValueError(
+            "Single-agent baseline is research-only; use `idx research compare`."
+        )
+    if requested_mode == "compare" and not research_compare:
+        raise ValueError(
+            "Comparison mode requires explicit research mode; "
+            "use `idx research compare`."
+        )
+    if requested_mode not in {"multi", "compare"}:
+        raise ValueError(f"Unsupported orchestrator mode: {requested_mode}")
+    run_mode = "compare" if research_compare else requested_mode
+    if run_mode not in {"multi", "compare"}:
         raise ValueError(f"Unsupported orchestrator mode: {run_mode}")
     run_screener_mode = canonical_screener_mode(screener_mode or CLI_SCREENER_MODE)
     _cli_renderer.render_header(
@@ -5771,20 +5823,7 @@ async def main(
         "OK" if prompt_pack_ok else "WARN",
         "OK" if prompt_pack_ok else "linter unavailable",
     )
-    try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            eval_summary = evaluate_memory(write=True)
-        if eval_summary.updated_records > 0:
-            logger.info(
-                f"[BacktestEval] Auto-evaluated "
-                f"{eval_summary.updated_records} "
-                f"open trade(s) from history"
-            )
-        else:
-            logger.info("[BacktestEval] No open trades to evaluate")
-    except Exception as e:
-        logger.warning(f"[BacktestEval] Auto-eval failed: {e}")
+    _maybe_evaluate_backtest_memory()
 
     ticker_override = list(tickers or CLI_TICKERS_OVERRIDE or [])
 
@@ -5929,8 +5968,10 @@ async def main(
     )
 
     single_results = None
-    if run_mode in {"single", "compare"}:
-        _cli_renderer.phase("Single-Agent Baseline")
+    if research_compare:
+        _cli_renderer.phase("Research Single-Agent Baseline")
+        from services.single_agent_analyzer import SingleAgentAnalyzer
+
         analyzer = SingleAgentAnalyzer()
         with _cli_renderer.buffer_alerts():
             single_results = await analyzer.analyze_batch(
@@ -5938,10 +5979,6 @@ async def main(
                 run_id=ledger_run_id,
             )
             save_single_agent_results(single_results, OUTPUT_DIR)
-        if run_mode == "single":
-            _cli_renderer.render_pipeline_status()
-            _cli_renderer.flush_buffered_alerts()
-            return
 
     if not dry_run:
         _cli_renderer.phase("Provider Health")
@@ -6158,7 +6195,7 @@ async def main(
         batch_json_path=FULL_RESULTS_PATH,
         top3_md_path=TOP3_REPORT_PATH,
     )
-    if run_mode == "compare" and single_results is not None:
+    if research_compare and single_results is not None:
         reporter: ComparisonReporter = DEFAULT_REPORTER
         report = reporter.build_comparison(
             single_results=single_results,
@@ -6184,7 +6221,7 @@ async def main(
         OUTPUT_DIR / "telemetry" / "latest_batch_report.txt",
         OUTPUT_DIR / "telemetry" / f"{ledger_run_id}_report.txt",
     ]
-    if run_mode == "compare":
+    if research_compare:
         persistence_outputs.extend(
             [
                 OUTPUT_DIR / "comparison_report.md",
@@ -6205,7 +6242,7 @@ async def main(
 
     # Tampilkan error summary dan top picks langsung di terminal (bukan raw markdown).
     _print_error_summary(results)
-    if run_mode != "compare":
+    if not research_compare:
         _print_top3_summary(top_n, results)
 
     _cli_renderer.phase("Summary Footer")
@@ -6811,13 +6848,17 @@ def _parse_cli_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--mode",
-        choices=["multi", "single", "compare"],
+        choices=["multi", "compare"],
         default="multi",
         help=(
             "multi: full debate pipeline (default)\n"
-            "single: single-agent baseline\n"
-            "compare: run both and generate comparison report"
+            "compare: explicit research comparison; use `idx research compare`"
         ),
+    )
+    parser.add_argument(
+        "--research-compare",
+        action="store_true",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--screener-mode",
@@ -6841,6 +6882,8 @@ def _parse_cli_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     args = parser.parse_args(argv)
+    if args.mode == "compare" and not args.research_compare:
+        parser.error("comparison mode is research-only; use `idx research compare`.")
     CLI_TICKERS_OVERRIDE = None
     CLI_MODE = args.mode
     CLI_SCREENER_MODE = canonical_screener_mode(args.screener_mode)
@@ -6896,5 +6939,9 @@ if __name__ == "__main__":
             dry_run=args.dry_run,
             output_dir=OUTPUT_DIR,
             user_config=user_config,
+            mode=args.mode,
+            screener_mode=args.screener_mode,
+            tickers=args.tickers,
+            research_compare=args.research_compare,
         )
     )

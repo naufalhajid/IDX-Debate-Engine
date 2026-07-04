@@ -1,3 +1,4 @@
+import asyncio
 import importlib
 import sys
 import time
@@ -370,3 +371,49 @@ def test_preflight_hint_column_appears_when_actionable() -> None:
     output = console.export_text()
     assert "Hint" in output
     assert "Isi GEMINI_API_KEY" in output
+
+
+def test_pipeline_runner_delegates_to_legacy_main(monkeypatch, tmp_path) -> None:
+    runner = importlib.import_module("core.orchestrator.runner")
+    captured: dict = {}
+    configured: list[Path] = []
+
+    async def fake_main(**kwargs):
+        captured.update(kwargs)
+
+    monkeypatch.setattr(runner.legacy, "configure_output_dir", configured.append)
+    monkeypatch.setattr(runner.legacy, "main", fake_main)
+
+    config = runner.PipelineRunConfig(
+        dry_run=True,
+        output_dir=tmp_path,
+        portfolio_state={"realized_loss_pct": -0.01},
+        user_config={"total_capital": 1_000_000.0},
+        mode="multi",
+        screener_mode="momentum",
+        tickers=["BBCA"],
+        raise_on_error=True,
+    )
+
+    asyncio.run(runner.PipelineRunner(config).run())
+
+    assert configured == [tmp_path]
+    assert captured == {
+        "dry_run": True,
+        "output_dir": tmp_path,
+        "portfolio_state": {"realized_loss_pct": -0.01},
+        "user_config": {"total_capital": 1_000_000.0},
+        "mode": "multi",
+        "screener_mode": "momentum",
+        "chamber_factory": None,
+        "tickers": ["BBCA"],
+        "research_compare": False,
+        "raise_on_error": True,
+    }
+
+
+def test_pipeline_module_does_not_eagerly_export_private_legacy_helpers() -> None:
+    pipeline = importlib.import_module("core.orchestrator.pipeline")
+
+    assert "_confidence_gate_should_skip" not in vars(pipeline)
+    assert pipeline._confidence_gate_should_skip is legacy._confidence_gate_should_skip

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from datetime import date
 from pathlib import Path
 from typing import Annotated
@@ -12,7 +13,40 @@ from app.cli.ui.console import console
 from core.idx_market_params import SWING_MAX_EXECUTION_HORIZON_DAYS
 
 
+def evaluate_open_records(*, debates_dir: Path, horizon_days: int):
+    """Evaluate open BacktestMemory records and persist resolved outcomes."""
+    from core.backtest_outcome_evaluator import evaluate_memory
+
+    with console.status("[idx.header]Evaluating open BacktestMemory records...[/idx.header]"):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            return evaluate_memory(
+                debates_dir=debates_dir,
+                write=True,
+                horizon_trading_days=horizon_days,
+            )
+
+
+def print_evaluation_summary(summary) -> None:
+    console.print(
+        "[idx.ok]Backtest memory evaluation complete.[/idx.ok] "
+        f"[idx.muted]total={summary.total_records}, "
+        f"eligible={summary.eligible_records}, "
+        f"updated={summary.updated_records}, "
+        f"skipped={summary.skipped_records}, "
+        f"unchanged={summary.unchanged_records}[/idx.muted]"
+    )
+    if summary.backup_path:
+        console.print(f"[idx.muted]Backup: {summary.backup_path}[/idx.muted]")
+
+
 def backtest_command(
+    action: Annotated[
+        str | None,
+        typer.Argument(
+            help="Optional maintenance action. Use 'evaluate-open' to score open records."
+        ),
+    ] = None,
     from_date: Annotated[
         str | None,
         typer.Option("--from", help="Only signals from this date onward (YYYYMMDD)."),
@@ -51,6 +85,21 @@ def backtest_command(
     ] = False,
 ) -> None:
     """Score historical CIO verdicts against actual IDX prices."""
+    if action:
+        normalized_action = action.strip().lower().replace("_", "-")
+        if normalized_action != "evaluate-open":
+            console.print(
+                f"[idx.error]Unknown backtest action '{action}'. "
+                "Use 'evaluate-open' or run 'idx backtest --help'.[/idx.error]"
+            )
+            raise typer.Exit(code=2)
+        summary = evaluate_open_records(
+            debates_dir=debates_dir,
+            horizon_days=horizon_days,
+        )
+        print_evaluation_summary(summary)
+        return
+
     from core.backtest_memory import BacktestMemory
     from core.backtester.signal_loader import (
         build_existing_run_ids,
@@ -140,4 +189,4 @@ def backtest_command(
 app = typer.Typer(help="Backtest historical CIO verdict signals.")
 app.command(name="backtest")(backtest_command)
 
-__all__ = ["app", "backtest_command"]
+__all__ = ["app", "backtest_command", "evaluate_open_records"]

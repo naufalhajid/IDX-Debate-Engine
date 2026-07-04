@@ -1,5 +1,6 @@
 from datetime import date, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -134,6 +135,78 @@ def test_insufficient_horizon_remains_unscored() -> None:
     )
 
     assert evaluated is None
+
+
+def test_pipeline_auto_evaluation_disabled_by_default(monkeypatch) -> None:
+    from core.orchestrator import legacy
+
+    calls: list[dict] = []
+    monkeypatch.setattr(legacy.settings, "PIPELINE_AUTO_EVALUATE_MEMORY", False)
+    monkeypatch.setattr(
+        legacy,
+        "evaluate_memory",
+        lambda **kwargs: calls.append(kwargs),
+    )
+
+    legacy._maybe_evaluate_backtest_memory()
+
+    assert calls == []
+
+
+def test_pipeline_auto_evaluation_opt_in_calls_write(monkeypatch) -> None:
+    from core.orchestrator import legacy
+
+    calls: list[dict] = []
+
+    def fake_evaluate_memory(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(updated_records=0)
+
+    monkeypatch.setattr(legacy.settings, "PIPELINE_AUTO_EVALUATE_MEMORY", True)
+    monkeypatch.setattr(legacy, "evaluate_memory", fake_evaluate_memory)
+
+    legacy._maybe_evaluate_backtest_memory()
+
+    assert calls == [{"write": True}]
+
+
+def test_backtest_evaluate_open_records_calls_evaluate_memory_with_write(
+    monkeypatch,
+) -> None:
+    from app.cli.commands.backtest import evaluate_open_records
+
+    calls: list[dict] = []
+    summary = SimpleNamespace(
+        total_records=2,
+        eligible_records=1,
+        updated_records=1,
+        skipped_records=0,
+        unchanged_records=1,
+        backup_path=None,
+    )
+
+    def fake_evaluate_memory(**kwargs):
+        calls.append(kwargs)
+        return summary
+
+    monkeypatch.setattr(
+        "core.backtest_outcome_evaluator.evaluate_memory",
+        fake_evaluate_memory,
+    )
+
+    result = evaluate_open_records(
+        debates_dir=Path("tmp/debates"),
+        horizon_days=7,
+    )
+
+    assert result is summary
+    assert calls == [
+        {
+            "debates_dir": Path("tmp/debates"),
+            "write": True,
+            "horizon_trading_days": 7,
+        }
+    ]
 
 
 def test_evaluate_memory_skips_records_without_artifact(tmp_path: Path) -> None:

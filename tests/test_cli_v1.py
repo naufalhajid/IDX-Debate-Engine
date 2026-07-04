@@ -21,7 +21,7 @@ def test_root_help_lists_v1_commands():
     result = runner.invoke(app, ["--help"])
 
     assert result.exit_code == 0
-    for command in ("scan", "filter", "debate", "pipeline", "sector"):
+    for command in ("scan", "filter", "debate", "pipeline", "research", "sector"):
         assert command in result.output
 
 
@@ -31,6 +31,9 @@ def test_command_help_pages_render():
         ["filter", "--help"],
         ["debate", "--help"],
         ["pipeline", "--help"],
+        ["research", "--help"],
+        ["research", "compare", "--help"],
+        ["backtest", "--help"],
         ["sector", "--help"],
         ["sector", "build", "--help"],
         ["sector", "list", "--help"],
@@ -282,6 +285,7 @@ def test_pipeline_preserves_legacy_flags(monkeypatch):
     )
 
     assert result.exit_code == 0, result.output
+    assert "temporary alias" in result.output
     assert calls == [
         {
             "dry_run": True,
@@ -333,7 +337,26 @@ def test_pipeline_accepts_positional_screener_mode(monkeypatch):
     assert calls[0]["tickers"] == ()
 
 
-def test_pipeline_accepts_positional_mode_screener_and_ticker(monkeypatch):
+def test_pipeline_accepts_positional_compare_screener_and_ticker(monkeypatch):
+    calls = []
+
+    def fake_run_pipeline_cli(**kwargs):
+        calls.append(kwargs)
+
+    monkeypatch.setattr(
+        "app.cli.commands.pipeline.run_pipeline_cli", fake_run_pipeline_cli
+    )
+
+    result = runner.invoke(app, ["pipeline", "compare", "mr", "BBCA", "--dry-run"])
+
+    assert result.exit_code == 0, result.output
+    assert "temporary alias" in result.output
+    assert calls[0]["mode"] == "compare"
+    assert calls[0]["screener_mode"] == "mean_reversion"
+    assert calls[0]["tickers"] == ("BBCA",)
+
+
+def test_pipeline_rejects_retired_single_mode(monkeypatch):
     calls = []
 
     def fake_run_pipeline_cli(**kwargs):
@@ -345,10 +368,9 @@ def test_pipeline_accepts_positional_mode_screener_and_ticker(monkeypatch):
 
     result = runner.invoke(app, ["pipeline", "single", "mr", "BBCA", "--dry-run"])
 
-    assert result.exit_code == 0, result.output
-    assert calls[0]["mode"] == "single"
-    assert calls[0]["screener_mode"] == "mean_reversion"
-    assert calls[0]["tickers"] == ("BBCA",)
+    assert result.exit_code != 0
+    assert calls == []
+    assert "idx research compare" in result.output
 
 
 def test_pipeline_choose_selects_modes_interactively(monkeypatch):
@@ -364,7 +386,7 @@ def test_pipeline_choose_selects_modes_interactively(monkeypatch):
     result = runner.invoke(app, ["pipeline", "choose", "--dry-run"], input="2\n2\n")
 
     assert result.exit_code == 0, result.output
-    assert calls[0]["mode"] == "single"
+    assert calls[0]["mode"] == "compare"
     assert calls[0]["screener_mode"] == "mean_reversion"
 
 
@@ -439,6 +461,99 @@ def test_pipeline_runner_passes_argparse_argv_without_program_name(monkeypatch):
             "BBCA",
         ]
     ]
+
+
+def test_pipeline_runner_marks_compare_as_explicit_research(monkeypatch):
+    calls = []
+
+    def fake_run_cli(argv):
+        calls.append(argv)
+
+    monkeypatch.setitem(
+        sys.modules, "orchestrator", SimpleNamespace(_run_cli=fake_run_cli)
+    )
+
+    run_pipeline_cli(
+        dry_run=True,
+        output_dir=Path("tmp/out"),
+        tickers=(),
+        skip_scraping=True,
+        no_interactive=True,
+        mode="compare",
+        screener_mode="mean_reversion",
+        verbose=False,
+    )
+
+    assert "--research-compare" in calls[0]
+    assert calls[0][calls[0].index("--mode") + 1] == "compare"
+
+
+def test_research_compare_invokes_orchestrator_with_explicit_flag(monkeypatch):
+    calls = []
+
+    def fake_run_cli(argv):
+        calls.append(argv)
+
+    monkeypatch.setitem(
+        sys.modules, "orchestrator", SimpleNamespace(_run_cli=fake_run_cli)
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "research",
+            "compare",
+            "mr",
+            "--dry-run",
+            "--no-interactive",
+            "--tickers",
+            "bbri",
+            "bbca",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "--research-compare" in calls[0]
+    assert calls[0][calls[0].index("--screener-mode") + 1] == "mean_reversion"
+    assert calls[0][-2:] == ["BBRI", "BBCA"]
+
+
+def test_backtest_evaluate_open_invokes_memory_evaluator(monkeypatch):
+    calls = []
+
+    def fake_evaluate_open_records(*, debates_dir, horizon_days):
+        calls.append((debates_dir, horizon_days))
+        return SimpleNamespace(
+            total_records=4,
+            eligible_records=2,
+            updated_records=1,
+            skipped_records=1,
+            unchanged_records=2,
+            backup_path="output/backtest/backtest_memory.jsonl.bak",
+        )
+
+    monkeypatch.setattr(
+        "app.cli.commands.backtest.evaluate_open_records",
+        fake_evaluate_open_records,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "backtest",
+            "evaluate-open",
+            "--debates-dir",
+            "tmp/debates",
+            "--horizon-days",
+            "7",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert calls == [(Path("tmp/debates"), 7)]
+    assert "Backtest memory evaluation complete" in result.output
+    assert "updated=1" in result.output
+    assert "backtest_memory.jsonl.bak" in result.output
 
 
 def _probe_orchestrator_pipeline_reasoning(

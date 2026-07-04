@@ -40,6 +40,15 @@ Every curated run should include enough context to reproduce or interpret it:
 date, command, mode, tickers, provider limitations, and whether the run used
 mock/dry-run data or live providers.
 
+Curated samples must also preserve the current decision semantics:
+
+- Risk Governor is the deployability authority.
+- Trade envelope owns entry, target, stop, and R/R geometry.
+- Forecasting and fair value must be labeled advisory unless a sample explicitly
+  demonstrates an opt-in promotion setting.
+- Research comparison output belongs under an explicit research/evaluation
+  context, not as a default `idx pipeline` artifact.
+
 ## Git Cleanup
 
 The `.gitignore` policy now ignores active `output/` artifacts while preserving

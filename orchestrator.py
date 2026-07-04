@@ -99,6 +99,10 @@ def _run_cli(argv: list[str] | None = None) -> None:
                 output_dir=_pipeline.OUTPUT_DIR,
                 portfolio_state=cli_portfolio_state,
                 user_config=user_config,
+                mode=getattr(args, "mode", None),
+                screener_mode=getattr(args, "screener_mode", None),
+                tickers=getattr(args, "tickers", None),
+                research_compare=bool(getattr(args, "research_compare", False)),
                 raise_on_error=True,
             )
         )

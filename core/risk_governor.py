@@ -38,6 +38,11 @@ _COUNTER_TREND_RR_FLOOR: float = 2.5
 # Soft flag when target requires many consecutive ARA sessions; this is a
 # practicality cap, not the trade holding-period horizon.
 _ARA_SESSION_PRACTICALITY_CAP: int = 5
+# Keep aligned with DebateChamber's momentum-watchlist escalation. Above-FV
+# valuation is context, not a hard swing rejection, when price action is already
+# volume-confirmed.
+_MOMENTUM_VOLUME_SURGE_THRESHOLD: float = 1.5
+_MOMENTUM_RETURN_THRESHOLD: float = 5.0
 UNBUYABLE_RATINGS = {"AVOID", "SELL"}
 SOFT_BUYABLE_RATINGS = {"HOLD"}
 HARD_REJECT_CODES = {
@@ -578,6 +583,106 @@ def _preflight_noise_reject(candidate: dict[str, Any], verdict: dict[str, Any]) 
     return False
 
 
+def _valuation_sources(
+    candidate: dict[str, Any], verdict: dict[str, Any]
+) -> tuple[dict[str, Any], ...]:
+    sources: list[dict[str, Any]] = [candidate, verdict]
+    for owner in (candidate, verdict):
+        metadata = owner.get("metadata") if isinstance(owner, dict) else None
+        if isinstance(metadata, dict):
+            sources.append(metadata)
+    return tuple(sources)
+
+
+def _valuation_quality_confirmed(
+    candidate: dict[str, Any], verdict: dict[str, Any]
+) -> bool:
+    for source in _valuation_sources(candidate, verdict):
+        if _truthy(source.get("fair_value_rejected")) or _truthy(
+            source.get("fv_quality_rejected")
+        ):
+            return False
+        if str(source.get("valuation_gap") or "").strip().lower() == "unverified":
+            return False
+        if str(source.get("valuation_verdict") or "").strip().upper() in {
+            "DATA_UNAVAILABLE",
+            "QUALITY_REJECTED",
+        }:
+            return False
+
+    fair_value = _first_float(
+        verdict.get("fair_value_high"),
+        candidate.get("fair_value_high"),
+        verdict.get("fair_value"),
+        candidate.get("fair_value"),
+    )
+    current_price = _first_float(
+        verdict.get("current_price"),
+        candidate.get("current_price"),
+    )
+    return fair_value is not None and fair_value > 0 and current_price is not None
+
+
+def _explicit_valuation_hard_reject(
+    candidate: dict[str, Any], verdict: dict[str, Any]
+) -> bool:
+    explicit_keys = {
+        "valuation_hard_reject",
+        "risk_overvalued_hard_reject",
+        "cio_valuation_hard_reject",
+    }
+    for source in _valuation_sources(candidate, verdict):
+        if any(_truthy(source.get(key)) for key in explicit_keys):
+            return True
+    return any(
+        code in {"valuation_hard_reject", "overvalued_hard_reject"}
+        for code in _upstream_reason_codes(candidate, verdict)
+    )
+
+
+def _volume_confirmed_momentum(
+    candidate: dict[str, Any], verdict: dict[str, Any]
+) -> bool:
+    technicals = candidate.get("technical_indicators")
+    if not isinstance(technicals, dict):
+        technicals = {}
+    verdict_technicals = verdict.get("technical_indicators")
+    if not isinstance(verdict_technicals, dict):
+        verdict_technicals = {}
+    risk_context = candidate.get("risk_context")
+    if not isinstance(risk_context, dict):
+        risk_context = {}
+
+    volume_surge = _first_float(
+        technicals.get("volume_surge_ratio"),
+        verdict_technicals.get("volume_surge_ratio"),
+        risk_context.get("volume_surge_ratio"),
+        candidate.get("volume_surge_ratio"),
+    )
+    recent_return = _first_float(
+        technicals.get("return_5d_pct"),
+        verdict_technicals.get("return_5d_pct"),
+        risk_context.get("return_5d_pct"),
+        candidate.get("return_5d_pct"),
+    )
+    return (
+        volume_surge is not None
+        and volume_surge >= _MOMENTUM_VOLUME_SURGE_THRESHOLD
+        and recent_return is not None
+        and recent_return >= _MOMENTUM_RETURN_THRESHOLD
+    )
+
+
+def _overvaluation_should_hard_reject(
+    candidate: dict[str, Any], verdict: dict[str, Any]
+) -> bool:
+    if _explicit_valuation_hard_reject(candidate, verdict):
+        return True
+    if not _valuation_quality_confirmed(candidate, verdict):
+        return False
+    return not _volume_confirmed_momentum(candidate, verdict)
+
+
 def _verdict_reason_codes(
     candidate: dict[str, Any],
     verdict: dict[str, Any],
@@ -603,7 +708,12 @@ def _verdict_reason_codes(
 
     _ovv = _risk_overvalued_flag(candidate, verdict)
     if _ovv is True:
-        reason_codes.append("overvalued")
+        if _overvaluation_should_hard_reject(candidate, verdict):
+            reason_codes.append("overvalued")
+        elif _valuation_quality_confirmed(candidate, verdict):
+            reason_codes.append("valuation_overhang")
+        else:
+            reason_codes.append("fv_unmeasurable")
     elif _ovv is None:
         reason_codes.append("fv_unmeasurable")
 
@@ -996,6 +1106,7 @@ def _is_conditional_setup(
         rating in SOFT_BUYABLE_RATINGS
         or "counter_trend_setup" in reason_codes
         or "fv_unmeasurable" in reason_codes
+        or "valuation_overhang" in reason_codes
         or "historically_expensive" in reason_codes
         or "t2_hold_warning" in reason_codes
     )
@@ -1009,7 +1120,10 @@ def _reject_message(reason_codes: list[str]) -> str:
     if "insufficient_technical_data" in reason_codes:
         return "Setup ditolak karena data teknikal tidak cukup untuk validasi risiko."
     if "overvalued" in reason_codes:
-        return "Setup ditolak karena verdict menandai saham overvalued."
+        return (
+            "Setup ditolak karena valuasi terkonfirmasi overvalued tanpa "
+            "konfirmasi momentum/volume yang cukup."
+        )
     if "rr_too_low" in reason_codes:
         return "Setup ditolak karena risk/reward terlalu rendah."
     if "rr_implausible" in reason_codes:

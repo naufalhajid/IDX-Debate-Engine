@@ -28,6 +28,35 @@ Scout Phase (Parallel Execution)
 
 ## Prompt Files
 
+### Runtime Status
+
+`manifest.json` separates prompts by production impact:
+
+- `runtime_required_prompts`: loaded at debate-chamber import/startup and used by
+  live LLM calls.
+- `archived_prompts`: retained for historical/research reference only. Missing
+  archived files must not block production startup.
+
+Current live runtime prompt names:
+
+- `FUNDAMENTAL_SCOUT_PROMPT`
+- `CHARTIST_PROMPT`
+- `SENTIMENT_PROMPT`
+- `BULL_SYSTEM_PROMPT_R1`
+- `BULL_SYSTEM_PROMPT_R2`
+- `BEAR_SYSTEM_PROMPT_R1`
+- `BEAR_SYSTEM_PROMPT_R2`
+- `DEVILS_ADVOCATE_PROMPT`
+- `CIO_SYSTEM_PROMPT`
+- `AGENT_SIGNAL_PROMPT`
+
+Current archived/reference prompt names:
+
+- `CONSENSUS_PROMPT` (`consensus.txt`) - replaced by deterministic vote logic in
+  `DebateChamber._consensus_evaluator_node`.
+- `STATE_CLEANER_PROMPT` (`state_cleaner.txt`) - replaced by deterministic
+  context pruning in `DebateChamber._state_cleaner_node`.
+
 ### Scout Prompts (Data Extraction Phase)
 
 These prompts run in **parallel** and extract structured evidence from market data.
@@ -124,24 +153,22 @@ Key instructions:
 
 ### Integration & Decision Prompts
 
-#### `consensus.txt`
-**Role**: Consensus Checker  
-**LLM Model**: Claude Flash (quick evaluation)  
-**Output**: Have bull & bear reached agreement? If not, why?  
-**Token Budget**: ~1,500 tokens
+#### `consensus.txt` (Archived)
+**Role**: Historical consensus-checker prompt  
+**Runtime Status**: Not loaded as a required production prompt  
+**Replacement**: Deterministic Python voting in `_consensus_evaluator_node`
 
-Logic:
+Archived reference only:
 - If both agree on risk level and trade setup → move to CIO Judge
 - If they diverge (one bullish, one bearish) → trigger another round
 - Max 3 rounds to avoid infinite debate loops
 
-#### `state_cleaner.txt`
-**Role**: Context Pruner (between debate rounds)  
-**LLM Model**: Claude Flash  
-**Output**: Compressed state, removing redundant evidence  
-**Token Budget**: ~1,500 tokens
+#### `state_cleaner.txt` (Archived)
+**Role**: Historical context-pruner prompt  
+**Runtime Status**: Not loaded as a required production prompt  
+**Replacement**: Deterministic Python pruning in `_state_cleaner_node`
 
-Key instructions:
+Archived reference only:
 - Summarize consensus points from previous round
 - Remove duplicate arguments
 - Keep only novel evidence from current round
@@ -204,6 +231,12 @@ Update prompts when:
    ```json
    {
      "prompt_version": "2026-06-15-improved-margin-of-safety",
+     "runtime_required_prompts": {
+       "BULL_SYSTEM_PROMPT_R1": "bull_r1.txt"
+     },
+     "archived_prompts": {
+       "CONSENSUS_PROMPT": "consensus.txt"
+     },
      ...
    }
    ```

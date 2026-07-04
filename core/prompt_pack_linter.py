@@ -11,8 +11,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-# JSON-only contracts: never receive AGENT_SIGNAL_PROMPT at the debate_chamber.py
-# call site, so they carry neither a Position: nor an Agent Confidence: footer.
+# JSON-only and archived contracts: they do not carry the agent footer markers
+# used by scout/debate prompts.
 EXEMPT_PROMPTS = {
     "CONSENSUS_PROMPT",
     "STATE_CLEANER_PROMPT",
@@ -49,18 +49,39 @@ def lint_prompt_pack(manifest_path: str) -> LintReport:
     manifest = Path(manifest_path)
 
     manifest_data, duplicate_names = _load_manifest(manifest, errors)
-    prompts = _extract_prompts(manifest_data, errors)
-    total_prompts = len(prompts)
+    runtime_prompts, archived_prompts = _extract_prompt_sections(
+        manifest_data,
+        errors,
+    )
+    total_prompts = len(runtime_prompts) + len(archived_prompts)
 
     for name in duplicate_names:
         errors.append(f"Duplicate prompt name in manifest: {name}")
 
-    for prompt_name, filename in prompts.items():
+    duplicate_sections = sorted(set(runtime_prompts) & set(archived_prompts))
+    for prompt_name in duplicate_sections:
+        errors.append(f"Prompt cannot be both runtime and archived: {prompt_name}")
+
+    for prompt_name, filename in runtime_prompts.items():
         _lint_prompt_file(
             prompt_name=prompt_name,
             filename=filename,
             prompt_dir=manifest.parent,
             errors=errors,
+            warnings=warnings,
+            blocking=True,
+            enforce_markers=True,
+        )
+
+    for prompt_name, filename in archived_prompts.items():
+        _lint_prompt_file(
+            prompt_name=prompt_name,
+            filename=filename,
+            prompt_dir=manifest.parent,
+            errors=errors,
+            warnings=warnings,
+            blocking=False,
+            enforce_markers=False,
         )
 
     return LintReport(
@@ -84,7 +105,7 @@ def guard_prompt_pack(
 
     manifest = Path(manifest_path)
     manifest_data, _duplicate_names = _load_manifest(manifest, [])
-    prompts = _extract_prompts(manifest_data, [])
+    runtime_prompts, _archived_prompts = _extract_prompt_sections(manifest_data, [])
 
     prompt_version = ""
     if isinstance(manifest_data, dict):
@@ -102,9 +123,9 @@ def guard_prompt_pack(
         )
 
     required = required_prompts if required_prompts is not None else _required_prompts()
-    missing_required = sorted(set(required) - set(prompts))
+    missing_required = sorted(set(required) - set(runtime_prompts))
     for prompt_name in missing_required:
-        errors.append(f"Manifest missing required prompt: {prompt_name}")
+        errors.append(f"Manifest missing required runtime prompt: {prompt_name}")
 
     return LintReport(
         valid=not errors,
@@ -153,17 +174,37 @@ def _load_manifest(
     return data, duplicate_keys
 
 
-def _extract_prompts(
+def _extract_prompt_sections(
     manifest_data: dict[str, Any] | None,
     errors: list[str],
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], dict[str, Any]]:
     if manifest_data is None:
-        return {}
+        return {}, {}
+
+    runtime = manifest_data.get("runtime_required_prompts")
+    archived = manifest_data.get("archived_prompts")
+    if runtime is not None or archived is not None:
+        runtime_prompts: dict[str, Any] = {}
+        archived_prompts: dict[str, Any] = {}
+        if not isinstance(runtime, dict):
+            errors.append("Manifest requires a 'runtime_required_prompts' object.")
+        else:
+            runtime_prompts = runtime
+        if archived is not None:
+            if not isinstance(archived, dict):
+                errors.append("Manifest 'archived_prompts' must be an object.")
+            else:
+                archived_prompts = archived
+        return runtime_prompts, archived_prompts
+
     prompts = manifest_data.get("prompts")
     if not isinstance(prompts, dict):
-        errors.append("Manifest requires a 'prompts' object.")
-        return {}
-    return prompts
+        errors.append(
+            "Manifest requires a 'runtime_required_prompts' object "
+            "or legacy 'prompts' object."
+        )
+        return {}, {}
+    return prompts, {}
 
 
 def _lint_prompt_file(
@@ -172,31 +213,36 @@ def _lint_prompt_file(
     filename: Any,
     prompt_dir: Path,
     errors: list[str],
+    warnings: list[str],
+    blocking: bool,
+    enforce_markers: bool,
 ) -> None:
+    problems = errors if blocking else warnings
+    prompt_kind = "Prompt" if blocking else "Archived prompt"
     if not isinstance(filename, str) or not filename.strip():
-        errors.append(f"Prompt {prompt_name} must map to a non-empty filename.")
+        problems.append(f"{prompt_kind} {prompt_name} must map to a non-empty filename.")
         return
 
     path = prompt_dir / filename
     if not path.exists():
-        errors.append(f"Prompt file missing for {prompt_name}: {path}")
+        problems.append(f"{prompt_kind} file missing for {prompt_name}: {path}")
         return
     if not path.is_file():
-        errors.append(f"Prompt path is not a file for {prompt_name}: {path}")
+        problems.append(f"{prompt_kind} path is not a file for {prompt_name}: {path}")
         return
 
     try:
         content = path.read_text(encoding="utf-8")
     except UnicodeDecodeError as exc:
-        errors.append(
-            f"Prompt file is not valid UTF-8 for {prompt_name}: {path}: {exc}"
+        problems.append(
+            f"{prompt_kind} file is not valid UTF-8 for {prompt_name}: {path}: {exc}"
         )
         return
 
     if not content.strip():
-        errors.append(f"Prompt file is empty for {prompt_name}: {path}")
+        problems.append(f"{prompt_kind} file is empty for {prompt_name}: {path}")
         return
-    if prompt_name not in EXEMPT_PROMPTS:
+    if enforce_markers and prompt_name not in EXEMPT_PROMPTS:
         if "Position:" not in content:
             errors.append(
                 f"Prompt file for {prompt_name} is missing required marker: Position:"

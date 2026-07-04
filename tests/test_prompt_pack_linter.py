@@ -1,8 +1,15 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from core.prompt_pack_linter import guard_prompt_pack, lint_prompt_pack
-from services.debate_prompt_registry import MANIFEST_PATH, REQUIRED_PROMPTS
+from services import debate_prompt_registry
+from services.debate_prompt_registry import (
+    ARCHIVED_PROMPTS,
+    MANIFEST_PATH,
+    RUNTIME_REQUIRED_PROMPTS,
+)
 
 
 VALID_PROMPT = "You are an agent.\n\nPosition: BUY\nAgent Confidence: 0.75\n"
@@ -92,20 +99,24 @@ def _write_required_prompt_pack(
     *,
     missing_prompt: str | None = None,
     prompt_version: str | None = "test-v1",
+    write_archived_files: bool = True,
 ) -> Path:
-    prompts: dict[str, str] = {}
-    for prompt_name, filename in REQUIRED_PROMPTS.items():
+    runtime_prompts: dict[str, str] = {}
+    for prompt_name, filename in RUNTIME_REQUIRED_PROMPTS.items():
         if prompt_name == missing_prompt:
             continue
-        prompts[prompt_name] = filename
-        content = (
-            "Prompt body\n"
-            if prompt_name in {"CONSENSUS_PROMPT", "STATE_CLEANER_PROMPT"}
-            else VALID_PROMPT
-        )
-        (prompt_dir / filename).write_text(content, encoding="utf-8")
+        runtime_prompts[prompt_name] = filename
+        (prompt_dir / filename).write_text(VALID_PROMPT, encoding="utf-8")
 
-    manifest_payload: dict[str, object] = {"prompts": prompts}
+    archived_prompts = dict(ARCHIVED_PROMPTS)
+    if write_archived_files:
+        for filename in archived_prompts.values():
+            (prompt_dir / filename).write_text("Archived prompt body\n", encoding="utf-8")
+
+    manifest_payload: dict[str, object] = {
+        "runtime_required_prompts": runtime_prompts,
+        "archived_prompts": archived_prompts,
+    }
     if prompt_version is not None:
         manifest_payload["prompt_version"] = prompt_version
     manifest_path = prompt_dir / "manifest.json"
@@ -133,9 +144,64 @@ def test_guard_prompt_pack_missing_required_prompt_error(tmp_path: Path) -> None
 
     assert report.valid is False
     assert any(
-        "Manifest missing required prompt: BULL_SYSTEM_PROMPT_R1" in error
+        "Manifest missing required runtime prompt: BULL_SYSTEM_PROMPT_R1" in error
         for error in report.errors
     )
+
+
+def test_guard_prompt_pack_missing_archived_prompt_is_warning_not_error(
+    tmp_path: Path,
+) -> None:
+    manifest_path = _write_required_prompt_pack(
+        tmp_path,
+        write_archived_files=False,
+    )
+
+    report = guard_prompt_pack(
+        str(manifest_path),
+        expected_prompt_version="test-v1",
+    )
+
+    assert report.valid is True
+    assert report.errors == []
+    assert any(
+        "Archived prompt file missing for CONSENSUS_PROMPT" in warning
+        for warning in report.warnings
+    )
+
+
+def test_load_prompt_registry_does_not_require_archived_prompts(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    manifest_path = _write_required_prompt_pack(
+        tmp_path,
+        write_archived_files=False,
+    )
+    monkeypatch.setattr(debate_prompt_registry, "PROMPT_DIR", tmp_path)
+    monkeypatch.setattr(debate_prompt_registry, "MANIFEST_PATH", manifest_path)
+
+    registry = debate_prompt_registry.load_prompt_registry()
+
+    assert "BULL_SYSTEM_PROMPT_R1" in registry.prompts
+    assert "CONSENSUS_PROMPT" not in registry.prompts
+    assert "STATE_CLEANER_PROMPT" not in registry.prompts
+    assert registry.archived_prompts == {}
+
+
+def test_load_prompt_registry_rejects_missing_runtime_manifest_key(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    manifest_path = _write_required_prompt_pack(
+        tmp_path,
+        missing_prompt="BULL_SYSTEM_PROMPT_R1",
+    )
+    monkeypatch.setattr(debate_prompt_registry, "PROMPT_DIR", tmp_path)
+    monkeypatch.setattr(debate_prompt_registry, "MANIFEST_PATH", manifest_path)
+
+    with pytest.raises(ValueError, match="BULL_SYSTEM_PROMPT_R1"):
+        debate_prompt_registry.load_prompt_registry()
 
 
 def test_guard_prompt_pack_missing_prompt_version_error(tmp_path: Path) -> None:

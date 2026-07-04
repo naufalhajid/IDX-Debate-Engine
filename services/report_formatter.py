@@ -15,6 +15,15 @@ from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 
+from services.display_packet import (
+    breaking_news_lines as _display_breaking_news_lines,
+    build_display_packet,
+    data_quality_warning_lines as _display_data_quality_warning_lines,
+    fair_value_range_text as _display_fair_value_range_text,
+    risk_governor_label as _display_risk_governor_label,
+    valuation_gap_is_unverified as _display_valuation_gap_is_unverified,
+    valuation_status as _display_valuation_status,
+)
 from services.explainability_auditor import AuditPacket
 from utils.logger_config import logger
 
@@ -306,133 +315,32 @@ def _valuation_status(
     fair_value_low: Any = None,
     fair_value_high: Any = None,
 ) -> str:
-    fv = _safe_float(fair_value)
-    price = _safe_float(current_price)
-    if fv is None or fv <= 0 or price is None or price <= 0:
-        return "N/A"
-    fv_low = _safe_float(fair_value_low)
-    fv_high = _safe_float(fair_value_high)
-    if fv_low is not None and fv_low > 0 and price < fv_low:
-        return "UNDERVALUED"
-    if price < fv * 0.95:
-        return "SLIGHTLY_UNDERVALUED"
-    if price <= fv * 1.05:
-        return "FAIRLY_VALUED"
-    if fv_high is not None and fv_high > 0 and price <= fv_high:
-        return "SLIGHTLY_OVERVALUED"
-    if fv_high is not None and fv_high > 0 and price > fv_high:
-        return "OVERVALUED"
-    if fv > price:
-        return "UNDERVALUED"
-    if fv < price:
-        return "OVERVALUED"
-    return "FAIR VALUE"
+    return _display_valuation_status(
+        fair_value,
+        current_price,
+        fair_value_low,
+        fair_value_high,
+    )
 
 
 def _fair_value_range_text(fair_value_low: Any, fair_value_high: Any) -> str | None:
-    low = _safe_float(fair_value_low)
-    high = _safe_float(fair_value_high)
-    if low is None or low <= 0 or high is None or high <= 0:
-        return None
-    return f"{_money(low)} - {_money(high)}"
+    return _display_fair_value_range_text(fair_value_low, fair_value_high)
 
 
 # FIX: ISSUE 1 — Treat rejected fair value as an unverified valuation gap.
 def _valuation_gap_is_unverified(
     result: dict[str, Any], verdict: dict[str, Any]
 ) -> bool:
-    metadata = _dict_or_empty(result.get("metadata"))
-    return (
-        str(verdict.get("valuation_gap") or "").lower() == "unverified"
-        or str(result.get("valuation_gap") or "").lower() == "unverified"
-        or str(metadata.get("valuation_gap") or "").lower() == "unverified"
-        or bool(metadata.get("fair_value_rejected"))
-    )
+    return _display_valuation_gap_is_unverified(result, verdict)
 
 
 # FIX: ISSUE 3 — Format breaking-news headlines for Rich and Markdown reports.
 def _breaking_news_lines(result: dict[str, Any]) -> list[str]:
-    metadata = _dict_or_empty(result.get("metadata"))
-    has_breaking = bool(
-        result.get("has_breaking_news") or metadata.get("has_breaking_news")
-    )
-    if not has_breaking:
-        return []
-    raw_items = (
-        result.get("breaking_news_headlines")
-        or metadata.get("breaking_news_headlines")
-        or []
-    )
-    lines: list[str] = []
-    for item in _list_or_empty(raw_items)[:3]:
-        if not isinstance(item, dict):
-            continue
-        title = str(item.get("title") or item.get("headline") or "").strip()
-        if not title:
-            continue
-        source = str(item.get("source") or "unknown").strip() or "unknown"
-        timestamp = str(item.get("timestamp") or item.get("published_at") or "unknown")
-        lines.append(f"• {title} — {source} ({timestamp})")
-    if not lines:
-        lines.append(
-            "Breaking news detected but headline content unavailable — verify manually."
-        )
-    return lines
-
-
-def _failure_warning_line(label: str, value: Any) -> str | None:
-    failure = _dict_or_empty(value)
-    if not failure:
-        return None
-    stage = str(failure.get("stage") or "unknown").strip() or "unknown"
-    failure_type = str(
-        failure.get("type") or failure.get("failure_type") or "unknown"
-    ).strip() or "unknown"
-    message = _short_text(
-        failure.get("message") or failure.get("reason") or "details unavailable",
-        limit=96,
-    )
-    return f"{label}: {stage}/{failure_type} - {message}"
+    return _display_breaking_news_lines(result)
 
 
 def _data_quality_warning_lines(result: dict[str, Any]) -> list[str]:
-    metadata = _dict_or_empty(result.get("metadata"))
-    lines: list[str] = []
-    for key, label in (
-        ("news_fetch_failure", "News fetch failure"),
-        ("rag_selection_failure", "RAG selection failure"),
-        ("cio_parse_failure", "CIO parse fallback"),
-    ):
-        line = _failure_warning_line(label, metadata.get(key) or result.get(key))
-        if line:
-            lines.append(line)
-
-    citation_failures = _list_or_empty(metadata.get("rag_citation_parse_failures"))
-    if citation_failures:
-        first = _dict_or_empty(citation_failures[0])
-        first_type = first.get("type") or "unknown"
-        first_message = _short_text(first.get("message"), limit=80)
-        lines.append(
-            "RAG citation metadata failure: "
-            f"{len(citation_failures)} malformed entry(s); "
-            f"first={first_type} - {first_message}"
-        )
-
-    citation_guard = _dict_or_empty(metadata.get("rag_citation_guard"))
-    guard_errors = _list_or_empty(citation_guard.get("errors"))
-    if citation_guard and citation_guard.get("valid") is False and guard_errors:
-        lines.append(f"RAG citation guard: {_short_text(guard_errors[0], limit=96)}")
-
-    forecast_report = _dict_or_empty(result.get("forecast_report"))
-    forecast_flags = _list_or_empty(forecast_report.get("data_quality_flags"))
-    if forecast_flags:
-        flags = ", ".join(str(flag) for flag in forecast_flags[:4])
-        lines.append(f"Forecast data quality: {_short_text(flags, limit=96)}")
-    ignored_reason = str(result.get("forecast_ev_ignored_reason") or "").strip()
-    if ignored_reason:
-        lines.append(f"Forecast EV ignored: {ignored_reason}")
-
-    return lines[:6]
+    return _display_data_quality_warning_lines(result)
 
 
 def _short_text(value: Any, limit: int = 60) -> str:
@@ -491,21 +399,7 @@ def _risk(result: dict[str, Any]) -> dict[str, Any]:
 
 
 def _risk_governor_label(risk: dict) -> str:
-    payload = _dict_or_empty(risk)
-    status = payload.get("status", "unknown")
-    reason_codes = payload.get("reason_codes")
-    if isinstance(reason_codes, list) and "market_regime_defensive" in {
-        str(item) for item in reason_codes
-    }:
-        return "No sizing (defensive market)"
-    labels = {
-        "deployable": "Execution ready",
-        "conditional_deployable": "Conditional watchlist",
-        "wait_for_pullback": "Wait for pullback",
-        "watchlist_only": "Watchlist only",
-        "reject": "System rejected",
-    }
-    return labels.get(str(status), str(status))
+    return _display_risk_governor_label(risk)
 
 
 def _key_risks(result: dict[str, Any]) -> list[str]:
@@ -1050,6 +944,7 @@ class RichFormatter:
             data = result if isinstance(result, dict) else {}
             ticker = _ticker(data, packet)
             verdict = _verdict(data)
+            display = build_display_packet(data)
             rating = _rating(data, packet)
             rating_style = self._rating_style(rating)
             confidence = _model_confidence(verdict)
@@ -1062,27 +957,17 @@ class RichFormatter:
             )
             current_price = verdict.get("current_price")
             fair_value = verdict.get("fair_value")
-            fair_value_low = verdict.get("fair_value_low")
-            fair_value_high = verdict.get("fair_value_high")
-            fair_value_range = _fair_value_range_text(
-                fair_value_low, fair_value_high
-            )
+            fair_value_range = display.valuation.range_text
             risk_overvalued = _optional_bool(verdict.get("risk_overvalued"))
-            valuation_unverified = _valuation_gap_is_unverified(data, verdict)
+            valuation_unverified = display.valuation.gap_unverified
             value_gap = _price_diff_pct(fair_value, current_price)
-            value_status = _valuation_status(
-                fair_value,
-                current_price,
-                fair_value_low,
-                fair_value_high,
-            )
+            value_status = display.valuation.status
             value_style = "green" if (value_gap or 0) >= 0 else "red"
             entry_low, entry_high = _entry_bounds(verdict)
             target = verdict.get("target_price")
             stop = verdict.get("stop_loss")
             upside = _move_pct(target, current_price)
             downside = _downside_pct(stop, current_price)
-            risk = _risk(data)
 
             consensus = data.get("consensus_reached")
             if consensus is None:
@@ -1207,7 +1092,7 @@ class RichFormatter:
             )
 
             # FIX: ISSUE 3 — Display breaking-news headlines below debate arguments.
-            breaking_lines = _breaking_news_lines(data)
+            breaking_lines = display.breaking_news.lines
             breaking_panel = None
             if breaking_lines:
                 breaking_panel = Panel(
@@ -1225,7 +1110,7 @@ class RichFormatter:
             sys_table = Table.grid(padding=(0, 2))
             sys_table.add_column(style="bold cyan", no_wrap=True, width=18)
             sys_table.add_column(style="white")
-            sys_table.add_row("Risk Governor", self._terminal_risk_governor_line(risk))
+            sys_table.add_row("Risk Governor", display.risk_governor_line)
 
             if risks:
                 sys_table.add_row("Key Risks", "\n".join(f"• {r}" for r in risks))
@@ -1234,7 +1119,7 @@ class RichFormatter:
                     "Key Catalysts", "\n".join(f"• {c}" for c in catalysts)
                 )
 
-            quality_lines = _data_quality_warning_lines(data)
+            quality_lines = display.system_warnings
             if quality_lines:
                 sys_table.add_row(
                     "Data Quality",
@@ -1431,6 +1316,7 @@ class MarkdownFormatter:
         try:
             data = result if isinstance(result, dict) else {}
             verdict = _verdict(data)
+            display = build_display_packet(data)
             ticker = _ticker(data, packet)
             rating = _rating(data, packet)
             confidence = _model_confidence(verdict)
@@ -1439,34 +1325,21 @@ class MarkdownFormatter:
             confidence_text = "N/A" if confidence is None else f"{confidence:.0%}"
             current_price = verdict.get("current_price")
             fair_value = verdict.get("fair_value")
-            fair_value_low = verdict.get("fair_value_low")
-            fair_value_high = verdict.get("fair_value_high")
-            fair_value_range = _fair_value_range_text(
-                fair_value_low, fair_value_high
-            )
+            fair_value_range = display.valuation.range_text
             risk_overvalued = _optional_bool(verdict.get("risk_overvalued"))
-            valuation_unverified = _valuation_gap_is_unverified(data, verdict)
+            valuation_unverified = display.valuation.gap_unverified
             value_gap = _price_diff_pct(fair_value, current_price)
-            value_status = (
-                "unverified"
-                if valuation_unverified
-                else _valuation_status(
-                    fair_value,
-                    current_price,
-                    fair_value_low,
-                    fair_value_high,
-                )
-            )
+            value_status = display.valuation.status
             low, high = _entry_bounds(verdict)
             target = verdict.get("target_price")
             stop = verdict.get("stop_loss")
             upside = _move_pct(target, current_price)
             downside = _downside_pct(stop, current_price)
             method = data.get("consensus_method") or verdict.get("consensus_method")
-            risk = _risk(data)
             news_sentiment, news_adj = _get_news(data)
             sources = _sources(data, packet)
             missing = _missing_fields(data, packet)
+            breaking_lines = display.breaking_news.lines
 
             lines = [
                 "---",
@@ -1549,10 +1422,10 @@ class MarkdownFormatter:
                     [
                         "⚠️  BREAKING NEWS",
                         "",
-                        *_breaking_news_lines(data),
+                        *breaking_lines,
                         "",
                     ]
-                    if _breaking_news_lines(data)
+                    if breaking_lines
                     else []
                 ),
                 "---",
@@ -1576,7 +1449,7 @@ class MarkdownFormatter:
                     lines.append("Catalyst data unavailable.")
                 lines.append("")
 
-            quality_lines = _data_quality_warning_lines(data)
+            quality_lines = display.system_warnings
             lines.extend(
                 [
                     "---",
@@ -1585,7 +1458,7 @@ class MarkdownFormatter:
                     "",
                     "| Component | Result |",
                     "|----------|-------|",
-                    f"| **Risk Governor** | {_risk_governor_label(risk)} |",
+                    f"| **Risk Governor** | {display.risk_governor_line} |",
                     f"| **News Sentiment** | {news_sentiment} ({news_adj:+.2f}) |",
                     f"| **Available Data** | {', '.join(sources) if sources else 'None'} |",
                     f"| **Missing Fields** | {', '.join(missing) if missing else 'None'} |",
