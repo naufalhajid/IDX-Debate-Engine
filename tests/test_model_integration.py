@@ -270,9 +270,7 @@ class TestCodexResponsesPayload:
 class TestCodexAdapter:
     """Test Codex adapter forwards model and reasoning settings."""
 
-    def test_codex_flash_uses_medium_reasoning(
-        self, monkeypatch: pytest.MonkeyPatch
-    ):
+    def test_codex_flash_uses_medium_reasoning(self, monkeypatch: pytest.MonkeyPatch):
         calls = []
 
         class FakeChatCodexResponses:
@@ -301,6 +299,7 @@ class TestCodexAdapter:
         assert calls[0]["reasoning_effort"] == "medium"
         assert calls[0]["request_timeout"] == 120
         assert calls[0]["max_tokens"] == 4000
+        assert calls[0]["temperature"] == 0.0
 
     def test_codex_pro_uses_xhigh_reasoning(self, monkeypatch: pytest.MonkeyPatch):
         calls = []
@@ -331,6 +330,7 @@ class TestCodexAdapter:
         assert calls[0]["reasoning_effort"] == "xhigh"
         assert calls[0]["request_timeout"] == 180
         assert calls[0]["max_tokens"] == 10000
+        assert calls[0]["temperature"] == 0.0
 
     def test_codex_reasoning_override_disables_reasoning(
         self, monkeypatch: pytest.MonkeyPatch
@@ -371,6 +371,109 @@ class TestCodexAdapter:
 
 
 # ---------------------------------------------------------------------------
+# Gemini / Anthropic adapter temperature (V4.2 — deterministic scout & CIO)
+# ---------------------------------------------------------------------------
+
+
+class TestGeminiAdapterTemperature:
+    """Test Gemini adapter uses temperature=0 for both tiers (V4.2)."""
+
+    def test_gemini_flash_uses_zero_temperature(self, monkeypatch: pytest.MonkeyPatch):
+        calls = []
+
+        class FakeChatGoogleGenerativeAI:
+            def __init__(self, **kwargs):
+                calls.append(kwargs)
+
+        monkeypatch.setattr("providers.gemini._get_api_key", lambda: "test-key")
+        monkeypatch.setattr(
+            "providers.gemini.settings",
+            MagicMock(GEMINI_FLASH_MODEL="gemini-2.5-flash"),
+        )
+        monkeypatch.setattr(
+            "providers.gemini.ChatGoogleGenerativeAI", FakeChatGoogleGenerativeAI
+        )
+
+        from providers.gemini import get_flash_llm
+
+        get_flash_llm()
+
+        assert calls[0]["temperature"] == 0.0
+
+    def test_gemini_pro_uses_zero_temperature(self, monkeypatch: pytest.MonkeyPatch):
+        calls = []
+
+        class FakeChatGoogleGenerativeAI:
+            def __init__(self, **kwargs):
+                calls.append(kwargs)
+
+        monkeypatch.setattr("providers.gemini._get_api_key", lambda: "test-key")
+        monkeypatch.setattr(
+            "providers.gemini.settings",
+            MagicMock(GEMINI_PRO_MODEL="gemini-2.5-pro"),
+        )
+        monkeypatch.setattr(
+            "providers.gemini.ChatGoogleGenerativeAI", FakeChatGoogleGenerativeAI
+        )
+
+        from providers.gemini import get_pro_llm
+
+        get_pro_llm()
+
+        assert calls[0]["temperature"] == 0.0
+
+
+class TestAnthropicAdapterTemperature:
+    """Test Anthropic adapter uses temperature=0 for both tiers (V4.2)."""
+
+    def test_anthropic_flash_uses_zero_temperature(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        calls = []
+
+        class FakeChatAnthropic:
+            def __init__(self, **kwargs):
+                calls.append(kwargs)
+
+        monkeypatch.setattr(
+            "providers.anthropic_adapter.resolve_anthropic_token", lambda: "t"
+        )
+        monkeypatch.setattr(
+            "providers.anthropic_adapter.settings",
+            MagicMock(ANTHROPIC_FLASH_MODEL="claude-haiku"),
+        )
+        monkeypatch.setattr("langchain_anthropic.ChatAnthropic", FakeChatAnthropic)
+
+        from providers.anthropic_adapter import get_anthropic_flash_llm
+
+        get_anthropic_flash_llm()
+
+        assert calls[0]["temperature"] == 0.0
+
+    def test_anthropic_pro_uses_zero_temperature(self, monkeypatch: pytest.MonkeyPatch):
+        calls = []
+
+        class FakeChatAnthropic:
+            def __init__(self, **kwargs):
+                calls.append(kwargs)
+
+        monkeypatch.setattr(
+            "providers.anthropic_adapter.resolve_anthropic_token", lambda: "t"
+        )
+        monkeypatch.setattr(
+            "providers.anthropic_adapter.settings",
+            MagicMock(ANTHROPIC_PRO_MODEL="claude-sonnet"),
+        )
+        monkeypatch.setattr("langchain_anthropic.ChatAnthropic", FakeChatAnthropic)
+
+        from providers.anthropic_adapter import get_anthropic_pro_llm
+
+        get_anthropic_pro_llm()
+
+        assert calls[0]["temperature"] == 0.0
+
+
+# ---------------------------------------------------------------------------
 # Debate timeout selection
 # ---------------------------------------------------------------------------
 
@@ -378,9 +481,7 @@ class TestCodexAdapter:
 class TestDebateTimeoutSelection:
     """Test provider-aware debate timeout defaults."""
 
-    def test_codex_xhigh_uses_extended_timeout(
-        self, monkeypatch: pytest.MonkeyPatch
-    ):
+    def test_codex_xhigh_uses_extended_timeout(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setattr(
             "services.debate_chamber.settings",
             MagicMock(

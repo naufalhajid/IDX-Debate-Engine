@@ -62,7 +62,7 @@ def get_flash_llm() -> ChatGoogleGenerativeAI:
         return ChatGoogleGenerativeAI(
             model=settings.GEMINI_FLASH_MODEL,
             google_api_key=_get_api_key(),
-            temperature=0.1,
+            temperature=0.0,
             max_tokens=4000,
             request_timeout=60,
         )
@@ -93,7 +93,7 @@ def get_pro_llm() -> ChatGoogleGenerativeAI:
         return ChatGoogleGenerativeAI(
             model=settings.GEMINI_PRO_MODEL,
             google_api_key=_get_api_key(),
-            temperature=0.3,
+            temperature=0.0,
             max_tokens=10000,
             request_timeout=90,
         )

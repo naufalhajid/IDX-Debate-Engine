@@ -34,9 +34,7 @@ _reasoning_override: ContextVar[tuple[str | None, str | None] | None] = ContextV
 
 
 @contextmanager
-def codex_reasoning_override(
-    *, flash: str | None, pro: str | None
-) -> Iterator[None]:
+def codex_reasoning_override(*, flash: str | None, pro: str | None) -> Iterator[None]:
     """Temporarily override Codex reasoning effort for this execution context.
 
     Passing None disables reasoning for that tier, causing the Responses payload
@@ -108,7 +106,7 @@ def get_codex_flash_llm() -> "ChatCodexResponses":
         ):
             kwargs["max_completion_tokens"] = 4000
         else:
-            kwargs["temperature"] = 0.1
+            kwargs["temperature"] = 0.0
             kwargs["max_tokens"] = 4000
 
         return ChatCodexResponses(**kwargs)
@@ -149,7 +147,7 @@ def get_codex_pro_llm() -> "ChatCodexResponses":
         ):
             kwargs["max_completion_tokens"] = 10000
         else:
-            kwargs["temperature"] = 0.3
+            kwargs["temperature"] = 0.0
             kwargs["max_tokens"] = 10000
 
         return ChatCodexResponses(**kwargs)

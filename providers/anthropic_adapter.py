@@ -98,7 +98,7 @@ def get_anthropic_flash_llm() -> ChatAnthropic:
     try:
         return ChatAnthropic(
             model=settings.ANTHROPIC_FLASH_MODEL,
-            temperature=0.1,
+            temperature=0.0,
             max_tokens=4000,
             timeout=60,
             **client_kwargs,
@@ -122,7 +122,7 @@ def get_anthropic_pro_llm() -> ChatAnthropic:
     try:
         return ChatAnthropic(
             model=settings.ANTHROPIC_PRO_MODEL,
-            temperature=0.3,
+            temperature=0.0,
             max_tokens=10000,
             timeout=90,
             **client_kwargs,
