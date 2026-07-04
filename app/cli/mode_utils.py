@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import typer
 
-PIPELINE_MODES = {"multi", "compare"}
-RETIRED_PIPELINE_MODES = {"single"}
+PIPELINE_MODES = {"multi", "single", "compare"}
 
 _SCREENER_MODE_ALIASES = {
     "momentum": "momentum",
@@ -24,12 +23,7 @@ def normalize_pipeline_mode(value: str) -> str:
     mode = _clean_token(value)
     if mode in PIPELINE_MODES:
         return mode
-    if mode in RETIRED_PIPELINE_MODES:
-        raise typer.BadParameter(
-            "single-agent baseline is no longer a production pipeline mode; "
-            "use `idx research compare` for explicit research comparison."
-        )
-    raise typer.BadParameter("pipeline mode must be one of: multi, compare")
+    raise typer.BadParameter("pipeline mode must be one of: multi, single, compare")
 
 
 def normalize_screener_mode(value: str) -> str:

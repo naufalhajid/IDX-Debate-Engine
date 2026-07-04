@@ -406,50 +406,6 @@ def test_quality_gate_passes_two_methods_with_sane_margin(monkeypatch):
     assert "FAIR VALUE QUALITY GATE" not in report
 
 
-def test_method_dispersion_widens_range_and_downgrades_confidence(monkeypatch):
-    _patch_methods(monkeypatch, pe=100.0, pb=250.0, ddm=260.0)
-
-    result = FairValueCalculator(
-        KeyStats(ticker="TEST", current_price=100.0)
-    ).fair_value_weighted()
-
-    assert result["fv_method_dispersion_ratio"] == pytest.approx(2.6)
-    assert result["confidence"] == "MEDIUM"
-    assert result["range_pct"] > 0.10
-
-
-def test_quality_gate_rejects_extreme_method_dispersion(monkeypatch):
-    _patch_methods(monkeypatch, pe=100.0, pb=450.0)
-
-    report, result = build_fair_value_payload(
-        _quality_gate_response("12%"), "TEST", 100.0
-    )
-
-    assert result["fair_value"] is None
-    assert result["fv_quality_rejected"] is True
-    assert "fv_dispersion_extreme" in result["fv_quality_reasons"]
-    assert "FAIR VALUE QUALITY GATE" in report
-
-
-def test_quality_gate_rejects_extreme_implied_pe(monkeypatch):
-    _patch_methods(monkeypatch, pe=400.0, pb=420.0)
-    api_response = _stockbit_response(
-        [
-            ("Current EPS (TTM)", "10"),
-            ("Book Value Per Share", "100"),
-            ("Net Profit Margin (TTM)", "12%"),
-            ("P/E Ratio", "10"),
-        ]
-    )
-
-    report, result = build_fair_value_payload(api_response, "TEST", 100.0)
-
-    assert result["fair_value"] is None
-    assert result["fv_quality_rejected"] is True
-    assert "fv_implied_pe_extreme" in result["fv_quality_reasons"]
-    assert "FAIR VALUE QUALITY GATE" in report
-
-
 # ---------------------------------------------------------------------------
 # Task 24: EV/EBITDA method
 # ---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 # IDX Debate Engine
 
-> **A multi-agent AI decision-support pipeline that fights back against information asymmetry in the Indonesian Stock Exchange.**
+> **A multi-agent AI research pipeline that fights back against information asymmetry in the Indonesian Stock Exchange.**
 
 Indonesia has over 13 million retail investors, but nearly all of them make decisions without access to the structured, multi-angle analysis that institutional traders take for granted. This engine closes that gap by automating an investment committee workflow: multiple AI agents argue opposite sides of each stock, and a CIO judge makes the final call backed by deterministic financial guardrails.
 
@@ -15,11 +15,11 @@ Indonesia has over 13 million retail investors, but nearly all of them make deci
 </p>
 
 <p align="center">
-  <img src="docs/assets/idx_filter.png" alt="uv run idx filter: Top 10 Swing-Trade Candidates table with scores, valuation context, RSI, and strategy signals" width="100%">
+  <img src="docs/assets/idx_filter.png" alt="uv run idx filter: Top 10 Swing-Trade Candidates table with scores, Graham FV, RSI, and strategy signals" width="100%">
 </p>
 
 <p align="center"><em>
-  <code>uv run idx filter</code>: quantitative screener ranks all IDX-listed stocks by composite score, showing valuation context, RSI, liquidity/momentum signals, and strategy signal per ticker.
+  <code>uv run idx filter</code>: quantitative screener ranks all IDX-listed stocks by composite score, showing Graham Fair Value, RSI, upside %, and strategy signal per ticker.
 </em></p>
 
 <p align="center">
@@ -55,19 +55,8 @@ This engine builds the counter-system: one AI argues bull, one argues bear, a th
 ## How the Pipeline Works
 
 ```
-Quant Screener -> Regime Context -> Trade Envelope -> Debate/CIO -> Risk Governor -> Ranking/Sizing -> Display Packet -> Report
+Quant Screener → Regime Detection → Debate Chamber → Risk Governor → Report
 ```
-
-The production path has one authority chain. Forecasting, fair value, research
-comparison, and long-form audits can inform the report, but they do not silently
-override entry/target/stop, ranking, sizing, or deployability.
-
-| Lifecycle | Can affect default `idx pipeline` decisions? | Current examples |
-| --- | --- | --- |
-| Production | Yes, through explicit stage ownership | Quant screener, regime context, trade envelope, CIO verdict, Risk Governor, ranking, position sizing, report artifacts |
-| Advisory | Display/context only by default | Fair value range, forecast report, news context, historical outcome hints |
-| Research | Only when an explicit command is used | `idx research compare`, forecast validation, backtest recalibration, diagnostic scripts |
-| Archived | No runtime authority | Historical audit docs, archived prompt contracts, legacy compatibility artifacts |
 
 <p align="center">
   <img src="docs/assets/idx_pipeline_preflight.png" alt="Pipeline pre-flight checks: LLM API, database, disk, models all green before batch starts" width="100%">
@@ -84,47 +73,28 @@ override entry/target/stop, ranking, sizing, or deployability.
   "ticker": "BBRI",
   "verdict": "HOLD",
   "confidence": 0.65,
-  "reasoning": "The Bullish Analyst correctly identifies the golden cross on MA50 and strong institutional accumulation. However, the Bearish Auditor raises a critical point in Round 2: the technical trade envelope only produces a 1.2x risk/reward ratio in the current HIGH volatility regime. Valuation is shown as context, not as the deployability owner.",
-  "trade_envelope": {
+  "reasoning": "The Bullish Analyst correctly identifies the golden cross on MA50 and strong institutional accumulation. However, the Bearish Auditor raises a critical point in Round 2: the margin of safety (Graham Valuation) has shrunk to 3%, and NPL data shows a slight uptick in the micro-segment. Given the current HIGH volatility regime, the risk/reward ratio of 1.2 is insufficient for a fresh entry.",
+  "recommended_action": {
     "entry_price": 4800,
     "target_price": 5200,
     "stop_loss": 4650,
     "risk_reward_ratio": 1.2
   },
-  "risk_governor": {
-    "status": "reject",
-    "sizing_allowed": false,
-    "reason_codes": ["rr_too_low"]
-  },
-  "advisory_context": {
-    "valuation": "visible when verified; suppressed or labeled when unverified",
-    "forecast": "advisory unless FORECAST_EV_RANKING_ENABLED=true"
-  }
+  "risk_flags": ["VALUATION_STRETCHED", "NPL_CONCERN"]
 }
 ```
-
-Current ownership additions worth knowing:
-
-- `core/orchestrator/runner.py` is the narrow production runner facade.
-- `core/trade_envelope.py` owns deterministic entry, target, stop, and R/R.
-- `services/display_packet.py` owns normalized report/display semantics before
-  Markdown or Rich rendering.
 
 ---
 
 ## System Architecture
 
-The pipeline is coordinated by a narrow `PipelineRunner` facade. Batch execution
-keeps output paths backward-compatible, while new production code should prefer
-public runner/service APIs over private helpers in `core/orchestrator/legacy.py`.
+The pipeline is **sequential at the batch level** and **parallel at the agent level**. Each ticker traverses the entire graph before the next begins, ensuring clean state isolation and predictable token budgeting.
 
 ```mermaid
 graph LR
-    EP["orchestrator.py / idx pipeline"] -->|1. Start| RUN["core/orchestrator/runner.py: PipelineRunner"]
-    RUN --> MR["core/regime.py: Regime Context"]
-    MR --> QF["core/quant_filter/pipeline.py: Quant Filter"]
-    QF --> TE["core/trade_envelope.py: Trade Envelope"]
-    TE --> DC["services/debate_chamber.py: DebateChamber"]
+    EP["orchestrator.py / main.py"] -->|1. Start Pipeline| MR["core/regime.py: Regime Detection"]
+    MR -->|2. Volatility Classification| QF["core/quant_filter/pipeline.py: Quant Filter"]
+    QF -->|3. Selected Tickers| DC["services/debate_chamber.py: DebateChamber"]
 
     subgraph SUB_DC ["Debate Chamber (LangGraph State Machine)"]
         direction LR
@@ -140,20 +110,17 @@ graph LR
         BA -->|Buy Argument| BR[Bearish Auditor]
         BR -->|Risk Audit| CE{Consensus Evaluator}
 
-        CE -->|"No Consensus & R < 3"| SC["Context Pruning / State Cleaner"]
+        CE -->|"No Consensus & R < 3"| SC["State Cleaner: Context Pruning"]
         SC --> BA
 
         CE -->|Consensus / R = 3| DA["Devil's Advocate: Bias Test"]
         DA -->|Pro LLM| CJ["CIO Judge: Final Decision"]
     end
 
-    CJ --> RG["core/risk_governor.py: Deployability Gate"]
-    RG --> HS["core/historical_scorer.py: Advisory Outcome Context"]
-    RG --> RANK["Ranking / Top Selection"]
-    RANK --> PSIZ["core/quant_filter/position_sizer.py: Money Management"]
-    PSIZ --> DP["services/display_packet.py: Display Semantics"]
-    DP --> OUT["Markdown / JSON Reports"]
-    PSIZ --> DB[("db/idx-fundamental.db via SQLAlchemy")]
+    CJ -->|4. CIOVerdict JSON| HS["core/historical_scorer.py: Win-Rate Matcher"]
+    HS -->|5. Final Score| PSIZ["core/quant_filter/position_sizer.py: Money Management"]
+    PSIZ -->|6. Markdown Report| OUT["output/TOP_3_SWING_TRADES.md"]
+    PSIZ -->|7. Database| DB[("db/idx-fundamental.db via SQLAlchemy")]
 ```
 
 ---
@@ -167,7 +134,7 @@ graph LR
 A LangGraph `StateGraph` with typed `DebateChamberState`, purpose-built to counteract the positive bias common in single-prompt LLM analysis.
 
 **Scout Phase** *(parallel, gemini-flash-lite):*
-- **Fundamental Scout**: EPS TTM, ROE, DER, PBV, and verified valuation context
+- **Fundamental Scout**: EPS TTM, ROE, DER, PBV, Graham Number, multi-method fair value
 - **Chartist**: MA50, MA200, RSI, ATR (pre-computed in Python, not LLM-generated)
 - **Sentiment Scout**: News freshness scoring, Stockbit analyst signals
 
@@ -175,19 +142,10 @@ A LangGraph `StateGraph` with typed `DebateChamberState`, purpose-built to count
 - **Anti-groupthink protocol:** Bull vs Bear across rounds. In Round 2, the Bear is programmatically forbidden from repeating any argument from Round 1; it must challenge the Bull's margin of safety using ATR-based downside
 - **Devil's Advocate node:** triggered automatically if consensus appears too early, before it reaches the CIO
 
-**CIO Judge** *(configured pro LLM):*
+**CIO Judge** *(gemini-pro-preview):*
 - Applies a strict **Conflict Resolution Matrix**: `Fundamental ✅ + Technical ✅ → BUY`, `Fundamental ✅ + Technical ❌ → HOLD`, etc.
 
-### 2. Deterministic Trade Envelope
-
-**File:** [`core/trade_envelope.py`](core/trade_envelope.py)
-
-The debate chamber no longer owns the trade geometry implementation. Entry,
-target, stop, R/R, noise rejection, resistance-first target selection, and
-sector swing caps are computed in a deterministic service before the CIO verdict
-is interpreted.
-
-### 3. Quantitative Screener (v3.2)
+### 2. Quantitative Screener (v3.2)
 
 **Files:** [`core/quant_filter/config.py`](core/quant_filter/config.py) · [`core/quant_filter/pipeline.py`](core/quant_filter/pipeline.py)
 
@@ -196,13 +154,13 @@ Multi-stage screening across all IDX-listed stocks:
 - **Stage 2 (Technical Gate):** Price > SMA50, RSI < 80, Min ADT Rp 5B
 - **Stage 3 (Composite Scoring):** 70/30 Technical-Fundamental split optimised for swing trading momentum
 
-### 4. Market-Adaptive Regime Detection
+### 3. Market-Adaptive Regime Detection
 
 **File:** [`core/regime.py`](core/regime.py)
 
 Indonesia's equity market has no public volatility index. The system builds its own regime signal: **20-day realized volatility** of `^JKSE` (IHSG) computed from daily returns via yfinance. Volatility directly controls API concurrency, risk-reward caps, and minimum AI confidence thresholds.
 
-### 5. Deterministic Risk Governor
+### 4. Deterministic Risk Governor
 
 **File:** [`core/risk_governor.py`](core/risk_governor.py)
 
@@ -210,28 +168,16 @@ A fully deterministic, **LLM-free gate** that classifies every CIO verdict befor
 - Rejects trades where the LLM hallucinated a target below the current price or a stop above it
 - Validates the Risk/Reward ratio against a tier-aware floor (1.3x for large-caps ≥ Rp 50T, 1.5x default) — recomputing it from entry/target/stop when the verdict omits it
 - Downgrades executable setups to watchlist-only during DEFENSIVE market regimes
-- Treats verified overvaluation as a deployability concern only under explicit
-  policy conditions; otherwise valuation remains advisory context
 
-(All entry/target/stop prices are snapped to official IDX tick sizes upstream in
-the Python-computed trade envelope.)
+(All entry/target/stop prices are snapped to official IDX tick sizes upstream, in the debate chamber's Python-computed trade envelope.)
 
-### 6. Display Packet and Report Semantics
-
-**Files:** [`services/display_packet.py`](services/display_packet.py) - [`services/report_formatter.py`](services/report_formatter.py)
-
-Reports consume normalized display state instead of inventing policy from raw
-internals. This keeps Markdown, Rich CLI, API, and future UI surfaces aligned on
-actionability labels, valuation visibility, forecast status, breaking-news
-warnings, and Risk Governor messaging.
-
-### 7. Adaptive Planner & Resilience Engine
+### 5. Adaptive Planner & Resilience Engine
 
 **Files:** [`core/adaptive_planner.py`](core/adaptive_planner.py)
 
 Structured failure taxonomy for inherently unreliable external dependencies (Stockbit, yfinance, Gemini API). Instead of crashing the batch on any error, the system makes context-aware recovery decisions: `PROCEED_PARTIAL`, `SKIP_TICKER`, `FALLBACK`, `ABORT_BATCH`.
 
-### 8. Evidence Ranker
+### 6. Evidence Ranker
 
 **File:** [`services/evidence_ranker.py`](services/evidence_ranker.py)
 
@@ -248,9 +194,7 @@ IDX-Debate-Engine/
 │   ├── cli/                        # Rich console UI and Typer commands
 │   └── ui/                         # Svelte 5 + SvelteKit frontend dashboard
 ├── core/
-│   ├── orchestrator/               # PipelineRunner facade + legacy compatibility
 │   ├── regime.py                   # ^JKSE realized-vol regime classifier
-│   ├── trade_envelope.py           # Deterministic entry/target/stop/R/R owner
 │   ├── risk_governor.py            # Deterministic buyability gate
 │   ├── portfolio_optimizer.py      # Greedy sector-cap diversifier
 │   ├── adaptive_planner.py         # Failure recovery decision engine
@@ -258,14 +202,13 @@ IDX-Debate-Engine/
 ├── services/
 │   ├── debate_chamber.py           # LangGraph state machine
 │   ├── debate_prompts/             # Versioned prompt corpus (manifest.json)
-│   ├── display_packet.py           # Normalized report/display semantics
 │   └── fair_value_calculator.py    # Multi-method IDX fair value engine
 ├── providers/
 │   ├── gemini.py                   # LangChain Gemini Flash/Pro adapter
 │   └── stockbit.py                 # Stockbit API client
 ├── schemas/                        # Pydantic v2 data contracts
 ├── db/                             # SQLAlchemy async models
-├── tests/                          # pytest suite
+├── tests/                          # 50 test files (518 test cases)
 ├── output/                         # Generated Markdown trade reports
 └── orchestrator.py                 # Batch pipeline entry point
 ```
@@ -292,8 +235,6 @@ uv run idx filter mr                # Mean-reversion swing screener
 uv run idx pipeline                 # Full momentum pipeline
 uv run idx pipeline mr              # Full mean-reversion pipeline
 uv run idx pipeline choose          # Interactive mode selector
-uv run idx research compare         # Explicit single-vs-multi research comparison
-uv run idx backtest evaluate-open   # Explicit backtest-memory maintenance
 uv run idx debate BBRI BBCA TLKM    # Debate specific tickers
 uv run idx scan                     # Quick fundamental sweep
 ```
@@ -306,15 +247,14 @@ For scripts and CI, the explicit flags remain available:
 
 ```bash
 uv run idx filter --mode mean-reversion --top 10
-uv run idx research compare --screener-mode mean-reversion
+uv run idx pipeline --mode compare --screener-mode mean-reversion
 ```
 
 ---
 
 ## Testing
 
-The pytest suite covers unit, integration, report, risk-governor, CLI, and
-pipeline reliability behavior.
+518 test cases across 50 test files covering unit, integration, and pipeline reliability tests.
 
 ```bash
 uv run pytest -v

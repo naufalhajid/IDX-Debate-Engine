@@ -99,8 +99,6 @@ class Settings(BaseSettings):
     CONVICTION_WEIGHT_CONFIDENCE: float = 0.50
     CONVICTION_WEIGHT_RR_RATIO: float = 0.50
     CONVICTION_RR_NORMALIZATION_CAP: float = 5.0
-    FORECAST_EV_RANKING_ENABLED: bool = False
-    PIPELINE_AUTO_EVALUATE_MEMORY: bool = False
 
     # Stockbit API
     STOCKBIT_MAX_WORKERS: int = 10

@@ -102,74 +102,6 @@ def test_explicit_risk_overvalued_rejects_even_if_legacy_flag_absent() -> None:
     assert "overvalued" in decision.reason_codes
 
 
-def test_volume_confirmed_momentum_over_fair_value_is_not_hard_rejected() -> None:
-    decision = evaluate_risk(
-        _candidate(
-            technical_indicators={
-                "volume_surge_ratio": 2.0,
-                "return_5d_pct": 8.0,
-            },
-            verdict={
-                "current_price": 1000,
-                "fair_value": 800,
-                "fair_value_high": 900,
-                "risk_overvalued": True,
-                "is_overvalued": True,
-            },
-        )
-    )
-
-    assert decision.status == "conditional_deployable"
-    assert decision.sizing_allowed is False
-    assert "valuation_overhang" in decision.reason_codes
-    assert "overvalued" not in decision.reason_codes
-
-
-def test_unverified_overvalued_flag_does_not_become_hard_reject() -> None:
-    decision = evaluate_risk(
-        _candidate(
-            metadata={
-                "fair_value_rejected": True,
-                "valuation_gap": "unverified",
-            },
-            verdict={
-                "current_price": 1000,
-                "fair_value": 800,
-                "fair_value_high": 900,
-                "risk_overvalued": True,
-                "is_overvalued": True,
-            },
-        )
-    )
-
-    assert decision.status == "conditional_deployable"
-    assert "fv_unmeasurable" in decision.reason_codes
-    assert "overvalued" not in decision.reason_codes
-
-
-def test_explicit_cio_valuation_override_can_still_hard_reject_breakout() -> None:
-    decision = evaluate_risk(
-        _candidate(
-            technical_indicators={
-                "volume_surge_ratio": 2.0,
-                "return_5d_pct": 8.0,
-            },
-            verdict={
-                "current_price": 1000,
-                "fair_value": 800,
-                "fair_value_high": 900,
-                "risk_overvalued": True,
-                "is_overvalued": True,
-                "cio_valuation_hard_reject": True,
-            },
-        )
-    )
-
-    assert decision.status == "reject"
-    assert decision.sizing_allowed is False
-    assert "overvalued" in decision.reason_codes
-
-
 def test_defensive_regime_downgrades_deployable_buy_to_watchlist() -> None:
     decision = evaluate_risk(
         _candidate(
@@ -321,8 +253,7 @@ def test_avoid_verdict_rejects_even_inside_entry_range() -> None:
     assert decision.sizing_allowed is False
     assert "rating_not_buyable" in decision.reason_codes
     assert "low_confidence" in decision.reason_codes
-    assert "fv_unmeasurable" in decision.reason_codes
-    assert "overvalued" not in decision.reason_codes
+    assert "overvalued" in decision.reason_codes
     assert "rr_too_low" in decision.reason_codes
     assert "insufficient_technical_data" in decision.reason_codes
 

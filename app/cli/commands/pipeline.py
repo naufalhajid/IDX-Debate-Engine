@@ -8,7 +8,6 @@ import typer
 from rich.panel import Panel
 
 from app.cli.mode_utils import (
-    RETIRED_PIPELINE_MODES,
     format_screener_mode,
     is_pipeline_mode_token,
     is_screener_mode_token,
@@ -58,8 +57,9 @@ def _choose_pipeline_modes() -> tuple[str, str]:
     selected_mode = _select_from_menu(
         title="Pipeline mode",
         choices=[
-            ("1", "multi", "Production multi-agent debate"),
-            ("2", "compare", "Research comparison (deprecated here)"),
+            ("1", "multi", "Multi-agent debate"),
+            ("2", "single", "Single-agent baseline"),
+            ("3", "compare", "Compare multi-agent vs single-agent"),
         ],
         default="multi",
     )
@@ -111,9 +111,6 @@ def _resolve_pipeline_tokens(
     positional_tickers: list[str] = []
 
     for token in extra_args:
-        cleaned = token.strip().lower().replace("-", "_")
-        if cleaned in RETIRED_PIPELINE_MODES:
-            normalize_pipeline_mode(token)
         if is_pipeline_mode_token(token):
             token_mode = normalize_pipeline_mode(token)
             if mode is not None and token_mode != selected_mode:
@@ -146,44 +143,6 @@ def _resolve_pipeline_tokens(
     return selected_mode, selected_screener_mode, tuple(positional_tickers)
 
 
-def _build_orchestrator_argv(
-    *,
-    dry_run: bool,
-    output_dir: Path,
-    tickers: tuple[str, ...],
-    skip_scraping: bool,
-    no_interactive: bool,
-    mode: str,
-    screener_mode: str,
-    verbose: bool,
-    portfolio_loss_pct: float | None = None,
-) -> list[str]:
-    argv = [
-        "--output-dir",
-        str(output_dir),
-        "--mode",
-        mode,
-        "--screener-mode",
-        screener_mode,
-    ]
-    if mode == "compare":
-        argv.append("--research-compare")
-    if dry_run:
-        argv.append("--dry-run")
-    if skip_scraping:
-        argv.append("--skip-scraping")
-    if no_interactive:
-        argv.append("--no-interactive")
-    if verbose:
-        argv.append("--verbose")
-    if tickers:
-        argv.append("--tickers")
-        argv.extend(ticker.strip().upper() for ticker in tickers if ticker.strip())
-    if portfolio_loss_pct is not None:
-        argv.extend(["--portfolio-loss-pct", str(portfolio_loss_pct)])
-    return argv
-
-
 def run_pipeline_cli(
     *,
     dry_run: bool,
@@ -198,17 +157,27 @@ def run_pipeline_cli(
 ) -> None:
     import orchestrator
 
-    argv = _build_orchestrator_argv(
-        dry_run=dry_run,
-        output_dir=output_dir,
-        tickers=tickers,
-        skip_scraping=skip_scraping,
-        no_interactive=no_interactive,
-        mode=mode,
-        screener_mode=screener_mode,
-        verbose=verbose,
-        portfolio_loss_pct=portfolio_loss_pct,
-    )
+    argv = [
+        "--output-dir",
+        str(output_dir),
+        "--mode",
+        mode,
+        "--screener-mode",
+        screener_mode,
+    ]
+    if dry_run:
+        argv.append("--dry-run")
+    if skip_scraping:
+        argv.append("--skip-scraping")
+    if no_interactive:
+        argv.append("--no-interactive")
+    if verbose:
+        argv.append("--verbose")
+    if tickers:
+        argv.append("--tickers")
+        argv.extend(ticker.strip().upper() for ticker in tickers if ticker.strip())
+    if portfolio_loss_pct is not None:
+        argv.extend(["--portfolio-loss-pct", str(portfolio_loss_pct)])
     orchestrator._run_cli(argv)
 
 
@@ -252,10 +221,7 @@ def pipeline_command(
         str | None,
         typer.Option(
             "--mode",
-            help=(
-                "Pipeline mode: multi (default). compare is a temporary "
-                "deprecated alias for `idx research compare`."
-            ),
+            help="Pipeline mode: multi (default, all tickers), single, or compare.",
         ),
     ] = None,
     screener_mode: Annotated[
@@ -348,11 +314,6 @@ def pipeline_command(
             expand=False,
         )
     )
-    if selected_mode == "compare":
-        console.print(
-            "[idx.warn]Deprecated:[/idx.warn] `idx pipeline compare` is a "
-            "temporary alias. Use `idx research compare` for comparison runs."
-        )
 
     run_pipeline_cli(
         dry_run=dry_run,

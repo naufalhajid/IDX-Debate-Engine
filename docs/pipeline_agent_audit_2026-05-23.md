@@ -1,10 +1,5 @@
 # Pipeline Agent Audit - 2026-05-23
 
-> Historical snapshot: this report captures the pipeline and prompt surface as
-> audited on 2026-05-23. It is retained for research and regression context, but
-> it is not the current architecture contract. For current production/advisory
-> boundaries, use `docs/architecture_decision_map.md`.
-
 Scope: production orchestrator pipeline (`orchestrator.py` -> `core/orchestrator/legacy.py` -> `services/debate_chamber.py`), direct debate wrapper (`run_debate.py`), API stream path (`app/api/routers/stocks.py`), prompt pack config, and current output artifacts.
 
 No code was changed. This is a surgical architecture audit and restructuring recommendation.

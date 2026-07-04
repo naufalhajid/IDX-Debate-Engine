@@ -6,7 +6,6 @@ from core.orchestrator.legacy import (
     compute_conviction_score,
     select_top_n,
 )
-from core.settings import settings
 
 
 def _outcome(ticker: str, outcome: str) -> TradeOutcome:
@@ -31,30 +30,6 @@ def _outcome(ticker: str, outcome: str) -> TradeOutcome:
 
 def _debate_record(ticker: str, rating: str) -> dict:
     return {"ticker": ticker, "verdict": {"rating": rating, "confidence": 0.8}}
-
-
-def _rankable_entry(
-    ticker: str,
-    *,
-    forecast_ev_pct: float | None = None,
-    validation_status: str = "production",
-) -> dict:
-    entry = {
-        "ticker": ticker,
-        "sector_key": ticker,
-        "forecast_report": {
-            "validation_summary": {"status": validation_status},
-        },
-        "verdict": {
-            "ticker": ticker,
-            "rating": "BUY",
-            "confidence": 0.60,
-            "risk_reward_ratio": 1.5,
-        },
-    }
-    if forecast_ev_pct is not None:
-        entry["forecast_ev_pct"] = forecast_ev_pct
-    return entry
 
 
 def test_realized_outcomes_take_priority_over_debate_history() -> None:
@@ -232,40 +207,3 @@ def test_forecast_ev_does_not_stack_on_realized_adjustment() -> None:
     )
 
     assert score == pytest.approx(base_score + 0.05)
-
-
-@pytest.mark.parametrize("validation_status", ["production", "research_only"])
-def test_select_top_n_ignores_forecast_ev_when_ranking_disabled(
-    monkeypatch,
-    validation_status: str,
-) -> None:
-    monkeypatch.setattr(settings, "FORECAST_EV_RANKING_ENABLED", False)
-    entry = _rankable_entry(
-        "BBCA",
-        forecast_ev_pct=50.0,
-        validation_status=validation_status,
-    )
-    expected_score, _ = compute_conviction_score(
-        entry["verdict"],
-        ticker="BBCA",
-        realized_outcomes=[],
-    )
-
-    top = select_top_n([entry], realized_outcomes=[])
-
-    assert top[0]["conviction_score"] == pytest.approx(round(expected_score, 4))
-
-
-def test_select_top_n_uses_forecast_ev_when_ranking_enabled(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "FORECAST_EV_RANKING_ENABLED", True)
-    entry = _rankable_entry("BBCA", forecast_ev_pct=5.0)
-    expected_score, _ = compute_conviction_score(
-        entry["verdict"],
-        ticker="BBCA",
-        realized_outcomes=[],
-        forecast_ev_pct=5.0,
-    )
-
-    top = select_top_n([entry], realized_outcomes=[])
-
-    assert top[0]["conviction_score"] == pytest.approx(round(expected_score, 4))

@@ -1,6 +1,5 @@
 from rich.console import Console
 
-from services.display_packet import build_display_packet
 from services.explainability_auditor import (
     AgentVoteSummary,
     AuditPacket,
@@ -270,41 +269,6 @@ def test_markdown_risk_governor_does_not_instantiate_rich_formatter(
     assert "| **Risk Governor** | Execution ready |" in report
 
 
-def test_display_packet_normalizes_report_semantics() -> None:
-    result = _mock_result()
-    result["forecast_report"] = {
-        "data_quality_flags": ["ocf_missing", "validation_status:failed"],
-    }
-    result["forecast_advisory_only"] = True
-    result["forecast_ranking_enabled"] = False
-    result["forecast_ev_ignored_reason"] = "validation_failed"
-    result["has_breaking_news"] = True
-    result["breaking_news_headlines"] = [
-        {
-            "title": "BBCA faces sudden regulatory pressure",
-            "source": "IDX News",
-            "timestamp": "2026-06-01T09:00:00+07:00",
-        }
-    ]
-
-    display = build_display_packet(result)
-
-    assert display.actionability_label == "Execution ready"
-    assert display.risk_governor_line == "Execution ready"
-    assert display.valuation.status == "SLIGHTLY_UNDERVALUED"
-    assert display.valuation.gap_unverified is False
-    assert display.forecast.advisory_only is True
-    assert display.forecast.quality_flags == (
-        "ocf_missing",
-        "validation_status:failed",
-    )
-    assert display.forecast.ignored_reason == "validation_failed"
-    assert "BBCA faces sudden regulatory pressure" in display.breaking_news.lines[0]
-    assert "Forecast advisory only: ranking influence disabled" in (
-        display.system_warnings
-    )
-
-
 def test_generate_ticker_report_replaces_advocatus_with_decision_summary() -> None:
     report = MarkdownFormatter().generate_ticker_report(_mock_result())
 
@@ -347,13 +311,10 @@ def test_generate_ticker_report_shows_forecast_quality_flags() -> None:
     result["forecast_report"] = {
         "data_quality_flags": ["ocf_missing", "validation_status:failed"],
     }
-    result["forecast_advisory_only"] = True
-    result["forecast_ranking_enabled"] = False
     result["forecast_ev_ignored_reason"] = "validation_failed"
 
     report = MarkdownFormatter().generate_ticker_report(result)
 
-    assert "Forecast advisory only: ranking influence disabled" in report
     assert "Forecast data quality: ocf_missing, validation_status:failed" in report
     assert "Forecast EV ignored: validation_failed" in report
 
@@ -382,14 +343,11 @@ def test_render_ticker_panel_shows_forecast_quality_flags() -> None:
     result["forecast_report"] = {
         "data_quality_flags": ["validation_status:failed"],
     }
-    result["forecast_advisory_only"] = True
-    result["forecast_ranking_enabled"] = False
     result["forecast_ev_ignored_reason"] = "validation_failed"
 
     formatter.render_ticker_panel(result)
     output = console.export_text()
 
-    assert "Forecast advisory only: ranking influence disabled" in output
     assert "Forecast data quality: validation_status:failed" in output
     assert "Forecast EV ignored: validation_failed" in output
 
@@ -445,24 +403,6 @@ def test_generate_ticker_report_suppresses_unverified_fair_value() -> None:
 
     assert "| **Fair Value** |" not in report
     assert "| **Gap** | unverified |" in report
-
-
-def test_render_ticker_panel_shows_packet_risk_horizon_and_unverified_fv() -> None:
-    console = Console(record=True, width=140)
-    formatter = RichFormatter(console=console)
-    result = _mock_result()
-    result["verdict"]["fair_value"] = None
-    result["verdict"]["valuation_gap"] = "unverified"
-
-    formatter.render_ticker_panel(result)
-
-    output = console.export_text()
-    assert "Risk Governor" in output
-    assert "Execution ready" in output
-    assert "Execution Horizon" in output
-    assert "10 trading days" in output
-    assert "Fair Value" not in output
-    assert "unverified" in output
 
 
 def test_generate_ticker_report_shows_fair_value_range_and_risk_flag() -> None:

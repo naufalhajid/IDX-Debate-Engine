@@ -115,9 +115,6 @@ class TestGracefulFallback:
 
         from core.forecasting.schemas import ForecastReport, ValidationSummary
         from core.orchestrator.legacy import _inject_forecast_reports
-        from core.settings import settings
-
-        monkeypatch.setattr(settings, "FORECAST_EV_RANKING_ENABLED", False)
 
         class FakeForecastingService:
             def predict(self, *_args, **_kwargs):
@@ -159,49 +156,6 @@ class TestGracefulFallback:
         assert results[0]["forecast_report"]["validation_summary"]["status"] == "failed"
         assert "forecast_ev_pct" not in results[0]
         assert results[0]["forecast_ev_ignored_reason"] == "validation_failed"
-        assert results[0]["forecast_advisory_only"] is True
-        assert results[0]["forecast_ranking_enabled"] is False
-
-    def test_inject_forecast_keeps_production_ev_advisory_when_ranking_disabled(self, monkeypatch):
-        import asyncio
-        import sys
-        import types
-        from datetime import date
-
-        from core.forecasting.schemas import ForecastReport, ValidationSummary
-        from core.orchestrator.legacy import _inject_forecast_reports
-        from core.settings import settings
-
-        monkeypatch.setattr(settings, "FORECAST_EV_RANKING_ENABLED", False)
-
-        class FakeForecastingService:
-            def predict(self, *_args, **_kwargs):
-                return ForecastReport(
-                    ticker="BBCA",
-                    as_of=date(2026, 6, 30),
-                    horizon_days=10,
-                    expected_value=0.42,
-                    risk_adjusted_expected_value=0.20,
-                    validation_summary=ValidationSummary(
-                        horizon_days=10,
-                        status="production",
-                    ),
-                    data_quality_flags=["validation_status:production"],
-                )
-
-        fake_module = types.ModuleType("core.forecasting")
-        fake_module.ForecastingService = FakeForecastingService
-        monkeypatch.setitem(sys.modules, "core.forecasting", fake_module)
-        results = [{"ticker": "BBCA", "status": "success", "verdict": _valid_verdict()}]
-
-        asyncio.run(_inject_forecast_reports(results))
-
-        assert results[0]["forecast_report"]["validation_summary"]["status"] == "production"
-        assert "forecast_ev_pct" not in results[0]
-        assert "forecast_ev_downweight" not in results[0]
-        assert results[0]["forecast_ev_ignored_reason"] == "forecast_ranking_disabled"
-        assert results[0]["forecast_advisory_only"] is True
-        assert results[0]["forecast_ranking_enabled"] is False
 
     def test_inject_forecast_uses_full_risk_adjusted_ev_when_production(self, monkeypatch):
         import asyncio
@@ -211,9 +165,6 @@ class TestGracefulFallback:
 
         from core.forecasting.schemas import ForecastReport, ValidationSummary
         from core.orchestrator.legacy import _inject_forecast_reports
-        from core.settings import settings
-
-        monkeypatch.setattr(settings, "FORECAST_EV_RANKING_ENABLED", True)
 
         class FakeForecastingService:
             def predict(self, *_args, **_kwargs):
@@ -240,10 +191,8 @@ class TestGracefulFallback:
         assert results[0]["forecast_ev_pct"] == pytest.approx(20.0)
         assert "forecast_ev_downweight" not in results[0]
         assert "forecast_ev_ignored_reason" not in results[0]
-        assert "forecast_advisory_only" not in results[0]
-        assert results[0]["forecast_ranking_enabled"] is True
 
-    def test_inject_forecast_keeps_research_only_ev_advisory_when_ranking_disabled(self, monkeypatch):
+    def test_inject_forecast_downweights_research_only_ev(self, monkeypatch):
         import asyncio
         import sys
         import types
@@ -251,50 +200,6 @@ class TestGracefulFallback:
 
         from core.forecasting.schemas import ForecastReport, ValidationSummary
         from core.orchestrator.legacy import _inject_forecast_reports
-        from core.settings import settings
-
-        monkeypatch.setattr(settings, "FORECAST_EV_RANKING_ENABLED", False)
-
-        class FakeForecastingService:
-            def predict(self, *_args, **_kwargs):
-                return ForecastReport(
-                    ticker="BBCA",
-                    as_of=date(2026, 6, 30),
-                    horizon_days=10,
-                    expected_value=0.42,
-                    risk_adjusted_expected_value=0.20,
-                    validation_summary=ValidationSummary(
-                        horizon_days=10,
-                        status="research_only",
-                    ),
-                    data_quality_flags=["validation_status:research_only"],
-                )
-
-        fake_module = types.ModuleType("core.forecasting")
-        fake_module.ForecastingService = FakeForecastingService
-        monkeypatch.setitem(sys.modules, "core.forecasting", fake_module)
-        results = [{"ticker": "BBCA", "status": "success", "verdict": _valid_verdict()}]
-
-        asyncio.run(_inject_forecast_reports(results))
-
-        assert results[0]["forecast_report"]["validation_summary"]["status"] == "research_only"
-        assert "forecast_ev_pct" not in results[0]
-        assert "forecast_ev_downweight" not in results[0]
-        assert results[0]["forecast_ev_ignored_reason"] == "forecast_ranking_disabled"
-        assert results[0]["forecast_advisory_only"] is True
-        assert results[0]["forecast_ranking_enabled"] is False
-
-    def test_inject_forecast_downweights_research_only_ev_when_enabled(self, monkeypatch):
-        import asyncio
-        import sys
-        import types
-        from datetime import date
-
-        from core.forecasting.schemas import ForecastReport, ValidationSummary
-        from core.orchestrator.legacy import _inject_forecast_reports
-        from core.settings import settings
-
-        monkeypatch.setattr(settings, "FORECAST_EV_RANKING_ENABLED", True)
 
         class FakeForecastingService:
             def predict(self, *_args, **_kwargs):
@@ -321,8 +226,6 @@ class TestGracefulFallback:
         assert results[0]["forecast_ev_pct"] == pytest.approx(7.0)
         assert results[0]["forecast_ev_downweight"] == pytest.approx(0.35)
         assert "forecast_ev_ignored_reason" not in results[0]
-        assert "forecast_advisory_only" not in results[0]
-        assert results[0]["forecast_ranking_enabled"] is True
 
 
 class _PredictionColumnModel(ModelBase):

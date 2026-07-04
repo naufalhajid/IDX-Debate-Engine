@@ -1,11 +1,5 @@
 # IDX Swing-Trade Pipeline — Exhaustive Audit Report
 
-> Historical snapshot: this report captures the pipeline state observed on
-> 2026-06-11. It is retained for audit evidence and regression context, but it
-> is not the current architecture contract. For current decision ownership, use
-> `docs/architecture_decision_map.md`; for implemented cleanup status, use
-> `docs/de_overengineering_execution_checklist_2026-07-03.md`.
-
 **Date:** 2026-06-11  
 **Auditor:** Principal Quant Engineer / AI Systems Architect  
 **Standard:** Make No Mistake — assume real investment decisions  
