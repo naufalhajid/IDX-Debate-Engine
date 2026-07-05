@@ -151,8 +151,11 @@ class Settings(BaseSettings):
     # ── Portfolio Diversification ────────────────────────────────────────────
     # PORTFOLIO_MAX_PER_SECTOR: max saham per sektor dalam top N
     # PORTFOLIO_MIN_CONVICTION: minimum conviction score agar eligible masuk top N
+    # PORTFOLIO_MAX_PER_CLUSTER (V4.3): max saham per correlation cluster (proxy
+    # heuristik lintas-sektor, lihat core.portfolio_optimizer.SECTOR_CORRELATION_CLUSTERS)
     PORTFOLIO_MAX_PER_SECTOR: int = 2
     PORTFOLIO_MIN_CONVICTION: float = 0.30
+    PORTFOLIO_MAX_PER_CLUSTER: int = 2
 
     # ── Trade Envelope ────────────────────────────────────────────────────────
     # Hard floor: stop tidak boleh lebih dari X% dari current price

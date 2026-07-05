@@ -40,6 +40,7 @@ class TradeOutcome(BaseModel):
     evaluation_reason: str | None = None
     evaluation_date: str | None = None
     holding_period_days: int | None = None
+    position_size_pct: float | None = None
 
     @model_validator(mode="after")
     def calculate_pnl_pct(self) -> TradeOutcome:

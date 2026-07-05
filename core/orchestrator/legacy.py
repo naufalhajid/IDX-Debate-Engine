@@ -107,7 +107,7 @@ from core.historical_scorer import (
 from core.idx_market_params import SWING_EXECUTION_HORIZON_DAYS, SWING_TIMEFRAME_LABEL
 from core.ops_telemetry import DEFAULT_TELEMETRY, TickerMetric
 from core.quant_filter.config import canonical_screener_mode
-from core.quant_filter.position_sizer import calculate_positions
+from core.quant_filter.position_sizer import RATING_BASE_ALLOCATION, calculate_positions
 from core.quant_filter.reporting import _build_position_summary
 from core.portfolio_optimizer import diversify_portfolio
 from core.prompt_pack_linter import lint_prompt_pack
@@ -683,7 +683,10 @@ class CliRenderer:
         if price_missing:
             tickers = ", ".join(sorted(price_missing))
             level = "ERROR" if price_missing_has_error else "WARNING"
-            key = ("error" if price_missing_has_error else "warning", f"price:{tickers}")
+            key = (
+                "error" if price_missing_has_error else "warning",
+                f"price:{tickers}",
+            )
             has_error = has_error or price_missing_has_error
             seen.add(key)
             table.add_row(
@@ -2246,10 +2249,7 @@ def _final_selection_label(result: dict[str, Any], *, selected: bool) -> Text:
         )
         risk_status = str(risk.get("status") or "").lower()
         reason_codes = risk.get("reason_codes")
-        if (
-            isinstance(reason_codes, list)
-            and "market_regime_defensive" in reason_codes
-        ):
+        if isinstance(reason_codes, list) and "market_regime_defensive" in reason_codes:
             return Text("No Sizing", style="warn")
         if risk_status == "conditional_deployable":
             return Text("Conditional", style="warn")
@@ -2486,6 +2486,7 @@ def _apply_regime_params(regime_params: dict[str, Any]) -> None:
         ORCHESTRATOR_CONFIG["min_conviction_override"] = regime_params[
             "min_conviction_override"
         ]
+
 
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", "output"))
 JSON_PATH = OUTPUT_DIR / "top10_candidates.json"
@@ -3172,7 +3173,6 @@ def _coerce_confidence(value: Any) -> float | None:
     return max(0.0, min(confidence, 1.0))
 
 
-
 FORECAST_RESEARCH_EV_DOWNWEIGHT = 0.35
 
 
@@ -3201,7 +3201,9 @@ def _forecast_float(value: Any) -> float | None:
     return parsed if math.isfinite(parsed) else None
 
 
-def _forecast_ranking_ev(report_payload: dict[str, Any]) -> tuple[float | None, float | None, str | None]:
+def _forecast_ranking_ev(
+    report_payload: dict[str, Any],
+) -> tuple[float | None, float | None, str | None]:
     status = _forecast_validation_status(report_payload)
     ev = _forecast_float(report_payload.get("risk_adjusted_expected_value"))
     if status == "production":
@@ -3211,8 +3213,13 @@ def _forecast_ranking_ev(report_payload: dict[str, Any]) -> tuple[float | None, 
     if status == "research_only":
         if ev is None:
             return None, None, "risk_adjusted_ev_missing"
-        return ev * FORECAST_RESEARCH_EV_DOWNWEIGHT, FORECAST_RESEARCH_EV_DOWNWEIGHT, None
+        return (
+            ev * FORECAST_RESEARCH_EV_DOWNWEIGHT,
+            FORECAST_RESEARCH_EV_DOWNWEIGHT,
+            None,
+        )
     return None, None, "validation_failed"
+
 
 class SetupCoherenceError(ValueError):
     """Raised when a generated trade setup violates basic price geometry."""
@@ -3733,6 +3740,7 @@ async def _inject_forecast_reports(results: list[dict]) -> None:
 
     try:
         from core.forecasting import ForecastingService
+
         service = ForecastingService()
     except ImportError:
         return
@@ -3743,7 +3751,9 @@ async def _inject_forecast_reports(results: list[dict]) -> None:
         ticker = str(result.get("ticker") or "").upper()
         if not ticker or _result_status(result) != "success":
             continue
-        verdict_dict = result.get("verdict") if isinstance(result.get("verdict"), dict) else {}
+        verdict_dict = (
+            result.get("verdict") if isinstance(result.get("verdict"), dict) else {}
+        )
         if not verdict_dict:
             continue
         try:
@@ -3759,7 +3769,9 @@ async def _inject_forecast_reports(results: list[dict]) -> None:
             result.pop("forecast_ev_pct", None)
             result.pop("forecast_ev_downweight", None)
             result.pop("forecast_ev_ignored_reason", None)
-            ranking_ev, downweight, ignored_reason = _forecast_ranking_ev(report_payload)
+            ranking_ev, downweight, ignored_reason = _forecast_ranking_ev(
+                report_payload
+            )
             if ignored_reason:
                 result["forecast_ev_ignored_reason"] = ignored_reason
             elif ranking_ev is not None:
@@ -3939,7 +3951,8 @@ def _record_backtest_memory(
                 },
             )
             logger.info(
-                "[BacktestMemory] %s: HOLD logged to watchlist_log (not trade record)", ticker
+                "[BacktestMemory] %s: HOLD logged to watchlist_log (not trade record)",
+                ticker,
             )
             return
 
@@ -3950,19 +3963,27 @@ def _record_backtest_memory(
             raise ValueError("missing trade price fields")
         confidence = _coerce_confidence(verdict.get("confidence"))
         _mem_path = getattr(memory, "path", None)
-        if _mem_path and _backtest_record_exists(_mem_path, ticker, entry_price, target_price, stop_loss):
-            logger.info("[BacktestMemory] %s: duplicate open record skipped (dedup)", ticker)
+        if _mem_path and _backtest_record_exists(
+            _mem_path, ticker, entry_price, target_price, stop_loss
+        ):
+            logger.info(
+                "[BacktestMemory] %s: duplicate open record skipped (dedup)", ticker
+            )
             return
         _raw_data = _dict_or_empty(result.get("raw_data"))
         _metadata = _dict_or_empty(result.get("metadata"))
         _technicals = _dict_or_empty(result.get("technical_indicators"))
         # Use explicit None-check so avg_volume_20d=0.0 (genuine zero volume) blocks recording
         _avg_vol = next(
-            (v for v in [
-                _raw_data.get("avg_volume_20d"),
-                _metadata.get("avg_volume_20d"),
-                _technicals.get("avg_volume_20d"),
-            ] if v is not None),
+            (
+                v
+                for v in [
+                    _raw_data.get("avg_volume_20d"),
+                    _metadata.get("avg_volume_20d"),
+                    _technicals.get("avg_volume_20d"),
+                ]
+                if v is not None
+            ),
             None,
         )
         _min_adt = ORCHESTRATOR_CONFIG.get("min_adt_20d", 20_000_000_000)
@@ -3976,14 +3997,24 @@ def _record_backtest_memory(
                 _min_adt,
             )
             return
+        # V4.3: base-allocation-by-rating proxy for real position size (position_sizer
+        # runs later, only on Top N candidates with real capital — not available here).
+        _position_size_pct = RATING_BASE_ALLOCATION.get(verdict_rating)
         if verdict_rating in ("BUY", "STRONG_BUY") and _mem_path:
             from core.portfolio_guard import check_portfolio_allows_new_entry
-            _stop_dist_pct = (entry_price - stop_loss) / entry_price if entry_price > 0 else 0.0
+
+            _stop_dist_pct = (
+                (entry_price - stop_loss) / entry_price if entry_price > 0 else 0.0
+            )
             _allowed, _guard_reason = check_portfolio_allows_new_entry(
-                Path(_mem_path), _stop_dist_pct
+                Path(_mem_path),
+                _stop_dist_pct,
+                new_position_size_pct=_position_size_pct,
             )
             if not _allowed:
-                logger.warning(f"[PortfolioGuard] {ticker}: entry blocked - {_guard_reason}")
+                logger.warning(
+                    f"[PortfolioGuard] {ticker}: entry blocked - {_guard_reason}"
+                )
                 return
         today = datetime.now(timezone.utc).date().isoformat()
         memory.record(
@@ -4003,6 +4034,7 @@ def _record_backtest_memory(
                 hit_stop=None,
                 confidence_at_entry=confidence,
                 notes="auto-recorded at orchestrator completion",
+                position_size_pct=_position_size_pct,
             )
         )
     except ValueError as ve:
@@ -4116,7 +4148,8 @@ async def _run_single_debate(ticker: str, chamber: Any, sector: str = "") -> dic
             error = str(result["error"])
             _guard_status = (result.get("metadata") or {}).get("guard_status", "")
             _is_timeout = _guard_status == "timeout" or any(
-                kw in error.lower() for kw in ("timeout", "timed out", "deadline exceeded")
+                kw in error.lower()
+                for kw in ("timeout", "timed out", "deadline exceeded")
             )
             return _empty_result(
                 ticker,
@@ -4192,8 +4225,12 @@ async def _run_single_debate(ticker: str, chamber: Any, sector: str = "") -> dic
             ],
             "raw_data_summary": result.get("raw_data", ""),
             "metadata": metadata,
-            "regime": result.get("regime"),  # HMM regime dict; read by apply_defensive_guard
-            "trading_params": result.get("trading_params"),  # REGIME_RULES entry for current label
+            "regime": result.get(
+                "regime"
+            ),  # HMM regime dict; read by apply_defensive_guard
+            "trading_params": result.get(
+                "trading_params"
+            ),  # REGIME_RULES entry for current label
             "error": None,
             "status": "success",
             "conviction_score": 0.0,  # Diisi oleh select_top3
@@ -4389,7 +4426,9 @@ async def run_batch_debates(
 
                 # 6. Eksekusi
                 try:
-                    result = await _run_single_debate(ticker, chamber, sector=sector_key)
+                    result = await _run_single_debate(
+                        ticker, chamber, sector=sector_key
+                    )
 
                     # Valuation disagreement: Graham FV (screener) vs debate engine FV
                     if candidates_by_ticker and not result.get("error"):
@@ -4407,7 +4446,10 @@ async def run_batch_debates(
                                     float(debate_fv) if debate_fv else None,
                                 )
                                 result["valuation_disagreement"] = disagreement
-                                if disagreement["valuation_disagreement"] == "SIGNIFICANT":
+                                if (
+                                    disagreement["valuation_disagreement"]
+                                    == "SIGNIFICANT"
+                                ):
                                     logger.warning(
                                         f"[ValuationGap] {ticker}: "
                                         f"Graham Rp{graham_fv:,.0f} vs "
@@ -4713,6 +4755,7 @@ def select_top_n(
     """
     top_n_cfg = ORCHESTRATOR_CONFIG["top_n_selection"]
     max_per_sector = settings.PORTFOLIO_MAX_PER_SECTOR
+    max_per_cluster = settings.PORTFOLIO_MAX_PER_CLUSTER
     min_conviction = ORCHESTRATOR_CONFIG["min_conviction_override"]
 
     scorable: list[dict] = []
@@ -4767,12 +4810,14 @@ def select_top_n(
         top_n=top_n_cfg,
         max_per_sector=max_per_sector,
         min_conviction=min_conviction,
+        max_per_cluster=max_per_cluster,
     )
 
     logger.info(
         f"[Rank] Top {len(top_n)} dipilih: {[t['ticker'] for t in top_n]} "
         f"(dari {len(scorable)} eligible, top_n={top_n_cfg}, "
-        f"sector_cap={max_per_sector}, min_conviction={min_conviction:.0%})"
+        f"sector_cap={max_per_sector}, cluster_cap={max_per_cluster}, "
+        f"min_conviction={min_conviction:.0%})"
     )
     return top_n
 
@@ -5672,6 +5717,7 @@ def _maybe_refresh_macro_rates() -> None:
             return
         logger.info("[Pipeline] Refreshing macro rates (SBN 10Y yield)...")
         from services.stockbit_api_client import StockbitApiClient
+
         try:
             client = StockbitApiClient()
         except Exception:
@@ -5693,16 +5739,24 @@ def _maybe_refresh_sector_benchmarks() -> None:
         if _SECTOR_BENCHMARKS_CACHE_PATH.exists():
             raw = json.loads(_SECTOR_BENCHMARKS_CACHE_PATH.read_text(encoding="utf-8"))
             updated_at = datetime.fromisoformat(raw.get("updated_at", "1970-01-01"))
-            stale = (datetime.now(timezone.utc) - updated_at.replace(tzinfo=timezone.utc)).days > _SECTOR_BENCHMARK_MAX_AGE_DAYS
+            stale = (
+                datetime.now(timezone.utc) - updated_at.replace(tzinfo=timezone.utc)
+            ).days > _SECTOR_BENCHMARK_MAX_AGE_DAYS
         if not stale:
-            logger.info("[Pipeline] Sector benchmarks cache is fresh — skipping refresh.")
+            logger.info(
+                "[Pipeline] Sector benchmarks cache is fresh — skipping refresh."
+            )
             return
         logger.info("[Pipeline] Refreshing sector benchmarks (12 IDX sectors)...")
         from services.stockbit_api_client import StockbitApiClient
+
         try:
             client = StockbitApiClient()
         except Exception as exc:
-            logger.warning("[Pipeline] Sector benchmark refresh skipped — client init failed: {}", exc)
+            logger.warning(
+                "[Pipeline] Sector benchmark refresh skipped — client init failed: {}",
+                exc,
+            )
             return
 
         def _fetch(ticker: str) -> dict:
@@ -5713,7 +5767,9 @@ def _maybe_refresh_sector_benchmarks() -> None:
         _refresh_sector_benchmarks(_fetch)
         logger.info("[Pipeline] Sector benchmarks refreshed and cached.")
     except Exception as exc:
-        logger.warning("[Pipeline] Sector benchmark refresh skipped (non-fatal): {}", exc)
+        logger.warning(
+            "[Pipeline] Sector benchmark refresh skipped (non-fatal): {}", exc
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -5856,10 +5912,14 @@ async def main(
                         )
                     else:
                         logger.warning(f"[Validator] {validation.message}")
-                        logger.error("[Validator] Auto-rerun gagal. Pipeline dihentikan.")
+                        logger.error(
+                            "[Validator] Auto-rerun gagal. Pipeline dihentikan."
+                        )
                         _cli_renderer.flush_buffered_alerts()
                         if raise_on_error:
-                            raise RuntimeError("Candidate validation auto-rerun failed.")
+                            raise RuntimeError(
+                                "Candidate validation auto-rerun failed."
+                            )
                         return
             else:
                 logger.warning(f"[Validator] {validation.message}")
@@ -5910,7 +5970,9 @@ async def main(
             candidates = _apply_pre_cio_filters(candidates, regime)
             tickers = parse_report(candidates=candidates)
             sector_map = parse_sector_map(candidates=candidates)
-            candidates_by_ticker = {c["Ticker"]: c for c in candidates if c.get("Ticker")}
+            candidates_by_ticker = {
+                c["Ticker"]: c for c in candidates if c.get("Ticker")
+            }
     except (FileNotFoundError, ValueError) as e:
         logger.error(f"[Orchestrator] {e}")
         _cli_renderer.flush_buffered_alerts()
@@ -6002,7 +6064,9 @@ async def main(
             _budget_usage["pro_calls"],
             _budget_usage["pro_budget"],
         )
-        raise BudgetExhaustedError("Pro budget exhausted before debate batch could start.")
+        raise BudgetExhaustedError(
+            "Pro budget exhausted before debate batch could start."
+        )
     if _max_feasible < len(tickers):
         _skipped = tickers[_max_feasible:]
         tickers = tickers[:_max_feasible]
@@ -6078,15 +6142,26 @@ async def main(
         _annotate_risk_governor(top_n)
     sizing_candidates = _build_sizing_candidates(top_n)
     _regime_tp = next(
-        (e.get("trading_params") for e in top_n if isinstance(e.get("trading_params"), dict)),
+        (
+            e.get("trading_params")
+            for e in top_n
+            if isinstance(e.get("trading_params"), dict)
+        ),
         None,
     )
     _regime_lbl = next(
-        (str((e.get("regime") or {}).get("label", "")).upper() for e in top_n if e.get("regime")),
+        (
+            str((e.get("regime") or {}).get("label", "")).upper()
+            for e in top_n
+            if e.get("regime")
+        ),
         "",
     )
     if _regime_tp:
-        user_config = {**user_config, "regime_params": {**_regime_tp, "label": _regime_lbl}}
+        user_config = {
+            **user_config,
+            "regime_params": {**_regime_tp, "label": _regime_lbl},
+        }
     logger.debug(f"[Sizing DEBUG] user_config masuk: {user_config}")
     logger.debug(f"[Sizing DEBUG] jumlah candidates: {len(sizing_candidates)}")
     for c in sizing_candidates:
@@ -6310,14 +6385,11 @@ def _watchlist_rows(results: list[dict]) -> list[dict[str, Any]]:
             )
             rating = str(verdict.get("rating") or "").upper()
             risk_status = str(risk.get("status") or "").lower()
-            is_execution_hold = (
-                risk.get("sizing_allowed") is False
-                and risk_status in {
-                    "watchlist_only",
-                    "conditional_deployable",
-                    "wait_for_pullback",
-                }
-            )
+            is_execution_hold = risk.get("sizing_allowed") is False and risk_status in {
+                "watchlist_only",
+                "conditional_deployable",
+                "wait_for_pullback",
+            }
             if rating != "HOLD" and not (
                 rating in {"BUY", "STRONG_BUY"} and is_execution_hold
             ):

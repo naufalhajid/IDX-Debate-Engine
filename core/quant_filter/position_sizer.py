@@ -42,7 +42,12 @@ def compute_kelly_fraction(
     f_full = (win_prob * rr - q) / rr
     return max(0.0, round(f_full * kelly_fraction, 4))
 
-_RATING_BASE_ALLOCATION = {
+
+#: Public: reused by core/portfolio_guard.py as a position-size proxy for
+#: portfolio-heat weighting (V4.3) — the actual sized allocation differs after
+#: Kelly/RR/regime adjustments below, but this base table is the best cheap
+#: estimate available at TradeOutcome-write time, before position_sizer runs.
+RATING_BASE_ALLOCATION = {
     "STRONG_BUY": 0.30,
     "BUY": 0.20,
     "HOLD": 0.10,
@@ -346,7 +351,7 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
         if rating == "AVOID":
             continue
 
-        base_allocation = _RATING_BASE_ALLOCATION.get(rating)
+        base_allocation = RATING_BASE_ALLOCATION.get(rating)
         if base_allocation is None:
             continue
 
@@ -374,9 +379,7 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
             * max(min(rr_ratio, 3.0), 0.50)
         )
         kelly_f = compute_kelly_fraction(confidence, rr_ratio)
-        atr14 = _to_float(
-            candidate.get("atr14") or candidate.get("ATR (14)"), None
-        )
+        atr14 = _to_float(candidate.get("atr14") or candidate.get("ATR (14)"), None)
         market_regime = str(candidate.get("market_regime") or "NORMAL").upper()
         eligible.append(
             {
@@ -398,14 +401,18 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
     total_weight = sum(item["weight"] for item in eligible) or 1.0
     per_position_risk_budget = max_loss_budget / max_positions
     if _regime_max_pct is not None and _regime_max_pct > 0:
-        per_position_risk_budget = min(per_position_risk_budget, total_capital * _regime_max_pct)
+        per_position_risk_budget = min(
+            per_position_risk_budget, total_capital * _regime_max_pct
+        )
 
     for item in eligible:
         allocation_pct = min(
             target_deployment_pct * (item["weight"] / total_weight), allocation_cap
         )
         capital_allocated = total_capital * allocation_pct
-        lot_from_risk = floor(per_position_risk_budget / (item["risk_per_share"] * LOT_SIZE))
+        lot_from_risk = floor(
+            per_position_risk_budget / (item["risk_per_share"] * LOT_SIZE)
+        )
         lot_from_alloc = floor(capital_allocated / (item["entry_price"] * LOT_SIZE))
         final_lot = min(lot_from_risk, lot_from_alloc)
         if final_lot < 1:
@@ -524,4 +531,4 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
     }
 
 
-__all__ = ["calculate_positions", "compute_kelly_fraction"]
+__all__ = ["calculate_positions", "compute_kelly_fraction", "RATING_BASE_ALLOCATION"]
