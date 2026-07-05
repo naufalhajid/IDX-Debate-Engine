@@ -2,7 +2,11 @@
 
 import pytest
 
-from core.quant_filter.position_sizer import calculate_positions
+from core.idx_market_params import ARB_LOWER_LIMIT
+from core.quant_filter.position_sizer import (
+    GAP_RISK_STRESS_ARB_DAYS,
+    calculate_positions,
+)
 
 USER_CONFIG = {
     "total_capital": 100_000_000,
@@ -58,6 +62,40 @@ def test_expected_return_falls_back_to_string_without_target() -> None:
     assert position["expected_return_pct"] == pytest.approx(12.2)
 
 
+def test_gap_stress_loss_uses_worse_of_nominal_or_consecutive_arb_days() -> None:
+    """V4.4: gap-stress loss stresses N consecutive ARB (-15%) days from entry."""
+    result = calculate_positions([_candidate()], USER_CONFIG)
+    [position] = result["positions"]
+
+    entry = position["entry_price"]  # 1050.0
+    gap_stress_floor = entry * ((1 - ARB_LOWER_LIMIT) ** GAP_RISK_STRESS_ARB_DAYS)
+    expected_risk_per_share = (
+        entry - gap_stress_floor
+    )  # ~291.4, wider than the 120 nominal stop
+
+    assert position["gap_stress_loss_rp"] == pytest.approx(
+        position["shares"] * expected_risk_per_share
+    )
+    assert position["gap_stress_loss_pct"] == pytest.approx(
+        position["gap_stress_loss_rp"] / USER_CONFIG["total_capital"]
+    )
+    # A stress scenario must never look better than the nominal stop-based loss.
+    assert position["gap_stress_loss_rp"] > position["max_loss_rp"]
+
+
+def test_gap_stress_loss_floors_at_nominal_when_stop_is_wider() -> None:
+    """When the nominal stop is already wider than the ARB stress depth, don't
+    report a smaller number — the stress metric is a worst-case floor, not a
+    strict re-derivation."""
+    result = calculate_positions(
+        [_candidate(stop_loss=700.0)],  # ~33% nominal stop > ~27.75% 2-day ARB depth
+        USER_CONFIG,
+    )
+    [position] = result["positions"]
+
+    assert position["gap_stress_loss_rp"] == pytest.approx(position["max_loss_rp"])
+
+
 def test_entry_price_falls_back_to_current_price_without_entry_high() -> None:
     result = calculate_positions([_candidate(entry_high=None)], USER_CONFIG)
 
@@ -78,7 +116,9 @@ def test_per_position_risk_budget_enforced_across_multiple_candidates() -> None:
     total_budget = config["total_capital"] * config["max_loss_pct"]
     per_pos_budget = total_budget / config["max_positions"]
     for pos in result["positions"]:
-        assert pos["max_loss_rp"] <= per_pos_budget + 1e-6  # tolerance for floor rounding
+        assert (
+            pos["max_loss_rp"] <= per_pos_budget + 1e-6
+        )  # tolerance for floor rounding
 
 
 # ── P8: Regime-aware position sizing ─────────────────────────────────────────
@@ -115,7 +155,9 @@ def test_bear_stress_caps_to_one_position() -> None:
     config = {**USER_CONFIG, "max_positions": 5, "regime_params": _BEAR_REGIME_PARAMS}
     candidates = [
         _candidate(ticker="BBRI"),
-        _candidate(ticker="TLKM", current_price=4000.0, entry_high=4100.0, stop_loss=3800.0),
+        _candidate(
+            ticker="TLKM", current_price=4000.0, entry_high=4100.0, stop_loss=3800.0
+        ),
     ]
     result = calculate_positions(candidates, config)
 
@@ -127,7 +169,7 @@ def test_bear_stress_per_position_risk_tighter_than_user_budget() -> None:
     capital = 100_000_000
     config = {
         "total_capital": capital,
-        "max_loss_pct": 0.02,   # user allows 2% total loss -> per-pos = 2%/1 = 2%
+        "max_loss_pct": 0.02,  # user allows 2% total loss -> per-pos = 2%/1 = 2%
         "max_positions": 1,
         "regime_params": _BEAR_REGIME_PARAMS,  # regime cap: 0.5%
     }
@@ -164,4 +206,6 @@ def test_no_regime_params_backward_compatible() -> None:
         [_candidate()], {**USER_CONFIG, "regime_params": None}
     )
 
-    assert result_without["positions"][0]["lot"] == result_with_none["positions"][0]["lot"]
+    assert (
+        result_without["positions"][0]["lot"] == result_with_none["positions"][0]["lot"]
+    )

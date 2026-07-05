@@ -5,7 +5,7 @@ from __future__ import annotations
 from math import floor
 from typing import Any
 
-from core.idx_market_params import LOT_SIZE
+from core.idx_market_params import ARB_LOWER_LIMIT, LOT_SIZE
 from utils.logger_config import logger
 from utils.trade_math import compute_trailing_stop
 
@@ -15,6 +15,13 @@ SELL_COMMISSION = 0.0025
 PPH_FINAL = 0.001
 
 _DEFAULT_KELLY_FRACTION = 0.5
+
+#: V4.4 gap-risk stress: consecutive ARB (Auto Rejection Bawah / limit-down)
+#: days assumed for the worst-case exit scenario, i.e. the position cannot be
+#: sold at stop_loss and instead gaps through N consecutive -15% floors before
+#: liquidity returns. Informational only (see gap_stress_loss_pct below) — no
+#: lot-size enforcement yet, pending review of the magnitude this produces.
+GAP_RISK_STRESS_ARB_DAYS = 2
 
 
 def compute_kelly_fraction(
@@ -141,6 +148,20 @@ def _recompute_position(position: dict, total_capital: float) -> None:
         position.get("expected_return_pct", 0.0) / 100
     )
     position["total_cost_est"] = buy_cost + sell_cost_est
+
+    # V4.4: gap-risk stress, informational only. Worst case of (a) the nominal
+    # stop distance or (b) N consecutive ARB days from entry — never below (a),
+    # since a stress scenario should never look better than the nominal case.
+    gap_stress_floor_price = position["entry_price"] * (
+        (1 - ARB_LOWER_LIMIT) ** GAP_RISK_STRESS_ARB_DAYS
+    )
+    gap_stress_risk_per_share = max(
+        risk_per_share, position["entry_price"] - gap_stress_floor_price
+    )
+    position["gap_stress_loss_rp"] = shares * gap_stress_risk_per_share
+    position["gap_stress_loss_pct"] = (
+        position["gap_stress_loss_rp"] / total_capital if total_capital > 0 else 0.0
+    )
 
 
 def _can_add_lot(
@@ -430,6 +451,8 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
             "kelly_fraction": item["kelly_fraction"],
             "max_loss_rp": 0.0,
             "max_drawdown_pct": 0.0,
+            "gap_stress_loss_rp": 0.0,
+            "gap_stress_loss_pct": 0.0,
             "expected_return_pct": item["expected_return_pct"],
             "expected_return_rp": 0.0,
             "total_cost_est": 0.0,
@@ -531,4 +554,9 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
     }
 
 
-__all__ = ["calculate_positions", "compute_kelly_fraction", "RATING_BASE_ALLOCATION"]
+__all__ = [
+    "calculate_positions",
+    "compute_kelly_fraction",
+    "RATING_BASE_ALLOCATION",
+    "GAP_RISK_STRESS_ARB_DAYS",
+]

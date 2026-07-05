@@ -88,7 +88,11 @@ def _build_markdown_report(final_df: pd.DataFrame, cfg: dict) -> str:
         return "🔻 DOWN"
 
     mode = cfg.get("screener_mode", "momentum")
-    mode_label = "Momentum (Trend-Following)" if mode == "momentum" else "Mean Reversion (Pullback)"
+    mode_label = (
+        "Momentum (Trend-Following)"
+        if mode == "momentum"
+        else "Mean Reversion (Pullback)"
+    )
     mode_icon = "📈" if mode == "momentum" else "🔄"
 
     lines = []
@@ -288,8 +292,8 @@ def _build_position_summary(sizing_result: dict | None) -> str:
     lines = [
         "## 💼 Rekomendasi Posisi",
         "",
-        "| # | Ticker | Rating | Lot | Saham | Nilai Posisi | Alokasi | Max Loss | Est. Biaya |",
-        "|---|--------|--------|-----|-------|-------------|---------|----------|------------|",
+        "| # | Ticker | Rating | Lot | Saham | Nilai Posisi | Alokasi | Max Loss | Gap-Stress Loss | Est. Biaya |",
+        "|---|--------|--------|-----|-------|-------------|---------|----------|------------------|------------|",
     ]
 
     for i, position in enumerate(positions, 1):
@@ -302,8 +306,16 @@ def _build_position_summary(sizing_result: dict | None) -> str:
             f"| {_rupiah(position.get('position_value'))} "
             f"| {_pct(position.get('allocation_pct'))} "
             f"| {_rupiah(position.get('max_loss_rp'))} "
+            f"| {_rupiah(position.get('gap_stress_loss_rp'))} "
             f"| {_rupiah(position.get('total_cost_est'))} |"
         )
+
+    lines += [
+        "",
+        "*Gap-Stress Loss: estimasi rugi jika 2 hari ARB (Auto Rejection Bawah, "
+        "limit-down -15%) berturut-turut terjadi sebelum stop bisa dieksekusi — "
+        "skenario tail-risk informasional, BUKAN pembatas ukuran posisi.*",
+    ]
 
     lines += [
         "",
