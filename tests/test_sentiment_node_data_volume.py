@@ -99,6 +99,10 @@ def chamber(monkeypatch) -> DebateChamber:
     monkeypatch.setattr(dc.asyncio, "sleep", no_sleep)
     monkeypatch.setattr(dc, "_news_context_for_state", no_news)
     monkeypatch.setattr(dc, "_news_headlines_for_llm", no_headlines)
+    # This file tests post volume/dedup/truncation, not sentiment classification;
+    # a live SENTIMENT_INDOBERT_ENABLED=True would append a prior block after the
+    # posts JSON these tests capture, breaking their json.loads() assumption.
+    monkeypatch.setattr(dc, "indobert_sentiment_prior", lambda posts: ("", {}))
     monkeypatch.setattr(dc, "_ledger_stage_start", lambda *args, **kwargs: None)
     monkeypatch.setattr(dc, "_ledger_stage_success", lambda *args, **kwargs: None)
     monkeypatch.setattr(dc, "_ledger_stage_failure", lambda *args, **kwargs: None)
