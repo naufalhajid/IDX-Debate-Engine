@@ -126,6 +126,60 @@ dan literatur+risiko IDX-spesifik sama-sama menentang pelucutan total.
    data pembanding sama berisikonya dengan mempertahankan filosofi lama
    tanpa data pembanding.
 
+## Addendum — eksperimen di branch `experiment/momentum-only` (2026-07-06)
+
+User memutuskan lanjut dengan cakupan **surgical**: aktifkan jalur Momentum
+Play yang sudah ada, gate anti-manipulasi (`check_free_float`, `is_lq45_ticker`,
+ARA/ARB) tetap tidak disentuh, `fundamental_scout` tetap jalan penuh.
+
+**Verifikasi empiris dulu** (`scripts/diagnostic_momentum_floor_bypass.py`,
+pola sama seperti `diagnostic_gate_reopen.py` — override cfg + monkeypatch
+runtime, tanpa mengubah kode produksi): sweep screener dengan
+`score_floor_*` dibypass ke -999. Hasil di tape 2026-07-06 (regime **HIGH**):
+dari 957 ticker, hanya **1** lolos sampai tahap scoring teknikal — gate
+`adt_liquidity` (173), `rs_vs_ihsg` (132), `ema20` (96), dan lainnya
+menyingkirkan 443/445 SEBELUM skor komposit relevan. Satu-satunya penyintas
+(MAPI) justru fundamentalnya kuat (Composite Score 60.5, Piotroski 8/9) —
+bukan profil "teknikal kuat/fundamental lemah" yang dicari. Phase B (jalan
+lewat LLM) dibatalkan karena nol kandidat.
+
+**Koreksi atas Temuan 1**: kendala yang benar-benar mengikat pada tape HIGH-
+regime adalah baterai gate teknikal (trend/relative-strength/likuiditas) —
+bukan skor komposit 85%-berbobot-fundamental yang tadinya dituduh sebagai
+penyebab utama. Gate teknikal itu sendiri SAH untuk strategi momentum
+(trend + relative strength + likuiditas memang kriteria inti momentum),
+jadi tidak dilonggarkan. Hipotesis skor-komposit jadi belum teruji secara
+terisolasi, bukan terbukti salah — perlu tape regime NORMAL/SIDEWAYS untuk
+diuji lebih representatif; tidak bisa disubstitusi dengan XLSX tanggal lain
+karena indikator teknikal diambil live dari yfinance, bukan snapshot historis.
+
+**Perbaikan kode yang dieksekusi** (`core/risk_governor.py`,
+`_verdict_reason_codes` + `_is_conditional_setup`): saat `momentum_play=true`
+dan verdict overvalued, kode sebelumnya tetap menambahkan reason code keras
+`"overvalued"` (di `HARD_REJECT_CODES`) — bertentangan langsung dengan
+`cio_judge.txt` STEP 4 yang sudah eksplisit mengizinkan "BUY (Momentum):
+Price > Fair Value...". Diperbaiki: saat `momentum_play=true`, pakai kode
+lunak baru `overvalued_momentum_exempt` (mengikuti pola `historically_expensive`
+yang sudah ada, baris 700-705) alih-alih kode keras — mempercayakan kontrol
+risiko ke R/R >= 2.5x + confidence cap 0.65 + ukuran posisi 50% yang CIO
+sudah terapkan, bukan blanket price-vs-fair-value reject. `cio_judge.txt`
+sendiri TIDAK diubah — trigger volume breakout (>=1.5x, return 5d > 0) sudah
+pernah dikalibrasi (migrasi 2026-06-21) dan tidak ada bukti baru yang
+menjustifikasi pelonggaran lebih lanjut; melonggarkan tanpa data akan
+mengulang pola yang dihindari di keputusan 1.2.
+
+Verifikasi: `uv run pytest` 1134 passed (sama seperti baseline sebelum
+perubahan ini, termasuk 172 test khusus `test_risk_governor.py` +
+`test_orchestrator_risk_governor.py` + `test_debate_chamber_reliability.py`),
+`ruff check` bersih. Semua kerja ini ada di branch `experiment/momentum-only`,
+terpisah dari `testing-version`.
+
+**Belum diverifikasi**: apakah `momentum_play=true` benar-benar tereksekusi
+end-to-end (fundamental_scout FAIL + technical PASS + volume breakout + CIO
+set momentum_play + risk_governor tidak lagi block) — perlu re-run
+`scripts/diagnostic_momentum_floor_bypass.py --debate` saat regime kembali
+NORMAL/SIDEWAYS dan ada kandidat nyata yang cocok profilnya.
+
 ## Sumber
 
 - [Saham Gorengan: Ciri-Ciri dan Cara Menghindarinya](https://www.maybanktrade.co.id/berita/saham-gorengan-ciri-ciri-dan-cara-menghindarinya/)
