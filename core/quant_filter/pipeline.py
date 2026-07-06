@@ -43,13 +43,7 @@ from utils.technicals import (
     REGIME_ATR_STOP_MULTIPLIER_DEFAULT,
     compute_52w_range_signal,
     compute_atr,
-    compute_bollinger,
-    compute_macd,
     compute_rsi,
-    detect_candlestick_pattern,
-    detect_gap,
-    detect_rsi_divergence,
-    detect_volatility_compression,
     snap_to_tick,
 )
 
@@ -1078,14 +1072,6 @@ def _analyze_ticker(
         except Exception:
             pass
 
-    # ── Tasks 10, 11, 12: MACD / Pattern / BB / Divergence / Gap / Compression
-    macd_data = compute_macd(close)
-    candle_data = detect_candlestick_pattern(df_t)
-    bb_data = compute_bollinger(close)
-    rsi_div_data = detect_rsi_divergence(close, rsi_series)
-    gap_data = detect_gap(df_t)
-    compression_data = detect_volatility_compression(df_t)
-
     # ── Quality Flags dari xlsx ───────────────────────────────────────────────
     # Catatan: piotroski sudah didefinisikan di atas (blok Piotroski adjustment)
     altman_z = row.get("Altman Z-Score (Modified)", 0)
@@ -1149,26 +1135,6 @@ def _analyze_ticker(
         "weekly_above_ma13": weekly_trend_data["weekly_above_ma13"],
         # P3.4
         "range_52w_signal": range_52w_signal,
-        # Task 10
-        "macd_histogram": macd_data["histogram"],
-        "macd_histogram_state": macd_data["histogram_state"],
-        "macd_line": macd_data["macd_line"],
-        "macd_signal_line": macd_data["signal_line"],
-        # Task 11
-        "last_candle_pattern": candle_data["last_candle_pattern"],
-        "pattern_type": candle_data["pattern_type"],
-        "bb_position": bb_data["bb_position"],
-        "bb_squeeze": bb_data["bb_squeeze"],
-        "bb_width": bb_data["bb_width"],
-        "rsi_divergence": rsi_div_data["rsi_divergence"],
-        "divergence_strength": rsi_div_data["divergence_strength"],
-        # Task 12
-        "gap_type": gap_data["gap_type"],
-        "gap_pct": gap_data["gap_pct"],
-        "compression_type": compression_data["compression_type"],
-        "range_pct": compression_data["range_pct"],
-        "is_inside_bar": compression_data["is_inside_bar"],
-        "is_nr7": compression_data["is_nr7"],
         # Task 21
         "is_lq45": is_lq45_ticker(t),
     }

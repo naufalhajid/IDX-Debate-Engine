@@ -19,8 +19,11 @@ _DEFAULT_KELLY_FRACTION = 0.5
 #: V4.4 gap-risk stress: consecutive ARB (Auto Rejection Bawah / limit-down)
 #: days assumed for the worst-case exit scenario, i.e. the position cannot be
 #: sold at stop_loss and instead gaps through N consecutive -15% floors before
-#: liquidity returns. Informational only (see gap_stress_loss_pct below) — no
-#: lot-size enforcement yet, pending review of the magnitude this produces.
+#: liquidity returns. Decided informational-only permanently (2026-07-06, see
+#: docs/research/over_engineering_remediation_checklist.md item 1.4): displayed
+#: via gap_stress_loss_pct/gap_stress_loss_rp (core/quant_filter/reporting.py)
+#: as a risk-awareness figure, deliberately not wired into lot-size enforcement.
+#: No realized ARB-gap incident has yet justified adding that enforcement layer.
 GAP_RISK_STRESS_ARB_DAYS = 2
 
 

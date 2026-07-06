@@ -124,3 +124,24 @@ filter Phase A) menambah kasus komplemen dari CPIN:
 - `output/diagnostics/gate_reopen_20260702_161907/` — Phase A pool default 10 ticker.
 - `output/diagnostics/gate_reopen_20260702_162015/` — Phase A sweep lebar 24 ticker.
 - `output/diagnostics/gate_reopen_20260702_162056/` — Phase B penuh (CPIN, SIDO) + `DIAGNOSTIC_REPORT.md`.
+
+## Keputusan V1.x (2026-07-06)
+
+Tindak lanjut di atas ("tinjau surrogate preflight ATAU dokumentasikan sebagai
+intended double-gate") diputuskan: **dokumentasikan sebagai intended
+double-gate, tidak melonggarkan surrogate preflight.** Dicatat sebagai
+docstring di `_run_tradeability_preflight` (`services/debate_chamber.py`).
+
+Rasional: sistem belum punya bukti realized bahwa meloloskan setup
+mean-reversion yang belum confirmed-bounce akan menguntungkan — track record
+saat ini (`core/backtest_memory.py`, per 2026-07-06) 2 menang/21 kalah (win
+rate 8.7%). Melonggarkan gate penerimaan pada sistem dengan track record
+seperti ini menambah eksposur tanpa dasar empiris. Keputusan ini murni
+konservatif-by-default, bukan klaim bahwa opsi (a) salah — bisa dibuka
+kembali bila data realized ke depan (khususnya dari eksperimen paralel di
+`docs/research/over_engineering_remediation_checklist.md` Fase 2) menunjukkan
+sinyal mean-reversion pra-bounce punya edge yang terlewat.
+
+Diputuskan otomatis oleh Claude (opsi yang direkomendasikan) setelah
+`AskUserQuestion` ke user tidak dijawab dalam window Auto Mode — bukan
+keputusan eksplisit user, silakan direvisi bila user menghendaki opsi (a).

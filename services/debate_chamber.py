@@ -2305,6 +2305,19 @@ Current Date (Asia/Jakarta): {current_date}
 
         Uses current_price vs low_20d (surrogate stop) to detect hard-reject setups
         without LLM calls. Returns status 'reject'|'conditional'|'clean'|'skip'.
+
+        Intended double-gate (decided 2026-07-06, see
+        docs/research/diagnostic_gate_reopen_2026-07-02.md): this surrogate is
+        deliberately stricter than _compute_trade_envelope's structural stop.
+        _compute_trade_envelope allows mean-reversion entries near the 20-day low
+        (RSI <= 40) by design (F12), but this preflight requires price to have
+        already bounced >= HARD_NOISE_ATR_MULTIPLIER x ATR off that low first. The
+        two gates together only pass a narrow "confirmed bounce" profile (bounced
+        off the low AND R/R to resistance still >= the floor) rather than raw
+        proximity to the low. This is a conservative choice, kept as-is given the
+        system's realized track record (see core/backtest_memory.py) has not yet
+        demonstrated that admitting unconfirmed mean-reversion setups would help.
+        Do not "fix" this by loosening the surrogate without re-opening that decision.
         """
         if not tech:
             return {"status": "skip", "reason": "no_technical_data"}

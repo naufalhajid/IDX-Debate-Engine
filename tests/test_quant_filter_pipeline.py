@@ -658,8 +658,8 @@ def test_validate_ohlcv_accepts_valid_frame():
     assert reason == ""
 
 
-def test_analyze_ticker_returns_s1_s4_fields(monkeypatch):
-    """S1-4 fields (is_lq45, macd, bb, gap, compression) all present in _analyze_ticker output."""
+def test_analyze_ticker_returns_is_lq45_field(monkeypatch):
+    """is_lq45 (Task 21) present in _analyze_ticker output."""
     _stub_indicators(monkeypatch)
     result = pipeline._analyze_ticker(
         _analysis_row(Ticker="BBCA"),
@@ -668,8 +668,7 @@ def test_analyze_ticker_returns_s1_s4_fields(monkeypatch):
         logging.getLogger("test"),
     )
     assert result is not None
-    for field in ("is_lq45", "macd_histogram_state", "bb_position", "gap_type", "compression_type"):
-        assert field in result, f"Missing S1-4 field in _analyze_ticker output: {field}"
+    assert "is_lq45" in result, "Missing is_lq45 field in _analyze_ticker output"
     assert result["is_lq45"] is True  # BBCA is in the LQ45 list
 
 
