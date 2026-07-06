@@ -639,8 +639,20 @@ def _verdict_reason_codes(
         reason_codes.append("low_confidence")
 
     _ovv = _risk_overvalued_flag(candidate, verdict)
+    _momentum_play = _truthy(verdict.get("momentum_play")) or _truthy(
+        candidate.get("momentum_play")
+    )
     if _ovv is True:
-        reason_codes.append("overvalued")
+        if _momentum_play:
+            # CIO already gates momentum plays behind a stricter R/R (>=2.5x
+            # vs the normal 1.4-1.62x floor) and a 50% position-size cap
+            # (schemas/debate.py momentum_play confidence cap at 0.65) --
+            # that is the intended risk control here, not a blanket
+            # price-vs-fair-value hard reject. Soft flag, not a hard reject
+            # (mirrors P8 historically_expensive below).
+            reason_codes.append("overvalued_momentum_exempt")
+        else:
+            reason_codes.append("overvalued")
     elif _ovv is None:
         reason_codes.append("fv_unmeasurable")
 
@@ -1041,6 +1053,7 @@ def _is_conditional_setup(
         or "fv_unmeasurable" in reason_codes
         or "historically_expensive" in reason_codes
         or "t2_hold_warning" in reason_codes
+        or "overvalued_momentum_exempt" in reason_codes
     )
 
 
