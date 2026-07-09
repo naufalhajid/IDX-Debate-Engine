@@ -113,3 +113,23 @@ def test_with_stream_data_category_failure_partial_result(monkeypatch) -> None:
     assert len(posts) == 10
     assert [post["stream_id"] for post in posts] == [f"idea-{i}" for i in range(10)]
     assert any("STREAM_CATEGORY_NEWS" in warning for warning in warnings)
+
+
+class _ReprBomb:
+    """Objek dengan ticker valid tapi __str__ meledak (cermin Stock ter-enrich
+    yang repr pydantic-nya siklik -> RecursionError)."""
+
+    ticker = "BBCA"
+
+    def __str__(self) -> str:
+        raise AssertionError("str(stock) tidak boleh dievaluasi saat ticker ada")
+
+
+def test_ticker_does_not_eagerly_str_the_stock() -> None:
+    # Regresi: getattr(stock, "ticker", str(stock)) mengevaluasi default secara
+    # EAGER -> str() model siklik memutus SEMUA stream fetch di scan.
+    assert StockBit._ticker(_ReprBomb()) == "BBCA"
+
+
+def test_ticker_falls_back_to_str_for_plain_strings() -> None:
+    assert StockBit._ticker("BBCA") == "BBCA"

@@ -559,7 +559,11 @@ class StockBit:
 
     @staticmethod
     def _ticker(stock: Stock | str) -> str:
-        return getattr(stock, "ticker", str(stock))
+        # getattr default dievaluasi EAGER: str(stock) pada Stock yang sudah
+        # di-enrich (price/fundamental) memicu repr pydantic siklik ->
+        # RecursionError untuk SEMUA ticker. Evaluasi fallback secara lazy.
+        ticker = getattr(stock, "ticker", None)
+        return ticker if ticker is not None else str(stock)
 
     @staticmethod
     def _extract_stream_posts(raw: dict | list | None) -> list[dict]:
