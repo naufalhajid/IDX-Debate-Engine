@@ -135,6 +135,26 @@ def test_xlsx_path_rejected_by_quality_gate_like_api_path(monkeypatch):
     assert xlsx_fv is None
 
 
+def test_fv_provenance_survives_quality_gate_rejection(monkeypatch):
+    """FIX 5: an auditor most wants to know the source of a *rejected* FV --
+    _apply_fv_quality_gate must not strip fv_provenance when it nulls the
+    anchor fields. Same net_margin>100% (INDO-style) rejection as above."""
+    stats = _base_stats(net_margin=1.31)
+
+    _, result = fvc._build_fair_value_core(
+        stats,
+        "PARITY",
+        1000.0,
+        sector="default",
+        financials_source="xlsx_batch",
+    )
+
+    assert result["fair_value"] is None
+    assert result["fv_quality_rejected"] is True
+    assert result["fv_provenance"] is not None
+    assert result["fv_provenance"]["financials_source"] == "xlsx_batch"
+
+
 def test_xlsx_adapter_has_no_independent_weighting_math():
     """Structural guardrail: the standalone aggregator must be gone, not just unused."""
     assert not hasattr(XlsxDataAdapter, "_weighted_average_with_ev")

@@ -48,6 +48,9 @@ _SECTOR_REPRESENTATIVE_TICKERS: dict[str, list[str]] = {
 # 5 bucket keys = used by FairValueCalculator SECTOR_WEIGHTS.
 # 12 raw IDX sector keys = used by build_sector_comparison() raw_sector lookup.
 _DYNAMIC_SECTOR_BENCHMARKS_INMEM: dict | None = None
+# FIX 5: provenance companion to _DYNAMIC_SECTOR_BENCHMARKS_INMEM, populated by
+# the same code path in _load_dynamic_sector_benchmarks() -- (source, as_of).
+_DYNAMIC_SECTOR_BENCHMARKS_PROVENANCE_INMEM: tuple[str, str | None] | None = None
 
 _SECTOR_MEDIAN_PROFILES_DEFAULT: dict[str, dict] = {
     # ── 5 FairValueCalculator bucket keys ─────────────────────────────────────
@@ -78,13 +81,14 @@ def _load_dynamic_sector_benchmarks() -> dict[str, dict]:
     instantiations).  Falls through to _SECTOR_MEDIAN_PROFILES_DEFAULT without
     caching so that a stale/missing file retries on the next call.
     """
-    global _DYNAMIC_SECTOR_BENCHMARKS_INMEM
+    global _DYNAMIC_SECTOR_BENCHMARKS_INMEM, _DYNAMIC_SECTOR_BENCHMARKS_PROVENANCE_INMEM
     if _DYNAMIC_SECTOR_BENCHMARKS_INMEM is not None:
         return _DYNAMIC_SECTOR_BENCHMARKS_INMEM
     try:
         if _SECTOR_BENCHMARKS_CACHE_PATH.exists():
             raw = json.loads(_SECTOR_BENCHMARKS_CACHE_PATH.read_text(encoding="utf-8"))
-            updated_at = _datetime.fromisoformat(raw.get("updated_at", "1970-01-01"))
+            updated_at_raw = raw.get("updated_at", "1970-01-01")
+            updated_at = _datetime.fromisoformat(updated_at_raw)
             age_days = (_datetime.now() - updated_at).days
             if age_days <= _SECTOR_BENCHMARK_MAX_AGE_DAYS:
                 benchmarks = raw.get("benchmarks", {})
@@ -93,9 +97,14 @@ def _load_dynamic_sector_benchmarks() -> dict[str, dict]:
                         "[FV-5] Loaded dynamic sector benchmarks (age {} days).", age_days
                     )
                     _DYNAMIC_SECTOR_BENCHMARKS_INMEM = benchmarks
+                    _DYNAMIC_SECTOR_BENCHMARKS_PROVENANCE_INMEM = (
+                        "sector_benchmarks_cache",
+                        updated_at_raw,
+                    )
                     return benchmarks
     except Exception as exc:
         logger.debug("[FV-5] _load_dynamic_sector_benchmarks failed: {}", exc)
+    _DYNAMIC_SECTOR_BENCHMARKS_PROVENANCE_INMEM = ("static_default", None)
     return _SECTOR_MEDIAN_PROFILES_DEFAULT
 
 
@@ -1018,6 +1027,11 @@ class FairValueCalculator:
         self.sector = self.SECTOR_PROFILE_ALIAS.get(self.raw_sector, "default")
         self.weights = self.SECTOR_WEIGHTS[self.sector]
         self.sector_medians: dict[str, dict] = _load_dynamic_sector_benchmarks()
+        # FIX 5: provenance for build_sector_comparison()'s diagnostic-only
+        # sector_comp entry -- set as a side effect of the call above.
+        self.sector_medians_source, self.sector_medians_as_of = (
+            _DYNAMIC_SECTOR_BENCHMARKS_PROVENANCE_INMEM or ("static_default", None)
+        )
         self._weighted_result_cache: dict | None = None
         self._pb_roe_capped: bool = False
         self._normalized_eps: float | None = None
@@ -1371,6 +1385,8 @@ class FairValueCalculator:
                     "configured_active_method_count": sum(
                         1 for weight in self.weights.values() if weight > 0
                     ),
+                    "active_methods": [],
+                    "diagnostic_methods": ["sector_comp"],
                     **self._fundamental_factor_payload(),
                 }
             )
@@ -1419,6 +1435,8 @@ class FairValueCalculator:
                     "valid_method_count": 0,
                     "available_method_count": len(results),
                     "configured_active_method_count": configured_active_method_count,
+                    "active_methods": [],
+                    "diagnostic_methods": sorted(results.keys()) + ["sector_comp"],
                     **self._fundamental_factor_payload(),
                 }
             )
@@ -1545,6 +1563,11 @@ class FairValueCalculator:
                 "valid_method_count": n,
                 "available_method_count": len(results),
                 "configured_active_method_count": configured_active_method_count,
+                "active_methods": sorted(active_results.keys()),
+                "diagnostic_methods": sorted(
+                    set(results.keys()) - set(active_results.keys())
+                )
+                + ["sector_comp"],
                 **self._fundamental_factor_payload(),
             }
         )
@@ -2145,6 +2168,9 @@ def _build_fair_value_core(
     sector: str | None = None,
     pe_values: list[float] | None = None,
     pb_values: list[float] | None = None,
+    financials_source: str = "unknown",
+    current_price_source: str | None = None,
+    current_price_as_of: str | None = None,
 ) -> tuple[str, dict]:
     """THE canonical FV engine — every source (API, XLSX, future) converges here.
 
@@ -2156,6 +2182,12 @@ def _build_fair_value_core(
     `pe_values`/`pb_values` (multi-year series for the historical valuation
     band) are an API-only enrichment — pass None when unavailable and that
     section is simply omitted from the report, same as today.
+
+    FIX 5 (audit-grade provenance): `financials_source` labels which caller
+    populated `stats` (e.g. "stockbit_api" vs "xlsx_batch"); `current_price_
+    source`/`current_price_as_of` pass through whatever the caller already
+    knows about the price basis (e.g. debate_chamber's FIX 2 `prepare_trade_
+    setup()` output) -- this function does not compute or guess them.
     """
     stats.current_price = current_price
     if stats.ocf_per_share <= 0 and stats.operating_cash_flow_ttm > 0:
@@ -2199,6 +2231,20 @@ def _build_fair_value_core(
     result["sector"] = calc.sector
     result["raw_sector"] = calc.raw_sector
 
+    # FIX 5: audit-grade provenance. Assembled BEFORE _apply_fv_quality_gate()
+    # runs and must survive it (a rejected FV is exactly when an auditor most
+    # wants to know what it was built from) -- the gate's result-dict spread
+    # only overrides the anchor fields it explicitly lists, so this key is
+    # preserved automatically as long as it's set here first.
+    result["fv_provenance"] = {
+        "financials_source": financials_source,
+        "financials_as_of_age_days": stats.keystats_age_days,
+        "current_price_source": current_price_source,
+        "current_price_as_of": current_price_as_of,
+        "sector_comp_source": calc.sector_medians_source,
+        "sector_comp_as_of": calc.sector_medians_as_of,
+    }
+
     # ── C3: Historical valuation band (API-only enrichment) ────────────────
     band_ctx = None
     if pe_values or pb_values:
@@ -2229,6 +2275,9 @@ def build_fair_value_payload(
     api_response: dict,
     ticker: str,
     current_price: float,
+    *,
+    current_price_source: str | None = None,
+    current_price_as_of: str | None = None,
 ) -> tuple[str, dict]:
     multiples = extract_historical_multiples(api_response, ticker)
     stats = extract_keystats(
@@ -2252,6 +2301,9 @@ def build_fair_value_payload(
         current_price,
         pe_values=multiples.get("pe_values"),
         pb_values=multiples.get("pb_values"),
+        financials_source="stockbit_api",
+        current_price_source=current_price_source,
+        current_price_as_of=current_price_as_of,
     )
 
 

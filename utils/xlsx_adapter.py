@@ -418,7 +418,7 @@ class XlsxDataAdapter:
         # sources select the same SECTOR_WEIGHTS for the same ticker, not just
         # the same aggregation math.
         _canonical_report, result = _build_fair_value_core(
-            stats, ticker, current_price, sector=None
+            stats, ticker, current_price, sector=None, financials_source="xlsx_batch"
         )
         # 5-bucket sector the engine actually used (bank/consumer/mining/
         # property/default) — for report display and the EV/EBITDA text

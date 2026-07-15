@@ -1649,3 +1649,88 @@ def test_implied_pe_within_self_cap_is_not_extreme(monkeypatch):
 
     assert result["fv_implied_pe"] == pytest.approx(54.9, abs=0.2)
     assert result["fv_implied_pe_extreme"] is False
+
+
+# ── FIX 5: audit-grade provenance ────────────────────────────────────────────
+
+
+def test_fair_value_weighted_exposes_active_and_diagnostic_methods():
+    """active_methods lists only methods that carried weight into the
+    composite; diagnostic_methods lists methods computed but zero-weighted
+    (DDM under the default sector) plus sector_comp (build_sector_comparison()
+    is always diagnostic text, never a weighted method)."""
+    calc = FairValueCalculator(
+        KeyStats(
+            ticker="TEST",
+            current_price=1000.0,
+            eps_ttm=100.0,
+            book_value_per_share=800.0,
+            dps=20.0,
+            roe=0.15,
+            cost_of_equity=0.12,
+            growth_rate=0.05,
+            historical_pe_avg=10.0,
+            historical_pb_avg=1.2,
+        ),
+        sector="default",
+    )
+    result = calc.fair_value_weighted()
+
+    assert "pe" in result["active_methods"]
+    assert "pb" in result["active_methods"]
+    assert "ddm" not in result["active_methods"]
+    assert "ddm" in result["diagnostic_methods"]
+    assert "sector_comp" in result["diagnostic_methods"]
+    assert "sector_comp" not in result["active_methods"]
+
+
+def test_fair_value_weighted_no_methods_still_reports_sector_comp_diagnostic():
+    """Even when every weighted method fails, sector_comp stays listed as
+    diagnostic -- build_sector_comparison() only needs sector medians, which
+    always resolve to something (falls back to the default profile)."""
+    calc = FairValueCalculator(
+        KeyStats(ticker="TEST", current_price=1000.0), sector="default"
+    )
+    result = calc.fair_value_weighted()
+
+    assert result["fair_value"] is None
+    assert result["active_methods"] == []
+    assert result["diagnostic_methods"] == ["sector_comp"]
+
+
+def test_build_fair_value_payload_includes_fv_provenance():
+    """The FV result payload carries per-source provenance so an auditor can
+    trace which data source and price basis produced a given fair value.
+    financials_source is fixed at 'stockbit_api' for this entry point;
+    current_price_source/as_of pass through whatever the caller (debate_
+    chamber, per FIX 2) supplies."""
+    api_response = _stockbit_response(
+        [
+            ("Current EPS (TTM)", "100"),
+            ("Book Value Per Share", "800"),
+        ]
+    )
+    _report, result = build_fair_value_payload(
+        api_response,
+        "TEST",
+        1000.0,
+        current_price_source="market_data",
+        current_price_as_of="2026-07-16T09:00:00+07:00",
+    )
+    prov = result["fv_provenance"]
+    assert prov["financials_source"] == "stockbit_api"
+    assert prov["current_price_source"] == "market_data"
+    assert prov["current_price_as_of"] == "2026-07-16T09:00:00+07:00"
+    assert prov["sector_comp_source"] in ("sector_benchmarks_cache", "static_default")
+
+
+def test_build_fair_value_payload_provenance_defaults_to_none_when_unsupplied():
+    """Backward compatibility: existing callers that don't pass current_price_
+    source/as_of (e.g. every pre-FIX-5 call site) must not break -- the new
+    kwargs default to None rather than becoming required."""
+    api_response = _stockbit_response([("Current EPS (TTM)", "100")])
+    _report, result = build_fair_value_payload(api_response, "TEST", 1000.0)
+    prov = result["fv_provenance"]
+    assert prov["current_price_source"] is None
+    assert prov["current_price_as_of"] is None
+    assert prov["financials_source"] == "stockbit_api"

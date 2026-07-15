@@ -2185,7 +2185,17 @@ Current Date (Asia/Jakarta): {current_date}
                 )
                 return {"fundamental_data": content}
 
-            report_str, fv_result = build_fair_value_payload(raw, ticker, current_price)
+            # FIX 5: forward the price provenance FIX 2 already computed
+            # (prepare_trade_setup() -> run()'s initial_state["metadata"])
+            # rather than letting it silently stop here.
+            _incoming_metadata = state.get("metadata") or {}
+            report_str, fv_result = build_fair_value_payload(
+                raw,
+                ticker,
+                current_price,
+                current_price_source=_incoming_metadata.get("current_price_source"),
+                current_price_as_of=_incoming_metadata.get("current_price_as_of"),
+            )
             fv_price = fv_result.get("fair_value")
             logger.info(f"[Fundamental] Fair value for {ticker}: {fv_price}")
             if fv_price is None and not fv_result.get("fv_quality_rejected"):
@@ -2224,19 +2234,27 @@ Current Date (Asia/Jakarta): {current_date}
                 "risk_overvalued": fv_result.get("risk_overvalued"),
                 "valuation_band_context": fv_result.get("valuation_band_context"),
             }
+            # FIX 5: audit-grade provenance -- always carried through (not
+            # just on quality rejection), so an auditor can trace source/
+            # as-of and active-vs-diagnostic methods for every FV, rejected
+            # or not. Same read-copy-write pattern as the quality-rejection
+            # block below so both can layer onto the same metadata dict.
+            metadata = dict(state.get("metadata") or {})
+            metadata["fv_provenance"] = fv_result.get("fv_provenance")
+            metadata["fv_active_methods"] = fv_result.get("active_methods")
+            metadata["fv_diagnostic_methods"] = fv_result.get("diagnostic_methods")
             if fv_result.get("fv_quality_rejected"):
                 # Propagate the quality rejection through the same metadata
                 # fields the RAG-evidence rejection sets (see
                 # _reject_unverified_fair_value_if_needed) so report/audit
                 # consumers render both rejection kinds consistently.
-                metadata = dict(state.get("metadata") or {})
                 metadata["fair_value_rejected"] = True
                 metadata["valuation_gap"] = "unverified"
                 reasons = list(metadata.get("reasons") or [])
                 if "fair_value_quality_rejected" not in reasons:
                     reasons.append("fair_value_quality_rejected")
                 metadata["reasons"] = reasons
-                partial["metadata"] = metadata
+            partial["metadata"] = metadata
             return partial
         except Exception as e:
             logger.error(f"[Fundamental] Error: {e}")
@@ -5758,6 +5776,11 @@ Start your response with '{' and end with '}'. Nothing else."""
                 "pro_calls": 0,
                 "trade_setup_snapshot": snapshot,
                 "execution_status": snapshot.get("status"),
+                # FIX 5: forward FIX 2's price provenance from prepare_trade_
+                # setup() so _fundamental_node() can pass it to
+                # build_fair_value_payload() instead of it dead-ending here.
+                "current_price_source": prepared.get("current_price_source"),
+                "current_price_as_of": prepared.get("current_price_as_of"),
             },
             "valuation_band_context": None,
             "error": None,

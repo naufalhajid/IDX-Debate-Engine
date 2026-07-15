@@ -1798,7 +1798,7 @@ async def test_fundamental_node_propagates_quality_rejection_to_metadata(monkeyp
     monkeypatch.setattr(
         dc,
         "build_fair_value_payload",
-        lambda raw, ticker, price: (
+        lambda raw, ticker, price, **kwargs: (
             "report",
             {
                 "fair_value": None,
@@ -1832,6 +1832,87 @@ async def test_fundamental_node_propagates_quality_rejection_to_metadata(monkeyp
     assert meta["fair_value_rejected"] is True
     assert meta["valuation_gap"] == "unverified"
     assert "fair_value_quality_rejected" in meta["reasons"]
+
+
+@pytest.mark.asyncio
+async def test_fundamental_node_threads_price_source_and_surfaces_fv_provenance(
+    monkeypatch,
+):
+    """FIX 5: _fundamental_node() must (a) forward whatever current_price_
+    source/as_of FIX 2 already recorded in state["metadata"] into
+    build_fair_value_payload() -- not recompute or drop it -- and (b) copy
+    the FV engine's own provenance (fv_provenance, active/diagnostic method
+    lists) into the returned metadata so it survives into the persisted
+    artifact alongside the existing quality-rejection metadata fields.
+    """
+    chamber = _chamber()
+    chamber.flash_llm = None
+
+    async def fake_fetch(url):
+        return {"data": "raw"}
+
+    async def fake_invoke(state, llm, messages):
+        return SimpleNamespace(content="analysis text")
+
+    monkeypatch.setattr(chamber, "_fetch_url", fake_fetch)
+    monkeypatch.setattr(chamber, "_invoke_llm_for_state", fake_invoke)
+
+    captured_call: dict = {}
+
+    def fake_build_fair_value_payload(raw, ticker, price, **kwargs):
+        captured_call.update(kwargs)
+        return (
+            "report",
+            {
+                "fair_value": 1000.0,
+                "fair_value_base": 1000.0,
+                "fair_value_low": 900.0,
+                "fair_value_high": 1100.0,
+                "range_pct": 0.1,
+                "dps": None,
+                "dps_source": None,
+                "dps_yield_pct": None,
+                "dps_price_used": None,
+                "risk_overvalued": False,
+                "active_methods": ["pe", "pb"],
+                "diagnostic_methods": ["ddm", "sector_comp"],
+                "fv_provenance": {
+                    "financials_source": "stockbit_api",
+                    "financials_as_of_age_days": 2,
+                    "current_price_source": kwargs.get("current_price_source"),
+                    "current_price_as_of": kwargs.get("current_price_as_of"),
+                    "sector_comp_source": "static_default",
+                    "sector_comp_as_of": None,
+                },
+            },
+        )
+
+    monkeypatch.setattr(dc, "build_fair_value_payload", fake_build_fair_value_payload)
+
+    partial = await chamber._fundamental_node(
+        {
+            "ticker": "NZIA",
+            "current_price": 1000.0,
+            "metadata": {
+                "run_id": "t1",
+                "current_price_source": "market_data",
+                "current_price_as_of": "2026-07-16T09:00:00+07:00",
+            },
+        }
+    )
+
+    # (a) the price provenance FIX 2 already computed was forwarded, not dropped.
+    assert captured_call["current_price_source"] == "market_data"
+    assert captured_call["current_price_as_of"] == "2026-07-16T09:00:00+07:00"
+
+    # (b) the FV engine's own provenance survived into the returned metadata.
+    meta = partial["metadata"]
+    assert meta["fv_active_methods"] == ["pe", "pb"]
+    assert meta["fv_diagnostic_methods"] == ["ddm", "sector_comp"]
+    assert meta["fv_provenance"]["financials_source"] == "stockbit_api"
+    assert meta["fv_provenance"]["current_price_source"] == "market_data"
+    # Pre-existing metadata keys (run_id etc.) must not be clobbered.
+    assert meta["run_id"] == "t1"
 
 
 def test_sentiment_payload_from_response_sanitizes_markdown_json():
