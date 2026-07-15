@@ -4,7 +4,17 @@ from __future__ import annotations
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+
+ForecastStatus = Literal[
+    "READY",
+    "NOT_VALIDATED",
+    "VALIDATION_FAILED",
+    "MODEL_FAILED",
+    "ZERO_WEIGHT",
+    "UNAVAILABLE",
+]
 
 
 class ModelVote(BaseModel):
@@ -13,6 +23,7 @@ class ModelVote(BaseModel):
     model_name: str
     status: Literal[
         "active",
+        "not_validated",
         "validation_failed",
         "unavailable",
         "experimental_unused",
@@ -55,6 +66,8 @@ class ForecastReport(BaseModel):
     ticker: str
     as_of: date
     horizon_days: int
+    forecast_status: ForecastStatus = "UNAVAILABLE"
+    failure_reason: str | None = "legacy_status_missing"
     expected_return_net: float | None = None
     p_target: float | None = None
     p_stop: float | None = None
@@ -70,3 +83,22 @@ class ForecastReport(BaseModel):
     risk_adjusted_expected_value: float | None = None
     data_quality_flags: list[str] = Field(default_factory=list)
     volatility_fallback: bool = False
+
+    @model_validator(mode="after")
+    def validate_status_reason(self) -> ForecastReport:
+        """Keep readiness and failure diagnostics internally consistent."""
+        if (
+            self.forecast_status != "READY"
+            and "forecast_status" in self.model_fields_set
+            and "failure_reason" not in self.model_fields_set
+        ):
+            raise ValueError(
+                "Explicit non-READY forecast_status requires explicit failure_reason"
+            )
+        reason = str(self.failure_reason or "").strip()
+        if self.forecast_status == "READY":
+            if reason:
+                raise ValueError("READY forecasts cannot include failure_reason")
+        elif not reason:
+            raise ValueError("Non-READY forecasts require failure_reason")
+        return self

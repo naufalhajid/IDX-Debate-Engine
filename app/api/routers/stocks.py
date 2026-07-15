@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.cache import get_cache_lock, get_stocks_cache
 from app.api.dependency_injections.api_key import get_gemini_api_key
 from app.api.dependency_injections.session import get_db
-from app.api.result_adapter import normalize_batch
+from app.api.result_adapter import build_execution_decision, normalize_batch
 from app.api.schemas import DebateStreamRequest, StockSchema
 from core.settings import settings
 from db.models.stock import Stock
@@ -263,19 +263,31 @@ async def health_check() -> dict[str, Any]:
 
     latest_time = None
     results = []
+    corrupt_artifacts = 0
 
     for f in _safe_debate_files():
         try:
             mtime = f.stat().st_mtime
             content = f.read_text(encoding="utf-8")
             if not content.strip():
+                corrupt_artifacts += 1
+                logger.warning(
+                    f"[health] stage=health_debate_artifact "
+                    f"reason_code=empty_debate_artifact path={f}"
+                )
                 continue
             data = _canonical_result_item(
                 json.loads(content),
                 expected_ticker=_expected_ticker_from_debate_path(f),
             )
             if data is None:
+                corrupt_artifacts += 1
+                logger.warning(
+                    f"[health] stage=health_debate_artifact "
+                    f"reason_code=invalid_debate_artifact path={f}"
+                )
                 continue
+            execution_status = build_execution_decision(data)["execution_status"]
             if latest_time is None or mtime > latest_time:
                 latest_time = mtime
 
@@ -305,6 +317,7 @@ async def health_check() -> dict[str, Any]:
             results.append(
                 {
                     "rating": rating,
+                    "execution_status": execution_status,
                     "confidence": confidence,
                     "conviction_score": conviction_score,
                     "rounds": rounds,
@@ -313,12 +326,24 @@ async def health_check() -> dict[str, Any]:
                 }
             )
         except Exception as exc:
-            logger.warning(f"[health] Failed to read debate artifact {f}: {exc}")
+            corrupt_artifacts += 1
+            logger.warning(
+                f"[health] stage=health_debate_artifact "
+                f"reason_code=corrupt_debate_artifact "
+                f"exception_type={type(exc).__name__} path={f}: {exc}"
+            )
 
     total_debates = len(results)
 
     # Calculate stats
     ratings_dist = {"STRONG_BUY": 0, "BUY": 0, "HOLD": 0, "AVOID": 0}
+    execution_status_dist = {
+        "EXECUTABLE_BUY": 0,
+        "WAITLIST": 0,
+        "NO_TRADE": 0,
+        "AVOID": 0,
+        "INSUFFICIENT_DATA": 0,
+    }
     total_conviction = 0.0
     total_confidence = 0.0
     consensus_count = 0
@@ -335,6 +360,11 @@ async def health_check() -> dict[str, Any]:
             ratings_dist[rating] += 1
         else:
             ratings_dist[rating] = 1
+
+        execution_status = r["execution_status"]
+        execution_status_dist[execution_status] = (
+            execution_status_dist.get(execution_status, 0) + 1
+        )
 
         total_conviction += r["conviction_score"]
         total_confidence += r["confidence"]
@@ -361,8 +391,10 @@ async def health_check() -> dict[str, Any]:
         if total_debates > 0
         else 0.0,
         "ratings_distribution": ratings_dist,
+        "execution_status_distribution": execution_status_dist,
         "fresh_count": fresh_count,
         "stale_count": stale_count,
+        "corrupt_artifacts": corrupt_artifacts,
         "latest_debate_date": latest_date_str,
     }
 

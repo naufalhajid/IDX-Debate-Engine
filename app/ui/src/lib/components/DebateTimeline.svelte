@@ -3,7 +3,13 @@
   import { activeTicker, allResults, debateStream, isStreaming } from '$lib/stores/dashboard';
   import { stockMap, resolveCompanyName, formatSector } from '$lib/stores/metadata';
   import { formatMarkdown } from '$lib/formatMarkdown';
-  import type { DebateEvent, DebateRound, Rating, ScoutMetrics, StockResult } from '$lib/types';
+  import type {
+    DebateEvent,
+    DebateRound,
+    ExecutionStatus,
+    ScoutMetrics,
+    StockResult
+  } from '$lib/types';
 
   let timelineEl: HTMLDivElement;
   let userScrolledUp = false;
@@ -47,10 +53,19 @@
     return value.toFixed(2);
   }
 
-  function ratingColor(rating: Rating) {
-    if (rating.includes('BUY')) return 'var(--signal-bull)';
-    if (rating === 'AVOID') return 'var(--signal-bear)';
+  function canonicalAction(result: StockResult): ExecutionStatus {
+    return result.execution_status ?? 'INSUFFICIENT_DATA';
+  }
+
+  function actionColor(status: ExecutionStatus) {
+    if (status === 'EXECUTABLE_BUY') return 'var(--signal-bull)';
+    if (status === 'AVOID') return 'var(--signal-bear)';
+    if (status === 'WAITLIST') return 'var(--accent-cyan)';
     return 'var(--signal-hold)';
+  }
+
+  function decisionLabel(value: string): string {
+    return value.replaceAll('_', ' ');
   }
 
   function splitArgumentByHeadings(text: string) {
@@ -86,8 +101,15 @@
           <p>{resolveCompanyName($stockMap, $activeTicker ?? '', activeResult?.sector)}</p>
         </div>
         {#if activeResult}
-          <div class="rating-badge" style="--rating-color: {ratingColor(activeResult.rating)}">
-            {activeResult.rating.replace('_', ' ')}
+          <div class="decision-badges">
+            <div class="action-badge" style="--action-color: {actionColor(canonicalAction(activeResult))}">
+              ACTION: {decisionLabel(canonicalAction(activeResult))}
+            </div>
+            {#if activeResult.model_rating}
+              <div class="model-rating-badge">
+                MODEL: {decisionLabel(activeResult.model_rating)}
+              </div>
+            {/if}
           </div>
         {/if}
       </div>
@@ -252,8 +274,13 @@
   <div class="verdict-summary">
     <div class="verdict-header">
       <h3>Summary</h3>
-      <div class="rating-badge" style="--rating-color: {ratingColor(result.rating)}">
-        {result.rating.replace('_', ' ')}
+      <div class="decision-badges">
+        <div class="action-badge" style="--action-color: {actionColor(canonicalAction(result))}">
+          ACTION: {decisionLabel(canonicalAction(result))}
+        </div>
+        {#if result.model_rating}
+          <div class="model-rating-badge">MODEL: {decisionLabel(result.model_rating)}</div>
+        {/if}
       </div>
     </div>
     
@@ -349,14 +376,32 @@
     color: var(--text-secondary);
   }
 
-  .rating-badge {
+  .decision-badges {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--sp-2);
+  }
+
+  .action-badge {
     padding: 6px 12px;
     border-radius: var(--radius-sm);
-    background: color-mix(in srgb, var(--rating-color) 15%, transparent);
-    color: var(--rating-color);
-    border: 1px solid color-mix(in srgb, var(--rating-color) 40%, transparent);
+    background: color-mix(in srgb, var(--action-color) 15%, transparent);
+    color: var(--action-color);
+    border: 1px solid color-mix(in srgb, var(--action-color) 40%, transparent);
     font-weight: 700;
     font-size: 14px;
+  }
+
+  .model-rating-badge {
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-secondary);
+    border: 1px solid var(--surface-border);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
   }
 
   .price-highlights {

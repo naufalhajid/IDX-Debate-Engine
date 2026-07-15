@@ -354,6 +354,8 @@ class XlsxDataAdapter:
             # position — see fair_value_ev_ebitda()).
             ebitda_ttm=f(ks, "EBITDA (TTM)", default=None),
             net_debt=f(ks, "Net Debt (Quarter)", default=None),
+            # ── FIX 3B: FCFE = OCF - Capex input ── same missing-vs-zero care.
+            capex_ttm=f(ks, "Capital expenditure (TTM)", default=None),
         )
 
         # Set historical multiples dari logika dinamis

@@ -89,10 +89,8 @@ def _normalize_workbook_tickers(
             normalized_values.append(normalize_idx_ticker(raw))
         except InvalidIDXTicker as exc:
             logger.warning(
-                "[TickerValidation] sheet={} row={} reason_code=invalid_idx_ticker: {}",
-                sheet_name,
-                row_index,
-                exc,
+                f"[TickerValidation] sheet={sheet_name} row={row_index} "
+                f"reason_code=invalid_idx_ticker: {exc}"
             )
             normalized_values.append(None)
 
@@ -102,9 +100,8 @@ def _normalize_workbook_tickers(
     duplicate_count = int(cleaned["Ticker"].duplicated(keep="first").sum())
     if duplicate_count:
         logger.warning(
-            "[TickerValidation] sheet={} reason_code=duplicate_idx_ticker count={}",
-            sheet_name,
-            duplicate_count,
+            f"[TickerValidation] sheet={sheet_name} "
+            f"reason_code=duplicate_idx_ticker count={duplicate_count}"
         )
         cleaned = cleaned.drop_duplicates(subset=["Ticker"], keep="first")
     return cleaned
@@ -1501,8 +1498,9 @@ def _safe_analyze_price_candidate(
         )
         return None
 
-    if ihsg_close is not None and not ihsg_close.empty:
-        df_t = df_t.reindex(ihsg_close.index).dropna(how="all")
+    # Relative strength receives the already-computed scalar IHSG return below.
+    # Reindexing ticker OHLCV to the benchmark calendar is therefore unnecessary
+    # and can silently discard a valid latest ticker bar when the IHSG feed lags.
 
     min_bars = int(cfg["min_bars"])
     if len(df_t) < min_bars:
@@ -1812,7 +1810,7 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         min_complete_bars=int(cfg.get("snapshot_min_complete_bars", 400)),
         snapshot_sink=market_snapshots,
     )
-    snapshot_output_root = Path(cfg["output_dir"])
+    snapshot_output_root = Path(cfg["output_dir"]).resolve()
     snapshot_paths_on_disk = persist_market_snapshots(
         market_snapshots,
         snapshot_output_root / "market_snapshots",
@@ -1900,8 +1898,8 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
     )
     if raw_execution_regime and execution_regime == "UNKNOWN":
         logger.warning(
-            "[Regime] Invalid external execution regime {}; fail closed to UNKNOWN.",
-            raw_execution_regime,
+            f"[Regime] Invalid external execution regime {raw_execution_regime}; "
+            f"fail closed to UNKNOWN."
         )
     scoring_regime_profile: str = str(cfg.get("regime") or "").upper()
     if external_execution_regime:
@@ -1951,10 +1949,8 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         )
     )
     logger.info(
-        "[Regime] Screener authority execution={} scoring_profile={} reason={}",
-        execution_regime,
-        scoring_regime_profile,
-        execution_regime_reason,
+        f"[Regime] Screener authority execution={execution_regime} "
+        f"scoring_profile={scoring_regime_profile} reason={execution_regime_reason}"
     )
 
     gate_counters: dict[str, int] = {}

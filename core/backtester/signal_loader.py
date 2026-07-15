@@ -157,6 +157,21 @@ def _load_signal(
 ) -> SignalRecord | None:
     data = json.loads(json_path.read_text(encoding="utf-8"))
     verdict = data.get("verdict", {})
+    execution_decision = data.get("execution_decision")
+    execution_decision = (
+        execution_decision if isinstance(execution_decision, dict) else {}
+    )
+    execution_statuses = {
+        str(value).strip().upper()
+        for value in (
+            execution_decision.get("execution_status"),
+            data.get("execution_status"),
+            verdict.get("execution_status"),
+        )
+        if value not in (None, "")
+    }
+    if execution_statuses != {"EXECUTABLE_BUY"}:
+        return None
 
     rating = (verdict.get("rating") or "").upper()
     if rating not in allowed:

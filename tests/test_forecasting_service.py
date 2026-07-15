@@ -9,9 +9,10 @@ import pandas as pd
 import pytest
 
 from core.forecasting.models import ModelBase
-from core.forecasting.schemas import ForecastReport, ValidationSummary
+from core.forecasting.schemas import ForecastReport, ModelVote, ValidationSummary
 from core.forecasting.service import (
     ForecastingService,
+    _aggregate_validation,
     _error_report,
     _make_decision,
     _model_disagreement_penalty,
@@ -57,6 +58,8 @@ class TestForecastReportSchema:
         assert isinstance(report, ForecastReport)
         assert report.ticker == "BBCA"
         assert report.decision == "AVOID"
+        assert report.forecast_status == "UNAVAILABLE"
+        assert report.failure_reason == "test_flag"
         assert "test_flag" in report.data_quality_flags
         assert report.p_target is None
 
@@ -65,8 +68,69 @@ class TestForecastReportSchema:
         d = _error_report("TLKM", date.today(), 10, []).model_dump()
 
         assert d["ticker"] == "TLKM"
+        assert d["forecast_status"] == "UNAVAILABLE"
+        assert d["failure_reason"] == "forecast_unavailable"
         assert isinstance(d["model_votes"], list)
         assert isinstance(d["data_quality_flags"], list)
+
+    def test_forecast_report_rejects_inconsistent_status_reason(self):
+        from datetime import date
+
+        with pytest.raises(ValueError, match="READY forecasts"):
+            ForecastReport(
+                ticker="BBCA",
+                as_of=date.today(),
+                horizon_days=10,
+                forecast_status="READY",
+                failure_reason="unexpected_failure",
+            )
+
+        with pytest.raises(ValueError, match="Non-READY forecasts"):
+            ForecastReport(
+                ticker="BBCA",
+                as_of=date.today(),
+                horizon_days=10,
+                forecast_status="MODEL_FAILED",
+                failure_reason=None,
+            )
+
+        with pytest.raises(ValueError, match="explicit failure_reason"):
+            ForecastReport(
+                ticker="BBCA",
+                as_of=date.today(),
+                horizon_days=10,
+                forecast_status="MODEL_FAILED",
+            )
+
+
+def test_predict_cli_renders_explicit_status_and_reason(monkeypatch) -> None:
+    from datetime import date
+
+    from rich.console import Console
+
+    from app.cli.commands import forecast as forecast_cli
+
+    report = ForecastReport(
+        ticker="BBCA",
+        as_of=date(2026, 7, 15),
+        horizon_days=10,
+        forecast_status="ZERO_WEIGHT",
+        failure_reason="all_validated_return_models_disqualified",
+    )
+
+    class FakeService:
+        def predict(self, *_args, **_kwargs):
+            return report
+
+    test_console = Console(record=True, width=140)
+    monkeypatch.setattr(forecast_cli, "console", test_console)
+    monkeypatch.setattr(forecast_cli, "_get_service", lambda: FakeService())
+
+    forecast_cli.predict_command("BBCA", horizon=10, mode="ensemble")
+    output = test_console.export_text()
+
+    assert "status: ZERO_WEIGHT" in output
+    assert "reason: all_validated_return_models_disqualified" in output
 
 
 def test_predict_rejects_invalid_ticker_before_policy_or_dataset(monkeypatch) -> None:
@@ -144,6 +208,8 @@ class TestGracefulFallback:
                     ticker="BBCA",
                     as_of=date(2026, 6, 30),
                     horizon_days=10,
+                    forecast_status="VALIDATION_FAILED",
+                    failure_reason="all_return_models_failed_validation",
                     expected_value=0.42,
                     validation_summary=ValidationSummary(
                         horizon_days=10,
@@ -177,7 +243,7 @@ class TestGracefulFallback:
 
         assert results[0]["forecast_report"]["validation_summary"]["status"] == "failed"
         assert "forecast_ev_pct" not in results[0]
-        assert results[0]["forecast_ev_ignored_reason"] == "validation_failed"
+        assert results[0]["forecast_ev_ignored_reason"] == "forecast_validation_failed"
 
     def test_inject_forecast_uses_full_risk_adjusted_ev_when_production(self, monkeypatch):
         import asyncio
@@ -194,6 +260,8 @@ class TestGracefulFallback:
                     ticker="BBCA",
                     as_of=date(2026, 6, 30),
                     horizon_days=10,
+                    forecast_status="READY",
+                    failure_reason=None,
                     expected_value=0.42,
                     risk_adjusted_expected_value=0.20,
                     validation_summary=ValidationSummary(
@@ -229,6 +297,8 @@ class TestGracefulFallback:
                     ticker="BBCA",
                     as_of=date(2026, 6, 30),
                     horizon_days=10,
+                    forecast_status="READY",
+                    failure_reason=None,
                     expected_value=0.42,
                     risk_adjusted_expected_value=0.20,
                     validation_summary=ValidationSummary(
@@ -248,6 +318,49 @@ class TestGracefulFallback:
         assert results[0]["forecast_ev_pct"] == pytest.approx(7.0)
         assert results[0]["forecast_ev_downweight"] == pytest.approx(0.35)
         assert "forecast_ev_ignored_reason" not in results[0]
+
+    @pytest.mark.parametrize(
+        ("forecast_status", "expected_reason"),
+        [
+            ("NOT_VALIDATED", "forecast_not_validated"),
+            ("VALIDATION_FAILED", "forecast_validation_failed"),
+            ("MODEL_FAILED", "forecast_model_failed"),
+            ("ZERO_WEIGHT", "forecast_zero_weight"),
+            ("UNAVAILABLE", "forecast_unavailable"),
+        ],
+    )
+    def test_ranking_reports_distinct_non_ready_reason(
+        self,
+        forecast_status,
+        expected_reason,
+    ):
+        from core.orchestrator.legacy import _forecast_ranking_ev
+
+        ranking_ev, downweight, ignored_reason = _forecast_ranking_ev(
+            {
+                "forecast_status": forecast_status,
+                "risk_adjusted_expected_value": 0.20,
+                "validation_summary": {"status": "production"},
+            }
+        )
+
+        assert ranking_ev is None
+        assert downweight is None
+        assert ignored_reason == expected_reason
+
+    def test_ranking_fails_closed_when_legacy_status_is_missing(self):
+        from core.orchestrator.legacy import _forecast_ranking_ev
+
+        ranking_ev, downweight, ignored_reason = _forecast_ranking_ev(
+            {
+                "risk_adjusted_expected_value": 0.20,
+                "validation_summary": {"status": "production"},
+            }
+        )
+
+        assert ranking_ev is None
+        assert downweight is None
+        assert ignored_reason == "forecast_status_missing"
 
 
 class _PredictionColumnModel(ModelBase):
@@ -316,7 +429,12 @@ def _fake_labeled_frame() -> pd.DataFrame:
     )
 
 
-def _service_with_fakes(monkeypatch, factories=None, status_map=None):
+def _service_with_fakes(
+    monkeypatch,
+    factories=None,
+    status_map=None,
+    brier_map=None,
+):
     service = ForecastingService()
     service._dataset_builder = _FakeDatasetBuilder()
     service._tgarch = _FakeTGarch()
@@ -336,6 +454,7 @@ def _service_with_fakes(monkeypatch, factories=None, status_map=None):
     )
 
     statuses = status_map or {}
+    briers = brier_map or {"naive": 0.25, "xgboost": 0.15}
 
     def fake_validate(model, _splits, horizon):
         status = statuses.get(model.name, "production")
@@ -344,7 +463,7 @@ def _service_with_fakes(monkeypatch, factories=None, status_map=None):
             n_observations=30,
             ic_mean=0.05 if status != "failed" else -0.01,
             ic_t_stat=3.0 if status == "production" else 1.0,
-            brier=0.20,
+            brier=briers.get(model.name, 0.15),
             rmse=0.01,
             mae=0.008,
             mape=0.40,
@@ -398,8 +517,12 @@ def test_predict_modes_have_distinct_model_composition(monkeypatch) -> None:
     ensemble = service.predict("BBCA", mode="ensemble")
 
     assert [vote.model_name for vote in naive.model_votes] == ["naive"]
+    assert naive.forecast_status == "READY"
+    assert naive.failure_reason is None
     assert "mode_naive_realized_volatility" in naive.data_quality_flags
     assert [vote.model_name for vote in tgarch.model_votes] == ["tgarch"]
+    assert tgarch.forecast_status == "READY"
+    assert tgarch.failure_reason is None
     assert tgarch.validation_summary is None
     assert tgarch.risk_adjusted_expected_value is None
 
@@ -408,6 +531,9 @@ def test_predict_modes_have_distinct_model_composition(monkeypatch) -> None:
     statuses = {vote.model_name: vote.status for vote in ensemble.model_votes}
     assert statuses["lstm"] == "experimental_unused"
     assert statuses["prophet"] == "experimental_unused"
+    assert ensemble.forecast_status == "READY"
+    assert ensemble.failure_reason is None
+    assert ensemble.risk_adjusted_expected_value is not None
 
 
 def test_predict_marks_unavailable_optional_models(monkeypatch) -> None:
@@ -422,6 +548,22 @@ def test_predict_marks_unavailable_optional_models(monkeypatch) -> None:
 
     assert xgboost_vote.status == "unavailable"
     assert "model_unavailable:xgboost" in report.data_quality_flags
+
+
+def test_partial_model_failure_keeps_viable_ensemble_ready(monkeypatch) -> None:
+    factories = {
+        "naive": _FailingReturnModel,
+        "xgboost": lambda: _FixedReturnModel("xgboost", 0.024),
+    }
+    service = _service_with_fakes(monkeypatch, factories=factories)
+
+    report = service.predict("BBCA", mode="ensemble")
+    xgboost_vote = next(vote for vote in report.model_votes if vote.model_name == "xgboost")
+
+    assert xgboost_vote.weight == pytest.approx(1.0)
+    assert report.forecast_status == "READY"
+    assert report.failure_reason is None
+    assert report.risk_adjusted_expected_value is not None
 
 
 def test_ensemble_does_not_blend_failed_return_models(monkeypatch) -> None:
@@ -445,7 +587,90 @@ def test_ensemble_does_not_blend_failed_return_models(monkeypatch) -> None:
     assert report.expected_value is None
     assert report.risk_adjusted_expected_value is None
     assert report.decision == "AVOID"
+    assert report.forecast_status == "VALIDATION_FAILED"
+    assert report.failure_reason == "all_return_models_failed_validation"
     assert "no_validated_return_model" in report.data_quality_flags
+
+
+def test_ensemble_reports_zero_weight_when_validated_models_are_disqualified(
+    monkeypatch,
+) -> None:
+    service = _service_with_fakes(
+        monkeypatch,
+        brier_map={"naive": 0.20, "xgboost": 0.30},
+    )
+
+    report = service.predict("BBCA", mode="ensemble")
+    return_votes = [
+        vote
+        for vote in report.model_votes
+        if vote.model_name in {"naive", "xgboost"}
+    ]
+
+    assert all(vote.r_hat_net is not None for vote in return_votes)
+    assert all(vote.weight == 0.0 for vote in return_votes)
+    assert report.forecast_status == "ZERO_WEIGHT"
+    assert report.failure_reason == "all_validated_return_models_disqualified"
+    assert report.expected_return_net is None
+
+
+def test_ensemble_reports_not_validated_when_walk_forward_is_unavailable(
+    monkeypatch,
+) -> None:
+    service = _service_with_fakes(monkeypatch)
+    monkeypatch.setattr(
+        "core.forecasting.service.walk_forward_splits",
+        lambda *_args, **_kwargs: [],
+    )
+
+    report = service.predict("BBCA", mode="ensemble")
+    return_votes = [
+        vote
+        for vote in report.model_votes
+        if vote.model_name in {"naive", "xgboost"}
+    ]
+
+    assert {vote.status for vote in return_votes} == {"not_validated"}
+    assert report.forecast_status == "NOT_VALIDATED"
+    assert report.failure_reason == "walk_forward_validation_unavailable"
+
+
+def test_ensemble_reports_model_failed_when_all_predictions_fail(monkeypatch) -> None:
+    service = _service_with_fakes(
+        monkeypatch,
+        factories={"naive": _FailingReturnModel, "xgboost": _FailingReturnModel},
+    )
+
+    report = service.predict("BBCA", mode="ensemble")
+
+    assert report.forecast_status == "MODEL_FAILED"
+    assert report.failure_reason == "all_return_models_unavailable"
+    assert all(
+        vote.status == "unavailable"
+        for vote in report.model_votes
+        if vote.model_name in {"naive", "xgboost"}
+    )
+    assert "validation_unavailable" not in report.data_quality_flags
+
+
+def test_ensemble_reports_validation_runtime_failure(monkeypatch) -> None:
+    service = _service_with_fakes(monkeypatch)
+
+    def fail_validation(*_args, **_kwargs):
+        raise RuntimeError("validation exploded")
+
+    monkeypatch.setattr("core.forecasting.service.validate_model", fail_validation)
+
+    report = service.predict("BBCA", mode="ensemble")
+
+    assert report.forecast_status == "VALIDATION_FAILED"
+    assert report.failure_reason == "walk_forward_validation_failed"
+    assert {
+        vote.status
+        for vote in report.model_votes
+        if vote.model_name in {"naive", "xgboost"}
+    } == {"validation_failed"}
+    assert "validation_unavailable" not in report.data_quality_flags
 
 
 def test_explicit_naive_mode_can_still_emit_failed_baseline(monkeypatch) -> None:
@@ -457,9 +682,68 @@ def test_explicit_naive_mode_can_still_emit_failed_baseline(monkeypatch) -> None
     assert naive_vote.model_name == "naive"
     assert naive_vote.status == "validation_failed"
     assert naive_vote.weight == 1.0
+    assert report.forecast_status == "VALIDATION_FAILED"
+    assert report.failure_reason == "all_return_models_failed_validation"
     assert report.expected_return_net == pytest.approx(0.020)
     assert report.risk_adjusted_expected_value is None
     assert "no_validated_return_model" not in report.data_quality_flags
+
+
+def test_tgarch_fallback_is_model_failed(monkeypatch) -> None:
+    service = _service_with_fakes(monkeypatch)
+
+    class FailingTGarch:
+        def predict_volatility(self, _returns: pd.Series, _horizon: int):
+            return [0.20], True
+
+    service._tgarch = FailingTGarch()
+
+    report = service.predict("BBCA", mode="tgarch")
+
+    assert report.forecast_status == "MODEL_FAILED"
+    assert report.failure_reason == "tgarch_volatility_model_failed"
+
+
+def test_aggregate_validation_ignores_zero_weight_model_metadata() -> None:
+    validations = {
+        "active": ValidationSummary(
+            horizon_days=10,
+            n_observations=20,
+            ic_mean=0.04,
+            mape=None,
+            bh_q_value_passed=False,
+            status="research_only",
+        ),
+        "excluded": ValidationSummary(
+            horizon_days=10,
+            n_observations=999,
+            ic_mean=0.90,
+            mape=99.0,
+            bh_q_value_passed=True,
+            status="production",
+        ),
+    }
+    votes = [
+        ModelVote(
+            model_name="active",
+            weight=1.0,
+            validation_passed=True,
+        ),
+        ModelVote(
+            model_name="excluded",
+            weight=0.0,
+            validation_passed=True,
+        ),
+    ]
+
+    summary = _aggregate_validation(validations, votes)
+
+    assert summary is not None
+    assert summary.status == "research_only"
+    assert summary.n_observations == 20
+    assert summary.ic_mean == pytest.approx(0.04)
+    assert summary.mape is None
+    assert summary.bh_q_value_passed is False
 
 
 def test_model_disagreement_penalty_detects_direction_conflict() -> None:

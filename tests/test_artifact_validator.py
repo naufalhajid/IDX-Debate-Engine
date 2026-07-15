@@ -141,11 +141,12 @@ def test_reconcile_artifacts_all_valid(tmp_path: Path) -> None:
             {
                 "ticker": "BBCA",
                 "status": "ok",
+                "execution_status": "EXECUTABLE_BUY",
                 "verdict": {"rating": "BUY"},
                 "risk_governor": _risk_governor(),
             }
         ],
-        markdown="# TOP 3\n\n## #1 - BBCA\nCurrent Price: Rp 1,000\nSignal: BUY\n",
+        markdown="# TOP 1\n\n## #1 - BBCA\nCurrent Price: Rp 1,000\nSignal: BUY\n",
         latest={"ticker": "BBCA", "metadata": {"run_id": "run-1"}},
     )
     audit_path, telemetry_path, rag_path = _write_optional_logs(tmp_path)
@@ -174,11 +175,12 @@ def test_reconcile_artifacts_preserves_corrupt_audit_jsonl(tmp_path: Path) -> No
             {
                 "ticker": "BBCA",
                 "status": "ok",
+                "execution_status": "EXECUTABLE_BUY",
                 "verdict": {"rating": "BUY"},
                 "risk_governor": _risk_governor(),
             }
         ],
-        markdown="# TOP 3\n\n## #1 - BBCA\nSignal: BUY\n",
+        markdown="# TOP 1\n\n## #1 - BBCA\nSignal: BUY\n",
         latest={"ticker": "BBCA", "metadata": {"run_id": "run-1"}},
     )
     audit_path, telemetry_path, rag_path = _write_optional_logs(tmp_path)
@@ -276,11 +278,12 @@ def test_reconcile_artifacts_warns_for_stale_or_missing_optional_surfaces(
             {
                 "ticker": "BBCA",
                 "status": "ok",
+                "execution_status": "EXECUTABLE_BUY",
                 "verdict": {"rating": "BUY"},
                 "risk_governor": _risk_governor(),
             }
         ],
-        markdown="# TOP 3\n\n## #1 - BBCA\nSignal: BUY\n",
+        markdown="# TOP 1\n\n## #1 - BBCA\nSignal: BUY\n",
         latest={"ticker": "BBCA", "metadata": {"run_id": "run-1"}},
     )
     rag_path = tmp_path / "evidence_log.jsonl"
@@ -337,8 +340,15 @@ def test_reconcile_artifacts_warns_when_promoted_ticker_has_no_risk_governor(
 ) -> None:
     batch_path, top3_path, latest_path = _write_artifacts(
         tmp_path,
-        batch=[{"ticker": "BBCA", "status": "ok", "verdict": {"rating": "BUY"}}],
-        markdown="# TOP 3\n\n## #1 - BBCA\nSignal: BUY\n",
+        batch=[
+            {
+                "ticker": "BBCA",
+                "status": "ok",
+                "execution_status": "EXECUTABLE_BUY",
+                "verdict": {"rating": "BUY"},
+            }
+        ],
+        markdown="# TOP 1\n\n## #1 - BBCA\nSignal: BUY\n",
         latest={"ticker": "BBCA", "metadata": {"run_id": "run-1"}},
     )
     audit_path, telemetry_path, rag_path = _write_optional_logs(tmp_path)

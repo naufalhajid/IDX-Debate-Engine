@@ -100,21 +100,25 @@
   {#if !collapsed}
     <div class="metrics-cards">
       <div class="metric-card">
-        <span class="metric-label">BUY / STR. BUY</span>
+        <span class="metric-label">EXECUTABLE BUY</span>
         <strong class="metric-val signal-bull">
-          {$debateStats ? (($debateStats.ratings_distribution.BUY || 0) + ($debateStats.ratings_distribution.STRONG_BUY || 0)) : 0}
+          {$debateStats ? ($debateStats.execution_status_distribution.EXECUTABLE_BUY || 0) : 0}
         </strong>
       </div>
       <div class="metric-card">
-        <span class="metric-label">AVOID SIGNALS</span>
+        <span class="metric-label">WAITLIST</span>
+        <strong class="metric-val" style="color: var(--signal-hold);">
+          {$debateStats ? ($debateStats.execution_status_distribution.WAITLIST || 0) : 0}
+        </strong>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">NOT EXECUTABLE</span>
         <strong class="metric-val signal-bear">
-          {$debateStats ? ($debateStats.ratings_distribution.AVOID || 0) : 0}
-        </strong>
-      </div>
-      <div class="metric-card">
-        <span class="metric-label">HOLD SIGNALS</span>
-        <strong class="metric-val" style="color: var(--text-secondary);">
-          {$debateStats ? ($debateStats.ratings_distribution.HOLD || 0) : 0}
+          {$debateStats
+            ? ($debateStats.execution_status_distribution.NO_TRADE || 0) +
+              ($debateStats.execution_status_distribution.AVOID || 0) +
+              ($debateStats.execution_status_distribution.INSUFFICIENT_DATA || 0)
+            : 0}
         </strong>
       </div>
       <div class="metric-card">

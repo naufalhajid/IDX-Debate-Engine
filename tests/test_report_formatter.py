@@ -1,6 +1,5 @@
 import re
 
-import pytest
 from rich.console import Console
 
 from services.explainability_auditor import (
@@ -348,12 +347,15 @@ def test_generate_ticker_report_shows_data_quality_warnings() -> None:
 def test_generate_ticker_report_shows_forecast_quality_flags() -> None:
     result = _mock_result()
     result["forecast_report"] = {
+        "forecast_status": "ZERO_WEIGHT",
+        "failure_reason": "all_validated_return_models_disqualified",
         "data_quality_flags": ["ocf_missing", "validation_status:failed"],
     }
     result["forecast_ev_ignored_reason"] = "validation_failed"
 
     report = MarkdownFormatter().generate_ticker_report(result)
 
+    assert "Forecast status: ZERO_WEIGHT (all_validated_return_models_disqualified)" in report
     assert "Forecast data quality: ocf_missing, validation_status:failed" in report
     assert "Forecast EV ignored: validation_failed" in report
 
@@ -380,6 +382,8 @@ def test_render_ticker_panel_shows_forecast_quality_flags() -> None:
     formatter = RichFormatter(console=console)
     result = _mock_result()
     result["forecast_report"] = {
+        "forecast_status": "MODEL_FAILED",
+        "failure_reason": "all_return_models_unavailable",
         "data_quality_flags": ["validation_status:failed"],
     }
     result["forecast_ev_ignored_reason"] = "validation_failed"
@@ -387,6 +391,7 @@ def test_render_ticker_panel_shows_forecast_quality_flags() -> None:
     formatter.render_ticker_panel(result)
     output = console.export_text()
 
+    assert "Forecast status: MODEL_FAILED (all_return_models_unavailable)" in output
     assert "Forecast data quality: validation_status:failed" in output
     assert "Forecast EV ignored: validation_failed" in output
 

@@ -125,6 +125,50 @@ def test_safe_candidate_attaches_snapshot_cross_process_provenance(monkeypatch) 
     assert result["market_snapshot"]["row_count"] == 400
 
 
+def test_safe_candidate_keeps_latest_ticker_bar_when_ihsg_calendar_lags(
+    monkeypatch,
+) -> None:
+    snapshot = build_market_snapshot(
+        "BBCA",
+        _frame(),
+        requested_start=date(2024, 11, 17),
+        requested_end=date(2026, 7, 10),
+        min_complete_bars=400,
+        now=datetime(2026, 7, 10, 17, tzinfo=IDX_TIMEZONE),
+    )
+    captured: dict[str, object] = {}
+
+    def capture_latest(_row, frame, *_args, **_kwargs):
+        captured["last_date"] = frame.index[-1].date()
+        captured["current_price"] = float(frame["Close"].iloc[-1])
+        return {"Ticker": "BBCA", "Current Price": captured["current_price"]}
+
+    monkeypatch.setattr(pipeline, "_analyze_ticker", capture_latest)
+    ihsg_close = pd.Series(
+        range(len(snapshot.history) - 1),
+        index=snapshot.history.index[:-1],
+        dtype="float64",
+    )
+
+    result = pipeline._safe_analyze_price_candidate(
+        row=pd.Series({"Ticker": "BBCA"}),
+        data=pd.concat({"BBCA.JK": snapshot.history}, axis=1),
+        cfg={"min_bars": 60},
+        logger=logging.getLogger("test.quant.snapshot.lagging_ihsg"),
+        ihsg_close=ihsg_close,
+        ihsg_return_1m=0.0,
+        adapter=None,
+        failures=[],
+        market_snapshot=snapshot,
+    )
+
+    assert result is not None
+    assert captured["last_date"] == snapshot.last_date
+    assert captured["current_price"] == pytest.approx(
+        float(snapshot.history["Close"].iloc[-1])
+    )
+
+
 def test_safe_candidate_rejects_snapshot_below_400_before_analysis(monkeypatch) -> None:
     snapshot = build_market_snapshot(
         "BBCA",

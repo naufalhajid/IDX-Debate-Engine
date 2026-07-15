@@ -464,3 +464,83 @@ creep; do not start Phase 2 without explicit design sign-off).
 
 *Read-only pass — no source files modified. All code references verified by direct Grep
 against the current working tree on 2026-06-21.*
+
+---
+
+## 2026-07-15 Addendum — Fair Value Unification data-quality finding
+
+This section is a separate addition from the Fair Value End-to-End Unification &
+Remediation effort (Fix 3B). It is unrelated to the 2026-06-21 STRATEGIC_ALIGNMENT_AUDIT
+above and is appended here only because this file is the project's standing remediation
+backlog.
+
+### Task H — Stockbit cash-flow-statement TTM block is non-negative-magnitude only
+
+**Priority Group:** REFINEMENT (no correctness bug shipped; documents a vendor data
+limitation discovered while building the FCFE-DCF bridge)
+
+**Files:**
+- `providers/stockbit.py` (~lines 373–393) — `CashFlowStatement(...)` construction, positional
+  `parse_key_statistic_results_item_value(cash_flow_statement_fin_name_results, 0..4)`
+- `utils/helpers.py` `parse_key_statistic_results_item_value()` — confirmed pure passthrough
+  of `result_item[key_index]["fitem"]["value"]`, no `abs()` or sign handling
+- `services/fair_value_calculator.py` `KeyStats.capex_ttm`, `fair_value_dcf()` (FIX 3B)
+
+**Finding:**
+Empirically verified against `output/IDX Fundamental Analysis 2026-07-15.xlsx`
+(`key-statistics` sheet, 963 tickers): all five cash-flow-statement TTM fields — Cash From
+Operations, Cash From Investing, Cash From Financing, Capital expenditure, and Free cash
+flow — have **zero negative values across all 963 rows**. This is not physically plausible
+for a real market (investing cash flow in particular is negative for the overwhelming
+majority of real companies), and `parse_key_statistic_results_item_value` does no sign
+stripping, so the vendor (Stockbit) itself appears to expose this entire block as unsigned
+magnitudes, not signed cash-flow figures.
+
+Cross-checking `OCF − Capex` against Stockbit's own reported `Free cash flow (TTM)` across
+760 tickers with non-zero capex: 410 (54%) match the subtraction exactly, 152 (20%) match
+`OCF + Capex` instead (stable per-ticker across the 2026-07-02 / 07-09 / 07-15 vintages, so
+not scrape noise), and 208 (27%) match neither. The `OCF + Capex` subset is most consistent
+with companies whose true TTM net capex was negative (a divestment/asset-sale year) — the
+sign was likely lost before the value reached this codebase, since it is never negative in
+either the OCF/investing/financing/capex/FCF fields at any point downstream.
+
+**Impact on FIX 3B (`fair_value_dcf()`):** Bounded and safe by construction, not a silent
+correctness bug. Because `capex_ttm` is always ≥ 0 and is *subtracted*
+(`fcfe_ps = ocf_ps − capex_ps`), the DCF method's output can only be **understated** relative
+to the (unrecoverable) true value for the ~20% minority — never inflated. `if fcfe_ps <= 0:
+return None` additionally excludes the method outright once capex exceeds OCF. Using
+Stockbit's own reported `Free cash flow (TTM)` directly as a shortcut (considered and
+rejected during Fix 3B) would have been *more* dangerous, not less: AKPI (OCF 256B, Capex
+368B) has a true FCF of −112B, but Stockbit reports `+112B` — feeding that directly into the
+DCF numerator would silently invert a should-be-excluded negative-FCF company into a
+positive, "valued" one.
+
+**Proposed Change (not started — design/data-source review needed first):**
+No safe code-level fix exists using only the currently exposed Stockbit fields, since the
+sign information is lost at the vendor before it reaches this codebase. Options for a future
+session:
+1. Contact/inspect Stockbit's raw JSON response (not just the `fin_name_results` array
+   already parsed) for an alternate, signed cash-flow field.
+2. Source capex/OCF from a second vendor for cross-validation on the ~20%+27% divergent
+   subset only.
+3. Accept the conservative-understatement bias as a documented, permanent limitation of the
+   FCFE-DCF method (current default) and surface it in per-ticker provenance (FIX 5) so a
+   human reviewer can see "DCF method excluded/understated — capex sign unverifiable" rather
+   than a bare null.
+
+**Test Coverage:** The conservative-bias invariant (capex only ever subtracts, never
+inflates FV) is already locked in by
+`tests/test_fair_value_calculator.py::test_fair_value_dcf_fcfe_lower_than_ocf_only_proxy`
+and `test_fair_value_dcf_negative_fcfe_returns_none`. No new test is required until Option
+1–3 above is actually implemented.
+
+**Risk:** LOW (documents a known, bounded, conservative-direction limitation; does not
+block Fix 3B from shipping).
+
+**Effort:** Investigation-only until a vendor/data-source decision is made (Option 1–3
+above are each M–L depending on choice).
+
+---
+
+*Addendum verified against real scraped data (963 tickers, three date vintages) on
+2026-07-15 during the Fair Value End-to-End Unification & Remediation effort, Fix 3B.*

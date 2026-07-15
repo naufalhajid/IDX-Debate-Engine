@@ -14,7 +14,9 @@ export const filteredResults = derived(
   ([$results, $query, $activeTab]) => {
     let results = $results;
     if ($activeTab === 'watchlist') {
-      results = results.filter((r) => ['STRONG_BUY', 'BUY', 'HOLD'].includes(r.rating));
+      results = results.filter((result) =>
+        ['EXECUTABLE_BUY', 'WAITLIST'].includes(result.execution_status)
+      );
     }
     const query = $query.trim().toUpperCase();
     if (!query) return results;
@@ -28,9 +30,16 @@ export const filteredResults = derived(
 
 export const summaryStats = derived(allResults, ($results) => ({
   total: $results.length,
-  strongBuy: $results.filter((result) => result.rating === 'STRONG_BUY').length,
-  buy: $results.filter((result) => result.rating === 'BUY').length,
-  avoid: $results.filter((result) => result.rating === 'AVOID').length,
+  strongBuy: $results.filter(
+    (result) =>
+      result.execution_status === 'EXECUTABLE_BUY' &&
+      result.model_rating === 'STRONG_BUY'
+  ).length,
+  buy: $results.filter(
+    (result) =>
+      result.execution_status === 'EXECUTABLE_BUY' && result.model_rating === 'BUY'
+  ).length,
+  avoid: $results.filter((result) => result.execution_status === 'AVOID').length,
   avgConviction: $results.length
     ? Math.round(
         $results.reduce((total, result) => total + result.conviction_score, 0) /
@@ -45,8 +54,10 @@ export interface DebateStats {
   avg_confidence: number;
   consensus_rate: number;
   ratings_distribution: Record<string, number>;
+  execution_status_distribution: Record<string, number>;
   fresh_count: number;
   stale_count: number;
+  corrupt_artifacts: number;
   latest_debate_date: string | null;
 }
 

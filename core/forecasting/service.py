@@ -19,7 +19,12 @@ from core.forecasting.models import ModelBase
 from core.forecasting.models.naive import NaiveModel
 from core.forecasting.models.tgarch import TGARCHForecaster
 from core.forecasting.models.xgboost_model import XGBoostForecaster
-from core.forecasting.schemas import ForecastReport, ModelVote, ValidationSummary
+from core.forecasting.schemas import (
+    ForecastReport,
+    ForecastStatus,
+    ModelVote,
+    ValidationSummary,
+)
 from core.forecasting.validation import (
     batch_bh_correction,
     validate_model,
@@ -230,10 +235,25 @@ class ForecastingService:
             flags.append(f"model_disagreement_penalty:{penalty:.3f}")
         risk_adjusted_ev = _risk_adjusted_ev(ev, penalty, validation_summary, mode)
 
-        if validation_summary is None:
-            flags.extend(["validation_status:failed", "validation_unavailable"])
-        else:
-            flags.append(f"validation_status:{validation_summary.status}")
+        forecast_status, failure_reason = _classify_forecast_status(
+            mode=mode,
+            return_votes=return_votes,
+            validations=validation_by_model,
+            flags=flags,
+            volatility_fallback=vol_fallback,
+            sigma_forecast=sigma_forecast,
+            r_hat_net=r_hat_net,
+            p_target=p_target,
+            p_stop=p_stop,
+            expected_value=ev,
+            risk_adjusted_expected_value=risk_adjusted_ev,
+        )
+
+        if mode != "tgarch":
+            if validation_summary is None:
+                flags.append("validation_status:failed")
+            else:
+                flags.append(f"validation_status:{validation_summary.status}")
 
         decision_ev = risk_adjusted_ev if risk_adjusted_ev is not None else ev
         decision = _make_decision(p_target, p_stop, decision_ev, r_hat_net)
@@ -243,6 +263,8 @@ class ForecastingService:
             ticker=ticker.upper(),
             as_of=as_of,
             horizon_days=horizon,
+            forecast_status=forecast_status,
+            failure_reason=failure_reason,
             expected_return_net=r_hat_net,
             p_target=p_target,
             p_stop=p_stop,
@@ -303,6 +325,7 @@ class ForecastingService:
     ) -> tuple[list[ModelVote], dict[str, ValidationSummary]]:
         predictions: dict[str, float] = {}
         unavailable: dict[str, str] = {}
+        validation_failures: dict[str, str] = {}
         validations: dict[str, ValidationSummary] = {}
 
         splits = walk_forward_splits(labeled, n_splits=5, test_size_days=30) if len(labeled) >= 60 else []
@@ -328,6 +351,7 @@ class ForecastingService:
                     validations[name] = validate_model(factory(), splits, horizon)
                 except Exception as exc:
                     logger.warning("[ForecastSvc] %s validation failed: %s", name, exc)
+                    validation_failures[name] = f"{type(exc).__name__}:{exc}"
                     flags.append(f"model_validation_failed:{name}")
 
         if validations:
@@ -352,7 +376,10 @@ class ForecastingService:
             pred = predictions.get(name)
             validation = validations.get(name)
             p_target, p_stop = _compute_probs(pred, sigma_forecast, horizon, cio_verdict, close_value)
-            status, reason = _vote_status(validation)
+            if name in validation_failures:
+                status, reason = "validation_failed", validation_failures[name]
+            else:
+                status, reason = _vote_status(validation)
             weight = weights.get(name, 0.0)
             votes.append(
                 ModelVote(
@@ -426,6 +453,7 @@ def _model_weights(
         }
         for name, validation in validations.items()
         if name in predictions
+        and validation.status in {"production", "research_only"}
     }
     weights = compute_ensemble_weights(scores) if scores else {}
     if sum(weights.values()) > 1e-12:
@@ -435,10 +463,79 @@ def _model_weights(
 
 def _vote_status(validation: ValidationSummary | None) -> tuple[str, str | None]:
     if validation is None:
-        return "active", "validation_unavailable"
+        return "not_validated", "validation_unavailable"
     if validation.status == "failed":
         return "validation_failed", "validation_status:failed"
     return "active", None
+
+
+def _classify_forecast_status(
+    *,
+    mode: ForecastMode,
+    return_votes: list[ModelVote],
+    validations: dict[str, ValidationSummary],
+    flags: list[str],
+    volatility_fallback: bool,
+    sigma_forecast: float | None,
+    r_hat_net: float | None,
+    p_target: float | None,
+    p_stop: float | None,
+    expected_value: float | None,
+    risk_adjusted_expected_value: float | None,
+) -> tuple[ForecastStatus, str | None]:
+    """Classify forecast readiness without inferring it from nullable values."""
+
+    def complete(*values: float | None) -> bool:
+        return all(value is not None and math.isfinite(float(value)) for value in values)
+
+    if mode == "tgarch":
+        if volatility_fallback:
+            return "MODEL_FAILED", "tgarch_volatility_model_failed"
+        if complete(sigma_forecast, r_hat_net, p_target, p_stop, expected_value):
+            return "READY", None
+        return "UNAVAILABLE", "forecast_output_unavailable"
+
+    available_votes = [
+        vote
+        for vote in return_votes
+        if vote.status != "unavailable"
+        and vote.r_hat_net is not None
+        and math.isfinite(float(vote.r_hat_net))
+    ]
+    if not available_votes:
+        return "MODEL_FAILED", "all_return_models_unavailable"
+
+    validation_runtime_failed = any(
+        str(flag).startswith("model_validation_failed:") for flag in flags
+    )
+    if not validations:
+        if validation_runtime_failed:
+            return "VALIDATION_FAILED", "walk_forward_validation_failed"
+        return "NOT_VALIDATED", "walk_forward_validation_unavailable"
+
+    validated_votes = [
+        vote
+        for vote in available_votes
+        if vote.weight > 1e-12
+        and vote.validation_passed
+        and validations.get(vote.model_name) is not None
+        and validations[vote.model_name].status in {"production", "research_only"}
+    ]
+    if not validated_votes:
+        if all(validation.status == "failed" for validation in validations.values()):
+            return "VALIDATION_FAILED", "all_return_models_failed_validation"
+        return "ZERO_WEIGHT", "all_validated_return_models_disqualified"
+
+    if not complete(
+        sigma_forecast,
+        r_hat_net,
+        p_target,
+        p_stop,
+        expected_value,
+        risk_adjusted_expected_value,
+    ):
+        return "UNAVAILABLE", "forecast_output_unavailable"
+    return "READY", None
 
 
 def _aggregate_validation(
@@ -450,6 +547,11 @@ def _aggregate_validation(
     ordered = list(validations.values())
     weights_by_name = {vote.model_name: max(0.0, float(vote.weight or 0.0)) for vote in votes}
     total_weight = sum(weights_by_name.get(name, 0.0) for name in validations)
+    active_validations = [
+        validation
+        for name, validation in validations.items()
+        if weights_by_name.get(name, 0.0) > 1e-12
+    ]
 
     def metric(name: str) -> float | None:
         values = []
@@ -461,23 +563,27 @@ def _aggregate_validation(
             values.append((float(value), weight))
         if not values:
             return None
-        if total_weight > 1e-12 and any(weight > 0 for _, weight in values):
+        if total_weight > 1e-12:
             used = [(value, weight) for value, weight in values if weight > 0]
+            if not used:
+                return None
             return sum(value * weight for value, weight in used) / sum(weight for _, weight in used)
         return sum(value for value, _ in values) / len(values)
 
     if total_weight <= 1e-12:
         status: str = "failed"
-    elif any(v.status == "production" for v in ordered):
+    elif any(v.status == "production" for v in active_validations):
         status = "production"
-    elif any(v.status == "research_only" for v in ordered):
+    elif any(v.status == "research_only" for v in active_validations):
         status = "research_only"
     else:
         status = "failed"
 
     return ValidationSummary(
         horizon_days=ordered[0].horizon_days,
-        n_observations=max(v.n_observations for v in ordered),
+        n_observations=max(
+            v.n_observations for v in (active_validations or ordered)
+        ),
         ic_mean=metric("ic_mean"),
         ic_t_stat=metric("ic_t_stat"),
         brier=metric("brier"),
@@ -486,7 +592,11 @@ def _aggregate_validation(
         mape=metric("mape"),
         directional_accuracy=metric("directional_accuracy"),
         dsr=metric("dsr"),
-        bh_q_value_passed=any(v.bh_q_value_passed for v in ordered),
+        bh_q_value_passed=(
+            any(v.bh_q_value_passed for v in active_validations)
+            if active_validations
+            else False
+        ),
         status=status,  # type: ignore[arg-type]
     )
 
@@ -665,6 +775,8 @@ def _error_report(
         ticker=ticker.upper(),
         as_of=as_of,
         horizon_days=horizon,
+        forecast_status="UNAVAILABLE",
+        failure_reason=flags[0] if flags else "forecast_unavailable",
         data_quality_flags=flags,
         decision="AVOID",
     )

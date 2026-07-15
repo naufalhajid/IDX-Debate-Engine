@@ -45,11 +45,18 @@ def _make_debate_json(
     target_price: float = 4940.0,
     stop_loss: float = 3960.0,
     current_price: float = 4200.0,
+    execution_status: str | None = None,
 ) -> dict:
+    canonical_status = execution_status or (
+        "EXECUTABLE_BUY" if rating in {"BUY", "STRONG_BUY"} else "NO_TRADE"
+    )
     return {
         "ticker": ticker,
+        "execution_status": canonical_status,
+        "execution_decision": {"execution_status": canonical_status},
         "verdict": {
             "rating": rating,
+            "execution_status": canonical_status,
             "confidence": confidence,
             "entry_price_range": entry_price_range,
             "target_price": target_price,
@@ -110,6 +117,39 @@ def test_scan_finds_buy_not_hold(tmp_path):
     tickers = [s.ticker for s in signals]
     assert "BBRI" in tickers
     assert "BMRI" not in tickers
+
+
+def test_scan_skips_model_buy_when_execution_is_not_tradeable(tmp_path):
+    _write_debate(
+        tmp_path,
+        "BBRI",
+        "v20260610_161217",
+        _make_debate_json(
+            "BBRI",
+            rating="BUY",
+            execution_status="NO_TRADE",
+        ),
+    )
+
+    assert scan_debate_dir(tmp_path) == []
+
+
+def test_scan_skips_legacy_buy_without_execution_status(tmp_path):
+    data = _make_debate_json("BBRI", rating="BUY")
+    data.pop("execution_status")
+    data.pop("execution_decision")
+    data["verdict"].pop("execution_status")
+    _write_debate(tmp_path, "BBRI", "v20260610_161217", data)
+
+    assert scan_debate_dir(tmp_path) == []
+
+
+def test_scan_fails_closed_on_conflicting_execution_statuses(tmp_path):
+    data = _make_debate_json("BBRI", rating="BUY")
+    data["execution_status"] = "NO_TRADE"
+    _write_debate(tmp_path, "BBRI", "v20260610_161217", data)
+
+    assert scan_debate_dir(tmp_path) == []
 
 
 def test_min_rating_strong_buy_filters_buy(tmp_path):

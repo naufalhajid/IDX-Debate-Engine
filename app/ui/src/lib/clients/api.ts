@@ -41,8 +41,10 @@ export const api = {
         avg_confidence: number;
         consensus_rate: number;
         ratings_distribution: Record<string, number>;
+        execution_status_distribution: Record<string, number>;
         fresh_count: number;
         stale_count: number;
+        corrupt_artifacts: number;
         latest_debate_date: string | null;
       };
     }>('/api/health'),

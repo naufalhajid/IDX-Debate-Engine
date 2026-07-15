@@ -9,12 +9,18 @@ Only the relevant model raises ImportError when actually called.
 """
 from __future__ import annotations
 
-from core.forecasting.schemas import ForecastReport, ModelVote, ValidationSummary
+from core.forecasting.schemas import (
+    ForecastReport,
+    ForecastStatus,
+    ModelVote,
+    ValidationSummary,
+)
 from core.forecasting.service import ForecastingService
 
 __all__ = [
     "ForecastingService",
     "ForecastReport",
+    "ForecastStatus",
     "ModelVote",
     "ValidationSummary",
 ]

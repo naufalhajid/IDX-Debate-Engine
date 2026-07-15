@@ -1319,8 +1319,15 @@ def test_52w_range_signal_contains_rp_prices():
 # P10: 2-Stage DCF (fair_value_dcf)
 # ---------------------------------------------------------------------------
 
-def _consumer_calc(ocf_per_share: float = 0.0, ocf_ttm: float = 0.0, shares: float = 0.0,
-                   price: float = 5_000.0, ke: float = 0.12, g: float = 0.07) -> FairValueCalculator:
+def _consumer_calc(ocf_per_share: float = 0.0, ocf_ttm: float = 0.0, shares: float = 1_000_000.0,
+                   price: float = 5_000.0, ke: float = 0.12, g: float = 0.07,
+                   capex_ttm: float | None = None) -> FairValueCalculator:
+    if capex_ttm is None:
+        # FIX 3B: default capex = 20% of OCF (a plausible maintenance-capex
+        # ratio) so tests that aren't specifically about capex still exercise
+        # a positive FCFE, same as they exercised a positive OCF before.
+        effective_ocf_ttm = ocf_ttm if ocf_ttm else (ocf_per_share * shares)
+        capex_ttm = effective_ocf_ttm * 0.2 if effective_ocf_ttm > 0 else 0.0
     stats = KeyStats(
         ticker="UNVR",
         current_price=price,
@@ -1329,6 +1336,7 @@ def _consumer_calc(ocf_per_share: float = 0.0, ocf_ttm: float = 0.0, shares: flo
         shares_outstanding=shares,
         cost_of_equity=ke,
         growth_rate=g,
+        capex_ttm=capex_ttm,
     )
     return FairValueCalculator(stats, sector="consumer")
 
@@ -1397,6 +1405,75 @@ def test_fair_value_dcf_result_within_sanity_band():
     result = calc.fair_value_dcf()
     assert result is not None
     assert 500.0 <= result <= 25_000.0
+
+
+# ---------------------------------------------------------------------------
+# FIX 3B: FCFE = OCF - Capex (deviation from spec's WACC/FCFF -- see
+# fair_value_dcf() docstring: Stockbit's indirect-method OCF is already
+# post-interest/levered, so WACC + net-debt bridge would double-count debt
+# service already reflected in the numerator).
+# ---------------------------------------------------------------------------
+
+def test_fair_value_dcf_fcfe_lower_than_ocf_only_proxy():
+    """Capex must actually reduce the DCF output vs an OCF-only base --
+    proving FCFE is really driving the calculation, not silently ignored.
+    The formula is linear in the base cash flow, so scaling fcfe_ps from
+    1000 (capex=0) to 800 (capex/share=200) must scale the FV by the same
+    0.8x -- this IS the hand-calculated proof, not just "some number differs".
+    """
+    ocf_only = _consumer_calc(ocf_per_share=1000.0, shares=1_000_000.0, capex_ttm=0.0)
+    with_capex = _consumer_calc(
+        ocf_per_share=1000.0, shares=1_000_000.0, capex_ttm=200_000_000.0,
+    )
+    fv_ocf_only = ocf_only.fair_value_dcf()
+    fv_with_capex = with_capex.fair_value_dcf()
+    assert fv_ocf_only is not None
+    assert fv_with_capex is not None
+    assert fv_with_capex < fv_ocf_only
+    assert fv_with_capex == pytest.approx(fv_ocf_only * 0.8, rel=0.01)
+
+
+def test_fair_value_dcf_missing_capex_returns_none_not_ocf_fallback():
+    """Missing capex must exclude the method, never silently fall back to
+    the old OCF-only proxy -- that would defeat this fix's entire purpose."""
+    stats = KeyStats(
+        ticker="UNVR",
+        current_price=5_000.0,
+        ocf_per_share=1_000.0,
+        shares_outstanding=1_000_000.0,
+        cost_of_equity=0.12,
+        growth_rate=0.07,
+        capex_ttm=None,
+    )
+    calc = FairValueCalculator(stats, sector="consumer")
+    assert calc.fair_value_dcf() is None
+
+
+def test_fair_value_dcf_negative_fcfe_returns_none():
+    """Capex exceeding OCF -> negative FCFE -> method not applicable, not a
+    negative or misleading fair value."""
+    calc = _consumer_calc(
+        ocf_per_share=1_000.0, shares=1_000_000.0, capex_ttm=1_500_000_000.0,
+    )
+    assert calc.fair_value_dcf() is None
+
+
+def test_fair_value_dcf_explicit_zero_capex_is_valid():
+    """Capex of exactly 0.0 is a known value distinct from None (unknown) --
+    FCFE collapses to OCF via the capex path, not a silent skip."""
+    calc = _consumer_calc(ocf_per_share=1_000.0, shares=1_000_000.0, capex_ttm=0.0)
+    result = calc.fair_value_dcf()
+    assert result is not None
+    assert result > 0
+
+
+def test_fair_value_dcf_missing_shares_returns_none():
+    """Capex is only reported as a TTM aggregate -- without shares outstanding
+    it cannot be converted to a per-share figure."""
+    calc = _consumer_calc(
+        ocf_per_share=1_000.0, shares=0.0, capex_ttm=100_000_000.0,
+    )
+    assert calc.fair_value_dcf() is None
 
 
 def test_consumer_sector_weights_include_dcf():

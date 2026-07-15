@@ -142,6 +142,9 @@ def predict_command(
         )
 
     console.print(f"[idx.header]Forecast: {report.ticker}[/idx.header]  as_of={report.as_of}  h={report.horizon_days}d")
+    console.print(f"  status: [bold]{report.forecast_status}[/bold]")
+    if report.failure_reason:
+        console.print(f"  [idx.warn]reason:[/idx.warn] {report.failure_reason}")
     console.print(f"  decision: [bold]{report.decision}[/bold]  confidence: {report.confidence}")
     console.print(f"  EV: {report.expected_value}  p_target: {report.p_target}  p_stop: {report.p_stop}")
     console.print(f"  sigma forecast (annualized): {report.volatility_forecast}")

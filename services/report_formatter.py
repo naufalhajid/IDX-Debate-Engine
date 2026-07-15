@@ -522,6 +522,13 @@ def _data_quality_warning_lines(result: dict[str, Any]) -> list[str]:
         lines.append(f"RAG citation guard: {_short_text(guard_errors[0], limit=96)}")
 
     forecast_report = _dict_or_empty(result.get("forecast_report"))
+    forecast_status = str(forecast_report.get("forecast_status") or "").strip()
+    forecast_failure = str(forecast_report.get("failure_reason") or "").strip()
+    if forecast_status:
+        status_line = f"Forecast status: {forecast_status}"
+        if forecast_failure:
+            status_line += f" ({forecast_failure})"
+        lines.append(_short_text(status_line, limit=120))
     forecast_flags = _list_or_empty(forecast_report.get("data_quality_flags"))
     if forecast_flags:
         flags = ", ".join(str(flag) for flag in forecast_flags[:4])

@@ -2,23 +2,25 @@
   import { onMount } from 'svelte';
   import { activeTicker, filteredResults, isStreaming, searchQuery, activeTab } from '$lib/stores/dashboard';
   import { stockMap, resolveCompanyName } from '$lib/stores/metadata';
-  import type { Rating, StockResult } from '$lib/types';
+  import type { ExecutionStatus, StockResult } from '$lib/types';
 
   export let onDebate: (tickers: string[]) => void = () => {};
 
   const rowHeight = 64;
   const buffer = 5;
-  const RATING_CONFIG: Record<Rating, { label: string; color: string }> = {
-    STRONG_BUY: { label: 'STRONG BUY', color: 'var(--signal-bull)' },
-    BUY: { label: 'BUY', color: '#34d399' },
-    HOLD: { label: 'HOLD', color: 'var(--signal-hold)' },
-    AVOID: { label: 'AVOID', color: 'var(--signal-bear)' }
+  const ACTION_CONFIG: Record<ExecutionStatus, { label: string; color: string }> = {
+    EXECUTABLE_BUY: { label: 'EXECUTABLE BUY', color: 'var(--signal-bull)' },
+    WAITLIST: { label: 'WAITLIST', color: '#34d399' },
+    NO_TRADE: { label: 'NO TRADE', color: 'var(--signal-hold)' },
+    AVOID: { label: 'AVOID', color: 'var(--signal-bear)' },
+    INSUFFICIENT_DATA: { label: 'INSUFFICIENT DATA', color: 'var(--text-muted)' }
   };
-  const RATING_RANK: Record<Rating, number> = {
-    STRONG_BUY: 4,
-    BUY: 3,
-    HOLD: 2,
-    AVOID: 1
+  const ACTION_RANK: Record<ExecutionStatus, number> = {
+    EXECUTABLE_BUY: 5,
+    WAITLIST: 4,
+    NO_TRADE: 3,
+    AVOID: 2,
+    INSUFFICIENT_DATA: 1
   };
 
   let selectedTickers = new Set<string>();
@@ -34,11 +36,11 @@
   }
 
   function compare(a: StockResult, b: StockResult, key: keyof StockResult, dir: 'desc' | 'asc') {
-    if (key === 'rating') {
-      const ratingA = (a.rating || '').toUpperCase() as Rating;
-      const ratingB = (b.rating || '').toUpperCase() as Rating;
-      const ra = RATING_RANK[ratingA] ?? 0;
-      const rb = RATING_RANK[ratingB] ?? 0;
+    if (key === 'execution_status') {
+      const statusA = a.execution_status ?? 'INSUFFICIENT_DATA';
+      const statusB = b.execution_status ?? 'INSUFFICIENT_DATA';
+      const ra = ACTION_RANK[statusA];
+      const rb = ACTION_RANK[statusB];
       return dir === 'desc' ? rb - ra : ra - rb;
     }
     const va = a[key] ?? '';
@@ -70,11 +72,12 @@
     selectedTickers = checked ? new Set(sorted.map((stock) => stock.ticker)) : new Set();
   }
 
-  function formatPrice(value: number) {
-    return value.toLocaleString('id-ID');
+  function formatPrice(value: number | null) {
+    return value == null ? '-' : value.toLocaleString('id-ID');
   }
 
   function formatEntry(stock: StockResult) {
+    if (stock.entry_low == null || stock.entry_high == null) return '-';
     return `${formatPrice(stock.entry_low)} - ${formatPrice(stock.entry_high)}`;
   }
 
@@ -89,17 +92,18 @@
         result.ticker,
         result.sector,
         result.conviction_score,
-        result.rating,
-        result.risk_reward,
-        result.target_price,
-        result.stop_loss,
-        result.actionable ? 'actionable' : 'watch'
+        result.execution_status ?? 'INSUFFICIENT_DATA',
+        result.model_rating ?? '',
+        result.legacy_rating,
+        result.risk_reward ?? '',
+        result.target_price ?? '',
+        result.stop_loss ?? ''
       ]
         .map((value) => `"${String(value).replaceAll('"', '""')}"`)
         .join(',')
     );
     const csv = [
-      'Ticker,Sector,Conviction,Rating,RiskReward,Target,StopLoss,Status',
+      'Ticker,Sector,Conviction,Action,ModelRating,LegacyRating,RiskReward,Target,StopLoss',
       ...rows
     ].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
@@ -161,7 +165,7 @@
       <h2 class="panel-heading">{$activeTab === 'watchlist' ? 'Watchlist' : 'Stock Recommendations'}</h2>
       <span class="panel-subtitle">
         {$activeTab === 'watchlist'
-          ? 'List of potential stocks rated STRONG BUY, BUY, and HOLD.'
+          ? 'Executable buys and valid setups waiting for entry.'
           : 'List of potential candidates based on fundamental engine analysis.'}
       </span>
     </div>
@@ -205,8 +209,8 @@
     <button class="cell cell--conv sortable" onclick={() => sort('conviction_score')} type="button">
       CONVICTION SCORE {sortKey === 'conviction_score' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
     </button>
-    <button class="cell cell--rating sortable" onclick={() => sort('rating')} type="button">
-      RATING {sortKey === 'rating' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
+    <button class="cell cell--rating sortable" onclick={() => sort('execution_status')} type="button">
+      ACTION {sortKey === 'execution_status' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
     </button>
     <button class="cell cell--price sortable" onclick={() => sort('entry_low')} type="button">
       HARGA (IDR) {sortKey === 'entry_low' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
@@ -232,7 +236,8 @@
     <div class="virtual-space" style="height: {totalHeight}px">
       <div class="virtual-window" style="transform: translateY({offsetY}px)">
         {#each visibleRows as stock (stock.ticker)}
-          {@const cfg = RATING_CONFIG[stock.rating] ?? RATING_CONFIG.HOLD}
+          {@const action = stock.execution_status ?? 'INSUFFICIENT_DATA'}
+          {@const cfg = ACTION_CONFIG[action]}
           {@const filledCount = Math.round((stock.conviction_score ?? 0) / 10)}
           {@const emptyCount = Math.max(0, 10 - filledCount)}
           <button
@@ -277,9 +282,13 @@
             <span class="cell cell--price mono">{formatPrice(stock.entry_low)}</span>
             <span
               class="cell cell--edge mono"
-              class:cell--negative={stock.risk_reward < 1}
+              class:cell--negative={stock.risk_reward != null && stock.risk_reward < 1}
             >
-              {stock.risk_reward >= 1 ? '+' : ''}{stock.risk_reward.toFixed(2)}x
+              {#if stock.risk_reward == null}
+                -
+              {:else}
+                {stock.risk_reward >= 1 ? '+' : ''}{stock.risk_reward.toFixed(2)}x
+              {/if}
             </span>
             <span class="cell cell--entry mono">{formatEntry(stock)}</span>
             <span class="cell cell--date mono" title={stock.last_debated_at}>

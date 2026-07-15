@@ -354,6 +354,23 @@ class KeyStats:
     ebitda_ttm: float | None = None
     net_debt: float | None = None
 
+    # FIX 3B: FCFE = OCF - Capex (Metode 5, DCF). None = missing/unknown --
+    # never silently treated as zero (that would collapse FCFE back to the
+    # old OCF-only proxy this fix removes).
+    # Vendor data note (verified against 963 real tickers in output/*.xlsx,
+    # 2026-07-15): Stockbit's entire cash-flow-statement TTM block (OCF,
+    # investing, financing, capex, FCF) is reported as a non-negative
+    # magnitude -- zero negative values across all 963 rows for all five
+    # fields, which is not physically plausible for a real market and
+    # indicates the vendor does not expose sign for this block. capex_ttm
+    # must therefore always be treated as a positive outflow and SUBTRACTED
+    # -- never sign-flipped or added. For the minority of tickers where the
+    # true TTM net capex was actually negative (a divestment year), this
+    # convention UNDERSTATES fcfe_ps (conservative bias: OCF - |capex| <
+    # true OCF + |capex|), which can only suppress a method, never inflate
+    # one -- see fair_value_dcf()'s `if fcfe_ps <= 0: return None` guard.
+    capex_ttm: float | None = None
+
     # Age of the underlying financial data in days (None = unknown).
     # Populated from the Stockbit API response where a closure date is available.
     keystats_age_days: int | None = None
@@ -715,6 +732,16 @@ def extract_keystats(
             )
             if _total_debt is not None and _cash_equiv is not None:
                 stats.net_debt = _total_debt - _cash_equiv
+
+        # FIX 3B: FCFE = OCF - Capex input. None if not exposed by this
+        # response -- fair_value_dcf() must not fall back to raw OCF.
+        stats.capex_ttm = _lookup_optional(
+            [
+                "Capital expenditure (TTM)",
+                "Capital Expenditure (TTM)",
+                "Capex (TTM)",
+            ]
+        )
 
     # ── Strategy B: legacy flat key-value fallback ────────────────────────────
     # Only runs if Strategy A found nothing useful (flat dict empty or all zeros)
@@ -1138,12 +1165,23 @@ class FairValueCalculator:
         return True
 
     def fair_value_dcf(self) -> float | None:
-        """2-stage OCF-based DCF. Fires only for consumer and default (industrials) sectors.
+        """2-stage FCFE-based DCF. Fires only for consumer and default (industrials) sectors.
+
+        FIX 3B: FCFE = OCF − Capex, discounted at cost of equity (Ke) — NOT a
+        WACC/FCFF/net-debt-bridge model. Stockbit's "Cash From Operations" is
+        the indirect method: it starts from net income, so it is already a
+        POST-INTEREST (levered) cash flow — i.e. FCFE-shaped, not FCFF-shaped.
+        Discounting it at WACC (which blends in after-tax cost of debt) would
+        overstate it, and subtracting net debt afterward would then double-count
+        the debt service already reflected in the numerator. A true FCFF
+        conversion would need to add back after-tax interest expense, which
+        Stockbit's keystats response does not expose as a distinct field.
+        FCFE already equals equity value directly — no net-debt bridge needed.
 
         Banks: OCF/share doesn't translate to equity value cleanly (interest income structure).
         Mining: EV/EBITDA (Method 4) is preferred for commodity cycle stocks.
-        Stage 1 (years 1–5): OCF grows at stats.growth_rate.
-        Terminal value: OCF_5 × (1 + g_t) / (ke − g_t), perpetuity at long-run IDX GDP.
+        Stage 1 (years 1–5): FCFE grows at stats.growth_rate.
+        Terminal value: FCFE_5 × (1 + g_t) / (ke − g_t), perpetuity at long-run IDX GDP.
         """
         if self.sector in ("bank", "mining"):
             return None
@@ -1156,6 +1194,20 @@ class FairValueCalculator:
         if not self._ocf_data_is_stable(ocf_ps):
             return None
 
+        # FCFE = OCF − Capex. Missing capex -> None (never silently fall back
+        # to the OCF-only proxy — that would be the exact "silent zero" this
+        # fix removes). Capex ≥ OCF -> negative FCFE -> method not applicable.
+        # capex_ttm is a vendor-reported non-negative magnitude (see KeyStats
+        # docstring) -- always subtract, never sign-flip or add.
+        if self.stats.capex_ttm is None:
+            return None
+        if self.stats.shares_outstanding <= 0:
+            return None
+        capex_ps = self.stats.capex_ttm / self.stats.shares_outstanding
+        fcfe_ps = ocf_ps - capex_ps
+        if fcfe_ps <= 0:
+            return None
+
         ke = _sector_ke(self.stats.cost_of_equity, self.sector)
         g = min(self.stats.growth_rate, ke - 0.02)  # ensure spread ≥ 2% for Stage 1
         g_t = self._DCF_TERMINAL_GROWTH
@@ -1164,11 +1216,11 @@ class FairValueCalculator:
             return None
 
         pv_stage1 = sum(
-            ocf_ps * ((1 + g) ** t) / ((1 + ke) ** t)
+            fcfe_ps * ((1 + g) ** t) / ((1 + ke) ** t)
             for t in range(1, self._DCF_STAGE1_YEARS + 1)
         )
-        ocf_terminal = ocf_ps * ((1 + g) ** self._DCF_STAGE1_YEARS)
-        tv = ocf_terminal * (1 + g_t) / (ke - g_t)
+        fcfe_terminal = fcfe_ps * ((1 + g) ** self._DCF_STAGE1_YEARS)
+        tv = fcfe_terminal * (1 + g_t) / (ke - g_t)
         pv_tv = tv / ((1 + ke) ** self._DCF_STAGE1_YEARS)
 
         fv = round(pv_stage1 + pv_tv, 0)
@@ -1662,15 +1714,21 @@ class FairValueCalculator:
 
         if "dcf" in self.weights:
             if "dcf" in bdown:
+                capex_ps_text = (
+                    f"Rp {self.stats.capex_ttm / self.stats.shares_outstanding:,.0f}"
+                    if self.stats.capex_ttm and self.stats.shares_outstanding > 0
+                    else "N/A"
+                )
                 lines.append(
-                    f"  OCF-DCF         : OCF/Share {ocf_per_share_text} "
+                    f"  FCFE-DCF        : OCF/Share {ocf_per_share_text} − "
+                    f"Capex/Share {capex_ps_text} "
                     f"diskonto ke {self.stats.cost_of_equity * 100:.1f}% "
                     f"= Rp {bdown['dcf']:,}"
                 )
             else:
                 lines.append(
-                    "  OCF-DCF         : TIDAK VALID "
-                    "(OCF kosong/tidak stabil/di luar sanity band)"
+                    "  FCFE-DCF        : TIDAK VALID "
+                    "(OCF/Capex kosong/tidak stabil/FCFE negatif/di luar sanity band)"
                 )
 
         fv_str = (

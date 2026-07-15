@@ -30,6 +30,14 @@ def test_health_reports_results_presence(monkeypatch, tmp_path):
     data = response.json()
     assert data["status"] == "ok"
     assert data["results_exist"] is False
+    assert data["debate_stats"]["corrupt_artifacts"] == 0
+    assert data["debate_stats"]["execution_status_distribution"] == {
+        "EXECUTABLE_BUY": 0,
+        "WAITLIST": 0,
+        "NO_TRADE": 0,
+        "AVOID": 0,
+        "INSUFFICIENT_DATA": 0,
+    }
 
 
 def test_validate_key_behavior(monkeypatch):
@@ -240,6 +248,68 @@ def test_health_excludes_invalid_and_mismatched_artifacts(monkeypatch, tmp_path)
     assert stats["total_debates"] == 1
     assert stats["ratings_distribution"]["HOLD"] == 1
     assert stats["ratings_distribution"]["BUY"] == 0
+    assert stats["execution_status_distribution"]["NO_TRADE"] == 1
+    assert stats["corrupt_artifacts"] == 2
+
+
+def test_health_reports_corrupt_artifacts_and_resets_counter(
+    monkeypatch,
+    tmp_path,
+):
+    output_root = tmp_path / "output"
+    debates_dir = output_root / "debates"
+    debates_dir.mkdir(parents=True)
+    (debates_dir / "BBCA_debate.json").write_text(
+        json.dumps(
+            {
+                "ticker": "BBCA",
+                "verdict": {"ticker": "BBCA", "rating": "HOLD"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    malformed_path = debates_dir / "BMRI_debate.json"
+    malformed_path.write_text("{", encoding="utf-8")
+    empty_path = debates_dir / "TLKM_debate.json"
+    empty_path.write_text("", encoding="utf-8")
+    _reset_results_path(monkeypatch, output_root / "full_batch_results.json")
+
+    warnings = []
+    monkeypatch.setattr(
+        stocks_router,
+        "logger",
+        types.SimpleNamespace(warning=warnings.append),
+    )
+
+    response = client.get("/api/health")
+
+    assert response.status_code == 200
+    stats = response.json()["debate_stats"]
+    assert stats["total_debates"] == 1
+    assert stats["execution_status_distribution"]["NO_TRADE"] == 1
+    assert stats["corrupt_artifacts"] == 2
+    assert any("reason_code=corrupt_debate_artifact" in item for item in warnings)
+    assert any("exception_type=JSONDecodeError" in item for item in warnings)
+    assert any("reason_code=empty_debate_artifact" in item for item in warnings)
+
+    for ticker, path in (("BMRI", malformed_path), ("TLKM", empty_path)):
+        path.write_text(
+            json.dumps(
+                {
+                    "ticker": ticker,
+                    "verdict": {"ticker": ticker, "rating": "HOLD"},
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    response = client.get("/api/health")
+
+    assert response.status_code == 200
+    stats = response.json()["debate_stats"]
+    assert stats["total_debates"] == 3
+    assert stats["execution_status_distribution"]["NO_TRADE"] == 3
+    assert stats["corrupt_artifacts"] == 0
 
 
 def test_http_ticker_guard_runs_before_database_dependency():

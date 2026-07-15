@@ -18,6 +18,8 @@ class InconsistencyType(str, Enum):
     """Known consistency failures between markdown and batch JSON."""
 
     RATING_MISMATCH = "rating_mismatch"
+    EXECUTION_STATUS_MISMATCH = "execution_status_mismatch"
+    MISSING_EXECUTION_STATUS = "missing_execution_status"
     TICKER_NOT_IN_BATCH = "ticker_not_in_batch"
     FAILED_TICKER_PROMOTED = "failed_ticker_promoted"
     PRICE_MISMATCH = "price_mismatch"
@@ -26,6 +28,7 @@ class InconsistencyType(str, Enum):
     SIZED_NON_DEPLOYABLE = "sized_non_deployable"
     NON_DEPLOYABLE_PROMOTED = "non_deployable_promoted"
     UPSIDE_EXHAUSTED = "upside_exhausted"
+    SELECTED_COUNT_MISMATCH = "selected_count_mismatch"
 
 
 class Inconsistency(BaseModel):
@@ -96,6 +99,18 @@ def check_consistency(
     markdown_tickers = _extract_markdown_tickers(markdown_text)
     inconsistencies: list[Inconsistency] = []
 
+    declared_selected = _extract_declared_selected_count(markdown_text)
+    if declared_selected is not None and declared_selected != len(markdown_tickers):
+        inconsistencies.append(
+            Inconsistency(
+                ticker="REPORT",
+                type=InconsistencyType.SELECTED_COUNT_MISMATCH,
+                markdown_value=str(declared_selected),
+                json_value=str(len(markdown_tickers)),
+                severity="error",
+            )
+        )
+
     for ticker in markdown_tickers:
         markdown_context = _ticker_context(markdown_text, ticker)
         batch_entry = batch_by_ticker.get(ticker)
@@ -124,6 +139,49 @@ def check_consistency(
             )
 
         rating = _extract_rating(batch_entry)
+        if _extract_verdict(batch_entry) is None:
+            inconsistencies.append(
+                Inconsistency(
+                    ticker=ticker,
+                    type=InconsistencyType.MISSING_VERDICT,
+                    markdown_value="promoted",
+                    json_value=None,
+                    severity="error",
+                )
+            )
+
+        execution_statuses = _extract_execution_statuses(batch_entry)
+        if not execution_statuses:
+            inconsistencies.append(
+                Inconsistency(
+                    ticker=ticker,
+                    type=InconsistencyType.MISSING_EXECUTION_STATUS,
+                    markdown_value="promoted",
+                    json_value=None,
+                    severity="error",
+                )
+            )
+        elif len(execution_statuses) > 1:
+            inconsistencies.append(
+                Inconsistency(
+                    ticker=ticker,
+                    type=InconsistencyType.EXECUTION_STATUS_MISMATCH,
+                    markdown_value="promoted",
+                    json_value=" | ".join(execution_statuses),
+                    severity="error",
+                )
+            )
+        elif execution_statuses[0] != "EXECUTABLE_BUY":
+            inconsistencies.append(
+                Inconsistency(
+                    ticker=ticker,
+                    type=InconsistencyType.EXECUTION_STATUS_MISMATCH,
+                    markdown_value="promoted",
+                    json_value=execution_statuses[0],
+                    severity="error",
+                )
+            )
+
         if rating in {"AVOID", "SELL"} and _markdown_presents_positive(
             markdown_context
         ):
@@ -182,15 +240,29 @@ def _load_batch_entries(path: Path) -> list[dict[str, Any]]:
 
 
 def _extract_markdown_tickers(markdown_text: str) -> list[str]:
-    seen: set[str] = set()
-    tickers: list[str] = []
     for regex in (_HEADING_TICKER_RE, _BOLD_TICKER_RE):
+        seen: set[str] = set()
+        tickers: list[str] = []
         for match in regex.finditer(markdown_text):
             ticker = _clean_ticker(match.group(1))
             if ticker and ticker not in seen:
                 seen.add(ticker)
                 tickers.append(ticker)
-    return tickers
+        if tickers:
+            return tickers
+    return []
+
+
+def _extract_declared_selected_count(markdown_text: str) -> int | None:
+    selected_match = re.search(
+        r"\*\*Selected\*\*\s*:\s*(\d+)",
+        markdown_text,
+        re.IGNORECASE,
+    )
+    if selected_match:
+        return int(selected_match.group(1))
+    top_match = re.search(r"^#\s+TOP\s+(\d+)\b", markdown_text, re.MULTILINE)
+    return int(top_match.group(1)) if top_match else None
 
 
 def _clean_ticker(value: Any) -> str | None:
@@ -224,15 +296,24 @@ def _extract_status(entry: dict[str, Any]) -> str | None:
     return str(value).strip().lower()
 
 
+def _extract_verdict(entry: dict[str, Any]) -> dict[str, Any] | None:
+    for candidate in (entry.get("verdict"), _nested_get(entry, "result", "verdict")):
+        if isinstance(candidate, str):
+            try:
+                candidate = json.loads(candidate)
+            except json.JSONDecodeError:
+                continue
+        if isinstance(candidate, dict):
+            return candidate
+    return None
+
+
 def _extract_rating(entry: dict[str, Any]) -> str | None:
-    verdict = entry.get("verdict")
-    if isinstance(verdict, str):
-        try:
-            verdict = json.loads(verdict)
-        except json.JSONDecodeError:
-            verdict = None
+    verdict = _extract_verdict(entry)
     candidates = (
+        entry.get("model_rating"),
         entry.get("rating"),
+        verdict.get("model_rating") if isinstance(verdict, dict) else None,
         verdict.get("rating") if isinstance(verdict, dict) else None,
         _nested_get(entry, "result", "rating"),
         _nested_get(entry, "result", "verdict", "rating"),
@@ -241,6 +322,25 @@ def _extract_rating(entry: dict[str, Any]) -> str | None:
         if candidate is not None:
             return str(candidate).strip().upper().replace(" ", "_")
     return None
+
+
+def _extract_execution_statuses(entry: dict[str, Any]) -> list[str]:
+    verdict = _extract_verdict(entry)
+    candidates = (
+        entry.get("execution_status"),
+        _nested_get(entry, "execution_decision", "execution_status"),
+        verdict.get("execution_status") if isinstance(verdict, dict) else None,
+        _nested_get(entry, "result", "execution_status"),
+        _nested_get(entry, "result", "execution_decision", "execution_status"),
+        _nested_get(entry, "result", "verdict", "execution_status"),
+    )
+    statuses: list[str] = []
+    for candidate in candidates:
+        if candidate is not None:
+            normalized = str(candidate).strip().upper().replace(" ", "_")
+            if normalized and normalized not in statuses:
+                statuses.append(normalized)
+    return statuses
 
 
 def _extract_json_price(entry: dict[str, Any]) -> float | None:
@@ -332,14 +432,24 @@ def _has_position_sizing(entry: dict[str, Any]) -> bool:
 
 def _ticker_context(markdown_text: str, ticker: str) -> str:
     lines = markdown_text.splitlines()
+    fallback_index: int | None = None
     for index, line in enumerate(lines):
-        if re.search(rf"\b{re.escape(ticker)}(?:\.JK)?\b", line):
+        heading_match = _HEADING_TICKER_RE.search(line)
+        if heading_match and _clean_ticker(heading_match.group(1)) == ticker:
             end = min(index + 8, len(lines))
             for next_index in range(index + 1, len(lines)):
                 if next_index > index + 1 and lines[next_index].startswith("#"):
                     end = next_index
                     break
             return "\n".join(lines[index:end])
+        if fallback_index is None and re.search(
+            rf"\*\*{re.escape(ticker)}(?:\.JK)?\*\*",
+            line,
+        ):
+            fallback_index = index
+    if fallback_index is not None:
+        end = min(fallback_index + 8, len(lines))
+        return "\n".join(lines[fallback_index:end])
     return ""
 
 
@@ -401,9 +511,20 @@ def _parse_price(value: Any) -> float | None:
         return None
     token = match.group(1)
     if "," in token and "." in token:
-        token = token.replace(".", "").replace(",", ".")
+        decimal_separator = "," if token.rfind(",") > token.rfind(".") else "."
+        thousands_separator = "." if decimal_separator == "," else ","
+        token = token.replace(thousands_separator, "")
+        token = token.replace(decimal_separator, ".")
     else:
-        token = token.replace(",", "").replace(".", "")
+        separator = "," if "," in token else "." if "." in token else None
+        if separator is not None:
+            groups = token.split(separator)
+            if len(groups) > 2 and all(len(group) == 3 for group in groups[1:]):
+                token = "".join(groups)
+            elif len(groups) == 2 and len(groups[1]) == 3 and len(groups[0]) <= 3:
+                token = "".join(groups)
+            else:
+                token = token.replace(separator, ".")
     try:
         return float(token)
     except ValueError:

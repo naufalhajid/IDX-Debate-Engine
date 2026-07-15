@@ -3618,6 +3618,20 @@ def _coerce_confidence(value: Any) -> float | None:
 
 
 FORECAST_RESEARCH_EV_DOWNWEIGHT = 0.35
+FORECAST_FAILURE_REASONS = {
+    "NOT_VALIDATED": "forecast_not_validated",
+    "VALIDATION_FAILED": "forecast_validation_failed",
+    "MODEL_FAILED": "forecast_model_failed",
+    "ZERO_WEIGHT": "forecast_zero_weight",
+    "UNAVAILABLE": "forecast_unavailable",
+}
+
+
+def _forecast_report_status(report_payload: dict[str, Any]) -> str | None:
+    status = str(report_payload.get("forecast_status") or "").strip().upper()
+    if status == "READY" or status in FORECAST_FAILURE_REASONS:
+        return status
+    return None
 
 
 def _forecast_validation_status(report_payload: dict[str, Any]) -> str:
@@ -3648,6 +3662,12 @@ def _forecast_float(value: Any) -> float | None:
 def _forecast_ranking_ev(
     report_payload: dict[str, Any],
 ) -> tuple[float | None, float | None, str | None]:
+    forecast_status = _forecast_report_status(report_payload)
+    if forecast_status is None:
+        return None, None, "forecast_status_missing"
+    if forecast_status != "READY":
+        return None, None, FORECAST_FAILURE_REASONS[forecast_status]
+
     status = _forecast_validation_status(report_payload)
     ev = _forecast_float(report_payload.get("risk_adjusted_expected_value"))
     if status == "production":
@@ -4552,6 +4572,19 @@ def _record_backtest_memory(
             logger.info(
                 "[BacktestMemory] %s: HOLD logged to watchlist_log (not trade record)",
                 ticker,
+            )
+            return
+
+        from app.api.result_adapter import build_execution_decision
+
+        execution_status = build_execution_decision(result)["execution_status"]
+        if execution_status != "EXECUTABLE_BUY":
+            logger.info(
+                "[BacktestMemory] %s: skipped %s verdict with canonical "
+                "execution_status=%s",
+                ticker,
+                verdict_rating,
+                execution_status,
             )
             return
 

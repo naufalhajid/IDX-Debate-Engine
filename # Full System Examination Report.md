@@ -1054,7 +1054,7 @@ berikutnya, diurutkan:
         - raw_fv
         - quality_status="rejected"
         - final_fv=null
-        - reason codes.
+        - reason codes. 
         (valuation_gap mendukung sebagian pola ini; field raw_fv/quality_status terpisah tidak dikonfirmasi)
 
     Acceptance:

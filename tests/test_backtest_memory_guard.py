@@ -45,6 +45,14 @@ def test_record_skips_low_volume_trade() -> None:
             "entry_price_range": "500 - 510",
             "target_price": 600,
             "stop_loss": 470,
+            "risk_reward_ratio": 2.25,
+            "execution_horizon_days": 10,
+        },
+        "risk_governor": {"status": "deployable", "sizing_allowed": True},
+        "position_sizing": {
+            "lot_count": 1,
+            "shares": 100,
+            "max_loss_rp": 4_000,
         },
         # avg_volume_20d=1000 shares × entry=500 → ADT Rp 500k < Rp 20B threshold
         "raw_data": {"avg_volume_20d": 1000},
@@ -63,8 +71,16 @@ def test_record_writes_valid_result() -> None:
             "rating": "BUY",
             "confidence": 0.61,
             "entry_price_range": "6600 - 6775",
-            "target_price": 7400,
+            "target_price": 7700,
             "stop_loss": 6350,
+            "risk_reward_ratio": 2.2,
+            "execution_horizon_days": 10,
+        },
+        "risk_governor": {"status": "deployable", "sizing_allowed": True},
+        "position_sizing": {
+            "lot_count": 1,
+            "shares": 100,
+            "max_loss_rp": 42_500,
         },
     }
 
@@ -76,8 +92,37 @@ def test_record_writes_valid_result() -> None:
     assert record.ticker == "INDF"
     assert record.verdict_rating == "BUY"
     assert record.entry_price == 6600
-    assert record.target_price == 7400
+    assert record.target_price == 7700
     assert record.stop_loss == 6350
+
+
+def test_record_skips_model_buy_rejected_by_risk() -> None:
+    memory = RecordingMemory()
+    result = {
+        "ticker": "INDF",
+        "verdict": {
+            "rating": "BUY",
+            "confidence": 0.75,
+            "entry_price_range": "6600 - 6775",
+            "target_price": 7700,
+            "stop_loss": 6350,
+            "risk_reward_ratio": 2.2,
+            "execution_horizon_days": 10,
+        },
+        "risk_governor": {
+            "status": "reject",
+            "sizing_allowed": False,
+            "reason_codes": ["rr_too_low"],
+        },
+    }
+
+    _record_backtest_memory(
+        result=result,
+        run_id="run-risk-rejected",
+        memory=memory,
+    )
+
+    assert memory.records == []
 
 
 def test_hold_watchlist_record_carries_counterfactual_fields(

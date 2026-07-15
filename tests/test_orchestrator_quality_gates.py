@@ -25,6 +25,7 @@ from core.orchestrator.legacy import (
     validate_setup_coherence,
 )
 from services.debate_chamber import apply_staleness_penalty
+from utils.ticker import PathContainmentError
 
 
 def _result(confidence: float = 0.13) -> dict:
@@ -706,7 +707,10 @@ async def test_candidate_snapshot_path_must_stay_inside_output_root(
         "data_hash": "fake",
         "snapshot_path": "../escape.json.gz",
     }
-    with pytest.raises(ValueError, match="escapes output directory"):
+    with pytest.raises(
+        PathContainmentError,
+        match=r"Artifact path .*(?:parent component|requested root)",
+    ):
         await orchestrator._seed_candidate_market_snapshots(
             [candidate],
             output_dir=tmp_path,
