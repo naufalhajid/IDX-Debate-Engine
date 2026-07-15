@@ -54,7 +54,7 @@ import numpy as np
 import pandas as pd
 
 if TYPE_CHECKING:
-    from fair_value_calculator import FairValueCalculator, KeyStats
+    from fair_value_calculator import KeyStats
     from utils.exdate_scanner import ExDateInfo
 
 logger = logging.getLogger(__name__)
@@ -429,20 +429,10 @@ class XlsxDataAdapter:
 
     # ── Drop-in replacement untuk build_fair_value_report() ─────────────────
 
-    # Sektor yang tidak ada di FairValueCalculator.SECTOR_WEIGHTS → remap ke default
-    _SECTOR_REMAP: dict[str, str] = {
-        "telecom": "default",
-        "industrial": "default",
-        "energy": "mining",  # paling mirip karakteristiknya
-        "healthcare": "consumer",  # paling mirip
-        "tech": "default",
-    }
-
     def build_fair_value_report(
         self,
         ticker: str,
         current_price: float = 0.0,
-        include_ev_ebitda: bool = True,
     ) -> tuple[str, float | None]:
         """
         Drop-in replacement untuk build_fair_value_report(api_response, ticker, price)
@@ -450,156 +440,61 @@ class XlsxDataAdapter:
 
         Perbedaan dari versi API:
           - Data dari xlsx (tidak hit API)
-          - Tambah metode ke-4: EV/EBITDA
           - Historical PE lebih dinamis (pakai IHSG PE Median sebagai cap)
           - Tambah quality flags (Piotroski, Altman) di output report
 
+        Valuasi (weighted average, per-method bridge, data-quality gate) memakai
+        services.fair_value_calculator._build_fair_value_core() — engine kanonik
+        yang sama dipakai jalur API, sehingga FV dan keputusan quality gate
+        identik untuk fundamental yang identik (FIX 1: no independent math here).
+        EV/EBITDA murni dikendalikan oleh SECTOR_WEIGHTS kanonik (mining-only),
+        bukan toggle lokal.
+
         Returns:
             (report_str, fair_value_float)
-            fair_value_float = None jika semua metode gagal.
+            fair_value_float = None jika semua metode gagal ATAU quality gate menolak.
         """
-        from services.fair_value_calculator import FairValueCalculator
+        from services.fair_value_calculator import _build_fair_value_core
 
         stats = self.extract_keystats(ticker, current_price)
-        sektor = _TICKER_SECTOR.get(ticker.upper(), "default")
-        calc_sektor = self._SECTOR_REMAP.get(sektor, sektor)
-        calc = FairValueCalculator(stats, sector=calc_sektor)
+        if current_price == 0.0:
+            current_price = stats.current_price
 
-        # Hitung 3 metode standar
-        pe_fv = calc.fair_value_pe()
-        pb_fv = calc.fair_value_pb()
-        ddm_fv = calc.fair_value_ddm()
-
-        # Metode ke-4: EV/EBITDA
-        ev_fv = None
-        if include_ev_ebitda:
-            ev_fv = self.fair_value_ev_ebitda(ticker, current_price)
-
-        # Weighted average — termasuk EV/EBITDA jika valid
-        result = self._weighted_average_with_ev(
-            calc, pe_fv, pb_fv, ddm_fv, ev_fv, sektor
+        # FIX 1 (sector-resolution parity): do NOT pass xlsx's own hardcoded
+        # _TICKER_SECTOR guess as an override. output/sector_cache.json (957
+        # tickers, yfinance-derived) is both more complete and more accurate
+        # than xlsx's local ~60-ticker table (e.g. LSIP/AALI are agriculture,
+        # not "energy"; SIDO/KLBF are healthcare, not "consumer") — letting
+        # FairValueCalculator resolve sector the same way it does for the API
+        # path (sector_cache -> small TICKER_SECTOR -> "default") means both
+        # sources select the same SECTOR_WEIGHTS for the same ticker, not just
+        # the same aggregation math.
+        _canonical_report, result = _build_fair_value_core(
+            stats, ticker, current_price, sector=None
         )
+        # 5-bucket sector the engine actually used (bank/consumer/mining/
+        # property/default) — for report display and the EV/EBITDA text
+        # below, not xlsx's local guess which may have just been overridden.
+        sektor = result.get("sector") or _TICKER_SECTOR.get(ticker.upper(), "default")
 
-        # Quality flags untuk enrichment report
+        # Quality flags untuk enrichment report (xlsx-only, tidak ada di API)
         quality = self.get_quality_flags(ticker)
+        bdown = result.get("breakdown", {})
 
-        # Build laporan teks
         report_str = self._build_extended_report(
             stats=stats,
             sektor=sektor,
             result=result,
-            pe_fv=pe_fv,
-            pb_fv=pb_fv,
-            ddm_fv=ddm_fv,
-            ev_fv=ev_fv,
+            pe_fv=bdown.get("pe"),
+            pb_fv=bdown.get("pb"),
+            ddm_fv=bdown.get("ddm"),
+            ev_fv=bdown.get("ev_ebitda"),
             quality=quality,
             current_price=current_price,
         )
 
         fv = result.get("fair_value")
         return report_str, fv
-
-    def _weighted_average_with_ev(
-        self,
-        calc: "FairValueCalculator",
-        pe_fv: float | None,
-        pb_fv: float | None,
-        ddm_fv: float | None,
-        ev_fv: float | None,
-        sektor: str,
-    ) -> dict:
-        """
-        Hitung weighted average termasuk metode EV/EBITDA ke-4.
-
-        Bobot EV/EBITDA: 15% (diambil proporsional dari PE dan PB).
-        Bank tidak menggunakan EV/EBITDA sehingga bobot tetap 3 metode.
-        """
-        from services.fair_value_calculator import FairValueCalculator
-
-        # Jika tidak ada EV/EBITDA atau sektor bank, pakai calc standar
-        if ev_fv is None or sektor == "bank":
-            return calc.fair_value_weighted()
-
-        # Bobot 4-metode: kurangi PE dan PB masing-masing 7.5% untuk EV/EBITDA
-        base_w = FairValueCalculator.SECTOR_WEIGHTS.get(
-            sektor, FairValueCalculator.SECTOR_WEIGHTS["default"]
-        )
-        EV_SHARE = 0.15
-        w4 = {
-            "pe": base_w["pe"] * (1 - EV_SHARE),
-            "pb": base_w["pb"] * (1 - EV_SHARE),
-            "ddm": base_w["ddm"] * (1 - EV_SHARE),
-            "ev": EV_SHARE,
-        }
-
-        results: dict[str, float] = {}
-        if pe_fv:
-            results["pe"] = pe_fv
-        if pb_fv:
-            results["pb"] = pb_fv
-        if ddm_fv:
-            results["ddm"] = ddm_fv
-        if ev_fv:
-            results["ev"] = ev_fv
-
-        if not results:
-            return {
-                "fair_value": None,
-                "breakdown": {},
-                "confidence": "INSUFFICIENT_DATA",
-                "margin_of_safety_pct": None,
-                "valuation_verdict": "DATA_UNAVAILABLE",
-            }
-
-        active_results = {
-            method: value
-            for method, value in results.items()
-            if w4.get(method, 0) > 0
-        }
-        configured_active_method_count = sum(
-            1 for weight in w4.values() if weight > 0
-        )
-        total_weight = sum(w4[m] for m in active_results)
-        if total_weight == 0:
-            return calc.fair_value_weighted()
-
-        weighted_fv = round(
-            sum(
-                active_results[m] * (w4[m] / total_weight)
-                for m in active_results
-            ),
-            0,
-        )
-
-        n = len(active_results)
-        confidence = "HIGH" if n >= 3 else ("MEDIUM" if n == 2 else "LOW")
-
-        mos, verdict = None, "DATA_UNAVAILABLE"
-        cp = calc.stats.current_price
-        if cp > 0 and weighted_fv > 0:
-            mos = round(((weighted_fv - cp) / cp) * 100, 1)
-            if mos >= 20:
-                verdict = "UNDERVALUED"
-            elif mos >= 5:
-                verdict = "SLIGHTLY_UNDERVALUED"
-            elif mos >= -5:
-                verdict = "FAIRLY_VALUED"
-            elif mos >= -20:
-                verdict = "SLIGHTLY_OVERVALUED"
-            else:
-                verdict = "OVERVALUED"
-
-        return {
-            "fair_value": weighted_fv,
-            "breakdown": {k: int(v) for k, v in results.items()},
-            "confidence": confidence,
-            "margin_of_safety_pct": mos,
-            "valuation_verdict": verdict,
-            "active_method_count": n,
-            "valid_method_count": n,
-            "available_method_count": len(results),
-            "configured_active_method_count": configured_active_method_count,
-        }
 
     def _build_extended_report(
         self,
@@ -673,7 +568,9 @@ class XlsxDataAdapter:
             )
         else:
             reason = (
-                "DPS=0" if stats.dps <= 0 else "spread ke−g terlalu kecil atau outlier"
+                "DPS=0/tidak tersedia"
+                if not stats.dps or stats.dps <= 0
+                else "spread ke−g terlalu kecil atau outlier"
             )
             lines.append(f"  Metode 3 DDM        : TIDAK VALID ({reason})")
 
@@ -705,6 +602,18 @@ class XlsxDataAdapter:
             "",
         ]
 
+        # FIX 1: quality-gate rejection must be as visible on the xlsx report
+        # as it already is on the API report — same canonical gate, same
+        # transparency, regardless of which source produced the fundamentals.
+        if result.get("fv_quality_rejected"):
+            reasons = ", ".join(result.get("fv_quality_reasons", []))
+            lines += [
+                f"⚠️ FAIR VALUE QUALITY GATE: estimasi FV di atas TIDAK dipakai "
+                f"sebagai anchor valuasi ({reasons}). Jangan mengutip FV atau "
+                "valuation gap sebagai fakta; perlakukan valuasi sebagai UNKNOWN.",
+                "",
+            ]
+
         # Margin of safety
         if mos is not None and fv:
             symbol = "⬆ UPSIDE" if mos >= 0 else "⬇ PREMIUM"
@@ -735,7 +644,7 @@ class XlsxDataAdapter:
             "── KEY FUNDAMENTALS ────────────────────────────────────────────",
             f"  EPS TTM         : Rp {stats.eps_ttm:,.0f}",
             f"  BVPS            : Rp {stats.book_value_per_share:,.0f}",
-            f"  DPS             : Rp {stats.dps:,.0f}",
+            f"  DPS             : Rp {(stats.dps or 0.0):,.0f}",
             f"  ROE             : {stats.roe * 100:.1f}%",
             f"  Net Margin      : {stats.net_margin * 100:.1f}%",
             f"  ROA             : {stats.roa * 100:.1f}%",

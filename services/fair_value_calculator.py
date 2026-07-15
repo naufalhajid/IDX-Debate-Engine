@@ -1952,96 +1952,26 @@ def compute_52w_range_signal(
 # ---------------------------------------------------------------------------
 
 
-def build_fair_value_payload(
-    api_response: dict,
-    ticker: str,
-    current_price: float,
-) -> tuple[str, dict]:
-    multiples = extract_historical_multiples(api_response, ticker)
-    stats = extract_keystats(
-        api_response,
-        ticker=ticker,
-        current_price=current_price,
-    )
+def _apply_fv_quality_gate(ticker: str, stats: "KeyStats", result: dict, report: str) -> tuple[str, dict]:
+    """Null the FV anchor when it's built on thin or broken inputs.
 
-    if multiples.get("pe") is not None:
-        stats.historical_pe_avg = multiples["pe"]
-    if multiples.get("pb") is not None:
-        stats.historical_pb_avg = multiples["pb"]
-    if multiples.get("cost_of_equity") is not None:
-        stats.cost_of_equity = multiples["cost_of_equity"]
-    if multiples.get("growth_rate") is not None:
-        stats.growth_rate = multiples["growth_rate"]
+    THE canonical quality gate — every entry point that produces a FairValue
+    payload (API, XLSX, or any future source) must route its FairValueCalculator
+    output through this exact function so a stock that gets rejected on one
+    path (e.g. ELSA) is rejected on all of them. Do not duplicate this logic.
 
-    stats.current_price = current_price
-    if stats.ocf_per_share <= 0 and stats.operating_cash_flow_ttm > 0:
-        if stats.shares_outstanding > 0:
-            stats.ocf_per_share = stats.operating_cash_flow_ttm / stats.shares_outstanding
-    if stats.ocf_price_ratio <= 0:
-        if stats.ocf_per_share > 0 and current_price > 0:
-            stats.ocf_price_ratio = stats.ocf_per_share / current_price
-        else:
-            stats.ocf_price_ratio = calculate_ocf_price_ratio(
-                stats.operating_cash_flow_ttm,
-                stats.shares_outstanding,
-                current_price,
-            )
-    stats.profitability_factor_score = calculate_profitability_score(
-        {"rnoa": stats.rnoa, "roa": stats.roa}
-    )
-
-    # ── EPS back-calculation from PE × price ──────────────────────────────
-    # The Stockbit closure_fin_items endpoint often includes PE but not EPS
-    # directly in the visible section.  If EPS is still 0 but we have PE
-    # and the live price, we can back-calculate a reasonable EPS estimate.
-    eps_derived = False
-    if stats.eps_ttm == 0.0 and stats.raw_pe_current > 0 and current_price > 0:
-        stats.eps_ttm = round(current_price / stats.raw_pe_current, 2)
-        eps_derived = True
-        logger.info(
-            "[FairValue] {}: EPS back-calculated from PE (derived, circular): {} / {} = {}",
-            ticker,
-            current_price,
-            stats.raw_pe_current,
-            stats.eps_ttm,
-        )
-
-    calc = FairValueCalculator(stats, eps_derived=eps_derived)
-    result = calc.fair_value_weighted()
-    report = calc.build_report(current_price=current_price)
-
-    # ── C3: Historical valuation band ─────────────────────────────────────
-    band_ctx = _compute_valuation_band_context(
-        current_pe=stats.raw_pe_current,
-        current_pb=stats.raw_pb_current,
-        pe_values=multiples.get("pe_values", []),
-        pb_values=multiples.get("pb_values", []),
-    )
-    if band_ctx:
-        report = report + "\n" + band_ctx
-    result["valuation_band_context"] = band_ctx
-
-    if eps_derived:
-        result["eps_source"] = "derived_from_pe"
-
+    A fair value built on thin or broken inputs must not anchor the trade
+    envelope or a CIO "undervalued" narrative (NZIA: 1/3 methods valid → FV
+    Rp 417 vs spot Rp 177 became the BUY catalyst; INDO: net margin 131%
+    from a revenue/net-income mismatch). The per-method numbers stay
+    visible in the report text; only the anchor fields are nulled, so the
+    envelope falls back to its swing cap and risk_overvalued never fires
+    off a garbage anchor. Note: the gate keys off structured signals — the
+    LLM's NEEDS_RECONCILIATION label is prose, net_margin > 1.0 is its
+    deterministic equivalent (post-normalisation, margins land in (1, ∞)
+    only when net income exceeds revenue).
+    """
     fv = result["fair_value"]
-    if fv is None:
-        logger.warning(
-            "[FairValue] {}: fair value tidak dapat dikalkulasi — semua metode gagal",
-            ticker,
-        )
-
-    # ── Data-quality gate ─────────────────────────────────────────────────
-    # A fair value built on thin or broken inputs must not anchor the trade
-    # envelope or a CIO "undervalued" narrative (NZIA: 1/3 methods valid → FV
-    # Rp 417 vs spot Rp 177 became the BUY catalyst; INDO: net margin 131%
-    # from a revenue/net-income mismatch). The per-method numbers stay
-    # visible in the report text; only the anchor fields are nulled, so the
-    # envelope falls back to its swing cap and risk_overvalued never fires
-    # off a garbage anchor. Note: the gate keys off structured signals — the
-    # LLM's NEEDS_RECONCILIATION label is prose, net_margin > 1.0 is its
-    # deterministic equivalent (post-normalisation, margins land in (1, ∞)
-    # only when net income exceeds revenue).
     quality_reasons: list[str] = []
     if result.get("confidence") == "LOW":
         quality_reasons.append("fv_methods_lt_2")
@@ -2082,8 +2012,125 @@ def build_fair_value_payload(
             "mengutip FV atau valuation gap sebagai fakta; perlakukan valuasi "
             "sebagai UNKNOWN."
         )
-
     return report, result
+
+
+def _build_fair_value_core(
+    stats: "KeyStats",
+    ticker: str,
+    current_price: float,
+    *,
+    sector: str | None = None,
+    pe_values: list[float] | None = None,
+    pb_values: list[float] | None = None,
+) -> tuple[str, dict]:
+    """THE canonical FV engine — every source (API, XLSX, future) converges here.
+
+    Callers are responsible only for source-specific extraction (parsing the
+    Stockbit API response vs. reading an xlsx sheet) and populating `stats`
+    accordingly; everything from normalisation through the quality gate is
+    shared so no source can produce an FV the others would have rejected.
+
+    `pe_values`/`pb_values` (multi-year series for the historical valuation
+    band) are an API-only enrichment — pass None when unavailable and that
+    section is simply omitted from the report, same as today.
+    """
+    stats.current_price = current_price
+    if stats.ocf_per_share <= 0 and stats.operating_cash_flow_ttm > 0:
+        if stats.shares_outstanding > 0:
+            stats.ocf_per_share = stats.operating_cash_flow_ttm / stats.shares_outstanding
+    if stats.ocf_price_ratio <= 0:
+        if stats.ocf_per_share > 0 and current_price > 0:
+            stats.ocf_price_ratio = stats.ocf_per_share / current_price
+        else:
+            stats.ocf_price_ratio = calculate_ocf_price_ratio(
+                stats.operating_cash_flow_ttm,
+                stats.shares_outstanding,
+                current_price,
+            )
+    stats.profitability_factor_score = calculate_profitability_score(
+        {"rnoa": stats.rnoa, "roa": stats.roa}
+    )
+
+    # ── EPS back-calculation from PE × price ──────────────────────────────
+    # The Stockbit closure_fin_items endpoint often includes PE but not EPS
+    # directly in the visible section.  If EPS is still 0 but we have PE
+    # and the live price, we can back-calculate a reasonable EPS estimate.
+    eps_derived = False
+    if stats.eps_ttm == 0.0 and stats.raw_pe_current > 0 and current_price > 0:
+        stats.eps_ttm = round(current_price / stats.raw_pe_current, 2)
+        eps_derived = True
+        logger.info(
+            "[FairValue] {}: EPS back-calculated from PE (derived, circular): {} / {} = {}",
+            ticker,
+            current_price,
+            stats.raw_pe_current,
+            stats.eps_ttm,
+        )
+
+    calc = FairValueCalculator(stats, sector=sector, eps_derived=eps_derived)
+    result = calc.fair_value_weighted()
+    report = calc.build_report(current_price=current_price)
+    # Sector actually used to select SECTOR_WEIGHTS — exposed so every caller
+    # (report display, provenance, parity checks) reflects what was actually
+    # computed rather than re-guessing sector through a second, divergent path.
+    result["sector"] = calc.sector
+    result["raw_sector"] = calc.raw_sector
+
+    # ── C3: Historical valuation band (API-only enrichment) ────────────────
+    band_ctx = None
+    if pe_values or pb_values:
+        band_ctx = _compute_valuation_band_context(
+            current_pe=stats.raw_pe_current,
+            current_pb=stats.raw_pb_current,
+            pe_values=pe_values or [],
+            pb_values=pb_values or [],
+        )
+    if band_ctx:
+        report = report + "\n" + band_ctx
+    result["valuation_band_context"] = band_ctx
+
+    if eps_derived:
+        result["eps_source"] = "derived_from_pe"
+
+    fv = result["fair_value"]
+    if fv is None:
+        logger.warning(
+            "[FairValue] {}: fair value tidak dapat dikalkulasi — semua metode gagal",
+            ticker,
+        )
+
+    return _apply_fv_quality_gate(ticker, stats, result, report)
+
+
+def build_fair_value_payload(
+    api_response: dict,
+    ticker: str,
+    current_price: float,
+) -> tuple[str, dict]:
+    multiples = extract_historical_multiples(api_response, ticker)
+    stats = extract_keystats(
+        api_response,
+        ticker=ticker,
+        current_price=current_price,
+    )
+
+    if multiples.get("pe") is not None:
+        stats.historical_pe_avg = multiples["pe"]
+    if multiples.get("pb") is not None:
+        stats.historical_pb_avg = multiples["pb"]
+    if multiples.get("cost_of_equity") is not None:
+        stats.cost_of_equity = multiples["cost_of_equity"]
+    if multiples.get("growth_rate") is not None:
+        stats.growth_rate = multiples["growth_rate"]
+
+    return _build_fair_value_core(
+        stats,
+        ticker,
+        current_price,
+        pe_values=multiples.get("pe_values"),
+        pb_values=multiples.get("pb_values"),
+    )
 
 
 def build_fair_value_report(
