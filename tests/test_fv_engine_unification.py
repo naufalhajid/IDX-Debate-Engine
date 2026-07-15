@@ -155,6 +155,62 @@ def test_fv_provenance_survives_quality_gate_rejection(monkeypatch):
     assert result["fv_provenance"]["financials_source"] == "xlsx_batch"
 
 
+def test_elsa_real_current_fundamentals_are_not_quality_rejected():
+    """FIX 6 regression pin + honest-status finding, not a bug fix.
+
+    The original spec's "confirmed working baseline" claimed the quality
+    gate rejects ELSA. Verified 2026-07-16 against ELSA's real figures
+    (output/*.xlsx, 2026-07-15 snapshot, via XlsxDataAdapter.extract_
+    keystats) that it does NOT: net_margin 5.24%, method dispersion 1.46x,
+    HIGH confidence -- none of the 4 gate conditions
+    (fv_methods_lt_2 / net_margin_gt_100pct / fv_dispersion_extreme /
+    fv_implied_pe_extreme) fire.
+
+    Discriminating check performed (not encoded here -- used a throwaway
+    `git worktree add ... 8fdfc23`, the commit immediately before this
+    session's FIX 1) to rule out a FIX 1-5 regression: the SAME figures
+    through the PRE-session build_fair_value_payload() -- which already had
+    this quality gate; FIX 1 only unified XLSX onto it -- also did NOT
+    reject ELSA (fair_value=942, fv_quality_rejected=None). The gate's
+    logic is unchanged by this session (see the net_margin>100% tests in
+    this file, which DO still reject both before and after). ELSA's real
+    fundamentals have evidently normalized since the spec was written --
+    the spec's baseline claim is stale, not a regression this session
+    introduced. Pinned as a real-ticker snapshot so a genuine future
+    regression (as opposed to further data drift) is caught.
+    """
+    stats = KeyStats(
+        ticker="ELSA",
+        eps_ttm=98.83,
+        eps_forward=121.95121951219512,
+        dps=44.29,
+        book_value_per_share=753.87,
+        roe=0.1311,
+        net_margin=0.0524,
+        roa=0.0655,
+        current_price=650.0,
+        shares_outstanding=7_300_000_000.0,
+        operating_cash_flow_ttm=2_450_000_000_000.0,
+        historical_pe_avg=11.1,
+        historical_pb_avg=1.4,
+        cost_of_equity=0.1319,
+        growth_rate=0.06,
+        raw_pe_current=6.58,
+        raw_pb_current=0.86,
+        ebitda_ttm=1_614_000_000_000.0,
+        net_debt=2_658_000_000_000.0,
+        capex_ttm=517_000_000_000.0,
+    )
+
+    _, result = fvc._build_fair_value_core(
+        stats, "ELSA", 650.0, sector="mining", financials_source="xlsx_batch"
+    )
+
+    assert result["fair_value"] is not None
+    assert result.get("fv_quality_rejected") is None
+    assert result.get("fv_quality_reasons") is None
+
+
 def test_xlsx_adapter_has_no_independent_weighting_math():
     """Structural guardrail: the standalone aggregator must be gone, not just unused."""
     assert not hasattr(XlsxDataAdapter, "_weighted_average_with_ev")
