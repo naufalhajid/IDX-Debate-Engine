@@ -1734,3 +1734,75 @@ def test_build_fair_value_payload_provenance_defaults_to_none_when_unsupplied():
     assert prov["current_price_source"] is None
     assert prov["current_price_as_of"] is None
     assert prov["financials_source"] == "stockbit_api"
+
+
+def test_clean_numeric_or_none_parses_miliar_suffix():
+    """FIX 7: live Stockbit keystats reports large aggregates ('EBITDA (TTM)',
+    'Net Debt (Quarter)', 'Capital expenditure (TTM)', 'Cash From Operations
+    (TTM)') as 'N,NNN B' -- comma-grouped with a trailing Miliar/Billion
+    suffix -- unlike small per-share fields (EPS, BVPS) which never carry a
+    suffix. Confirmed via live probe against ELSA's real 2026-07-16 response.
+    Before this fix, the trailing ' B' made float() raise ValueError and the
+    field silently resolved to None (or 0.0 via _lookup's default), so
+    ebitda_ttm/net_debt/capex_ttm/operating_cash_flow_ttm were never
+    populated on the live-API path -- EV/EBITDA and DCF could never activate
+    there, independent of whether the underlying company data supported them.
+    """
+    assert fvc._clean_numeric_or_none("1,614 B") == 1_614_000_000_000.0
+    assert fvc._clean_numeric_or_none("2,450 B") == 2_450_000_000_000.0
+
+
+def test_clean_numeric_or_none_parses_juta_suffix():
+    """Same Miliar-suffix bug, Million case (documented in parse_currency_to_
+    float's own docstring convention: '2.5M' -> 2500000.0) -- no live example
+    hit this during the FIX 7 probe, but the same trailing-letter failure
+    mode applies, so it is covered directly rather than left unverified."""
+    assert fvc._clean_numeric_or_none("2.5 M") == 2_500_000.0
+
+
+def test_clean_numeric_or_none_strips_parenthetical_negative_to_positive_magnitude():
+    """FIX 7: Stockbit wraps a negative aggregate in parentheses, e.g. 'Net
+    Debt (Quarter)' -> '(2,658 B)' and 'Capital expenditure (TTM)' ->
+    '(517 B)' (confirmed via live probe against ELSA). This must resolve to a
+    POSITIVE magnitude, not a negated float -- matching utils/helpers.py's
+    parse_currency_to_float(), which the legacy XLSX ETL already uses for
+    these exact figures (currency_str.replace("(", "").replace(")", "") then
+    float(): parentheses are discarded, never interpreted as a minus sign).
+    This is a deliberate parity fix, not a sign-convention fix: the open
+    question of whether Stockbit's parenthesised figure is "semantically
+    negative" is pre-existing (REMEDIATION_BACKLOG Task H territory) and
+    identical on both ingestion paths -- capex_ttm must stay a positive
+    magnitude here so fair_value_dcf()'s fcfe_ps = ocf_ps - capex_ps keeps
+    subtracting (per FIX 3B's conservative, non-inflating convention) rather
+    than starting to ADD capex back in because the parser guessed a sign.
+    """
+    assert fvc._clean_numeric_or_none("(2,658 B)") == 2_658_000_000_000.0
+    assert fvc._clean_numeric_or_none("(517 B)") == 517_000_000_000.0
+
+
+def test_extract_keystats_parses_live_api_ebitda_net_debt_capex_ocf():
+    """Integration-level regression pin for the FIX 7 parsing bug, using
+    ELSA's exact real raw strings from the live keystats endpoint (probed
+    2026-07-16). These parsed magnitudes must match the XLSX-sourced ELSA
+    fixture already pinned in tests/test_fv_engine_unification.py::
+    test_elsa_real_current_fundamentals_are_not_quality_rejected (ebitda_ttm=
+    1_614_000_000_000.0, net_debt=2_658_000_000_000.0, capex_ttm=
+    517_000_000_000.0) -- both ingestion paths must agree on the same
+    company's numbers once the live-API parser is fixed.
+    """
+    api_response = _stockbit_response(
+        [
+            ("Current EPS (TTM)", "98.83"),
+            ("Book Value Per Share", "753.87"),
+            ("EBITDA (TTM)", "1,614 B"),
+            ("Net Debt (Quarter)", "(2,658 B)"),
+            ("Capital expenditure (TTM)", "(517 B)"),
+            ("Cash From Operations (TTM)", "2,450 B"),
+        ]
+    )
+    stats = extract_keystats(api_response, "ELSA", current_price=650.0)
+
+    assert stats.ebitda_ttm == 1_614_000_000_000.0
+    assert stats.net_debt == 2_658_000_000_000.0
+    assert stats.capex_ttm == 517_000_000_000.0
+    assert stats.operating_cash_flow_ttm == 2_450_000_000_000.0

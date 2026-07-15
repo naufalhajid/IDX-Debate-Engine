@@ -515,12 +515,40 @@ rejected during Fix 3B) would have been *more* dangerous, not less: AKPI (OCF 25
 DCF numerator would silently invert a should-be-excluded negative-FCF company into a
 positive, "valued" one.
 
+**2026-07-16 Correction (FIX 7) — root cause was wrong, mitigation still stands:**
+The "sign lost at the vendor" claim above is **false** and is corrected here rather than
+silently edited, since Fix 4/5/6's findings were all cross-checked against real data the
+same way and should be trusted the same way — this one wasn't, until FIX 7's live-API probe
+against ELSA/AKRA/GGRM/TAPG/ERAA on 2026-07-16 caught it. The live
+`/keystats/ratio/v1/{ticker}` JSON response **does** send signed figures — as standard
+accounting parenthetical notation, e.g. `"Cash From Investing (TTM)": "(508 B)"`,
+`"Capital expenditure (TTM)": "(517 B)"`. Both this codebase's ingestion paths discard that
+sign themselves rather than the vendor omitting it:
+- `utils/helpers.py::parse_currency_to_float()` / `parse_key_statistic_results_item_value()`
+  (the xlsx ETL path) does `currency_str.replace("(", "").replace(")", "")` — deletes the
+  parenthesis characters outright, never interpreting them as negation.
+- `services/fair_value_calculator.py::_clean_numeric_or_none()` (the live-API path, before
+  FIX 7) didn't strip parentheses at all, so `float("(517 B)")` raised `ValueError` and the
+  field resolved to `None`/`0.0` — a harder failure than xlsx's silent-positive, but the same
+  root confusion: nobody read the parenthesis as a sign.
+
+This does **not** reopen the capex-subtraction mitigation below (still correct, still
+conservative — capex stays a positive magnitude and is still only ever subtracted). It only
+retires Option 1 below (there is no hidden signed field to go find — the one already being
+parsed is signed; parsing just wasn't reading it) and reframes 2–3 as a genuine sign-
+convention decision now that FIX 7 has separately fixed the live-API path's ability to parse
+the figure at all (see `_clean_numeric_or_none()`'s FIX 7 docstring). FIX 7 deliberately kept
+both paths' parenthesis-discarding (positive-magnitude) behavior — turning parentheses into a
+minus sign was considered and rejected for this specific field, because `capex_ttm` going
+negative would flip `fcfe_ps = ocf_ps − capex_ps` from subtracting to *adding* capex back in,
+i.e. exactly the FV-inflation failure mode this task exists to prevent. Options 2–3 below are
+still open; option 1 is struck.
+
 **Proposed Change (not started — design/data-source review needed first):**
-No safe code-level fix exists using only the currently exposed Stockbit fields, since the
-sign information is lost at the vendor before it reaches this codebase. Options for a future
-session:
-1. Contact/inspect Stockbit's raw JSON response (not just the `fin_name_results` array
-   already parsed) for an alternate, signed cash-flow field.
+1. ~~Contact/inspect Stockbit's raw JSON response... for an alternate, signed cash-flow
+   field.~~ Retired 2026-07-16 (FIX 7): the field already carries a sign, via parentheses;
+   no alternate field is needed, only a sign-aware parser — which is a deliberate design
+   decision (see correction above), not a data-availability gap.
 2. Source capex/OCF from a second vendor for cross-validation on the ~20%+27% divergent
    subset only.
 3. Accept the conservative-understatement bias as a documented, permanent limitation of the
@@ -613,3 +641,123 @@ site) + prompt edit + compliance test.
 *Addendum written 2026-07-16 during the Fair Value End-to-End Unification & Remediation
 effort, Fix 4, after tracing `check_valuation_disagreement()`'s full history via
 `PROMPT_MIGRATION.md`.*
+
+---
+
+## 2026-07-16 Addendum — FIX 7 live-probe findings: parser bug (fixed) + shares_outstanding gap (open)
+
+Separate addition from the Fair Value End-to-End Unification & Remediation effort, Fix 7
+(regression verification). Also corrects Task H's root-cause claim above — see that task's
+"2026-07-16 Correction" subsection.
+
+### FIX 7 — live-API Miliar-suffix / parenthetical-negative parsing bug (fixed this session)
+
+**Files:** `services/fair_value_calculator.py::_clean_numeric_or_none()` (~line 444);
+`tests/test_fair_value_calculator.py` (4 new tests).
+
+**Finding:** the live `/keystats/ratio/v1/{ticker}` endpoint reports every large aggregate
+field — Revenue, Gross Profit, Net Income, EBITDA, Cash From Operations/Investing/Financing,
+Net Debt, Capital expenditure, Free cash flow, Total Assets — as `"N,NNN B"` (comma-grouped,
+trailing Miliar/Billion suffix) with parentheses for negatives, e.g. `"1,614 B"`,
+`"(2,658 B)"`. Small per-share fields (EPS, BVPS, DPS) never carry this suffix and were
+unaffected. `_clean_numeric_or_none()` could not parse the suffixed form at all —
+`float("1614 B")` raises `ValueError` — so `ebitda_ttm`, `net_debt`, and `capex_ttm` resolved
+to `None`, and `operating_cash_flow_ttm` (looked up via `_lookup()`, which defaults `None` to
+`0.0`) silently resolved to **`0.0`** on every live-API ticker, not just the FIX 3A/3B
+"field might be absent" open items originally anticipated. This made EV/EBITDA (FIX 3A) and
+FCFE-DCF (FIX 3B) unable to activate on the live/debate path regardless of whether the
+underlying company data supported them — both methods were code-complete and correct
+(verified by unit tests and against real xlsx data) but had never actually fired on live data.
+
+**Fix:** `_clean_numeric_or_none()` now strips a trailing `B`/`M` suffix (× 1e9 / 1e6) and
+discards (does not negate) parenthesis characters — a deliberate **parity** fix matching
+`utils/helpers.py::parse_currency_to_float()`, which the legacy xlsx ETL already applies to
+these exact fields. Positive-magnitude-only was chosen specifically so `capex_ttm` cannot go
+negative and flip FIX 3B's `fcfe_ps = ocf_ps − capex_ps` into an addition (see Task H's
+correction above for why that failure mode matters). Verified: (a) 4 new unit/integration
+tests in `tests/test_fair_value_calculator.py`, using ELSA's exact live-probed raw strings;
+(b) live re-probe against ELSA confirms `ebitda_ttm=1_614_000_000_000.0`,
+`net_debt=2_658_000_000_000.0`, `capex_ttm=517_000_000_000.0` — matching, to the rupiah, the
+XLSX-sourced fixture already pinned in
+`tests/test_fv_engine_unification.py::test_elsa_real_current_fundamentals_are_not_quality_rejected`.
+
+**Test Coverage:** `test_clean_numeric_or_none_parses_miliar_suffix`,
+`test_clean_numeric_or_none_parses_juta_suffix`,
+`test_clean_numeric_or_none_strips_parenthetical_negative_to_positive_magnitude`,
+`test_extract_keystats_parses_live_api_ebitda_net_debt_capex_ocf`.
+
+**Status:** Fixed and merged this session (Fix 7).
+
+---
+
+### Task J — `shares_outstanding` is absent from the live keystats endpoint, blocking EV/EBITDA and DCF on the live/debate path
+
+**Priority Group:** REFINEMENT (no incorrect output; the methods correctly return `None`
+rather than compute on a missing denominator — but they never activate at all on live data)
+
+**Files:**
+- `services/fair_value_calculator.py` `extract_keystats()` (~line 690, `shares_outstanding`
+  lookup), `fair_value_ev_ebitda()` (~line 1161-1168), `fair_value_dcf()` (~line 1224-1239)
+- `services/debate_chamber.py` `_fundamental_node()` (~line 2174-2196) — the only live-path
+  caller; fetches `{BASE_URL}/keystats/ratio/v1/{ticker}?year_limit=10` and passes it
+  straight to `build_fair_value_payload()`, no merge with any other endpoint
+
+**Finding:** discovered while re-verifying FIX 7's parsing fix end-to-end. Even after
+`_clean_numeric_or_none()` correctly parses `ebitda_ttm`/`net_debt`/`capex_ttm` (confirmed via
+live probe: e.g. AKRA `ebitda_ttm=3_776_000_000_000.0`, `net_debt=2_272_000_000_000.0`, both
+non-`None`, sector `mining`), `fair_value_ev_ebitda()` and `fair_value_dcf()` still did not
+appear in `active_methods` for any of the 5 probed tickers (TAPG/ELSA/AKRA/GGRM/ERAA). Root
+cause: both methods gate on `self.stats.shares_outstanding > 0` (EV/EBITDA needs it to bridge
+aggregate equity value to a per-share figure; DCF needs it to convert `capex_ttm` to
+`capex_ps`), and a direct probe of the live keystats response found none of the four field-
+name variants `extract_keystats()` searches for (`"Current Share Outstanding"`, `"Shares
+Outstanding"`, `"Outstanding Shares"`, `"Share Outstanding"`) present at all — confirmed for
+AKRA specifically, and consistent with `shares_outstanding` parsing to `0.0` (the `_lookup()`
+missing-default) for all 5 probed tickers. This is a field-availability gap in the specific
+endpoint used, not a format-parsing bug like the one FIX 7 just fixed — no parser change can
+recover a field the endpoint response never contains.
+
+Current live price (`"Current Price"`/`"Last Price"`/`"Close Price"`/`"Price"`) is *also*
+absent from this same endpoint, but that is expected, not a gap: production already sources
+price separately and threads it in as an explicit parameter (`current_price` at
+`debate_chamber.py:2194`, provenance-tracked per FIX 2/5) rather than reading it from
+`raw`. `shares_outstanding` has no equivalent side-channel — `extract_keystats()` expects to
+find it inside the same `raw` keystats response, and on this endpoint it never will.
+
+**Practical consequence:** on the current live/debate path, **PE and PB are the only fair-
+value methods that can activate** (DDM needs `dps`, which was also absent/zero for all 5
+probed tickers, though that is more plausibly genuine low/no-dividend data than a parsing
+issue and was not separately investigated). EV/EBITDA and FCFE-DCF — this session's FIX 3A/3B
+work — are code-complete, unit-tested, and verified correct against real xlsx-sourced data,
+but structurally cannot fire on live/debate-chamber data until this gap closes.
+
+**Proposed Change (not started — needs its own investigation):**
+1. Check whether another already-called Stockbit endpoint in this codebase exposes share
+   count or market cap — `providers/idx_broker_summary.py`, `providers/idx.py`, and
+   `providers/stockbit.py` all reference market-cap/shares-outstanding-shaped data for other
+   purposes (not confirmed to be the same field or freshness the FV engine would need; not
+   investigated further this session).
+2. If found, thread it into `_fundamental_node()` the same way FIX 2/5 threaded
+   `current_price`/`current_price_source` — an explicit parameter into
+   `build_fair_value_payload()`, not a field `extract_keystats()` searches for inside `raw`.
+3. If no existing endpoint has it, evaluate whether `market_cap / current_price` (both
+   independently obtainable) is an acceptable derived proxy, or whether a new Stockbit
+   endpoint call is warranted (extra latency/budget cost per FIX ticker — see
+   `core/budget.py`).
+
+**Test Coverage:** None yet — investigation/proposal only. A future fix should add a live-
+shaped integration test analogous to
+`test_extract_keystats_parses_live_api_ebitda_net_debt_capex_ocf` (FIX 7) once a
+`shares_outstanding` source is chosen.
+
+**Risk:** LOW to document (methods fail closed — `None`, never a wrong number); MEDIUM
+priority to fix (two of the six FV methods, including this session's two newest, are
+effectively dormant on the path real trading decisions run through).
+
+**Effort:** S (investigation) + S–M (threading, depending on where step 1 lands).
+
+---
+
+*Addendum written 2026-07-16 during the Fair Value End-to-End Unification & Remediation
+effort, Fix 7, via a live-API probe against TAPG/ELSA/AKRA/GGRM/ERAA using the authenticated
+`StockbitApiClient` (read-only GET requests, no writes/orders/state mutation).*

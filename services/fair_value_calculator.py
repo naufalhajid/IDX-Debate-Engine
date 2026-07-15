@@ -442,17 +442,37 @@ def _clean_numeric(raw: str) -> float:
 
 
 def _clean_numeric_or_none(raw: object) -> float | None:
-    """Parse a numeric source value while preserving missing values as None."""
+    """Parse a numeric source value while preserving missing values as None.
+
+    Live Stockbit keystats reports large aggregates (EBITDA, Net Debt,
+    Capex, OCF) as "N,NNN B" / "(N,NNN B)" -- comma-grouped with a trailing
+    Miliar/Billion (or Juta/Million) suffix, and parentheses instead of a
+    minus sign for negatives, e.g. "1,614 B" or "(2,658 B)". Small per-share
+    fields (EPS, BVPS) never carry this suffix. Parentheses are DISCARDED,
+    not interpreted as negative -- this matches utils/helpers.py's
+    parse_currency_to_float(), which the legacy XLSX ETL already applies to
+    these same fields, so both ingestion paths keep resolving to the same
+    positive magnitude for a given company (see REMEDIATION_BACKLOG Task H
+    for why the sign question itself stays open on both paths alike).
+    """
     if raw is None:
         return None
     text = str(raw).strip()
     if text in {"", "-", "N/A", "n/a", "null", "None"}:
         return None
     s = re.sub(r"[Rr][Pp]\.?\s*", "", text).strip()
+    s = s.replace("(", "").replace(")", "")
     s = re.sub(r"[,.](?=\d{3}(?!\d))", "", s)
     s = s.replace("%", "").strip()
+    multiplier = 1.0
+    if s.endswith("B"):
+        multiplier = 1_000_000_000.0
+        s = s[:-1].strip()
+    elif s.endswith("M"):
+        multiplier = 1_000_000.0
+        s = s[:-1].strip()
     try:
-        return float(s)
+        return float(s) * multiplier
     except (ValueError, TypeError):
         return None
 
