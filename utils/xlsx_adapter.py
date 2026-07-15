@@ -140,20 +140,6 @@ _TICKER_SECTOR: dict[str, str] = {
     "PRDA": "healthcare",
 }
 
-# EV/EBITDA historical multiples per sektor (median 5 tahun IHSG)
-_SECTOR_EV_EBITDA: dict[str, float] = {
-    "bank": 0.0,  # EV/EBITDA tidak relevan untuk bank
-    "consumer": 14.0,
-    "mining": 5.0,
-    "property": 10.0,
-    "telecom": 10.0,
-    "industrial": 8.0,
-    "energy": 6.0,
-    "tech": 20.0,
-    "healthcare": 15.0,
-    "default": 10.0,
-}
-
 
 # ---------------------------------------------------------------------------
 # Main Adapter
@@ -232,8 +218,11 @@ class XlsxDataAdapter:
     # ── Safe value extractor ────────────────────────────────────────────────
 
     @staticmethod
-    def _f(row: pd.Series, col: str, default: float = 0.0) -> float:
-        """Ambil nilai float dari Series; return default jika kosong/NaN/invalid."""
+    def _f(row: pd.Series, col: str, default: float | None = 0.0) -> float | None:
+        """Ambil nilai float dari Series; return default jika kosong/NaN/invalid.
+
+        Pass default=None to distinguish "column missing/NaN" from an
+        explicit 0.0 (e.g. net debt: unknown vs a confirmed net-cash 0)."""
         if col not in row.index:
             return default
         val = row[col]
@@ -359,6 +348,12 @@ class XlsxDataAdapter:
             # ── Valuation saat ini (untuk display di report) ──
             raw_pe_current=f(ks, "Current PE Ratio (TTM)"),
             raw_pb_current=f(ks, "Current Price to Book Value"),
+            # ── FIX 3A: EV/EBITDA proper bridge inputs (mining only) ──
+            # default=None so a missing column stays "unknown", not a silent
+            # 0.0 (a missing net_debt is not the same as a confirmed net-cash
+            # position — see fair_value_ev_ebitda()).
+            ebitda_ttm=f(ks, "EBITDA (TTM)", default=None),
+            net_debt=f(ks, "Net Debt (Quarter)", default=None),
         )
 
         # Set historical multiples dari logika dinamis
@@ -377,55 +372,6 @@ class XlsxDataAdapter:
             stats.roa = stats.roa / 100.0
 
         return stats
-
-    # ── Metode ke-4: EV/EBITDA ──────────────────────────────────────────────
-
-    def fair_value_ev_ebitda(
-        self, ticker: str, current_price: float = 0.0
-    ) -> float | None:
-        """
-        Fair value ke-4: EV/EBITDA Band.
-
-        Formula:
-          FV = (EBITDA_TTM × Sektor_EV_EBITDA_historis + Net_Debt) / Shares
-
-        Tidak dipakai untuk bank (EV/EBITDA tidak relevan karena struktur modal).
-        Valid jika EBITDA TTM > 0 dan shares outstanding > 0.
-        """
-        sektor = _TICKER_SECTOR.get(ticker.upper(), "default")
-        if sektor == "bank":
-            return None
-
-        target_ev_ebitda = _SECTOR_EV_EBITDA.get(sektor, _SECTOR_EV_EBITDA["default"])
-        if target_ev_ebitda <= 0:
-            return None
-
-        ks = self._ks_row(ticker)
-        if ks is None:
-            return None
-
-        f = self._f
-        ebitda_ttm = f(ks, "EBITDA (TTM)")
-        net_debt = f(ks, "Net Debt (Quarter)")
-        shares = f(ks, "Current Share Outstanding")
-
-        if ebitda_ttm <= 0 or shares <= 0:
-            return None
-
-        enterprise_value = ebitda_ttm * target_ev_ebitda
-        equity_value = enterprise_value - net_debt
-        if equity_value <= 0:
-            return None
-
-        fv = equity_value / shares
-
-        # Sanity check: tidak boleh > 10× atau < 0.1× current price
-        if current_price > 0:
-            ratio = fv / current_price
-            if ratio > 10.0 or ratio < 0.1:
-                return None
-
-        return round(fv, 0)
 
     # ── Drop-in replacement untuk build_fair_value_report() ─────────────────
 
@@ -574,21 +520,25 @@ class XlsxDataAdapter:
             )
             lines.append(f"  Metode 3 DDM        : TIDAK VALID ({reason})")
 
-        # Metode 4: EV/EBITDA
-        if sektor != "bank":
+        # Metode 4: EV/EBITDA -- canonical policy: mining-only (SECTOR_WEIGHTS).
+        if sektor == "mining":
             if ev_fv:
-                ev_mult = _SECTOR_EV_EBITDA.get(sektor, _SECTOR_EV_EBITDA["default"])
+                from services.fair_value_calculator import FairValueCalculator as _FVC
+
                 lines.append(
-                    f"  Metode 4 EV/EBITDA  : EBITDA × {ev_mult:.0f}x historical "
-                    f"→ equity value / shares = Rp {int(ev_fv):,}"
+                    f"  Metode 4 EV/EBITDA  : EBITDA Rp {(stats.ebitda_ttm or 0):,.0f} × "
+                    f"{_FVC._MINING_EV_EBITDA_TARGET:.1f}x target − "
+                    f"Net Debt Rp {(stats.net_debt or 0):,.0f}, ÷ shares "
+                    f"= Rp {int(ev_fv):,}"
                 )
             else:
                 lines.append(
-                    "  Metode 4 EV/EBITDA  : TIDAK VALID (EBITDA=0 atau data tidak tersedia)"
+                    "  Metode 4 EV/EBITDA  : TIDAK VALID (EBITDA/net debt/shares "
+                    "tidak tersedia, atau di luar sanity band)"
                 )
         else:
             lines.append(
-                "  Metode 4 EV/EBITDA  : SKIP (tidak relevan untuk sektor bank)"
+                "  Metode 4 EV/EBITDA  : SKIP (hanya berlaku untuk sektor mining)"
             )
 
         # Hasil akhir

@@ -617,46 +617,92 @@ def test_quality_gate_passes_two_methods_with_sane_margin(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Task 24: EV/EBITDA method
+# FIX 3A: EV/EBITDA proper bridge — EBITDA x target multiple -> Enterprise
+# Value -> subtract Net Debt -> Equity Value -> / shares. Replaces the old
+# price x (target/current multiple) shortcut (former "Task 24" tests below).
 # ---------------------------------------------------------------------------
 
-def _mining_calc(ev_ebitda_current: float | None, price: float = 1000.0) -> FairValueCalculator:
+def _mining_calc(
+    *,
+    ebitda_ttm: float | None = 1_000_000_000_000.0,
+    net_debt: float | None = 200_000_000_000.0,
+    shares_outstanding: float = 10_000_000_000.0,
+    price: float = 500.0,
+) -> FairValueCalculator:
     stats = KeyStats(
         ticker="ADRO",
         current_price=price,
-        ev_ebitda_current=ev_ebitda_current,
+        ebitda_ttm=ebitda_ttm,
+        net_debt=net_debt,
+        shares_outstanding=shares_outstanding,
     )
     return FairValueCalculator(stats, sector="mining")
 
 
 def test_fair_value_ev_ebitda_returns_none_for_non_mining():
-    stats = KeyStats(ticker="BBCA", current_price=9000, ev_ebitda_current=10.0)
+    stats = KeyStats(
+        ticker="BBCA",
+        current_price=9000,
+        ebitda_ttm=1_000_000_000_000.0,
+        net_debt=0.0,
+        shares_outstanding=10_000_000_000.0,
+    )
     calc = FairValueCalculator(stats, sector="bank")
     assert calc.fair_value_ev_ebitda() is None
 
 
-def test_fair_value_ev_ebitda_returns_none_when_field_missing():
-    assert _mining_calc(ev_ebitda_current=None).fair_value_ev_ebitda() is None
+def test_fair_value_ev_ebitda_matches_hand_calculated_bridge():
+    # EBITDA 1e12 x target 5.5 = EV 5.5e12; equity = 5.5e12 - net_debt 2e11
+    # = 5.3e12; / shares 1e10 = 530. NOT the old shortcut's price-ratio value.
+    calc = _mining_calc()
+    assert calc.fair_value_ev_ebitda() == pytest.approx(530.0)
 
 
-def test_fair_value_ev_ebitda_returns_none_when_zero():
-    assert _mining_calc(ev_ebitda_current=0.0).fair_value_ev_ebitda() is None
+def test_fair_value_ev_ebitda_missing_ebitda_returns_none():
+    assert _mining_calc(ebitda_ttm=None).fair_value_ev_ebitda() is None
 
 
-def test_fair_value_ev_ebitda_computes_correctly():
-    # price 1000, current EV/EBITDA 4.0, target 5.5 → FV = 1000 × 5.5/4.0 = 1375
-    calc = _mining_calc(ev_ebitda_current=4.0, price=1000.0)
-    assert calc.fair_value_ev_ebitda() == pytest.approx(1375.0)
+def test_fair_value_ev_ebitda_negative_ebitda_excludes_method():
+    # Method not applicable for loss-making EBITDA -- not a negative FV.
+    assert _mining_calc(ebitda_ttm=-1_000_000_000.0).fair_value_ev_ebitda() is None
+
+
+def test_fair_value_ev_ebitda_zero_ebitda_excludes_method():
+    assert _mining_calc(ebitda_ttm=0.0).fair_value_ev_ebitda() is None
+
+
+def test_fair_value_ev_ebitda_missing_net_debt_returns_none_not_zero():
+    """Unknown net debt must exclude the method, never silently assume
+    debt-free (which would inflate equity value)."""
+    assert _mining_calc(net_debt=None).fair_value_ev_ebitda() is None
+
+
+def test_fair_value_ev_ebitda_explicit_zero_net_debt_is_valid():
+    """Net debt of exactly 0.0 (net-cash company) is a real, known value —
+    distinct from None (unknown) — and must NOT be excluded."""
+    # EBITDA 1e12 x 5.5 = 5.5e12; equity = 5.5e12 - 0 = 5.5e12; / 1e10 = 550.
+    calc = _mining_calc(net_debt=0.0)
+    assert calc.fair_value_ev_ebitda() == pytest.approx(550.0)
+
+
+def test_fair_value_ev_ebitda_debt_exceeding_enterprise_value_returns_none():
+    # EV 5.5e12 - net_debt 6e12 = negative equity value -> not applicable.
+    calc = _mining_calc(net_debt=6_000_000_000_000.0)
+    assert calc.fair_value_ev_ebitda() is None
+
+
+def test_fair_value_ev_ebitda_missing_shares_returns_none():
+    assert _mining_calc(shares_outstanding=0.0).fair_value_ev_ebitda() is None
 
 
 def test_fair_value_ev_ebitda_rejects_outlier_high():
-    # current EV/EBITDA 0.5 → FV/price = 5.5/0.5 = 11× → rejected
-    assert _mining_calc(ev_ebitda_current=0.5).fair_value_ev_ebitda() is None
+    # fv 530 vs price 100 -> ratio 5.3x > 3.0x sanity band -> rejected.
+    assert _mining_calc(price=100.0).fair_value_ev_ebitda() is None
 
 
 def test_fair_value_ev_ebitda_rejects_outlier_low():
-    # current EV/EBITDA 50 → FV/price = 5.5/50 = 0.11× → rejected
-    assert _mining_calc(ev_ebitda_current=50.0).fair_value_ev_ebitda() is None
+    # fv 530 vs price 5000 -> ratio 0.106x < 0.3x sanity band -> rejected.
+    assert _mining_calc(price=5000.0).fair_value_ev_ebitda() is None
 
 
 def test_extract_keystats_parses_ev_ebitda():
@@ -672,21 +718,23 @@ def test_extract_keystats_parses_ev_ebitda():
 
 
 def test_mining_weighted_includes_ev_ebitda(monkeypatch):
-    calc = _mining_calc(ev_ebitda_current=4.0, price=1000.0)
-    monkeypatch.setattr(calc, "fair_value_pe", lambda: 1200.0)
-    monkeypatch.setattr(calc, "fair_value_pb", lambda: 900.0)
+    # bridge fv 530 (price=1000 -> ratio 0.53, within sanity band). PE/PB
+    # mocked close to 530 so this test isolates method-count-based confidence
+    # from the (separately tested) cross-method dispersion mechanism.
+    calc = _mining_calc(price=1000.0)
+    monkeypatch.setattr(calc, "fair_value_pe", lambda: 550.0)
+    monkeypatch.setattr(calc, "fair_value_pb", lambda: 500.0)
     monkeypatch.setattr(calc, "fair_value_ddm", lambda: None)
-    # ev_ebitda fires: 1000 × 5.5/4.0 = 1375
     result = calc.fair_value_weighted()
     assert "ev_ebitda" in result["breakdown"]
     assert result["confidence"] == "HIGH"
 
 
 def test_mining_weighted_four_methods_gives_high_confidence(monkeypatch):
-    calc = _mining_calc(ev_ebitda_current=4.0, price=1000.0)
-    monkeypatch.setattr(calc, "fair_value_pe", lambda: 1200.0)
-    monkeypatch.setattr(calc, "fair_value_pb", lambda: 900.0)
-    monkeypatch.setattr(calc, "fair_value_ddm", lambda: 1100.0)
+    calc = _mining_calc(price=1000.0)
+    monkeypatch.setattr(calc, "fair_value_pe", lambda: 550.0)
+    monkeypatch.setattr(calc, "fair_value_pb", lambda: 500.0)
+    monkeypatch.setattr(calc, "fair_value_ddm", lambda: 520.0)
     result = calc.fair_value_weighted()
     assert len(result["breakdown"]) == 4
     assert result["confidence"] == "HIGH"

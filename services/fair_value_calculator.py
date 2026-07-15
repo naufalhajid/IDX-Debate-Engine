@@ -348,6 +348,12 @@ class KeyStats:
     # EV/EBITDA current multiple (untuk metode ke-4, mining/energy saja)
     ev_ebitda_current: float | None = None
 
+    # FIX 3A: EV/EBITDA proper bridge inputs (Metode 4). None = missing/unknown
+    # -- never silently treated as zero (a missing net_debt is NOT the same
+    # as a confirmed net-cash position).
+    ebitda_ttm: float | None = None
+    net_debt: float | None = None
+
     # Age of the underlying financial data in days (None = unknown).
     # Populated from the Stockbit API response where a closure date is available.
     keystats_age_days: int | None = None
@@ -671,6 +677,44 @@ def extract_keystats(
                 "Enterprise Value/EBITDA",
             ]
         )
+
+        # FIX 3A: EV/EBITDA proper bridge inputs. Prefer a direct net-debt
+        # figure; fall back to total debt minus cash when only the components
+        # are present. Neither found -> stays None (method correctly excluded
+        # rather than assuming debt-free).
+        stats.ebitda_ttm = _lookup_optional(
+            [
+                "EBITDA (TTM)",
+                "EBITDA",
+            ]
+        )
+        _net_debt_direct = _lookup_optional(
+            [
+                "Net Debt (Quarter)",
+                "Net Debt (TTM)",
+                "Net Debt",
+            ]
+        )
+        if _net_debt_direct is not None:
+            stats.net_debt = _net_debt_direct
+        else:
+            _total_debt = _lookup_optional(
+                [
+                    "Total Debt (Quarter)",
+                    "Total Debt (TTM)",
+                    "Total Debt",
+                ]
+            )
+            _cash_equiv = _lookup_optional(
+                [
+                    "Cash and Cash Equivalents (Quarter)",
+                    "Cash and Cash Equivalents (TTM)",
+                    "Cash and Cash Equivalents",
+                    "Cash & Cash Equivalents",
+                ]
+            )
+            if _total_debt is not None and _cash_equiv is not None:
+                stats.net_debt = _total_debt - _cash_equiv
 
     # ── Strategy B: legacy flat key-value fallback ────────────────────────────
     # Only runs if Strategy A found nothing useful (flat dict empty or all zeros)
@@ -1039,21 +1083,37 @@ class FairValueCalculator:
 
     def fair_value_ev_ebitda(self) -> float | None:
         """
-        Fair value = current_price × (target_EV_EBITDA / current_EV_EBITDA)
+        Fair value = (EBITDA_TTM × target_EV_EBITDA − Net Debt) / shares_outstanding
 
-        Only fires for mining/energy sector. Returns None if EV/EBITDA is
-        unavailable or the result falls outside a 3x–0.3x sanity band.
+        Full bridge: EBITDA -> Enterprise Value -> subtract net debt ->
+        Equity Value -> per-share. Only fires for mining sector. Returns None
+        when EBITDA is missing/non-positive (method not applicable to a
+        loss-making EBITDA base), net debt is unknown (never silently assumed
+        debt-free), shares are missing, the resulting equity value is
+        non-positive (debt exceeds enterprise value), or the FV falls outside
+        a 3x-0.3x sanity band versus current price.
         """
         if self.sector != "mining":
             return None
-        current = self.stats.ev_ebitda_current
+        ebitda = self.stats.ebitda_ttm
+        net_debt = self.stats.net_debt
+        shares = self.stats.shares_outstanding
         price = self.stats.current_price
-        if not current or current <= 0 or price <= 0:
+        if ebitda is None or ebitda <= 0:
             return None
-        fv = round(price * (self._MINING_EV_EBITDA_TARGET / current), 0)
-        ratio = fv / price
-        if ratio > 3.0 or ratio < 0.3:
+        if net_debt is None:
             return None
+        if shares <= 0:
+            return None
+        enterprise_value = ebitda * self._MINING_EV_EBITDA_TARGET
+        equity_value = enterprise_value - net_debt
+        if equity_value <= 0:
+            return None
+        fv = round(equity_value / shares, 0)
+        if price > 0:
+            ratio = fv / price
+            if ratio > 3.0 or ratio < 0.3:
+                return None
         return fv
 
     # ── Metode 5: 2-Stage DCF using OCF/Share (consumer/industrials) ─────────
@@ -1585,10 +1645,14 @@ class FairValueCalculator:
 
         if self.sector == "mining":
             if "ev_ebitda" in bdown:
-                ev_cur = self.stats.ev_ebitda_current or 0.0
+                ebitda = self.stats.ebitda_ttm or 0.0
+                net_debt = self.stats.net_debt or 0.0
+                ev_cur = self.stats.ev_ebitda_current
+                cur_note = f" (trades {ev_cur:.1f}x current)" if ev_cur else ""
                 lines.append(
-                    f"  EV/EBITDA Band  : {ev_cur:.1f}x current → "
-                    f"{self._MINING_EV_EBITDA_TARGET:.1f}x target "
+                    f"  EV/EBITDA Band  : EBITDA Rp {ebitda:,.0f} × "
+                    f"{self._MINING_EV_EBITDA_TARGET:.1f}x target − "
+                    f"Net Debt Rp {net_debt:,.0f}, ÷ shares{cur_note} "
                     f"= Rp {bdown['ev_ebitda']:,}"
                 )
             else:
