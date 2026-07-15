@@ -5225,7 +5225,13 @@ async def run_batch_debates(
                         prepared_setup=prepared_setup,
                     )
 
-                    # Valuation disagreement: Graham FV (screener) vs debate engine FV
+                    # Valuation disagreement: Graham FV (screener) vs debate engine FV.
+                    # FIX 4 policy: informational only -- stored on result["valuation_
+                    # disagreement"] for audit/JSON visibility, deliberately NOT fed
+                    # back into the verdict's confidence or fair_value. See
+                    # check_valuation_disagreement()'s docstring (fair_value_calculator.py)
+                    # for the empirical rationale (66% of tickers diverge >25% -- too
+                    # noisy a signal to gate confidence on).
                     if candidates_by_ticker and not result.get("error"):
                         try:
                             from services.fair_value_calculator import (

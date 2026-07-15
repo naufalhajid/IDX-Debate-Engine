@@ -14,6 +14,9 @@ from core.quant_filter.config import (
     MAX_XLSX_AGE_HARD_BLOCK_DAYS,
     assess_xlsx_staleness,
 )
+import inspect
+
+from services.fair_value_calculator import FairValueCalculator
 from services.fair_value_calculator import check_valuation_disagreement
 from services.fair_value_calculator import KeyStats
 from utils.xlsx_adapter import XlsxDataAdapter
@@ -136,6 +139,66 @@ def test_custom_threshold():
         graham_fv=1000.0, debate_fv=1400.0, disagreement_threshold=0.50
     )
     assert result["valuation_disagreement"] == "ALIGNED"
+
+
+# ── FIX 4 — Graham/MultiMoS reconciliation: no automatic coupling ───────────
+#
+# Policy (user-confirmed 2026-07-16, after an empirical check across 963 real
+# tickers): MultiMoS/FairValueCalculator stays the sole canonical fair value.
+# Graham divergence is surfaced only via check_valuation_disagreement() above
+# -- it must never feed back into fair_value_weighted()'s confidence, range,
+# or fair_value. See check_valuation_disagreement()'s docstring for why: a
+# SIGNIFICANT (>25%) Graham/MultiMoS gap turned out to fire on 66% of tickers
+# (408/617, including 179/322 that are otherwise HIGH confidence) -- Graham's
+# sqrt(k*EPS*BVPS) is too noisy a signal in this market to gate confidence on
+# (core/quant_filter/pipeline.py already has to cap it at 5x price and 1.5x
+# price for low-ROE names). A confidence penalty keyed on this gap would have
+# been a systematic re-score of most of the universe, not an outlier guard --
+# and risked worsening the system's separately-documented 0-BUY-since-
+# hardening problem. These two tests are a regression guardrail, not a
+# behavior change: fair_value_weighted() already takes no Graham input.
+
+
+def test_fair_value_weighted_accepts_no_graham_parameter():
+    """Structural guardrail: fair_value_weighted() must not grow a Graham /
+    external-reference parameter. If this test needs updating, the FIX 4
+    no-penalty policy is being revisited -- re-read the rationale above and
+    in check_valuation_disagreement()'s docstring first."""
+    sig = inspect.signature(FairValueCalculator.fair_value_weighted)
+    assert list(sig.parameters) == ["self"]
+
+
+def test_graham_divergence_does_not_alter_canonical_confidence_or_fv():
+    """A SIGNIFICANT Graham/MultiMoS gap (per check_valuation_disagreement)
+    must not change fair_value_weighted()'s own confidence, fair_value, or
+    range -- those are computed purely from internal PE/PB/DDM/EV/DCF
+    methods. Same calculator instance, called before and after computing the
+    disagreement classification: result must be byte-for-byte identical."""
+    stats = KeyStats(
+        ticker="TEST",
+        eps_ttm=100.0,
+        book_value_per_share=800.0,
+        roe=0.15,
+        dps=20.0,
+        current_price=1000.0,
+        historical_pe_avg=10.0,
+        historical_pb_avg=1.2,
+        cost_of_equity=0.12,
+        growth_rate=0.05,
+        shares_outstanding=1_000_000.0,
+    )
+    calc = FairValueCalculator(stats, sector="default")
+    result_before = calc.fair_value_weighted()
+    assert result_before["fair_value"] is not None
+
+    graham_fv = result_before["fair_value"] * 3.0  # obviously large gap
+    disagreement = check_valuation_disagreement(
+        graham_fv, result_before["fair_value"]
+    )
+    assert disagreement["valuation_disagreement"] == "SIGNIFICANT"
+
+    result_after = calc.fair_value_weighted()
+    assert result_after == result_before
 
 
 def test_xlsx_default_sector_ignores_zero_weight_ddm(monkeypatch):

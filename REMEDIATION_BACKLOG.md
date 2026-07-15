@@ -544,3 +544,72 @@ above are each M–L depending on choice).
 
 *Addendum verified against real scraped data (963 tickers, three date vintages) on
 2026-07-15 during the Fair Value End-to-End Unification & Remediation effort, Fix 3B.*
+
+---
+
+## 2026-07-16 Addendum — CIO judge cannot see valuation-disagreement in real time
+
+Separate addition from the Fair Value End-to-End Unification & Remediation effort, Fix 4.
+Unrelated to the 2026-06-21 STRATEGIC_ALIGNMENT_AUDIT and to the 2026-07-15 Task H addendum.
+
+### Task I — Restore (or formally retire) real-time CIO visibility into Graham/MultiMoS disagreement
+
+**Priority Group:** REFINEMENT (previously attempted, reverted; not a regression from Fix 4 --
+Fix 4 deliberately did not touch this)
+
+**Files:**
+- `services/debate_prompts/cio_judge.txt` — VALUATION DISAGREEMENT CHECK section was added
+  (manifest `2026-06-19-s12-valuation-disagreement-v15`) then removed; see `PROMPT_MIGRATION.md`
+  lines ~283-309 for the full history.
+- `core/orchestrator/legacy.py` (~5228-5271) — `check_valuation_disagreement()` runs
+  **after** `chamber.run()` / `_run_single_debate()` returns.
+- `services/fair_value_calculator.py` `check_valuation_disagreement()`.
+
+**Finding:**
+`PROMPT_MIGRATION.md` records that a CIO-judge prompt section once instructed the LLM to
+read `valuation_disagreement` from "output metadata" and reason about it (cite both FV
+figures, explain which it trusts; sector-specific guidance for mining/energy and banks).
+It was removed because the field is computed by `_guarded()` in `legacy.py` **after**
+`chamber.run()` completes -- i.e. after the CIO has already produced its verdict. The
+prompt instructed the LLM to use data that did not exist yet at reasoning time. The
+section was deleted rather than fixed; the field still exists and is stored on the result
+dict post-debate (JSON output + warning log), but no LLM or deterministic logic ever acts
+on it during a run.
+
+**Relationship to FIX 4:** FIX 4 (2026-07-16) confirmed the policy that Graham divergence
+must never *deterministically* alter the canonical FV's confidence or range -- rejected
+after finding a 25% gap fires on 66% of tickers (see `check_valuation_disagreement()`'s
+docstring in `services/fair_value_calculator.py`). That policy does not resolve this
+separate question: should the CIO's own *qualitative* LLM reasoning be allowed to see the
+disagreement in real time (restoring the original s12 intent), or should the field remain
+post-hoc/audit-only forever? Deliberately NOT decided or implemented as part of FIX 4 --
+re-attempting a previously-reverted approach needs its own explicit sign-off, not an
+autonomous scope addition, and it carries the same underlying concern as the deterministic
+version (a noisy Graham signal shaping the outcome, just through the LLM's reasoning
+instead of a formula).
+
+**Proposed Change (not started -- needs explicit sign-off before any code):**
+1. Thread `graham_fv` into `DebateChamberState` and the `FairValueCalculator` call site
+   inside `_fundamental_node()` (`services/debate_chamber.py`) so the disagreement can be
+   computed during the fundamental-scout phase, before the CIO judge runs -- not after.
+2. Re-add a CIO-judge prompt section (adapt the reverted `s12` text) so the LLM can consider
+   the disagreement qualitatively -- informational context only, no deterministic
+   confidence/range change (that part stays FIX 4's settled policy).
+3. Bump `prompt_version` in `services/debate_prompts/manifest.json` and document in
+   `PROMPT_MIGRATION.md` per project convention; run
+   `tests/test_debate_chamber_reliability.py` for LLM-compliance regressions.
+
+**Test Coverage:** None yet -- this is investigation/proposal only.
+
+**Risk:** MEDIUM -- touches live debate state threading and CIO prompt content (LLM
+compliance drift risk), and re-introduces a coupling (Graham → CIO reasoning) adjacent to
+the one FIX 4 just declined on the deterministic side.
+
+**Effort:** M -- state threading (schemas/debate.py, debate_chamber.py, legacy.py call
+site) + prompt edit + compliance test.
+
+---
+
+*Addendum written 2026-07-16 during the Fair Value End-to-End Unification & Remediation
+effort, Fix 4, after tracing `check_valuation_disagreement()`'s full history via
+`PROMPT_MIGRATION.md`.*

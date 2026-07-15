@@ -2274,6 +2274,22 @@ def check_valuation_disagreement(
     Tidak mereconcile angka — hanya membuat disagreement terlihat di output.
     Threshold default 25%: selisih di atas ini dianggap SIGNIFICANT.
 
+    FIX 4 policy (deliberate, user-confirmed 2026-07-16): this function is
+    informational only and must stay that way -- do NOT wire its output back
+    into FairValueCalculator.fair_value_weighted()'s confidence/range as an
+    automatic penalty. That was considered and rejected after an empirical
+    check across 963 real tickers (output/*.xlsx, 2026-07-15): a SIGNIFICANT
+    (>25%) gap fires on 66% of tickers (408/617), including 179/322 that are
+    otherwise HIGH confidence -- Graham's sqrt(k*EPS*BVPS) is simply too
+    noisy a signal in this market to gate confidence on (the screener itself
+    already has to cap it at 5x price, and 1.5x price for low-ROE names --
+    see core/quant_filter/pipeline.py). A confidence penalty at that firing
+    rate would be a systematic re-score of most of the universe, not an
+    outlier guard, and risked worsening the system's separately-documented
+    0-BUY-since-hardening problem. MultiMoS/FairValueCalculator is the sole
+    canonical fair value, unconditionally -- see
+    tests/test_xlsx_staleness_and_valuation_gap.py's FIX 4 guardrail tests.
+
     Returns dict dengan keys:
       valuation_disagreement : "SIGNIFICANT" | "ALIGNED" | "NOT_COMPARABLE"
       disagreement_pct       : float | None
