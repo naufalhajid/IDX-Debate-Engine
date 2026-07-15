@@ -8,13 +8,14 @@ import typer
 from rich.panel import Panel
 
 from app.cli.ui.console import console
+from utils.ticker import InvalidIDXTicker, normalize_idx_tickers
 
 
 def _normalize_tickers(tickers: list[str]) -> list[str]:
-    normalized = [ticker.strip().upper() for ticker in tickers if ticker.strip()]
-    if not normalized:
-        raise typer.BadParameter("Provide at least one ticker.")
-    return normalized
+    try:
+        return normalize_idx_tickers(tickers)
+    except InvalidIDXTicker as exc:
+        raise typer.BadParameter(str(exc)) from exc
 
 
 def run_debate_cli(

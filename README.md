@@ -152,7 +152,7 @@ A LangGraph `StateGraph` with typed `DebateChamberState`, purpose-built to count
 Multi-stage screening across all IDX-listed stocks:
 - **Stage 1 (Static Gate):** Hard excludes: DER cap, PBV ceiling, ROE floor > 10%, Altman Z-Score > 1.1
 - **Stage 2 (Technical Gate):** Price > SMA50, RSI < 80, Min ADT Rp 5B
-- **Stage 3 (Composite Scoring):** 70/30 Technical-Fundamental split optimised for swing trading momentum
+- **Stage 3 (Composite Scoring):** 85/15 Fundamental-Technical split (valuation 48 + profitability 37 vs momentum 15) — momentum weights trimmed after internal IC validation found no statistically significant technical signal
 
 ### 3. Market-Adaptive Regime Detection
 
@@ -166,7 +166,7 @@ Indonesia's equity market has no public volatility index. The system builds its 
 
 A fully deterministic, **LLM-free gate** that classifies every CIO verdict before it reaches the portfolio optimizer:
 - Rejects trades where the LLM hallucinated a target below the current price or a stop above it
-- Validates the Risk/Reward ratio against a tier-aware floor (1.3x for large-caps ≥ Rp 50T, 1.5x default) — recomputing it from entry/target/stop when the verdict omits it
+- Validates the Risk/Reward ratio against a tier-aware floor (1.4x for large-caps ≥ Rp 50T, 1.62x default — transaction-cost adjusted) — recomputing it from entry/target/stop when the verdict omits it
 - Downgrades executable setups to watchlist-only during DEFENSIVE market regimes
 
 (All entry/target/stop prices are snapped to official IDX tick sizes upstream, in the debate chamber's Python-computed trade envelope.)
@@ -208,7 +208,7 @@ IDX-Debate-Engine/
 │   └── stockbit.py                 # Stockbit API client
 ├── schemas/                        # Pydantic v2 data contracts
 ├── db/                             # SQLAlchemy async models
-├── tests/                          # 50 test files (518 test cases)
+├── tests/                          # 71 test files (1,100+ test cases)
 ├── output/                         # Generated Markdown trade reports
 └── orchestrator.py                 # Batch pipeline entry point
 ```
@@ -254,7 +254,7 @@ uv run idx pipeline --mode compare --screener-mode mean-reversion
 
 ## Testing
 
-518 test cases across 50 test files covering unit, integration, and pipeline reliability tests.
+1,100+ test cases across 71 test files covering unit, integration, and pipeline reliability tests.
 
 ```bash
 uv run pytest -v

@@ -29,6 +29,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from utils.ticker import (
+    InvalidIDXTicker,
+    normalize_idx_ticker,
+    normalize_idx_tickers,
+    resolve_within_root,
+)
+
 ABLATION_DIR = Path("output/ablation_v2_1")
 
 # Today's live `idx filter --top 25` run (DEFENSIVE regime, 2026-07-04): only
@@ -67,7 +74,10 @@ def _load_json(path: Path) -> object:
 
 
 def _load_single_agent(ticker: str) -> dict:
-    payload = _load_json(ABLATION_DIR / "single_agent" / f"{ticker}.json")
+    ticker = normalize_idx_ticker(ticker)
+    payload = _load_json(
+        resolve_within_root(ABLATION_DIR, "single_agent", f"{ticker}.json")
+    )
     return payload if isinstance(payload, dict) else {}
 
 
@@ -75,7 +85,10 @@ def _index_by_ticker(full_results: list) -> dict[str, dict]:
     index: dict[str, dict] = {}
     for r in full_results:
         if isinstance(r, dict) and r.get("ticker"):
-            index[str(r["ticker"]).upper()] = r
+            try:
+                index[normalize_idx_ticker(r["ticker"])] = r
+            except InvalidIDXTicker:
+                continue
     return index
 
 
@@ -294,7 +307,7 @@ if __name__ == "__main__":
 
     from scripts.ablation_v2_1_run import TICKERS
 
-    selected = sys.argv[1:] if len(sys.argv) > 1 else TICKERS
+    selected = normalize_idx_tickers(sys.argv[1:] if len(sys.argv) > 1 else TICKERS)
     report_rows = build_rows(selected)
     markdown = render_markdown(report_rows)
     out_path = ABLATION_DIR / "v2_1_structural_report.md"

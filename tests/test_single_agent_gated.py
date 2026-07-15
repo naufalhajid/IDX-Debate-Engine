@@ -22,7 +22,7 @@ def _verdict(**overrides) -> SingleAgentVerdict:
         fair_value=1300.0,
         current_price=1000.0,
         entry_price_range="960 - 1000",
-        target_price=1150.0,   # >> current 1000, R/R sehat
+        target_price=1200.0,   # (1200-1000)/(1000-920) = 2.5x
         stop_loss=920.0,
         risk_reward_ratio=2.5,
         reasoning="clean swing setup",

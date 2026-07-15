@@ -28,6 +28,7 @@ from core.forecasting.dataset import DatasetBuilder  # noqa: E402
 from core.forecasting.labels import build_labels  # noqa: E402
 from core.forecasting.models.xgboost_model import XGBoostForecaster  # noqa: E402
 from core.forecasting.validation import validate_model, walk_forward_splits  # noqa: E402
+from utils.ticker import InvalidIDXTicker, normalize_idx_tickers  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
 logger = logging.getLogger(__name__)
@@ -197,8 +198,13 @@ def main() -> None:
     parser.add_argument("--output", metavar="PATH", help="Override output CSV path")
     args = parser.parse_args()
 
+    try:
+        tickers = normalize_idx_tickers(args.tickers or _DEFAULT_TICKERS)
+    except InvalidIDXTicker as exc:
+        parser.error(str(exc))
+
     rows = run_backtest(
-        tickers=args.tickers or None,
+        tickers=tickers,
         horizons=tuple(args.horizons),
     )
 

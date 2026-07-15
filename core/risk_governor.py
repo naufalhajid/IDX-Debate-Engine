@@ -10,9 +10,10 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict
 
 from core.idx_market_params import MIN_HOLD_DAYS, ara_upper_limit
+from core.execution_regime import execution_regime_from_payload
 from core.settings import settings
 from utils.logger_config import logger
-from utils.trade_math import apply_regime_rr_scaling, calculate_rr, get_rr_resolution
+from utils.trade_math import calculate_rr, get_required_rr_resolution
 
 
 RiskStatus = Literal[
@@ -440,7 +441,37 @@ def evaluate_risk(candidate: dict[str, Any]) -> RiskDecision:
 def annotate_risk(entry: dict[str, Any]) -> RiskDecision:
     """Attach a top-level risk_governor artifact to an orchestrator entry."""
     decision = evaluate_risk(entry)
-    entry["risk_governor"] = decision.model_dump()
+    ticker = _clean_ticker(entry.get("ticker") or decision.ticker)
+    requirement = get_required_rr_resolution(
+        ticker,
+        regime=_market_regime(entry) or None,
+        yf_info=_risk_yf_info(
+            entry,
+            entry.get("verdict") if isinstance(entry.get("verdict"), dict) else {},
+        ),
+    )
+    rr_payload: dict[str, Any] = {
+        "required_rr": requirement.required_rr,
+        "rr_base_minimum": requirement.base_rr_minimum,
+        "rr_regime_minimum": requirement.regime_rr_minimum,
+        "rr_user_floor": requirement.user_execution_floor,
+        "rr_regime": requirement.execution_regime,
+        "rr_regime_multiplier": requirement.regime_multiplier,
+        "rr_tier": requirement.tier_name,
+        "rr_tier_label": requirement.tier_label,
+        "rr_tier_source": requirement.tier_source,
+        "rr_requirement_source": "max_user_floor_tier_x_regime",
+    }
+    if requirement.market_cap_idr is not None:
+        rr_payload["rr_market_cap_idr"] = requirement.market_cap_idr
+    entry["risk_governor"] = {**decision.model_dump(), **rr_payload}
+    entry.update(rr_payload)
+    metadata = entry.get("metadata")
+    if isinstance(metadata, dict):
+        metadata.update(rr_payload)
+    verdict = entry.get("verdict")
+    if isinstance(verdict, dict):
+        verdict.update(rr_payload)
     return decision
 
 
@@ -492,13 +523,9 @@ def _clean_ticker(value: Any) -> str:
 
 
 def _market_regime(candidate: dict[str, Any]) -> str:
-    # HMM regime dict written by regime_gate_node (new pipeline).
-    # Checked first so BEAR_STRESS/BULL/SIDEWAYS from HMM takes precedence.
-    _hmm = candidate.get("regime")
-    if isinstance(_hmm, dict):
-        _label = str(_hmm.get("label", "")).upper()
-        if _label:
-            return _label
+    canonical = execution_regime_from_payload(candidate)
+    if canonical:
+        return canonical
     for source in (
         candidate.get("market_regime"),
         _dict_value(candidate.get("risk_context"), "market_regime"),
@@ -511,6 +538,12 @@ def _market_regime(candidate: dict[str, Any]) -> str:
         text = str(regime or "").strip().upper()
         if text:
             return text
+    # Legacy HMM-only artifact fallback. New artifacts must use execution_regime.
+    legacy_hmm = candidate.get("regime")
+    if isinstance(legacy_hmm, dict):
+        label = str(legacy_hmm.get("label", "")).upper()
+        if label:
+            return label
     return ""
 
 
@@ -783,27 +816,32 @@ def _rr_minimum_for_candidate(
         candidate.get("metadata") if isinstance(candidate.get("metadata"), dict) else {}
     )
     explicit_minimum = _first_float(
+        verdict.get("required_rr"),
+        candidate.get("required_rr"),
+        metadata.get("required_rr"),
         verdict.get("rr_minimum"),
         candidate.get("rr_minimum"),
         metadata.get("rr_minimum"),
     )
-    if explicit_minimum is not None and explicit_minimum > 0:
-        logger.debug(
-            "[Risk] {} rr_minimum={} source=orchestrator_metadata",
-            ticker,
-            explicit_minimum,
-        )
-        return explicit_minimum
-
-    resolution = get_rr_resolution(ticker, yf_info=_risk_yf_info(candidate, verdict))
     regime = _market_regime(candidate)
-    rr_min = apply_regime_rr_scaling(resolution.rr_minimum, regime)
+    resolution = get_required_rr_resolution(
+        ticker,
+        regime=regime or None,
+        yf_info=_risk_yf_info(candidate, verdict),
+    )
+    rr_min = resolution.required_rr
+    source = "canonical_tier_regime_floor"
+    if explicit_minimum is not None and explicit_minimum > rr_min:
+        rr_min = explicit_minimum
+        source = "stricter_orchestrator_metadata"
     logger.debug(
-        "[Risk] {} rr_minimum={} source={} regime={}",
+        "[Risk] {} required_rr={} source={} tier_source={} regime={} multiplier={}",
         ticker,
         rr_min,
-        resolution.source,
+        source,
+        resolution.tier_source,
         regime or "none",
+        resolution.regime_multiplier,
     )
     return rr_min
 
@@ -1034,19 +1072,8 @@ def _is_conditional_setup(
     if any(code in HARD_REJECT_CODES for code in reason_codes):
         return False
     rating = _clean_rating(verdict.get("rating"))
-    # High-R/R counter-trend HOLD setups don't need to wait for breakout confirmation.
-    # When the only soft flags are counter_trend + rating_hold and R/R >= 3.5x, the
-    # valuation margin is wide enough to deploy without waiting for MA crossover.
-    # P3 precedence: prefer price-recomputed R/R over LLM-supplied ratio.
-    if "counter_trend_setup" in reason_codes and rating in SOFT_BUYABLE_RATINGS:
-        soft_only = [
-            c for c in reason_codes if c not in {"counter_trend_setup", "rating_hold"}
-        ]
-        rr = _recompute_rr(ticker, entry_high, target_price, stop_loss)
-        if rr is None:
-            rr = _first_float(verdict.get("risk_reward_ratio")) or 0.0
-        if not soft_only and rr >= 3.5:
-            return False
+    # HOLD remains a watchlist opinion regardless of R/R. Only an explicit BUY
+    # may become deployable after the remaining deterministic gates pass.
     return (
         rating in SOFT_BUYABLE_RATINGS
         or "counter_trend_setup" in reason_codes

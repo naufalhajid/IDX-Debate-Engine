@@ -141,7 +141,10 @@ CONFIG = {
     # Fires when Graham_Number > cap_mult × price AND ROE < roe_penalty_threshold.
     "graham_low_roe_cap_mult": 1.5,  # cap FV ke 1.5x price untuk low-ROE stocks
     # ── yfinance (HANYA untuk teknikal OHLCV)
-    "yf_period": "252d",           # full year for stable EMA/SMA/volume baselines
+    # Kept as a compatibility label only; the downloader uses explicit dates.
+    "yf_period": "630d",
+    "yf_lookback_calendar_days": 630,
+    "snapshot_min_complete_bars": 400,
     "garch_fit_window": 120,        # GARCH fits only this many recent bars (reactive to current regime)
     "yf_retries": 3,
     "yf_retry_delay": 5,

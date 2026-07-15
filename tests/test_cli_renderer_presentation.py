@@ -330,6 +330,32 @@ def test_live_batch_progress_uses_compact_headers_and_summary_note() -> None:
     assert "price_inside_entry_range" not in output
 
 
+def test_live_batch_progress_does_not_label_preflight_policy_as_model_confidence() -> None:
+    console = _recording_console(width=90)
+    view = BatchProgressView(["LSIP"], con=console)
+
+    view.update_from_result(
+        {
+            "ticker": "LSIP",
+            "verdict": {
+                "rating": "HOLD",
+                "confidence": 0.40,
+                "model_confidence": None,
+                "decision_source": "preflight",
+                "reason_codes": ["rr_too_low"],
+            },
+            "risk_governor": {
+                "sizing_allowed": False,
+                "status": "reject",
+                "reason_codes": ["rr_too_low"],
+            },
+        }
+    )
+
+    assert view._rows["LSIP"]["confidence"] == "-"
+    assert "low conf" not in view._rows["LSIP"]["status"].lower()
+
+
 def test_preflight_hint_column_is_hidden_when_empty() -> None:
     console = _recording_console(width=100)
     cli = InteractiveCLI(con=console)

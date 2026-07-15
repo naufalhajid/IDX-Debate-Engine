@@ -21,10 +21,16 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Sequence
+from typing import Any, Sequence
 
 from core.backtest_memory import DEFAULT_PATH, BacktestMemory, TradeOutcome
 from utils.logger_config import logger
+from utils.ticker import (
+    InvalidIDXTicker,
+    PathContainmentError,
+    normalize_idx_ticker,
+    resolve_within_root,
+)
 
 # \u2500\u2500 Constants \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
@@ -40,6 +46,56 @@ _BONUS: float = 0.05
 _PENALTY: float = -0.05
 _MAX_HISTORY_RECORDS_PER_TICKER: int = 20
 
+_NESTED_TICKER_FIELDS = ("verdict", "risk_governor", "execution_decision")
+
+
+def _canonicalize_history_record(
+    data: Any,
+    *,
+    expected_ticker: str | None = None,
+) -> dict[str, Any]:
+    """Validate one debate record's complete ticker identity."""
+    if not isinstance(data, dict):
+        raise ValueError("debate history record must be a JSON object")
+    ticker = normalize_idx_ticker(data.get("ticker"))
+    if expected_ticker is not None and ticker != expected_ticker:
+        raise ValueError(
+            f"payload ticker {ticker} does not match artifact ticker {expected_ticker}"
+        )
+
+    normalized = dict(data)
+    normalized["ticker"] = ticker
+    for field in _NESTED_TICKER_FIELDS:
+        nested = data.get(field)
+        if not isinstance(nested, dict):
+            continue
+        nested_ticker = nested.get("ticker")
+        if nested_ticker not in (None, ""):
+            canonical_nested = normalize_idx_ticker(nested_ticker)
+            if canonical_nested != ticker:
+                raise ValueError(
+                    f"{field} ticker {canonical_nested} does not match {ticker}"
+                )
+        normalized[field] = {**nested, "ticker": ticker}
+    return normalized
+
+
+def _validated_history_records(records: Sequence[Any]) -> list[dict[str, Any]]:
+    """Skip corrupt caller-provided records without aborting the score."""
+    validated: list[dict[str, Any]] = []
+    for index, record in enumerate(records, start=1):
+        try:
+            validated.append(_canonicalize_history_record(record))
+        except Exception as exc:
+            logger.warning(
+                "[HistScorer] reason_code=invalid_history_record record={} "
+                "exception_type={} detail={}",
+                index,
+                type(exc).__name__,
+                exc,
+            )
+    return validated
+
 
 # \u2500\u2500 Public API \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
@@ -51,7 +107,11 @@ def load_debate_history(output_dir: Path) -> list[dict]:
     Format yang diharapkan: {ticker, verdict: {rating, confidence}, ...}
     File yang rusak/tidak bisa di-parse diabaikan dengan silent warning.
     """
-    debates_dir = output_dir / "debates"
+    try:
+        debates_dir = resolve_within_root(output_dir, "debates")
+    except PathContainmentError as exc:
+        logger.error(f"[HistScorer] Unsafe debates directory: {exc}")
+        return []
     records: list[dict] = []
 
     if not debates_dir.exists():
@@ -61,32 +121,89 @@ def load_debate_history(output_dir: Path) -> list[dict]:
         return records
 
     versioned_by_ticker: dict[str, list[Path]] = {}
-    for f in debates_dir.glob("*/v*/*_debate.json"):
-        ticker = f.name.removesuffix("_debate.json")
-        versioned_by_ticker.setdefault(ticker, []).append(f)
+    flat_files: list[tuple[str, Path]] = []
+    for candidate in debates_dir.iterdir():
+        if candidate.name.endswith("_debate.json"):
+            raw_ticker = candidate.name.removesuffix("_debate.json")
+            try:
+                ticker = normalize_idx_ticker(raw_ticker)
+                if ticker != raw_ticker:
+                    continue
+                flat_path = resolve_within_root(
+                    debates_dir,
+                    f"{ticker}_debate.json",
+                )
+            except (InvalidIDXTicker, PathContainmentError):
+                continue
+            if flat_path.is_file():
+                flat_files.append((ticker, flat_path))
+            continue
 
-    files: list[Path] = []
-    for ticker_files in versioned_by_ticker.values():
+        try:
+            ticker = normalize_idx_ticker(candidate.name)
+            if ticker != candidate.name:
+                continue
+            ticker_dir = resolve_within_root(debates_dir, ticker)
+        except (InvalidIDXTicker, PathContainmentError):
+            continue
+        if not ticker_dir.is_dir():
+            continue
+        for candidate_version in ticker_dir.iterdir():
+            version_name = candidate_version.name
+            if not version_name.startswith("v"):
+                continue
+            try:
+                version_dir = resolve_within_root(
+                    debates_dir,
+                    ticker,
+                    version_name,
+                )
+                debate_path = resolve_within_root(
+                    debates_dir,
+                    ticker,
+                    version_name,
+                    f"{ticker}_debate.json",
+                )
+            except PathContainmentError:
+                continue
+            if version_dir.is_dir() and debate_path.is_file():
+                versioned_by_ticker.setdefault(ticker, []).append(debate_path)
+
+    files: list[tuple[str, Path]] = []
+    for ticker, ticker_files in versioned_by_ticker.items():
         files.extend(
-            sorted(ticker_files, key=lambda p: p.parent.name, reverse=True)[
-                :_MAX_HISTORY_RECORDS_PER_TICKER
-            ]
+            (ticker, path)
+            for path in sorted(
+                ticker_files,
+                key=lambda p: p.parent.name,
+                reverse=True,
+            )[:_MAX_HISTORY_RECORDS_PER_TICKER]
         )
 
     versioned_tickers = set(versioned_by_ticker)
     files.extend(
-        f
-        for f in debates_dir.glob("*_debate.json")
-        if f.name.removesuffix("_debate.json") not in versioned_tickers
+        (ticker, path)
+        for ticker, path in flat_files
+        if ticker not in versioned_tickers
     )
 
-    for f in files:
+    for expected_ticker, f in files:
         try:
             data = json.loads(f.read_text(encoding="utf-8"))
-            if isinstance(data, dict) and "ticker" in data:
-                records.append(data)
-        except Exception as e:
-            logger.warning(f"[HistScorer] Gagal baca {f.name}: {e} — dilewati.")
+            records.append(
+                _canonicalize_history_record(
+                    data,
+                    expected_ticker=expected_ticker,
+                )
+            )
+        except Exception as exc:
+            logger.warning(
+                "[HistScorer] reason_code=invalid_debate_history_record file={} "
+                "exception_type={} detail={}",
+                f.name,
+                type(exc).__name__,
+                exc,
+            )
 
     logger.info(f"[HistScorer] Loaded {len(records)} debate records dari {debates_dir}")
     return records
@@ -103,7 +220,12 @@ def compute_historical_win_rate(ticker: str, records: list[dict]) -> float | Non
     Returns:
         float in [0.0, 1.0], atau None jika records < _MIN_RECORDS_FOR_ADJUSTMENT.
     """
-    ticker_records = [r for r in records if r.get("ticker") == ticker]
+    canonical_ticker = normalize_idx_ticker(ticker)
+    ticker_records = [
+        record
+        for record in _validated_history_records(records)
+        if record["ticker"] == canonical_ticker
+    ]
 
     if len(ticker_records) < _MIN_RECORDS_FOR_ADJUSTMENT:
         logger.debug(
@@ -115,8 +237,21 @@ def compute_historical_win_rate(ticker: str, records: list[dict]) -> float | Non
     wins = sum(
         1
         for r in ticker_records
-        if r.get("verdict", {}).get("rating") in ("BUY", "STRONG_BUY")
-        and float(r.get("verdict", {}).get("confidence", 0) or 0) > 0.50
+        if (
+            r.get("verdict")
+            if isinstance(r.get("verdict"), dict)
+            else {}
+        ).get("rating")
+        in ("BUY", "STRONG_BUY")
+        and float(
+            (
+                r.get("verdict")
+                if isinstance(r.get("verdict"), dict)
+                else {}
+            ).get("confidence", 0)
+            or 0
+        )
+        > 0.50
     )
     win_rate = wins / len(ticker_records)
     logger.debug(
@@ -140,11 +275,11 @@ def compute_realized_win_rate(
     records: Sequence[TradeOutcome],
 ) -> float | None:
     """Return realized win rate for evaluated BUY/STRONG_BUY outcomes."""
-    ticker_upper = ticker.upper()
+    canonical_ticker = normalize_idx_ticker(ticker)
     ticker_records = [
         record
         for record in records
-        if record.ticker.upper() == ticker_upper
+        if normalize_idx_ticker(record.ticker) == canonical_ticker
         and record.verdict_rating.upper() in {"BUY", "STRONG_BUY"}
         and record.outcome in {"win", "loss"}
     ]
@@ -239,11 +374,11 @@ def compute_realized_ev(
     Returns None if fewer than _MIN_RECORDS_FOR_ADJUSTMENT closed trades with pnl_pct.
     EV > 0 means the system's signals for this ticker are profitable on average.
     """
-    ticker_upper = ticker.upper()
+    canonical_ticker = normalize_idx_ticker(ticker)
     closed = [
         r
         for r in records
-        if r.ticker.upper() == ticker_upper
+        if normalize_idx_ticker(r.ticker) == canonical_ticker
         and r.verdict_rating.upper() in {"BUY", "STRONG_BUY"}
         and r.outcome in {"win", "loss", "breakeven"}
         and r.pnl_pct is not None

@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from core.execution_ledger import (
     EventSeverity,
     EventType,
@@ -205,6 +207,29 @@ def test_query_filters_by_ticker_correctly(tmp_path: Path) -> None:
     assert events[0].ticker == "BBRI"
 
 
+def test_ticker_alias_is_canonicalized_for_events_and_queries(tmp_path: Path) -> None:
+    ledger = _ledger(tmp_path)
+    ledger.ticker_start("run-1", "bbca.jk")
+
+    events = ledger.query(LedgerQuery(run_id="run-1", ticker="BBCA.JK"))
+
+    assert [event.ticker for event in events] == ["BBCA"]
+
+
+def test_invalid_query_ticker_is_rejected_before_ledger_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ledger = _ledger(tmp_path)
+
+    def unexpected_read():
+        pytest.fail("invalid ticker reached execution-ledger read")
+
+    monkeypatch.setattr(ledger, "_read_all", unexpected_read)
+    with pytest.raises(ValueError):
+        ledger.get_run_trace("run-1", ticker="../escape")
+
+
 def test_query_filters_by_severity_correctly(tmp_path: Path) -> None:
     ledger = _ledger(tmp_path)
     ledger.emit(_sample_event(severity=EventSeverity.INFO))
@@ -303,3 +328,21 @@ def test_multiple_tickers_in_same_run_are_queryable_independently(
     assert bbca_trace.error_count == 0
     assert bbri_trace.total_events == 2
     assert bbri_trace.error_count == 1
+
+
+def test_corrupt_and_invalid_ticker_lines_are_skipped_per_event(
+    tmp_path: Path,
+) -> None:
+    ledger = _ledger(tmp_path)
+    ledger.ticker_start("run-1", "BBCA")
+    path = tmp_path / "execution_ledger.jsonl"
+    invalid = _sample_event(ticker="BBRI").model_dump(mode="json")
+    invalid["ticker"] = "../escape"
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write("not-json\n")
+        handle.write(json.dumps(invalid) + "\n")
+    ledger.ticker_start("run-1", "BBRI")
+
+    events = ledger.query(LedgerQuery(run_id="run-1"))
+
+    assert [event.ticker for event in events] == ["BBCA", "BBRI"]

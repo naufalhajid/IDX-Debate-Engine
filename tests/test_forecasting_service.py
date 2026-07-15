@@ -17,6 +17,7 @@ from core.forecasting.service import (
     _model_disagreement_penalty,
 )
 from core.forecasting.validation import compute_ic, validate_model
+from utils.ticker import InvalidIDXTicker
 
 
 class TestDecisionThresholds:
@@ -66,6 +67,27 @@ class TestForecastReportSchema:
         assert d["ticker"] == "TLKM"
         assert isinstance(d["model_votes"], list)
         assert isinstance(d["data_quality_flags"], list)
+
+
+def test_predict_rejects_invalid_ticker_before_policy_or_dataset(monkeypatch) -> None:
+    service = ForecastingService()
+
+    monkeypatch.setattr(
+        "core.forecasting.service._is_blocked",
+        lambda *_args, **_kwargs: pytest.fail(
+            "invalid ticker reached forecast blocklist"
+        ),
+    )
+    monkeypatch.setattr(
+        service._dataset_builder,
+        "build",
+        lambda *_args, **_kwargs: pytest.fail(
+            "invalid ticker reached forecast dataset"
+        ),
+    )
+
+    with pytest.raises(InvalidIDXTicker):
+        service.predict("../escape")
 
 
 def _valid_verdict() -> dict:

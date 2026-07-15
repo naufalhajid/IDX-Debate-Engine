@@ -114,11 +114,16 @@ def filter_command(
                 pass
 
         if watchlist:
-            _regime = watchlist[0].get("regime", "?")
+            _execution_regime = watchlist[0].get("execution_regime", "UNKNOWN")
+            _scoring_profile = watchlist[0].get(
+                "scoring_regime_profile", "UNKNOWN"
+            )
             _floor = watchlist[0].get("score_floor", "?")
             console.print(
                 f"[idx.warn]No candidates passed all filters.[/idx.warn] "
-                f"[idx.muted](regime={_regime}, score floor={_floor})[/idx.muted]"
+                "[idx.muted](execution regime="
+                f"{_execution_regime}, scoring profile={_scoring_profile}, "
+                f"score floor={_floor})[/idx.muted]"
             )
             console.print("\n[idx.header]Watchlist (belum trigger):[/idx.header]")
             for _w in watchlist[:5]:
@@ -134,6 +139,13 @@ def filter_command(
             console.print("[idx.warn]No candidates passed all filters.[/idx.warn]")
         return
 
+    first = df.iloc[0]
+    console.print(
+        "[idx.muted]Execution regime: "
+        f"{first.get('execution_regime', 'UNKNOWN')} | "
+        "scoring profile: "
+        f"{first.get('scoring_regime_profile', 'UNKNOWN')}[/idx.muted]"
+    )
     console.print(build_filter_results_table(df, top_n=top))
     json_path = output_dir / "top10_candidates.json"
     console.print(

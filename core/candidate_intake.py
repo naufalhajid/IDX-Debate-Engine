@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
+
+from utils.ticker import normalize_idx_ticker
 
 
 class RawCandidate(BaseModel):
@@ -23,6 +25,11 @@ class NormalizedCandidate(BaseModel):
     market_cap: float | None
     sector: str | None
     source: str
+
+    @field_validator("ticker", mode="before")
+    @classmethod
+    def normalize_ticker(cls, value: Any) -> str:
+        return normalize_idx_ticker(value)
 
 
 def normalize(raw: dict) -> NormalizedCandidate:

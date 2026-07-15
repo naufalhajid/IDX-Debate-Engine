@@ -18,6 +18,7 @@ import xml.etree.ElementTree as ET
 from pydantic import BaseModel, ConfigDict, Field
 
 from services.indonesian_nlp import detect_language, preprocess_indonesian_text
+from utils.ticker import InvalidIDXTicker, normalize_idx_ticker
 
 NEWS_LOOKBACK_DAYS = 60
 MAX_NEWS_ITEMS = 10
@@ -25,9 +26,6 @@ BREAKING_NEWS_HOURS = 48
 STALE_NEWS_HOURS = 144
 CACHE_TTL_MINUTES = 30
 UNKNOWN_DATE_RECENCY_SCORE = 0.15
-
-IDX_TICKER_RE = re.compile(r"^[A-Z]{4}$")
-
 
 NEGATIVE_KEYWORDS = [
     "rugi",
@@ -539,7 +537,10 @@ class NewsFetcher:
 
     async def fetch_news_async(self, ticker: str, company_name: str = "") -> list[dict]:
         """Fetch raw RSS news for an IDX ticker without raising."""
-        normalized = _normalize_ticker(ticker)
+        try:
+            normalized = _normalize_ticker(ticker)
+        except InvalidIDXTicker:
+            return []
         self._last_fetch_failure = None
         if not _is_valid_idx_ticker(normalized):
             return []
@@ -664,11 +665,12 @@ class NewsFetcher:
         use_cache: bool = True,
     ) -> NewsBundle:
         """Async RSS-backed implementation for debate-time news fetching."""
-        normalized_ticker = _normalize_ticker(ticker)
         now = datetime.now(timezone.utc)
-        if not _is_valid_idx_ticker(normalized_ticker):
+        try:
+            normalized_ticker = _normalize_ticker(ticker)
+        except InvalidIDXTicker:
             return _empty_bundle(
-                ticker=normalized_ticker,
+                ticker=str(ticker or "").strip(),
                 fetched_at=now,
                 reason="Invalid IDX ticker - news sentiment unavailable",
             )
@@ -710,13 +712,11 @@ class NewsFetcher:
         if any(item.is_corporate_action for item in selected):
             try:
                 from utils.market_data_cache import (
-                    DEFAULT_MARKET_DATA_CACHE,
+                    prefetch_market_data,
                     scan_exdate_from_market_data,
                 )
 
-                market_data = await DEFAULT_MARKET_DATA_CACHE.prefetch(
-                    normalized_ticker
-                )
+                market_data = await prefetch_market_data(normalized_ticker)
                 exdate_info = scan_exdate_from_market_data(
                     normalized_ticker, market_data
                 )
@@ -850,16 +850,21 @@ class NewsFetcher:
 
 
 def _normalize_ticker(ticker: str) -> str:
-    return str(ticker or "").strip().upper().removesuffix(".JK")
+    return normalize_idx_ticker(ticker)
 
 
 def _is_valid_idx_ticker(ticker: str) -> bool:
-    return bool(IDX_TICKER_RE.fullmatch(ticker))
+    try:
+        normalize_idx_ticker(ticker)
+    except InvalidIDXTicker:
+        return False
+    return True
 
 
 def _normalize_symbol(ticker: str) -> str | None:
-    normalized = _normalize_ticker(ticker)
-    if not _is_valid_idx_ticker(normalized):
+    try:
+        normalized = _normalize_ticker(ticker)
+    except InvalidIDXTicker:
         return None
     return f"{normalized}.JK"
 
@@ -1018,8 +1023,9 @@ def _keyword_matches(text: str, keyword: str) -> bool:
 
 
 def _ticker_in_text(text: str, ticker: str) -> bool:
-    normalized = _normalize_ticker(ticker)
-    if not _is_valid_idx_ticker(normalized):
+    try:
+        normalized = _normalize_ticker(ticker)
+    except InvalidIDXTicker:
         return False
     pattern = re.compile(
         rf"(?<![A-Z0-9]){re.escape(normalized)}(?:\.JK)?(?![A-Z0-9])", re.IGNORECASE

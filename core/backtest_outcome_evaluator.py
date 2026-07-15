@@ -16,6 +16,13 @@ from core.backtest_memory import BacktestMemory, DEFAULT_PATH, TradeOutcome
 from core.idx_market_params import SWING_MAX_EXECUTION_HORIZON_DAYS
 from core.settings import settings
 from utils.logger_config import logger
+from utils.ticker import (
+    InvalidIDXTicker,
+    PathContainmentError,
+    normalize_idx_ticker,
+    resolve_within_root,
+    to_yfinance_symbol,
+)
 
 
 DEFAULT_HORIZON_TRADING_DAYS = SWING_MAX_EXECUTION_HORIZON_DAYS
@@ -211,7 +218,12 @@ def evaluate_memory(
             continue
         if record.verdict_rating.upper() not in EVALUATED_RATINGS:
             continue
-        if not _matching_debate_artifact_exists(record, debates_dir):
+        try:
+            key = normalize_idx_ticker(record.ticker)
+            artifact_exists = _matching_debate_artifact_exists(record, debates_dir)
+        except (InvalidIDXTicker, PathContainmentError):
+            continue
+        if not artifact_exists:
             continue
         try:
             entry_date = _parse_date(record.entry_date)
@@ -219,7 +231,6 @@ def evaluate_memory(
             continue
         if entry_date >= evaluation_day:
             continue
-        key = record.ticker.upper()
         start = entry_date + timedelta(days=1)
         if key not in earliest_start or start < earliest_start[key]:
             earliest_start[key] = start
@@ -244,7 +255,18 @@ def evaluate_memory(
             continue
 
         eligible_count += 1
-        if not _matching_debate_artifact_exists(record, debates_dir):
+        try:
+            key = normalize_idx_ticker(record.ticker)
+            artifact_exists = _matching_debate_artifact_exists(record, debates_dir)
+        except (InvalidIDXTicker, PathContainmentError) as exc:
+            logger.warning(
+                f"[BacktestEval] Invalid artifact identity for {record.ticker}: {exc}"
+            )
+            details.append(
+                _detail(record, "skipped", "invalid_artifact_identity")
+            )
+            continue
+        if not artifact_exists:
             details.append(_detail(record, "skipped", "missing_debate_artifact"))
             continue
 
@@ -258,7 +280,6 @@ def evaluate_memory(
             details.append(_detail(record, "skipped", "too_early_to_evaluate"))
             continue
 
-        key = record.ticker.upper()
         if key in fetch_failed:
             details.append(_detail(record, "skipped", "price_fetch_failed"))
             continue
@@ -305,9 +326,7 @@ def evaluate_memory(
 
 def fetch_yfinance_price_bars(ticker: str, start: date, end: date) -> list[PriceBar]:
     """Download daily OHLCV bars from yfinance for an IDX ticker."""
-    symbol = ticker.upper()
-    if not symbol.endswith(".JK"):
-        symbol = f"{symbol}.JK"
+    symbol = to_yfinance_symbol(ticker)
 
     yf_logger = logging.getLogger("yfinance")
     previous_disabled = yf_logger.disabled
@@ -387,9 +406,12 @@ def _with_evaluation(
 
 
 def _matching_debate_artifact_exists(record: TradeOutcome, debates_dir: Path) -> bool:
-    ticker = record.ticker.upper()
-    return (
-        debates_dir / ticker / f"v{record.run_id}" / f"{ticker}_debate.json"
+    ticker = normalize_idx_ticker(record.ticker)
+    return resolve_within_root(
+        debates_dir,
+        ticker,
+        f"v{record.run_id}",
+        f"{ticker}_debate.json",
     ).exists()
 
 

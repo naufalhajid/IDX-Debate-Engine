@@ -1,0 +1,45 @@
+╔══════════════════════════════════════════╗
+║  OPS TELEMETRY: 20260712_173441         ║
+╚══════════════════════════════════════════╝
+
+BATCH SUMMARY
+─────────────
+Tickers   : 6 (6 ok / 0 fail / 0 timeout / 0 skip)
+Success   : 100%
+Run ID    : 20260712_173441
+Timestamp : 20260712_173908
+
+VERDICTS
+────────
+  HOLD     5
+  INSUFFICIENT_DATA 1
+Avg confidence : 36%
+Avg rounds     : 2.7
+Avg duration   : 145s
+Longest run    : BACH (213s)
+
+TOKEN SPEND (estimated)
+───────────────────────
+Flash calls : 56 (~44,800 tokens)
+Pro calls   : 1 (~2,000 tokens)
+Total est.  : ~46,800 tokens
+
+RAG EFFICIENCY
+──────────────
+Avg chunks     : 5.8 selected / 14.2 considered
+Avg RAG tokens : ~572 tokens
+Context saving : 59% chunks filtered out
+
+PROVIDER HEALTH
+───────────────
+Errors : none
+Stale  : none
+
+PER-TICKER
+──────────
+  BBCA   success  HOLD  conf=40%  101s R3  RAG:6/15
+  BMRI   success  HOLD  conf=40%  115s R3  RAG:6/15
+  LSIP   success  HOLD  conf=40%  110s R3  RAG:6/15
+  ERAA   success  HOLD  conf=40%  144s R1  RAG:6/14
+  BACH   success  INSUFFICIENT_DATA conf=15%  213s R3  RAG:5/11
+  BAPA   success  HOLD  conf=40%  185s R3  RAG:6/15

@@ -310,6 +310,9 @@ class KeyStats:
     dps: float | None = (
         None  # Dividend Per Share (TTM); None = missing, 0.0 = explicit zero
     )
+    dps_source: str | None = None
+    dps_yield_pct: float | None = None
+    dps_price_used: float | None = None
 
     # Balance sheet
     book_value_per_share: float = 0.0  # Ekuitas / jumlah saham beredar
@@ -422,7 +425,11 @@ def _clean_numeric_or_none(raw: object) -> float | None:
         return None
 
 
-def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
+def extract_keystats(
+    api_response: dict,
+    ticker: str = "",
+    current_price: float | None = None,
+) -> KeyStats:
     """
     Ekstrak field yang relevan dari response raw Stockbit keystats API.
 
@@ -434,13 +441,27 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
     Debug log menampilkan field mana yang berhasil di-parse sehingga mudah
     menambah mapping baru jika Stockbit mengubah nama field.
     """
-    stats = KeyStats(ticker=ticker)
+    price_was_supplied = current_price is not None
+    parsed_current_price = _clean_numeric_or_none(current_price)
+    stats = KeyStats(
+        ticker=ticker,
+        current_price=(
+            parsed_current_price
+            if parsed_current_price is not None and parsed_current_price > 0
+            else 0.0
+        ),
+    )
 
     # ── Strategy A: parse by field name (live Stockbit format) ────────────────
     flat = _parse_stockbit_flat(api_response)
     flat_lower = {k.lower(): v for k, v in flat.items()}
 
-    def _lookup_optional(name_patterns: list[str], pct: bool = False) -> float | None:
+    def _lookup_optional(
+        name_patterns: list[str],
+        pct: bool = False,
+        *,
+        allow_partial: bool = True,
+    ) -> float | None:
         """
         Find the first matching name from flat dict.
 
@@ -460,7 +481,7 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
             if val_str is None:
                 # 2. Case-insensitive exact
                 val_str = flat_lower.get(pattern.lower())
-            if val_str is None:
+            if val_str is None and allow_partial:
                 # 3. Case-insensitive partial — pattern is substring of a key
                 pl = pattern.lower()
                 partial_matches = [(k, v) for k, v in flat_lower.items() if pl in k]
@@ -476,9 +497,18 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
                 return v
         return None
 
-    def _lookup(name_patterns: list[str], pct: bool = False) -> float:
+    def _lookup(
+        name_patterns: list[str],
+        pct: bool = False,
+        *,
+        allow_partial: bool = True,
+    ) -> float:
         """Return a parsed numeric field, defaulting missing non-DPS data to 0.0."""
-        value = _lookup_optional(name_patterns, pct=pct)
+        value = _lookup_optional(
+            name_patterns,
+            pct=pct,
+            allow_partial=allow_partial,
+        )
         return 0.0 if value is None else value
 
     if flat:
@@ -536,8 +566,11 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
                 "Cash Dividend Per Share",
                 "Total Dividend Per Share",
                 "Dividen Per Saham",
-            ]
+            ],
+            allow_partial=False,
         )
+        if stats.dps is not None:
+            stats.dps_source = "stockbit_direct"
 
         # ── Profitability ratios ─────────────────────────────────────────────
         stats.roe = _lookup(
@@ -691,6 +724,7 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
         )
         if legacy_dps is not None:
             stats.dps = legacy_dps
+            stats.dps_source = "stockbit_legacy_direct"
         stats.roe = _get_legacy(["roe", "returnOnEquity", "data.Current.ROE", "ROE"])
         stats.net_margin = _get_legacy(
             ["netMargin", "net_margin", "data.Current.NetProfitMargin"]
@@ -741,16 +775,19 @@ def extract_keystats(api_response: dict, ticker: str = "") -> KeyStats:
             ]
         )
         if div_yield_pct > 0:
-            price_for_dps = stats.current_price or _lookup(
-                ["Last Price", "Current Price", "Close Price"]
-            )
-            if price_for_dps > 0:
-                # yield dari Stockbit dalam % (e.g. "5.62") → bagi 100
-                stats.dps = (
-                    round((div_yield_pct / 100.0) * price_for_dps, 2)
-                    if div_yield_pct > 1.0
-                    else round(div_yield_pct * price_for_dps, 2)
+            price_for_dps = stats.current_price
+            if not price_was_supplied:
+                price_for_dps = _lookup(
+                    ["Last Price", "Current Price", "Close Price"],
+                    allow_partial=False,
                 )
+            if price_for_dps > 0:
+                # Stockbit's Dividend Yield field is percentage-point data:
+                # 5.62 means 5.62%, and 0.50 means 0.50% (not 50%).
+                stats.dps = round((div_yield_pct / 100.0) * price_for_dps, 2)
+                stats.dps_source = "yield_x_market_price"
+                stats.dps_yield_pct = div_yield_pct
+                stats.dps_price_used = price_for_dps
                 logger.info(
                     "[FairValue] {}: DPS derived from yield "
                     "({:.2f}%) × price ({:,.0f}) "
@@ -1155,6 +1192,10 @@ class FairValueCalculator:
             )
 
         return {
+            "dps": round(self.stats.dps, 2) if self.stats.dps is not None else None,
+            "dps_source": self.stats.dps_source,
+            "dps_yield_pct": self.stats.dps_yield_pct,
+            "dps_price_used": self.stats.dps_price_used,
             "ocf_price_ratio": round(ocf_price_ratio, 4) if ocf_price_ratio > 0 else None,
             "ocf_per_share": round(ocf_per_share, 2) if ocf_per_share > 0 else None,
             "rnoa": round(self.stats.rnoa, 4) if self.stats.rnoa > 0 else None,
@@ -1212,6 +1253,12 @@ class FairValueCalculator:
                     "fv_method_dispersion_ratio": None,
                     "fv_implied_pe": None,
                     "fv_implied_pe_extreme": False,
+                    "active_method_count": 0,
+                    "valid_method_count": 0,
+                    "available_method_count": 0,
+                    "configured_active_method_count": sum(
+                        1 for weight in self.weights.values() if weight > 0
+                    ),
                     **self._fundamental_factor_payload(),
                 }
             )
@@ -1228,9 +1275,46 @@ class FairValueCalculator:
         else:
             effective_weights = self.weights
 
-        total_weight = sum(effective_weights[m] for m in results)
+        active_results = {
+            method: value
+            for method, value in results.items()
+            if effective_weights.get(method, 0) > 0
+        }
+        configured_active_method_count = sum(
+            1 for weight in effective_weights.values() if weight > 0
+        )
+        if not active_results:
+            return self._cache_weighted_result(
+                {
+                    "fair_value": None,
+                    "fair_value_base": None,
+                    "fair_value_low": None,
+                    "fair_value_high": None,
+                    "range_pct": None,
+                    "risk_overvalued": False,
+                    "breakdown": {k: int(v) for k, v in results.items()},
+                    "confidence": "INSUFFICIENT_DATA",
+                    "margin_of_safety_pct": None,
+                    "valuation_verdict": "DATA_UNAVAILABLE",
+                    "is_soe": is_soe,
+                    "governance_discount_pct": None,
+                    "keystats_stale": keystats_stale,
+                    "keystats_age_days": self.stats.keystats_age_days,
+                    "fv_method_dispersion_ratio": None,
+                    "fv_implied_pe": None,
+                    "fv_implied_pe_extreme": False,
+                    "active_method_count": 0,
+                    "valid_method_count": 0,
+                    "available_method_count": len(results),
+                    "configured_active_method_count": configured_active_method_count,
+                    **self._fundamental_factor_payload(),
+                }
+            )
+
+        total_weight = sum(effective_weights[m] for m in active_results)
         weighted_fv = sum(
-            results[m] * (effective_weights[m] / total_weight) for m in results
+            active_results[m] * (effective_weights[m] / total_weight)
+            for m in active_results
         )
         weighted_fv = round(weighted_fv, 0)
 
@@ -1245,9 +1329,7 @@ class FairValueCalculator:
         # conflict ships as HIGH confidence with a narrow ±10% band.
         # Zero-weight methods (e.g. DDM under the default profile) cannot move
         # the composite, so they must not move the dispersion either.
-        weighted_values = [
-            v for m, v in results.items() if effective_weights.get(m, 0) > 0
-        ]
+        weighted_values = list(active_results.values())
         dispersion_ratio = None
         fv_spread_min = fv_spread_max = 0.0
         if len(weighted_values) >= 2:
@@ -1256,7 +1338,7 @@ class FairValueCalculator:
             if fv_spread_min > 0:
                 dispersion_ratio = round(fv_spread_max / fv_spread_min, 2)
 
-        n = len(results)
+        n = len(active_results)
         confidence = "HIGH" if n >= 3 else ("MEDIUM" if n == 2 else "LOW")
         range_pct = _range_pct_for_method_count(n)
         if (
@@ -1300,6 +1382,15 @@ class FairValueCalculator:
                     implied_pe_extreme = (
                         implied_pe > sector_cap and implied_pe > self_cap
                     )
+            # NOTE: when raw_pe_current is unavailable, this sanity check is
+            # intentionally skipped rather than applying the sector cap alone
+            # -- a sector-only fallback was tried and reverted because it
+            # rejected ordinary, previously-passing fair values (e.g. a 2-method
+            # PE/PB blend with a merely sector-relative-high implied PE and no
+            # current-PE signal to confirm it as actually anomalous). Closing
+            # this gap needs a calibrated threshold from real IDX PE dispersion
+            # data, not a guessed multiplier -- see code review finding
+            # "FV-6b implied-PE gate skipped when raw_pe_current<=0".
 
         mos = None
         verdict = "DATA_UNAVAILABLE"
@@ -1338,6 +1429,10 @@ class FairValueCalculator:
                 "fv_method_dispersion_ratio": dispersion_ratio,
                 "fv_implied_pe": implied_pe,
                 "fv_implied_pe_extreme": implied_pe_extreme,
+                "active_method_count": n,
+                "valid_method_count": n,
+                "available_method_count": len(results),
+                "configured_active_method_count": configured_active_method_count,
                 **self._fundamental_factor_payload(),
             }
         )
@@ -1383,7 +1478,23 @@ class FairValueCalculator:
         mos = result["margin_of_safety_pct"]
         conf = result["confidence"]
         verdict = result["valuation_verdict"]
+        active_method_count = result.get("active_method_count", 0)
+        configured_active_method_count = result.get(
+            "configured_active_method_count",
+            sum(1 for weight in self.weights.values() if weight > 0),
+        )
         dps_text = f"Rp {self.stats.dps:,.0f}" if self.stats.dps is not None else "N/A"
+        dps_source_text = self.stats.dps_source or "unavailable"
+        if (
+            self.stats.dps_source == "yield_x_market_price"
+            and self.stats.dps_yield_pct is not None
+            and self.stats.dps_price_used is not None
+        ):
+            dps_source_text = (
+                f"yield_x_market_price "
+                f"({self.stats.dps_yield_pct:.2f}% x "
+                f"Rp {self.stats.dps_price_used:,.0f})"
+            )
         ocf_price_ratio = result.get("ocf_price_ratio") or self.stats.ocf_price_ratio
         ocf_per_share = result.get("ocf_per_share") or self.stats.ocf_per_share
         ocf_price_text = (
@@ -1467,7 +1578,7 @@ class FairValueCalculator:
             lines.append(
                 f"  Metode DDM      : DPS {dps_text} / "
                 f"(ke {self.stats.cost_of_equity * 100:.0f}% - g {self.stats.growth_rate * 100:.0f}%) "
-                f"= Rp {bdown['ddm']:,}"
+                f"= Rp {bdown['ddm']:,} [source: {dps_source_text}]"
             )
         else:
             lines.append("  Metode DDM      : TIDAK VALID")
@@ -1515,7 +1626,8 @@ class FairValueCalculator:
             f"  FAIR VALUE (weighted avg) : {fv_str}",
             f"  FAIR VALUE BASE           : {fv_base_str}",
             f"  FAIR VALUE RANGE          : {fv_range_str}",
-            f"  Kalkulasi confidence      : {conf} ({len(bdown)}/{len(self.weights)} metode valid)",
+            f"  Kalkulasi confidence      : {conf} "
+            f"({active_method_count}/{configured_active_method_count} metode aktif)",
             f"  RISK OVERVALUED           : {risk_overvalued}",
             "",
         ]
@@ -1568,6 +1680,7 @@ class FairValueCalculator:
             f"  EPS TTM         : Rp {self.stats.eps_ttm:,.0f}",
             f"  BVPS            : Rp {self.stats.book_value_per_share:,.0f}",
             f"  DPS             : {dps_text}",
+            f"  DPS Source      : {dps_source_text}",
             f"  ROE             : {self.stats.roe * 100:.1f}%",
             f"  RNOA/ROA Proxy  : {proxy_text}",
             f"  Quality Factor  : {quality_text}",
@@ -1845,7 +1958,11 @@ def build_fair_value_payload(
     current_price: float,
 ) -> tuple[str, dict]:
     multiples = extract_historical_multiples(api_response, ticker)
-    stats = extract_keystats(api_response, ticker=ticker)
+    stats = extract_keystats(
+        api_response,
+        ticker=ticker,
+        current_price=current_price,
+    )
 
     if multiples.get("pe") is not None:
         stats.historical_pe_avg = multiples["pe"]

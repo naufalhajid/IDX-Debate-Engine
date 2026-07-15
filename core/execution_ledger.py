@@ -11,10 +11,11 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from core.settings import settings
 from utils.logger_config import logger
+from utils.ticker import normalize_idx_ticker, normalize_idx_tickers
 
 
 DEFAULT_PATH = settings.execution_ledger_path
@@ -76,6 +77,11 @@ class LedgerEvent(BaseModel):
     attempt: int = Field(default=0, ge=0)
     timestamp: str = Field(default_factory=_utc_now_iso)
 
+    @field_validator("ticker", mode="before")
+    @classmethod
+    def normalize_ticker(cls, value: object) -> str | None:
+        return None if value is None else normalize_idx_ticker(value)  # type: ignore[arg-type]
+
 
 class LedgerQuery(BaseModel):
     """Filter criteria for querying ledger events."""
@@ -88,6 +94,11 @@ class LedgerQuery(BaseModel):
     event_type: EventType | None = None
     severity: EventSeverity | None = None
     since: str | None = None
+
+    @field_validator("ticker", mode="before")
+    @classmethod
+    def normalize_ticker(cls, value: object) -> str | None:
+        return None if value is None else normalize_idx_ticker(value)  # type: ignore[arg-type]
 
 
 class RunTrace(BaseModel):
@@ -109,6 +120,11 @@ class RunTrace(BaseModel):
     last_event_at: str
     duration_seconds: float | None
 
+    @field_validator("ticker", mode="before")
+    @classmethod
+    def normalize_ticker(cls, value: object) -> str | None:
+        return None if value is None else normalize_idx_ticker(value)  # type: ignore[arg-type]
+
 
 class ExecutionLedger:
     """Append and query causal execution events."""
@@ -123,15 +139,17 @@ class ExecutionLedger:
     def emit(self, event: LedgerEvent) -> None:
         """Append one event to JSONL without ever crashing the caller."""
         try:
+            validated = LedgerEvent.model_validate(event.model_dump())
             self.storage_path.parent.mkdir(parents=True, exist_ok=True)
             with self.storage_path.open("a", encoding="utf-8") as handle:
-                handle.write(event.model_dump_json())
+                handle.write(validated.model_dump_json())
                 handle.write("\n")
         except Exception as exc:
             logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
             return
 
     def batch_start(self, run_id: str, ticker_count: int, tickers: list[str]) -> None:
+        normalized_tickers = normalize_idx_tickers(tickers, require_nonempty=False)
         self.emit(
             self._event(
                 run_id=run_id,
@@ -140,7 +158,10 @@ class ExecutionLedger:
                 event_type=EventType.BATCH_START,
                 severity=EventSeverity.INFO,
                 message="Batch started",
-                detail={"ticker_count": ticker_count, "tickers": list(tickers)},
+                detail={
+                    "ticker_count": len(normalized_tickers),
+                    "tickers": normalized_tickers,
+                },
             )
         )
 
@@ -407,7 +428,10 @@ class ExecutionLedger:
 
     def query(self, q: LedgerQuery) -> list[LedgerEvent]:
         """Return matching events sorted by timestamp ascending."""
-        events = [event for event in self._read_all() if _matches(event, q)]
+        validated_query = LedgerQuery.model_validate(q.model_dump())
+        events = [
+            event for event in self._read_all() if _matches(event, validated_query)
+        ]
         return sorted(events, key=lambda event: event.timestamp)
 
     def get_run_trace(self, run_id: str, ticker: str | None = None) -> RunTrace:
@@ -537,13 +561,19 @@ class ExecutionLedger:
         except Exception as exc:
             logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
             return []
-        for line in lines:
+        for line_number, line in enumerate(lines, start=1):
             if not line.strip():
                 continue
             try:
                 events.append(LedgerEvent.model_validate_json(line))
             except Exception as exc:
-                logger.error(f"[{__name__}] Unexpected error: {exc}", exc_info=True)
+                logger.warning(
+                    "[ExecutionLedger] reason_code=invalid_execution_ledger_event "
+                    "line={} exception_type={} detail={}",
+                    line_number,
+                    type(exc).__name__,
+                    exc,
+                )
                 continue
         return events
 

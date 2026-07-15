@@ -211,6 +211,15 @@ def test_normalize_ticker_strips_suffix_and_uppercases():
     assert _normalize_ticker(None) == ""
 
 
+def test_fetch_foreign_flow_rejects_invalid_ticker_before_client_call():
+    client = MagicMock()
+
+    snap = fetch_foreign_flow("../escape", client)
+
+    assert snap == _empty("")
+    client.get.assert_not_called()
+
+
 def test_context_pack_surfaces_foreign_flow_fields_in_prompt():
     raw_data = {
         "current_price": 9000,

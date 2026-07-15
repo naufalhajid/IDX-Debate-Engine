@@ -2,6 +2,8 @@
 import sys
 import types
 
+import pytest
+
 from fastapi.testclient import TestClient
 
 from app.api.cache import get_batch_cache
@@ -81,17 +83,24 @@ def test_results_normalizes_orchestrator_artifact(monkeypatch, tmp_path):
                         "rating": "BUY",
                         "confidence": 0.72,
                         "entry_price_range": "2260 - 2330",
-                        "target_price": 2480,
+                        "target_price": 2590,
                         "stop_loss": 2200,
-                        "risk_reward_ratio": 1.95,
+                        "risk_reward_ratio": 2.0,
+                        "execution_horizon_days": 10,
                         "summary": "Ringkasan verdict.",
                     },
                     "risk_governor": {
+                        "status": "deployable",
                         "sizing_allowed": True,
                         "entry_low": 2260,
                         "entry_high": 2330,
-                        "target_price": 2480,
+                        "target_price": 2590,
                         "stop_loss": 2200,
+                    },
+                    "position_sizing": {
+                        "lot": 2,
+                        "shares": 200,
+                        "max_loss_rp": 26000,
                     },
                     "debate_history": [
                         {
@@ -129,6 +138,152 @@ def test_results_normalizes_orchestrator_artifact(monkeypatch, tmp_path):
     assert payload[0]["actionable"] is True
     assert payload[0]["debate_rounds"][0]["score_delta"] == 20
     assert payload[0]["devil_advocate_triggered"] is True
+
+
+def test_results_skips_artifact_with_invalid_ticker(monkeypatch, tmp_path):
+    results_path = tmp_path / "full_batch_results.json"
+    results_path.write_text(
+        json.dumps(
+            [
+                {
+                    "ticker": "../escape",
+                    "verdict": {"ticker": "../escape", "rating": "HOLD"},
+                },
+                {
+                    "ticker": "bbca.jk",
+                    "verdict": {"ticker": "bbca.jk", "rating": "HOLD"},
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+    _reset_results_path(monkeypatch, results_path)
+
+    response = client.get("/api/results")
+
+    assert response.status_code == 200
+    assert [item["ticker"] for item in response.json()] == ["BBCA"]
+
+
+def test_results_rejects_cross_stock_artifact_identity(monkeypatch, tmp_path):
+    results_path = tmp_path / "full_batch_results.json"
+    results_path.write_text(
+        json.dumps(
+            [
+                {
+                    "ticker": "BBCA",
+                    "verdict": {"ticker": "BMRI", "rating": "BUY"},
+                },
+                {
+                    "ticker": "TLKM",
+                    "verdict": {"ticker": "TLKM", "rating": "HOLD"},
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+    _reset_results_path(monkeypatch, results_path)
+
+    response = client.get("/api/results")
+
+    assert response.status_code == 200
+    assert [item["ticker"] for item in response.json()] == ["TLKM"]
+
+
+def test_debate_filename_identity_must_match_payload(monkeypatch, tmp_path):
+    output_root = tmp_path / "output"
+    debates_dir = output_root / "debates"
+    debates_dir.mkdir(parents=True)
+    (debates_dir / "BBCA_debate.json").write_text(
+        json.dumps(
+            {
+                "ticker": "BMRI",
+                "verdict": {"ticker": "BMRI", "rating": "BUY"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    _reset_results_path(monkeypatch, output_root / "full_batch_results.json")
+
+    response = client.get("/api/results")
+
+    assert response.status_code == 404
+    assert response.json()["detail"]["code"] == "NO_RESULTS"
+
+
+def test_health_excludes_invalid_and_mismatched_artifacts(monkeypatch, tmp_path):
+    output_root = tmp_path / "output"
+    debates_dir = output_root / "debates"
+    debates_dir.mkdir(parents=True)
+    artifacts = {
+        "BBCA_debate.json": {
+            "ticker": "BBCA",
+            "verdict": {"ticker": "BBCA", "rating": "HOLD"},
+        },
+        "BMRI_debate.json": {
+            "ticker": "TLKM",
+            "verdict": {"ticker": "TLKM", "rating": "BUY"},
+        },
+        "BAPA_debate.json": {
+            "ticker": "../escape",
+            "verdict": {"ticker": "../escape", "rating": "BUY"},
+        },
+    }
+    for filename, payload in artifacts.items():
+        (debates_dir / filename).write_text(json.dumps(payload), encoding="utf-8")
+    _reset_results_path(monkeypatch, output_root / "full_batch_results.json")
+
+    response = client.get("/api/health")
+
+    assert response.status_code == 200
+    stats = response.json()["debate_stats"]
+    assert stats["total_debates"] == 1
+    assert stats["ratings_distribution"]["HOLD"] == 1
+    assert stats["ratings_distribution"]["BUY"] == 0
+
+
+def test_http_ticker_guard_runs_before_database_dependency():
+    calls = 0
+
+    async def unexpected_db_dependency():
+        nonlocal calls
+        calls += 1
+        yield object()
+
+    app.dependency_overrides[stocks_router.get_db] = unexpected_db_dependency
+    try:
+        response = client.get("/api/stocks/A:B")
+    finally:
+        app.dependency_overrides.pop(stocks_router.get_db, None)
+
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "INVALID_IDX_TICKER"
+    assert calls == 0
+
+
+def test_api_scanner_does_not_follow_valid_named_symlink_outside_root(
+    monkeypatch,
+    tmp_path,
+):
+    output_root = tmp_path / "output"
+    debates_dir = output_root / "debates"
+    outside_dir = tmp_path / "outside"
+    debates_dir.mkdir(parents=True)
+    outside_dir.mkdir()
+    outside_file = outside_dir / "external.json"
+    outside_file.write_text(
+        json.dumps({"ticker": "BBCA", "verdict": {"rating": "BUY"}}),
+        encoding="utf-8",
+    )
+    linked_file = debates_dir / "BBCA_debate.json"
+    try:
+        linked_file.symlink_to(outside_file)
+    except (NotImplementedError, OSError) as exc:
+        pytest.skip(f"file symlink unavailable on this platform: {exc}")
+
+    _reset_results_path(monkeypatch, output_root / "full_batch_results.json")
+
+    assert stocks_router._safe_debate_files() == []
 
 
 def test_results_prefers_merged_ticker_state_when_present(monkeypatch, tmp_path):

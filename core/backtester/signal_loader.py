@@ -9,6 +9,13 @@ from datetime import date
 from pathlib import Path
 
 from core.backtest_memory import TradeOutcome
+from utils.ticker import (
+    InvalidIDXTicker,
+    PathContainmentError,
+    normalize_idx_ticker,
+    normalize_idx_tickers,
+    resolve_within_root,
+)
 
 
 _FOLDER_RE = re.compile(r"^v(\d{8})_(\d{6})$")
@@ -41,26 +48,44 @@ def scan_debate_dir(
     Skips signals with missing target_price or stop_loss.
     """
     allowed = _allowed_ratings(min_rating)
-    ticker_filter = {t.upper() for t in tickers} if tickers else None
+    ticker_filter = set(normalize_idx_tickers(tickers)) if tickers else None
+    resolved_root = debates_dir.resolve()
 
     # Collect best (ticker, signal_date) → (folder_name, json_path)
     best: dict[tuple[str, date], tuple[str, Path]] = {}
 
-    for ticker_dir in sorted(debates_dir.iterdir()):
+    for candidate_ticker_dir in sorted(resolved_root.iterdir()):
+        try:
+            ticker = normalize_idx_ticker(candidate_ticker_dir.name)
+            if ticker != candidate_ticker_dir.name:
+                continue
+            ticker_dir = resolve_within_root(resolved_root, ticker)
+        except (InvalidIDXTicker, PathContainmentError):
+            continue
         if not ticker_dir.is_dir():
             continue
-        ticker = ticker_dir.name.upper()
         if ticker_filter and ticker not in ticker_filter:
             continue
 
         # sorted(reverse=True) ensures latest folder is first
-        for version_dir in sorted(ticker_dir.iterdir(), reverse=True):
-            if not version_dir.is_dir():
+        for candidate_version_dir in sorted(ticker_dir.iterdir(), reverse=True):
+            if not _FOLDER_RE.fullmatch(candidate_version_dir.name):
                 continue
-            if not _FOLDER_RE.match(version_dir.name):
+            try:
+                version_dir = resolve_within_root(
+                    resolved_root,
+                    ticker,
+                    candidate_version_dir.name,
+                )
+                json_path = resolve_within_root(
+                    resolved_root,
+                    ticker,
+                    candidate_version_dir.name,
+                    f"{ticker}_debate.json",
+                )
+            except PathContainmentError:
                 continue
-            json_path = version_dir / f"{ticker_dir.name}_debate.json"
-            if not json_path.exists():
+            if not version_dir.is_dir() or not json_path.is_file():
                 continue
             try:
                 signal_date = _parse_signal_date(version_dir.name)
@@ -149,7 +174,15 @@ def _load_signal(
     if entry_price is None:
         return None
 
-    regime = (data.get("metadata") or {}).get("regime") or None
+    metadata = data.get("metadata") or {}
+    context = data.get("regime_context") or {}
+    regime = (
+        data.get("execution_regime")
+        or context.get("execution_regime")
+        or metadata.get("execution_regime")
+        or metadata.get("regime")
+        or None
+    )
     run_id = folder_name.lstrip("v")
     return SignalRecord(
         run_id=run_id,

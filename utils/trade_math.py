@@ -21,6 +21,7 @@ LARGE_CAP_TIER_NAME = "large_cap"
 LARGE_CAP_THRESHOLD_IDR: int = 50_000_000_000_000
 LARGE_CAP_RR_MINIMUM: float = 1.4
 DEFAULT_RR_MINIMUM: float = 1.62
+USER_EXECUTION_RR_FLOOR: float = 2.0
 
 # ATR stops widen in DEFENSIVE/HIGH regimes; R/R minimums scale up to match.
 # LOW and NORMAL use no scaling — base thresholds are calibrated for calm markets.
@@ -49,6 +50,23 @@ class RRTierResolution:
     tier_label: str
     rr_minimum: float
     source: str
+    market_cap_idr: int | None = None
+
+
+@dataclass(frozen=True)
+class RequiredRRResolution:
+    """Auditable final R/R requirement for one execution setup."""
+
+    ticker: str
+    required_rr: float
+    base_rr_minimum: float
+    regime_rr_minimum: float
+    user_execution_floor: float
+    execution_regime: str
+    regime_multiplier: float
+    tier_name: str
+    tier_label: str
+    tier_source: str
     market_cap_idr: int | None = None
 
 
@@ -232,6 +250,59 @@ def get_rr_minimum(
     return apply_regime_rr_scaling(base, regime)
 
 
+def get_required_rr_resolution(
+    ticker: str,
+    regime: str | None = None,
+    yf_info: dict[str, Any] | None = None,
+) -> RequiredRRResolution:
+    """Return the sole deployable R/R threshold and its provenance.
+
+    The execution contract is intentionally stricter than the historical tier
+    calibration: ``max(2.0, tier minimum x execution-regime multiplier)``.
+    Keeping all intermediate values makes batch artifacts explain why the
+    final threshold was selected.
+    """
+
+    tier = get_rr_resolution(ticker, yf_info=yf_info)
+    regime_text = str(regime or "").strip().upper()
+    regime_multiplier = (
+        REGIME_RR_SCALING.get(regime_text, 1.0) if regime_text else 1.0
+    )
+    regime_minimum = get_rr_minimum(
+        ticker,
+        regime=regime_text or None,
+        yf_info=yf_info,
+    )
+    required_rr = round(max(USER_EXECUTION_RR_FLOOR, regime_minimum), 3)
+    return RequiredRRResolution(
+        ticker=tier.ticker,
+        required_rr=required_rr,
+        base_rr_minimum=tier.rr_minimum,
+        regime_rr_minimum=regime_minimum,
+        user_execution_floor=USER_EXECUTION_RR_FLOOR,
+        execution_regime=regime_text or "UNSPECIFIED",
+        regime_multiplier=regime_multiplier,
+        tier_name=tier.tier_name,
+        tier_label=tier.tier_label,
+        tier_source=tier.source,
+        market_cap_idr=tier.market_cap_idr,
+    )
+
+
+def get_required_rr_minimum(
+    ticker: str,
+    regime: str | None = None,
+    yf_info: dict[str, Any] | None = None,
+) -> float:
+    """Return ``max(2.0, get_rr_minimum(...))`` for execution gates."""
+
+    return get_required_rr_resolution(
+        ticker,
+        regime=regime,
+        yf_info=yf_info,
+    ).required_rr
+
+
 def get_rr_tier_name(ticker: str, yf_info: dict[str, Any] | None = None) -> str:
     """Return the resolved R/R tier name for a ticker."""
     return get_rr_resolution(ticker, yf_info=yf_info).tier_name
@@ -271,6 +342,9 @@ def _log_rr_resolution(resolution: RRTierResolution) -> None:
 # ── Task 8: Trailing Stop Computation ────────────────────────────────────────
 
 _TRAILING_STOP_MULTIPLIER: dict[str, float] = {
+    "BULL": 1.5,
+    "SIDEWAYS": 1.8,
+    "UNKNOWN": 2.5,
     "LOW": 1.5,
     "NORMAL": 1.5,
     "HIGH": 1.8,

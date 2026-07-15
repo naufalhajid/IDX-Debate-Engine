@@ -34,7 +34,7 @@ These prompts run in **parallel** and extract structured evidence from market da
 
 #### `fundamental_scout.txt`
 **Role**: Financial Analyst  
-**LLM Model**: Claude Flash (fast, cost-effective)  
+**LLM Tier**: flash — via `get_llm("flash")` (Gemini Flash by default; provider switchable to Anthropic/Codex in `providers/llm_factory.py`)  
 **Output**: Key financial metrics, valuation signals, growth trends  
 **Context Window**: ~2,000 tokens (lightweight)
 
@@ -46,7 +46,7 @@ Key instructions:
 
 #### `chartist.txt`
 **Role**: Technical Analyst  
-**LLM Model**: Claude Flash  
+**LLM Tier**: flash  
 **Output**: Support/resistance levels, trend strength, pattern signals  
 **Context Window**: ~1,500 tokens
 
@@ -58,7 +58,7 @@ Key instructions:
 
 #### `sentiment.txt`
 **Role**: Market Sentiment Scout  
-**LLM Model**: Claude Flash  
+**LLM Tier**: flash  
 **Output**: News sentiment, institutional flows, retail positioning  
 **Context Window**: ~1,500 tokens
 
@@ -72,7 +72,7 @@ Key instructions:
 
 #### `bull_r1.txt` (Round 1 — Initial Bull Case)
 **Role**: Bullish Analyst making the buy case  
-**LLM Model**: Claude Sonnet Pro (reasoning-heavy)  
+**LLM Tier**: flash  
 **Output**: 3-5 key arguments for buying, recommended entry/target/stop prices  
 **Token Budget**: ~3,000-4,000 tokens
 
@@ -80,12 +80,12 @@ Key instructions:
 - Synthesize evidence from all three scouts
 - Build a compelling narrative (why NOW?)
 - Cite specific numbers (e.g., "P/B of 1.2x vs sector 1.8x")
-- Propose trade envelope: entry, target (+15% to +30%), stop loss (-5% to -10%)
-- Risk/reward ratio must be ≥ 1.5
+- Argue within the Python-computed trade envelope (`_compute_trade_envelope`: resistance-based target with sector-aware swing cap — +10% default, up to +20% mining; agents never invent prices)
+- R/R must clear the tier-aware floor: 1.4x large-cap (≥ Rp 50T) / 1.62x default, regime-scaled (`utils/trade_math.py`)
 
 #### `bull_r2.txt` (Round 2 — Bull Responds to Bear)
 **Role**: Bullish Analyst addressing bear challenges  
-**LLM Model**: Claude Sonnet Pro  
+**LLM Tier**: flash  
 **Output**: Counterarguments to bear concerns, margin of safety analysis  
 **Token Budget**: ~3,000-4,000 tokens
 
@@ -98,7 +98,7 @@ Key instructions:
 
 #### `bear_r1.txt` (Round 1 — Bear's Initial Audit)
 **Role**: Risk Auditor challenging the bull case  
-**LLM Model**: Claude Sonnet Pro  
+**LLM Tier**: flash  
 **Output**: 3-5 key downside risks, valuation concerns, warning flags  
 **Token Budget**: ~3,000-4,000 tokens
 
@@ -111,7 +111,7 @@ Key instructions:
 
 #### `bear_r2.txt` (Round 2 — Bear Doubles Down)
 **Role**: Bearish Auditor with focused pressure  
-**LLM Model**: Claude Sonnet Pro  
+**LLM Tier**: flash  
 **Output**: Deep dive on margin of safety + ATR-based downside risk  
 **Token Budget**: ~3,000-4,000 tokens
 
@@ -126,7 +126,7 @@ Key instructions:
 
 #### `consensus.txt`
 **Role**: Consensus Checker  
-**LLM Model**: Claude Flash (quick evaluation)  
+**Execution**: deterministic Python vote counting (`_evaluate_consensus_votes`) — no LLM call; prompt file retained in manifest  
 **Output**: Have bull & bear reached agreement? If not, why?  
 **Token Budget**: ~1,500 tokens
 
@@ -137,7 +137,7 @@ Logic:
 
 #### `state_cleaner.txt`
 **Role**: Context Pruner (between debate rounds)  
-**LLM Model**: Claude Flash  
+**Execution**: deterministic zero-LLM pruning (tail truncation + regex price extraction); prompt file retained in manifest  
 **Output**: Compressed state, removing redundant evidence  
 **Token Budget**: ~1,500 tokens
 
@@ -149,7 +149,7 @@ Key instructions:
 
 #### `devils_advocate.txt`
 **Role**: Bias Tester  
-**LLM Model**: Claude Sonnet Pro  
+**LLM Tier**: flash  
 **Output**: Stress test scenarios, hidden assumption challenges  
 **Token Budget**: ~2,500 tokens
 
@@ -161,21 +161,21 @@ Key instructions:
 
 #### `cio_judge.txt`
 **Role**: Final Decision Maker  
-**LLM Model**: Claude Sonnet Pro  
+**LLM Tier**: pro — the only pro-tier call in the graph (`get_llm("pro")`)  
 **Output**: CIOVerdict JSON with BUY/HOLD/SELL, confidence (0-1), detailed reasoning  
 **Token Budget**: ~4,000-5,000 tokens
 
 Key instructions:
 - Synthesize bull/bear arguments into ONE clear recommendation
-- Confidence = probability trade thesis remains valid for 3-6 months
-- HOLD if risk/reward ≤ 1.2 despite agreement
+- Confidence = probability trade thesis remains valid for the 5-20 trading-day swing window
+- R/R below the tier-aware floor (1.4x large-cap / 1.62x default) is hard-rejected downstream by the deterministic risk governor
 - Flag high-uncertainty scenarios (skip trade if confidence < 0.5)
-- Never invent prices; use bull's proposed envelope from R1
+- Never invent prices; use the Python-computed trade envelope injected into the prompt
 - Require margin of safety ≥ 5% for entry
 
 #### `agent_signal.txt`
 **Role**: Agent Signal Aggregator  
-**LLM Model**: Claude Flash  
+**LLM Tier**: flash  
 **Output**: Integration matrix showing which scouts agree/disagree  
 **Token Budget**: ~1,500 tokens
 
@@ -210,7 +210,7 @@ Update prompts when:
 3. **Document the change** in `PROMPT_MIGRATION.md` (see below)
 4. **Run tests**:
    ```bash
-   pytest tests/test_debate_chamber_reliability.py -v
+   uv run pytest tests/test_debate_chamber_reliability.py -v
    ```
 5. **Commit** with clear message:
    ```
@@ -229,7 +229,7 @@ See `PROMPT_MIGRATION.md` for:
 - Backtest results for that version
 - Fallback instructions if new version underperforms
 
-**Current Version**: `2026-05-11-critical-audit-v1`
+**Current Version**: `2026-06-30-cio-regime-labels-v27` — `manifest.json` is the source of truth; always check it rather than this README
 
 ### Testing Prompts
 
@@ -251,24 +251,24 @@ asyncio.run(test())
 "
 
 # Backtest new prompt against historical trades
-pytest tests/test_debate_chamber_reliability.py::test_cio_judge_confidence_calibration -v
+uv run pytest tests/test_debate_chamber_reliability.py::test_cio_judge_confidence_calibration -v
 ```
 
 ## Token Budget Allocation
 
-**Total debate per ticker**: ~500k tokens (Flash + Pro combined)
+**Total debate per ticker**: ~35,000-40,000 tokens (flash + pro combined; see table below)
 
 | Phase | Model | Budget | Justification |
 |-------|-------|--------|---|
 | Scouts (3×) | Flash | 6,000 | Data extraction; low reasoning needed |
-| Bull R1 | Sonnet Pro | 3,500 | Core reasoning & trade logic |
-| Bear R1 | Sonnet Pro | 3,500 | Risk challenge requires depth |
-| Bull R2 | Sonnet Pro | 3,000 | Counterargument; less novel data |
-| Bear R2 | Sonnet Pro | 3,500 | Critical margin of safety analysis |
-| Consensus | Flash | 1,500 | Binary check (agree/disagree) |
-| State Cleaner (×2 max) | Flash | 3,000 | Compression between rounds |
-| Devil's Advocate | Sonnet Pro | 2,500 | Stress testing & bias detection |
-| CIO Judge | Sonnet Pro | 4,500 | Final reasoning, highest stakes |
+| Bull R1 | Flash | 3,500 | Core reasoning & trade logic |
+| Bear R1 | Flash | 3,500 | Risk challenge requires depth |
+| Bull R2 | Flash | 3,000 | Counterargument; less novel data |
+| Bear R2 | Flash | 3,500 | Critical margin of safety analysis |
+| Consensus | — (deterministic) | 0 | Python vote counting, no LLM |
+| State Cleaner (×2 max) | — (deterministic) | 0 | Zero-LLM context pruning |
+| Devil's Advocate | Flash | 2,500 | Stress testing & bias detection |
+| CIO Judge | Pro | 4,500 | Final reasoning, highest stakes |
 | **Total** | | ~35,000-40,000 tokens | ~1,000 tickers/month @ $10 budget |
 
 ## Troubleshooting Prompts

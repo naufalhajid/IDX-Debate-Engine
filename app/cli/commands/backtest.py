@@ -10,6 +10,7 @@ import typer
 
 from app.cli.ui.console import console
 from core.idx_market_params import SWING_MAX_EXECUTION_HORIZON_DAYS
+from utils.ticker import InvalidIDXTicker, normalize_idx_tickers
 
 
 def backtest_command(
@@ -61,6 +62,13 @@ def backtest_command(
     from core.backtester.metrics_calculator import compute_metrics
     from core.backtester.report_generator import print_report
 
+    try:
+        normalized_tickers = (
+            normalize_idx_tickers(tickers) if tickers is not None else None
+        )
+    except InvalidIDXTicker as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
     parsed_from: date | None = None
     if from_date:
         try:
@@ -84,7 +92,7 @@ def backtest_command(
             debates_dir,
             min_rating=min_rating,
             from_date=parsed_from,
-            tickers=list(tickers) if tickers else None,
+            tickers=normalized_tickers,
         )
 
     if not signals:

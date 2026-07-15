@@ -13,6 +13,8 @@ import math
 from dataclasses import dataclass, field
 from urllib.parse import urlencode
 
+from utils.ticker import InvalidIDXTicker, normalize_idx_ticker
+
 logger = logging.getLogger(__name__)
 
 _BASE_URL = "https://exodus.stockbit.com"
@@ -40,8 +42,9 @@ def _empty(ticker: str) -> BrokerSummarySnapshot:
 
 
 def _normalize_ticker(ticker: str) -> str:
-    t = str(ticker or "").strip().upper()
-    return t[:-3] if t.endswith(".JK") else t
+    if ticker is None or not str(ticker).strip():
+        return ""
+    return normalize_idx_ticker(ticker)
 
 
 def _safe_float(val) -> float | None:
@@ -216,7 +219,11 @@ def fetch_broker_summary(ticker: str, client=None) -> BrokerSummarySnapshot:
     Returns a BrokerSummarySnapshot with empty lists on any failure so callers
     can always proceed without a guard.
     """
-    ticker = _normalize_ticker(ticker)
+    try:
+        ticker = _normalize_ticker(ticker)
+    except InvalidIDXTicker as exc:
+        logger.warning("[BrokerSummary] invalid ticker rejected before fetch: %s", exc)
+        return _empty("")
     if not ticker:
         return _empty(ticker)
 

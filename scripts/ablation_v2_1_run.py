@@ -19,6 +19,8 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
+from utils.ticker import normalize_idx_tickers
+
 TICKERS: list[str] = [
     "BBCA",
     "BBRI",
@@ -95,6 +97,6 @@ if __name__ == "__main__":
             run_mode = arg.split("=", 1)[1]
             argv.remove(arg)
 
-    selected = argv if argv else TICKERS
+    selected = normalize_idx_tickers(argv if argv else TICKERS)
     ABLATION_DIR.mkdir(parents=True, exist_ok=True)
     asyncio.run(_run(selected, run_mode))

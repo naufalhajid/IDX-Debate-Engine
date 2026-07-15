@@ -36,10 +36,10 @@ SWING_TIMEFRAME_LABEL = "5-20 Trading Days"
 SWING_EXECUTION_HORIZON_DAYS = 10
 SWING_MAX_EXECUTION_HORIZON_DAYS = 20
 
-# === Auto Rejection Limits (Kep-00002/BEI/04-2025, effective Apr 8 2025) ===
+# === Auto Rejection Limits (Kep-00003/BEI/04-2025, effective Apr 8 2025) ===
 ARB_LOWER_LIMIT = 0.15
 ARA_UPPER_PRICE_BELOW_50 = 0.35
-ARA_UPPER_PRICE_50_200 = 0.25
+ARA_UPPER_PRICE_50_200 = 0.35
 ARA_UPPER_PRICE_200_5000 = 0.25
 ARA_UPPER_PRICE_ABOVE_5000 = 0.20
 
@@ -116,7 +116,7 @@ REGIME_RULES: dict[str, dict] = {
 
 
 def ara_upper_limit(price: float) -> float:
-    """Return the daily ARA upper limit for a given IDX price (Kep-00002/BEI/04-2025)."""
+    """Return the daily ARA upper limit for a given IDX price (Kep-00003/BEI/04-2025)."""
     if price <= 50:
         return ARA_UPPER_PRICE_BELOW_50
     if price <= 200:

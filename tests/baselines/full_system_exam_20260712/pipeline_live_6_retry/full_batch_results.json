@@ -1,0 +1,2822 @@
+[
+  {
+    "ticker": "BBCA",
+    "verdict": {
+      "ticker": "BBCA",
+      "rating": "HOLD",
+      "confidence": 0.4,
+      "fair_value": null,
+      "fair_value_base": null,
+      "fair_value_low": null,
+      "fair_value_high": null,
+      "valuation_gap": null,
+      "entry_price_range": null,
+      "target_price": null,
+      "stop_loss": null,
+      "current_price": 6175.0,
+      "timeframe": "5-20 Trading Days",
+      "execution_horizon_days": 10,
+      "weighted_reasoning": "",
+      "critical_risk_factor": "",
+      "key_catalysts": [],
+      "key_risks": [
+        "Fair value tidak tersedia — validasi fundamental secara manual sebelum entry."
+      ],
+      "summary": "Setup ditolak: rr_too_low: R/R 1.00 < 1.4 (target 6550.0, entry_high 6050.0, stop 5550.0).",
+      "target_basis": null,
+      "expected_return": null,
+      "risk_reward_ratio": null,
+      "is_overvalued": null,
+      "risk_overvalued": null,
+      "wait_and_see": true,
+      "consensus_reached": false,
+      "consensus_method": null,
+      "dissenting_agents": [
+        "chartist",
+        "bear"
+      ],
+      "reason_codes": [
+        "rr_too_low"
+      ],
+      "hypothetical_envelope": {
+        "entry_low": 5925.0,
+        "entry_high": 6050.0,
+        "target_price": 6550.0,
+        "target_basis": "Resistance 20-Day",
+        "stop_loss": 5550.0,
+        "risk_reward_ratio": 1.0
+      },
+      "trailing_stop_pct": null,
+      "trailing_stop_trigger_pct": null,
+      "partial_exit_t1_pct": 0.5,
+      "partial_exit_trail_remainder": true,
+      "momentum_play": false,
+      "reasons": [
+        "fair_value_quality_rejected"
+      ],
+      "model_confidence": 0.4
+    },
+    "debate_rounds": 3,
+    "consensus_reached": false,
+    "consensus_method": null,
+    "dissenting_agents": [
+      "chartist",
+      "bear"
+    ],
+    "agent_votes": [
+      {
+        "agent": "fundamental_scout",
+        "position": "UNKNOWN",
+        "confidence": 0.62,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.62,
+        "round": 0
+      },
+      {
+        "agent": "chartist",
+        "position": "AVOID",
+        "confidence": 0.7,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.7,
+        "round": 0
+      },
+      {
+        "agent": "sentiment_specialist",
+        "position": "HOLD",
+        "confidence": 0.72,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.72,
+        "round": 0
+      },
+      {
+        "agent": "bull",
+        "position": "HOLD",
+        "confidence": 0.31,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.31,
+        "round": 3
+      },
+      {
+        "agent": "bear",
+        "position": "AVOID",
+        "confidence": 0.36,
+        "calibration_weight": 0.85,
+        "effective_confidence": 0.306,
+        "round": 3
+      },
+      {
+        "agent": "devils_advocate",
+        "position": "AVOID",
+        "confidence": 0.4,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.4,
+        "round": 4
+      }
+    ],
+    "consensus_winner": null,
+    "disagreement_type": "timing",
+    "debate_history": [
+      {
+        "role": "system",
+        "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 6,175, Rp 5,880, Rp 6,090, Rp 6,016, Rp 5,936, Rp 5,436, Rp 4,850, Rp 232, Rp 464",
+        "round": 0,
+        "position": "UNKNOWN",
+        "confidence": null
+      },
+      {
+        "role": "system",
+        "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 6,175, Rp 5,880, Rp 6,090, Rp 6,016, Rp 5,936, Rp 5,436",
+        "round": 0,
+        "position": "UNKNOWN",
+        "confidence": null
+      },
+      {
+        "role": "bull",
+        "content": "…stogram is **positive shrinking**, which is constructive but decelerating. That makes this a tactical bounce setup at best, not a high-conviction swing entry.\n\nCatalyst check fails for the required 5–20 trading-day trigger: the news feed contains only broad flow/macro items and one breaking item dated **2026-07-12** about foreign buying/selling, but no specific company event with a clear actionable timing edge. Because a valid near-term catalyst is missing, and the core valuation anchor is also missing, the correct call is **HOLD/NEUTRAL**, not bullish.\n\nPosition: HOLD  \nAgent Confidence: 0.24",
+        "round": 1,
+        "position": "HOLD",
+        "confidence": 0.204
+      },
+      {
+        "role": "bear",
+        "content": "…6,090**, but the setup is still explicitly labeled **counter-trend bounce** and **rebound-only**. That makes the technical upside tactical, not durable.\n\nCatalyst risk remains unresolved: the news flow contains no company-specific announcement likely to convert into a decisive 5–20 trading-day catalyst. The dated news items are mostly broad sector/foreign flow commentary, which is not enough to justify execution confidence. With missing fundamental anchors and no valid catalyst, the proper stance is to **avoid acting** on a swing BUY thesis.\n\nPosition: BUY | HOLD | AVOID\nAgent Confidence: 0.24",
+        "round": 1,
+        "position": "HOLD",
+        "confidence": 0.24
+      },
+      {
+        "role": "bull",
+        "content": "… company-specific catalyst in the news window, this remains a conditional trade rather than a high-conviction swing.\n\nR/R does not cleanly overturn the Bear’s critique because the technical package still describes a counter-trend bounce and reduced-size idea, so the revised stop reference should be the secondary support rather than the immediate breakdown zone. Even with that wider reference, the upside remains tactical and the entry is not backed by a confirmed catalyst. So the thesis is not invalidated, but it is not strong enough for an aggressive BUY.\n\nPosition: HOLD\nAgent Confidence: 0.28",
+        "round": 2,
+        "position": "HOLD",
+        "confidence": 0.238
+      },
+      {
+        "role": "bear",
+        "content": "…,936, because the real loss profile expands once the cited support fails.\n\nMargin of safety stress test: ATR(14) is Rp 232, so the maximum 1-week adverse move is about Rp 464. Relative to the Bull’s own stop reference at Rp 5,436, that is a meaningful one-week volatility span and is inconsistent with calling the trade tightly protected. Combined with the fact that the move is explicitly non-expansionary and momentum is decelerating, the setup is fragile for swing execution. Trade is unviable for swing execution -- adverse move exceeds margin of safety.\n\nPosition: AVOID  \nAgent Confidence: 0.33",
+        "round": 2,
+        "position": "AVOID",
+        "confidence": 0.33
+      },
+      {
+        "role": "bull",
+        "content": "Position: NEUTRAL\nDebate Confidence: LOW\n\nBear’s cited breakdown zone is Rp 5,936, but the next technical cushion below that is the 52-week low at Rp 4,850, which gives the chart a deeper structural backstop than the Bear’s near-term failure point implies. That does not make the trade “safe,” but it does mean the downside is not unbounded if Rp 5,936 gives way; the setup becomes a wider-range mean reversion rather than an immediate thesis break.\n\nOn valuation, the fair-value field is unusable: fair value base is 0 and the range is INSUFFICIENT_DATA, so there is no credible anchor to say the current price fully discounts the Bear’s downside scenario. Because the core valuation data are missing, this is a NEEDS_RECONCILIATION case rather than a clean overvaluation call; that weakens both the Bear’s valuation objection and any aggressive bullish claim.\n\nTrigger skepticism is still partly valid: no company-specific event is visible, and the dated flow items from 2026-07-10 to 2026-07-12 are PAST_EVENT_NOT_CATALYST for a 5–20 trading-day swing. The best fallback trigger is technical rather than fundamental: price holding above AVWAP at Rp 5,880 while remaining above the upper-half Bollinger regime, with RSI neutral and MACD still positive though shrinking. That supports a tactical bounce, not a durable trend change.\n\nR/R can be restated using the secondary support as the revised stop reference: the reward to the near-term objective around Rp 6,550 is modest, but the risk is now framed against Rp 4,850 instead of only the closer support failure zone. Even so, because the move is counter-trend, volume is not expansionary, and the news window lacks a fresh catalyst, the setup is better classified as a cautious HOLD than a decisive BUY.\n\nPosition: HOLD\nAgent Confidence: 0.31",
+        "round": 3,
+        "position": "HOLD",
+        "confidence": 0.264
+      },
+      {
+        "role": "bear",
+        "content": "Position: BEARISH\nDebate Confidence: LOW\n\nThe Bull’s cited support at Rp 5,936 is not a dependable floor for a 5–20 trading-day swing: the technical brief explicitly says BBCA is in a structural downtrend and only a counter-trend bounce, with the price still below the long-term trend filter. That means a failure of the Bull’s own support level is not a small noise event; it is consistent with the broader downtrend regime already in place. The Bull also leans on price staying above AVWAP at Rp 5,880, but that is a fragile tactical condition, not structural support, and it is weaker than the swing thesis would need.\n\nIf Rp 5,936 breaks, the next support is Rp 4,850 -- making the actual max loss Rp 1,326, not the much tighter loss profile implied by the Bull’s setup. That deeper downside reference is the correct stress case because the current chart already sits in a counter-trend bounce, with volume not confirming a breakout and momentum only decelerating rather than expanding. In other words, the Bull’s near-term cushion does not prevent a materially larger drawdown if the bounce fails.\n\nMargin of safety stress test: ATR(14) is Rp 232, so the maximum 1-week adverse move is Rp 464. Compared against the Bull’s own stop reference at Rp 5,436, that is a substantial volatility band and leaves little room for execution error in a swing trade. The chart brief itself characterizes the move as non-expansionary, so this is not a clean impulse setup. Trade is unviable for swing execution -- adverse move exceeds margin of safety.\n\nPosition: AVOID\nAgent Confidence: 0.36",
+        "round": 3,
+        "position": "AVOID",
+        "confidence": 0.36
+      },
+      {
+        "role": "devils_advocate",
+        "content": "Position: STRESS_TEST  \nAgent Confidence: 0.39\n\n**Challenge 1 — Macro / company risk**  \nIf foreign flow flips back to net selling and BBCA loses the exact support at **Rp 5,936**, could that break the counter-trend bounce and trigger stops toward **Rp 5,436** within 5–20 trading days?\n\n**Challenge 2 — Transaction cost stress test**  \nUsing **Entry Midpoint = Rp 5,976** and **Target Price = Rp 6,550**:\n\n- Projected target return% = **(6,550 - 5,976) / 5,976 = 9.61%**\n- Buy commission = **0.15%**\n- Sell commission = **0.25%**\n- Final income tax = **0.10%**\n- Slippage = **0.15%** (entry price ≥ Rp 500)\n- **Total round-trip cost = 0.15% + 0.25% + 0.10% + 0.15% = 0.65%**\n\nNet return after costs = **9.61% - 0.65% = 8.96%**\n\n**VIABLE after transaction costs.**\n\n**Challenge 3 — Anti-averaging down check**  \nSkipped: `ma200_context` is not explicitly provided as BELOW in the brief.\n\nPOSITION: AVOID CONFIDENCE: 0.40",
+        "round": 4,
+        "position": "AVOID",
+        "confidence": 0.4
+      }
+    ],
+    "raw_data_summary": "=== EVIDENCE BRIEF: BBCA ===\nQuery: swing trade analysis\n\n[FAIR_VALUE]\nEvidence ID: BBCA_20260712_173441_fair_value_0\nCurrent Price: 6175 | Fair Value Base: 0 | Fair Value Range: INSUFFICIENT_DATA - INSUFFICIENT_DATA | Upside: -100.0% | Risk Overvalued: False\nSource: stockbit | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: BBCA_20260712_173441_technical_0\n{\"52w_high\":8495.0,\"52w_low\":4850.0,\"atr14\":232.0,\"avg_volume_20d\":236993620.0,\"avwap\":5880.0,\"avwap_anchor_bars_ago\":22,\"avwap_position\":\"ABOVE_AVWAP\",\"bb_position\":\"UPPER_HALF\",\"bb_squeeze\":false,\"bb_width\":13.98,\"brief\":\"Position: BEARISH Stock is in a structural downtrend. This is a counter-trend bounce -- use a conservative target and reduce position size to 50%. BBCA is still trading below\nSource: yfinance | Score: 0.95\n\n[TECHNICAL]\nEvidence ID: BBCA_20260712_173441_technical_1\nMA200, so upside should be treated as rebound-only until price reclaims the long-term trend. Counter-trend trade — reduce position size to 50%. ENTRY ZONE: Rp 6,016 - Rp 5,936 TARGET: Rp 6,550 (approx. 2.8% from entry midpoint) STOP-LOSS: Rp 5,436 (2.5 x ATR below EMA20) RSI(14) at 54.6 is neutral, so momentum is neither oversold nor overbought. Current volume does not confirm a strong breakout;\nSource: yfinance | Score: 0.95\n\n[TECHNICAL]\nEvidence ID: BBCA_20260712_173441_technical_2\nvolume_surge_ratio 0.58 suggests the move is not expansionary. Weekly trend is unavailable, so no higher-timeframe confirmation can be made. MACD histogram state is POSITIVE_SHRINKING — momentum is still positive but decelerating; near-term caution, take profits early. Gap up is present, which is mildly constructive, but BB position is only upper-half rather than an extended breakout. Price is\nSource: yfinance | Score: 0.95\n\n[TECHNICAL]\nEvidence ID: BBCA_20260712_173441_technical_3\nabove VWAP (Rp 6,090) by 1.4%...\",\"compression_type\":\"NONE\",\"current_price\":6175.0,\"divergence_strength\":null,\"ema20\":6016.0,\"entry_rationale\":\"Market closed (weekend). Plan entries for Monday\nSource: yfinance | Score: 0.95\n\n[FUNDAMENTAL]\nEvidence ID: BBCA_20260712_173441_fundamental_3\ndepan.\\n\",\"fair_value\":0.0,\"fair_value_base\":0.0,\"fair_value_high\":null,\"fair_value_low\":null,\"risk_overvalued\":false}\nSource: stockbit | Score: 0.80\n\n---\nTotal evidence: 6/15 chunks selected\nToken estimate: ~578\n\n=== NEWS BRIEF: BBCA ===\nPeriod: last 60 days\nSentiment: NEUTRAL (score: -0.12)\nBREAKING NEWS DETECTED\nMACRO EVENT DETECTED\nConfidence adjustment: -0.20\nReason: Breaking negative news in last 48h - significant risk detected\nLanguage: ID/EN\n\nTOP NEWS:\n1. [NEGATIVE] Investor Asing Borong Saham BBCA Rp 638 Miliar di Tengah Aksi Jual - achmadnurhidayat.id\n   Source: achmadnurhidayat.id | 2026-07-12\n   Events: BREAKING\n2. [NEUTRAL] Saham BBRI-BBCA Cs Jadi Motor Penguatan IHSG Sepekan - IDX Channel\n   Source: IDX Channel | 2026-07-11\n   Events: BREAKING | MACRO_EVENT\n3. [NEUTRAL] Saham BBCA, BBRI, BRPT, hingga ADRO Dorong Penguatan LQ45 dan IHSG - Bisnis.com - Market\n   Source: Bisnis.com - Market | 2026-07-10\n   Events: BREAKING | MACRO_EVENT\n4. [NEUTRAL] Saham BBRI hingga BBCA Paling Banyak Dibuang Asing Akhir Pekan Kemarin - BeritaSatu.com\n   Source: BeritaSatu.com | 2026-07-12\n   Events: BREAKING\n5. [NEUTRAL] Usai IPO 2024, Remala Abadi (DATA) Tempatkan Sisa Dana Rp1,84 Miliar di Giro BBCA - SWA.co.id\n   Source: SWA.co.id | 2026-07-12\n   Events: BREAKING",
+    "metadata": {
+      "prompt_version": "2026-06-30-cio-regime-labels-v27",
+      "run_id": "20260712_173441",
+      "regime": "DEFENSIVE",
+      "sector": "unknown",
+      "market_data_source": "yfinance",
+      "market_data_fetched_at": "2026-07-09T17:00:00+00:00",
+      "market_data_cached": true,
+      "flash_calls": 10,
+      "pro_calls": 0,
+      "tradeability_preflight": {
+        "status": "clean",
+        "atr14": 232.0,
+        "surrogate_gap": 625.0
+      },
+      "preflight_skipped": false,
+      "fair_value_rejected": true,
+      "valuation_gap": "unverified",
+      "reasons": [
+        "fair_value_quality_rejected"
+      ],
+      "has_breaking_news": true,
+      "has_insider_selling": false,
+      "has_post_earnings": false,
+      "breaking_news_headlines": [
+        {
+          "title": "Investor Asing Borong Saham BBCA Rp 638 Miliar di Tengah Aksi Jual - achmadnurhidayat.id",
+          "source": "achmadnurhidayat.id",
+          "timestamp": "2026-07-12T01:18:18+00:00"
+        },
+        {
+          "title": "Saham BBRI-BBCA Cs Jadi Motor Penguatan IHSG Sepekan - IDX Channel",
+          "source": "IDX Channel",
+          "timestamp": "2026-07-11T05:05:00+00:00"
+        },
+        {
+          "title": "Saham BBCA, BBRI, BRPT, hingga ADRO Dorong Penguatan LQ45 dan IHSG - Bisnis.com - Market",
+          "source": "Bisnis.com - Market",
+          "timestamp": "2026-07-10T21:08:36+00:00"
+        }
+      ],
+      "news_confidence_adjustment": 0.0,
+      "news_overall_sentiment": "NEUTRAL",
+      "news_brief": "=== NEWS BRIEF: BBCA ===\nPeriod: last 60 days\nSentiment: NEUTRAL (score: -0.12)\nBREAKING NEWS DETECTED\nMACRO EVENT DETECTED\nConfidence adjustment: -0.20\nReason: Breaking negative news in last 48h - significant risk detected\nLanguage: ID/EN\n\nTOP NEWS:\n1. [NEGATIVE] Investor Asing Borong Saham BBCA Rp 638 Miliar di Tengah Aksi Jual - achmadnurhidayat.id\n   Source: achmadnurhidayat.id | 2026-07-12\n   Events: BREAKING\n2. [NEUTRAL] Saham BBRI-BBCA Cs Jadi Motor Penguatan IHSG Sepekan - IDX Channel\n   Source: IDX Channel | 2026-07-11\n   Events: BREAKING | MACRO_EVENT\n3. [NEUTRAL] Saham BBCA, BBRI, BRPT, hingga ADRO Dorong Penguatan LQ45 dan IHSG - Bisnis.com - Market\n   Source: Bisnis.com - Market | 2026-07-10\n   Events: BREAKING | MACRO_EVENT\n4. [NEUTRAL] Saham BBRI hingga BBCA Paling Banyak Dibuang Asing Akhir Pekan Kemarin - BeritaSatu.com\n   Source: BeritaSatu.com | 2026-07-12\n   Events: BREAKING\n5. [NEUTRAL] Usai IPO 2024, Remala Abadi (DATA) Tempatkan Sisa Dana Rp1,84 Miliar di Giro BBCA - SWA.co.id\n   Source: SWA.co.id | 2026-07-12\n   Events: BREAKING",
+      "exdate_tier": "CLEAR",
+      "rag_chunks_selected": 6,
+      "rag_chunks_considered": 15,
+      "rag_token_estimate": 578,
+      "rag_rendered_char_count": 2314,
+      "evidence_age_h": 0,
+      "evidence_age_hours": 0.0,
+      "rag_citation_ids": [
+        "BBCA_20260712_173441_fair_value_0",
+        "BBCA_20260712_173441_technical_0",
+        "BBCA_20260712_173441_technical_1",
+        "BBCA_20260712_173441_technical_2",
+        "BBCA_20260712_173441_technical_3",
+        "BBCA_20260712_173441_fundamental_3"
+      ],
+      "rag_citations": [
+        {
+          "chunk_id": "BBCA_20260712_173441_fair_value_0",
+          "category": "fair_value",
+          "source": "stockbit",
+          "relevance_score": 0.85,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "BBCA_20260712_173441_technical_0",
+          "category": "technical",
+          "source": "yfinance",
+          "relevance_score": 0.95,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "BBCA_20260712_173441_technical_1",
+          "category": "technical",
+          "source": "yfinance",
+          "relevance_score": 0.95,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "BBCA_20260712_173441_technical_2",
+          "category": "technical",
+          "source": "yfinance",
+          "relevance_score": 0.95,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "BBCA_20260712_173441_technical_3",
+          "category": "technical",
+          "source": "yfinance",
+          "relevance_score": 0.95,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "BBCA_20260712_173441_fundamental_3",
+          "category": "fundamental",
+          "source": "stockbit",
+          "relevance_score": 0.8,
+          "is_stale": false
+        }
+      ],
+      "rag_stale_citation_ids": [],
+      "market_cap_idr": 758760800780288,
+      "duration_seconds": 101.38999999998487,
+      "batch_timestamp": "20260712_173908"
+    },
+    "regime": {
+      "label": "SIDEWAYS",
+      "confidence": 0.9467375021528672,
+      "probabilities": {
+        "SIDEWAYS": 0.9467375021528672,
+        "BULL": 0.019237603759281907,
+        "BEAR_STRESS": 0.034024894087631256
+      },
+      "msci_override": false,
+      "training_days": 756,
+      "detected_at": "2026-07-12T17:35:27.295446",
+      "notes": "MSCI review active: True"
+    },
+    "trading_params": {
+      "description": "IHSG flat, moderate volatility",
+      "max_position_pct": 0.01,
+      "min_risk_reward": 2.0,
+      "consensus_threshold": 0.7,
+      "max_concurrent_positions": 2,
+      "devil_advocate_weight": 0.3,
+      "regime_multiplier": 0.85,
+      "trading_allowed": true
+    },
+    "error": null,
+    "status": "success",
+    "conviction_score": 0.0,
+    "sector_key": "unknown",
+    "news_sentiment": "NEUTRAL",
+    "news_confidence_adjustment": 0.0,
+    "has_breaking_news": true,
+    "breaking_news_headlines": [
+      {
+        "title": "Investor Asing Borong Saham BBCA Rp 638 Miliar di Tengah Aksi Jual - achmadnurhidayat.id",
+        "source": "achmadnurhidayat.id",
+        "timestamp": "2026-07-12T01:18:18+00:00"
+      },
+      {
+        "title": "Saham BBRI-BBCA Cs Jadi Motor Penguatan IHSG Sepekan - IDX Channel",
+        "source": "IDX Channel",
+        "timestamp": "2026-07-11T05:05:00+00:00"
+      },
+      {
+        "title": "Saham BBCA, BBRI, BRPT, hingga ADRO Dorong Penguatan LQ45 dan IHSG - Bisnis.com - Market",
+        "source": "Bisnis.com - Market",
+        "timestamp": "2026-07-10T21:08:36+00:00"
+      }
+    ],
+    "reasons": [
+      "fair_value_quality_rejected"
+    ],
+    "evidence_age_h": 0,
+    "model_confidence": 0.4,
+    "trade_conviction": 0.0,
+    "risk_governor": {
+      "ticker": "BBCA",
+      "status": "reject",
+      "sizing_allowed": false,
+      "reason_codes": [
+        "rr_too_low",
+        "fair_value_quality_rejected",
+        "invalid_entry_range",
+        "missing_target_price",
+        "missing_stop_loss"
+      ],
+      "message": "Setup ditolak karena data harga kunci belum valid.",
+      "current_price": 6175.0,
+      "entry_low": null,
+      "entry_high": null,
+      "target_price": null,
+      "stop_loss": null
+    },
+    "forecast_report": {
+      "ticker": "BBCA",
+      "as_of": "2026-07-12",
+      "horizon_days": 10,
+      "expected_return_net": null,
+      "p_target": null,
+      "p_stop": null,
+      "volatility_forecast": 0.4091469096233647,
+      "expected_value": null,
+      "decision": "AVOID",
+      "confidence": null,
+      "model_votes": [
+        {
+          "model_name": "naive",
+          "status": "validation_failed",
+          "reason": "validation_status:failed",
+          "r_hat_net": -0.015013294491136971,
+          "p_target": 0.4246612220868078,
+          "p_stop": 0.42931255168840404,
+          "volatility_forecast": 0.4091469096233647,
+          "weight": 0.0,
+          "validation_passed": false,
+          "ic": null,
+          "brier_target": 0.25,
+          "rmse": 0.051860773401920815,
+          "mae": 0.04086515347126352,
+          "mape": 1.0602216020914104,
+          "directional_accuracy": 0.7933333333333333
+        },
+        {
+          "model_name": "xgboost",
+          "status": "active",
+          "reason": null,
+          "r_hat_net": -0.009942212142050266,
+          "p_target": 0.42562882014769055,
+          "p_stop": 0.4283432800260251,
+          "volatility_forecast": 0.4091469096233647,
+          "weight": 0.0,
+          "validation_passed": true,
+          "ic": 0.3156260996922042,
+          "brier_target": 0.2548577119102416,
+          "rmse": 0.07706486179911487,
+          "mae": 0.06688949987336106,
+          "mape": 3.431431225090214,
+          "directional_accuracy": 0.6266666666666667
+        },
+        {
+          "model_name": "lstm",
+          "status": "experimental_unused",
+          "reason": "conservative_policy",
+          "r_hat_net": null,
+          "p_target": null,
+          "p_stop": null,
+          "volatility_forecast": null,
+          "weight": 0.0,
+          "validation_passed": false,
+          "ic": null,
+          "brier_target": null,
+          "rmse": null,
+          "mae": null,
+          "mape": null,
+          "directional_accuracy": null
+        },
+        {
+          "model_name": "prophet",
+          "status": "experimental_unused",
+          "reason": "conservative_policy_not_primary_return_model",
+          "r_hat_net": null,
+          "p_target": null,
+          "p_stop": null,
+          "volatility_forecast": null,
+          "weight": 0.0,
+          "validation_passed": false,
+          "ic": null,
+          "brier_target": null,
+          "rmse": null,
+          "mae": null,
+          "mape": null,
+          "directional_accuracy": null
+        },
+        {
+          "model_name": "tgarch",
+          "status": "active",
+          "reason": null,
+          "r_hat_net": null,
+          "p_target": null,
+          "p_stop": null,
+          "volatility_forecast": 0.4091469096233647,
+          "weight": 0.0,
+          "validation_passed": true,
+          "ic": null,
+          "brier_target": null,
+          "rmse": null,
+          "mae": null,
+          "mape": null,
+          "directional_accuracy": null
+        }
+      ],
+      "validation_summary": {
+        "horizon_days": 10,
+        "n_observations": 150,
+        "ic_mean": 0.3156260996922042,
+        "ic_t_stat": 2.538187710109276,
+        "brier": 0.25242885595512077,
+        "rmse": 0.06446281760051784,
+        "mae": 0.05387732667231229,
+        "mape": 2.2458264135908124,
+        "directional_accuracy": 0.71,
+        "dsr": 6e-06,
+        "bh_q_value_passed": true,
+        "status": "failed"
+      },
+      "validation_by_model": {
+        "naive": {
+          "horizon_days": 10,
+          "n_observations": 150,
+          "ic_mean": null,
+          "ic_t_stat": null,
+          "brier": 0.25,
+          "rmse": 0.051860773401920815,
+          "mae": 0.04086515347126352,
+          "mape": 1.0602216020914104,
+          "directional_accuracy": 0.7933333333333333,
+          "dsr": 6e-06,
+          "bh_q_value_passed": false,
+          "status": "failed"
+        },
+        "xgboost": {
+          "horizon_days": 10,
+          "n_observations": 150,
+          "ic_mean": 0.3156260996922042,
+          "ic_t_stat": 2.538187710109276,
+          "brier": 0.2548577119102416,
+          "rmse": 0.07706486179911487,
+          "mae": 0.06688949987336106,
+          "mape": 3.431431225090214,
+          "directional_accuracy": 0.6266666666666667,
+          "dsr": 6e-06,
+          "bh_q_value_passed": true,
+          "status": "production"
+        }
+      },
+      "model_dispersion": 0.0025355411745433525,
+      "model_disagreement_penalty": 0.0051,
+      "risk_adjusted_expected_value": null,
+      "data_quality_flags": [
+        "no_validated_return_model",
+        "experimental_unused:lstm",
+        "experimental_unused:prophet",
+        "model_disagreement_penalty:0.005",
+        "validation_status:failed"
+      ],
+      "volatility_fallback": false
+    },
+    "forecast_ev_ignored_reason": "validation_failed"
+  },
+  {
+    "ticker": "BMRI",
+    "verdict": {
+      "ticker": "BMRI",
+      "rating": "HOLD",
+      "confidence": 0.4,
+      "fair_value": 5911.0,
+      "fair_value_base": 5911.0,
+      "fair_value_low": 5024.0,
+      "fair_value_high": 6798.0,
+      "valuation_gap": null,
+      "entry_price_range": null,
+      "target_price": null,
+      "stop_loss": null,
+      "current_price": 4080.0,
+      "timeframe": "5-20 Trading Days",
+      "execution_horizon_days": 10,
+      "weighted_reasoning": "",
+      "critical_risk_factor": "",
+      "key_catalysts": [],
+      "key_risks": [],
+      "summary": "Setup ditolak: rr_too_low: R/R 1.08 < 1.4 (target 4490.0, entry_high 4080.0, stop 3700.0).",
+      "target_basis": null,
+      "expected_return": null,
+      "risk_reward_ratio": null,
+      "is_overvalued": false,
+      "risk_overvalued": false,
+      "wait_and_see": true,
+      "consensus_reached": false,
+      "consensus_method": null,
+      "dissenting_agents": [
+        "bear"
+      ],
+      "reason_codes": [
+        "rr_too_low"
+      ],
+      "hypothetical_envelope": {
+        "entry_low": 3960.0,
+        "entry_high": 4080.0,
+        "target_price": 4490.0,
+        "target_basis": "Resistance 20-Day (Swing Cap)",
+        "stop_loss": 3700.0,
+        "risk_reward_ratio": 1.08
+      },
+      "trailing_stop_pct": null,
+      "trailing_stop_trigger_pct": null,
+      "partial_exit_t1_pct": 0.5,
+      "partial_exit_trail_remainder": true,
+      "momentum_play": false,
+      "model_confidence": 0.4
+    },
+    "debate_rounds": 3,
+    "consensus_reached": false,
+    "consensus_method": null,
+    "dissenting_agents": [
+      "bear"
+    ],
+    "agent_votes": [
+      {
+        "agent": "fundamental_scout",
+        "position": "UNKNOWN",
+        "confidence": 0.79,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.79,
+        "round": 0
+      },
+      {
+        "agent": "chartist",
+        "position": "HOLD",
+        "confidence": 0.67,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.67,
+        "round": 0
+      },
+      {
+        "agent": "sentiment_specialist",
+        "position": "HOLD",
+        "confidence": 0.62,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.62,
+        "round": 0
+      },
+      {
+        "agent": "bull",
+        "position": "HOLD",
+        "confidence": 0.61,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.61,
+        "round": 3
+      },
+      {
+        "agent": "bear",
+        "position": "AVOID",
+        "confidence": 0.38,
+        "calibration_weight": 0.85,
+        "effective_confidence": 0.323,
+        "round": 3
+      },
+      {
+        "agent": "devils_advocate",
+        "position": "AVOID",
+        "confidence": 0.4,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.4,
+        "round": 4
+      }
+    ],
+    "consensus_winner": null,
+    "disagreement_type": null,
+    "debate_history": [
+      {
+        "role": "system",
+        "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 4,080, Rp 5,911, Rp 4,049, Rp 4,116, Rp 4,276, Rp 4,219, Rp 3,731, Rp 127, Rp 5,024, Rp 6,798, Rp 3,647, Rp 254",
+        "round": 0,
+        "position": "UNKNOWN",
+        "confidence": null
+      },
+      {
+        "role": "system",
+        "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 4,080, Rp 5,911, Rp 4,049, Rp 4,116, Rp 4,276, Rp 4,219, Rp 3,731, Rp 127",
+        "round": 0,
+        "position": "UNKNOWN",
+        "confidence": null
+      },
+      {
+        "role": "bull",
+        "content": "…oreign buying and the ESOP/treasury-share distribution on 2026-07-09, but that event is the context, not the direct swing trigger. The actionable trigger is a close above the entry band/MA50 area with follow-through volume; without that, it remains just a counter-trend bounce.\n\nEntry Rp 4,080 -> Target Rp 4,219 -> Stop Rp 3,731 -> R/R: 1.1:1. Because this is only a modest reward versus stop distance and the trend is still below MA200, position size should remain conservative. If price loses the Rp 4,049–4,116 support zone, the trade thesis weakens quickly.\n\nPosition: BUY\nAgent Confidence: 0.67",
+        "round": 1,
+        "position": "BUY",
+        "confidence": 0.57
+      },
+      {
+        "role": "bear",
+        "content": "…edibly claim a negative near-term catalyst from the supplied evidence. The bull’s NR7-based breakout timing is plausible, but the brief does not provide a bearish company event that would prevent that trigger from materialising within 5–20 trading days. R/R is also not compelling enough to override the missing data problem: the cited target Rp 4,219 versus stop Rp 3,731 implies only about **1.1:1** reward/risk, which is thin for a counter-trend trade, but I cannot verify this as a rejection-grade AVOID case without the missing fundamental risk metric.  \n\nPosition: HOLD  \nAgent Confidence: 0.42",
+        "round": 1,
+        "position": "HOLD",
+        "confidence": 0.42
+      },
+      {
+        "role": "bull",
+        "content": "…pport as the revised stop reference is still acceptable for a tactical bounce: the downside is now anchored closer to Rp 4,049 rather than the deeper breakdown level the Bear emphasized, while the upside remains toward the technical target area above current price. This improves trade structure versus the Bear’s critique because the stop distance narrows materially without requiring the thesis to depend on a full trend reversal. The key caveat is that volume confirmation is still weak, so this is a controlled swing setup, not an aggressive conviction long.\n\nPosition: BUY\nAgent Confidence: 0.64",
+        "round": 2,
+        "position": "BUY",
+        "confidence": 0.544
+      },
+      {
+        "role": "bear",
+        "content": "… 52-week low area, which is a much harsher swing-execution profile than the Bull acknowledges.\n\nMargin of safety stress test: ATR(14) is Rp 127, so maximum 1-week adverse move = 2 x ATR = Rp 254. Relative to the Bull’s claimed protection around Rp 4,049, that is a meaningful hit in a 5–20 trading-day frame, especially because the trade is explicitly counter-trend and volume confirmation is weak. With no verified strong support above Rp 4,049 and with current price Rp 4,080 still under MA50 Rp 4,116, the setup lacks enough cushion for a clean swing entry.\n\nPosition: AVOID\nAgent Confidence: 0.38",
+        "round": 2,
+        "position": "AVOID",
+        "confidence": 0.38
+      },
+      {
+        "role": "bull",
+        "content": "Position: NEUTRAL\nDebate Confidence: MEDIUM\n\nBear’s stop-loss critique leans on the downside corridor around Rp 4,049, but the chart still offers a lower secondary support near the recent pivot around Rp 3,647, which is materially below that breakdown area and closer to the 52-week floor; that gives the tape a defined “next shelf” if the first line fails. That said, I cannot repeat the Round 1 levels, so the key point is simply that the Bear’s stress test does not remove all technical structure — it shifts the trade from a tight bounce to a deeper support-reclaim attempt. On valuation, the fair-value base at Rp 5,911 still leaves a large buffer versus the current Rp 4,080 print, so even if the Bear’s downside path plays out, the market is still pricing BMRI below the modeled intrinsic anchor; the gap is wide enough that a tactical pullback alone does not invalidate the longer re-rating case.\n\nOn trigger skepticism, the latest 48-hour flow is the strongest corroboration: foreign buying showed up in the same window as the positive macro tape, and the NR7 compression plus POSITIVE_EXPANDING MACD histogram suggests a move can occur within the next 1–2 sessions even without a fresh company-specific headline. If the Bear argues the ESOP/buyback transfer is stale, I agree it is not the catalyst itself; the fallback 5–20 trading-day trigger is a close-and-hold back above the AVWAP/short-term moving-average cluster with volume expansion, which would confirm that the recent institutional accumulation is being accepted by the market.\n\nFor R/R, using the secondary support as the revised stop reference materially changes the profile versus the Bear’s complaint: the downside is no longer measured against the first broken shelf, but against a lower structural floor, while upside still points toward the fair-value reversion zone above spot. Because the stock remains under the medium-term trend filters and volume confirmation is still weak, this is not a clean high-conviction long; it is a tactical swing only if the reclaim trigger fires. So the Bear is right that the setup is not pristine, but the combination of discounted valuation, nearby compression, and fallback support keeps it in actionable-bullish territory rather than outright avoid.\n\nPosition: BUY\nAgent Confidence: 0.61",
+        "round": 3,
+        "position": "HOLD",
+        "confidence": 0.518
+      },
+      {
+        "role": "bear",
+        "content": "Position: BEARISH\nDebate Confidence: MEDIUM\n\nBull’s cited support at Rp 4,049–4,116 is not a reliable floor for swing execution because the same evidence says BMRI is still below MA50 Rp 4,116 and below MA200 Rp 4,276, with “overhead supply remains significant.” That means the Bull’s own support zone sits inside a broader downtrend regime, so a brief touch of Rp 4,116 does not prove acceptance. Also, the tape is still below AVWAP Rp 4,134, which weakens any claim that the rebound has been structurally reclaimed rather than just mechanically bounced.\n\nIf Rp 4,049 breaks, the next support is Rp 3,647 -- making the actual max loss materially larger than the Bull’s implied tight-risk bounce, not the shallow dip the Bull implies. This is important because the Bull’s setup is framed as a counter-trend bounce with a compact target, yet the downside path can extend to a prior swing low that is far enough away to distort the reward-to-risk profile once the first shelf fails. In other words, the trade is not protected by a single local support; it is exposed to a deeper air pocket if sellers reassert.\n\nMargin of safety stress test: ATR(14) is Rp 127, so maximum 1-week adverse move = Rp 254. Against the Bull’s cited entry band around Rp 4,049–4,116, that is a large enough shock to threaten the whole bounce thesis within the 5–20 trading-day window. Since the Bull’s own framing is a narrow counter-trend setup, a two-ATR hit is enough to consume the practical margin of safety; therefore, this trade is unviable for swing execution if the price cannot quickly reclaim the short-term trend cluster with real volume.\n\nPosition: AVOID\nAgent Confidence: 0.38",
+        "round": 3,
+        "position": "AVOID",
+        "confidence": 0.38
+      },
+      {
+        "role": "devils_advocate",
+        "content": "Position: STRESS_TEST  \nAgent Confidence: 0.86\n\n**Challenge 1 — Macro / company risk**  \nIf foreign buying fades and BMRI loses the Rp 4,049 support while still below MA50 Rp 4,116, could the support shelf fail within 5-20 trading days and force stops toward Rp 3,731?\n\n**Challenge 2 — Transaction cost stress test**  \nEntry price used: **Rp 4,080**  \nProjected target return from entry midpoint to target: **(4,219 - 4,080) / 4,080 = 3.41%**\n\nCost components:\n- Buy commission: **0.15%**\n- Sell commission: **0.25%**\n- Final income tax: **0.10%**\n- Slippage: **0.15%** because entry price is >= Rp 500\n\nTotal round-trip cost: **0.65%**\n\nNet return after costs: **3.41% - 0.65% = 2.76%**\n\n**MARGINAL -- proceed only if conviction is high.**\n\n**Challenge 3 — Anti-averaging down check**  \nPrice is below MA200 Rp 4,276, but it has not clearly declined 10% from the recent high of Rp 4,937. Skip.\n\nPOSITION: AVOID CONFIDENCE: 0.40",
+        "round": 4,
+        "position": "AVOID",
+        "confidence": 0.4
+      }
+    ],
+    "raw_data_summary": "=== EVIDENCE BRIEF: BMRI ===\nQuery: swing trade analysis\n\n[FAIR_VALUE]\nEvidence ID: BMRI_20260712_173441_fair_value_0\nCurrent Price: 4080 | Fair Value Base: 5911 | Fair Value Range: 5024 - 6798 | Upside: 44.9% | Risk Overvalued: False\nSource: stockbit | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: BMRI_20260712_173441_technical_0\n{\"52w_high\":4937.0,\"52w_low\":3647.0,\"atr14\":127.0,\"avg_volume_20d\":194630970.0,\"avwap\":4134.0,\"avwap_anchor_bars_ago\":22,\"avwap_position\":\"BELOW_AVWAP\",\"bb_position\":\"LOWER_HALF\",\"bb_squeeze\":false,\"bb_width\":19.57,\"brief\":\"Position: NEUTRAL Stock is in a structural downtrend. This is a counter-trend bounce — use a conservative target and reduce position size to 50%. Ticker context: current price\nSource: yfinance | Score: 0.95\n\n[TECHNICAL]\nEvidence ID: BMRI_20260712_173441_technical_1\nRp 4,080 is still below MA200 Rp 4,276 and below MA50 Rp 4,116, so overhead supply remains significant. ENTRY ZONE: Rp 4,049 - Rp 4,116. Counter-trend trade -- reduce position size to 50%. TARGET: Rp 4,219 (approx. 2.6% from entry midpoint). STOP-LOSS: Rp 3,731 (2.5 x ATR below EMA20). RSI(14) at 50.6 is neutral, so momentum is neither oversold nor overbought. Current volume is not confirming\nSource: yfinance | Score: 0.95\n\n[TECHNICAL]\nEvidence ID: BMRI_20260712_173441_technical_2\nstrongly; volume surge ratio 0.38 suggests the move lacks strong participation. Weekly trend is unavailable, so no higher-timeframe bias can be confirmed. MACD histogram is POSITIVE_EXPANDING, meaning momentum is accelerating higher; however, because MA200 context is BELOW, this is only a counter-trend improvement, not a full bullish reversal. NR7 compression is present, so a breakout may come\nSource: yfinance | Score: 0.95\n\n[TECHNICAL]\nEvidence ID: BMRI_20260712_173441_technical_3\nwithin 1-2 sessions, but confir...\",\"compression_type\":\"NR7\",\"current_price\":4080.0,\"divergence_strength\":null,\"ema20\":4049.0,\"entry_rationale\":\"Market closed (weekend). Plan entries for Monday\nSource: yfinance | Score: 0.95\n\n[FUNDAMENTAL]\nEvidence ID: BMRI_20260712_173441_fundamental_3\ndepan.\\n\",\"fair_value\":5911.0,\"fair_value_base\":5911.0,\"fair_value_high\":6798.0,\"fair_value_low\":5024.0,\"risk_overvalued\":false}\nSource: stockbit | Score: 0.80\n\n---\nTotal evidence: 6/15 chunks selected\nToken estimate: ~574\n\n=== NEWS BRIEF: BMRI ===\nPeriod: last 60 days\nSentiment: POSITIVE (score: +0.57)\nBREAKING NEWS DETECTED\nMACRO EVENT DETECTED\nConfidence adjustment: +0.10\nReason: Breaking positive news in last 48h - significant opportunity detected\nLanguage: ID/EN\n\nTOP NEWS:\n1. [POSITIVE] IHSG Sepekan Menguat: Investor Asing Genggam Saham BMRI Hingga BRMS di Akhir Pekan! - Sinar Harapan - Sinar Harapan\n   Source: Sinar Harapan | 2026-07-12\n   Events: BREAKING | MACRO_EVENT\n2. [POSITIVE] IHSG Ditutup Naik ke 5.924: Saham BBRI, BMRI hingga BRPT Melaju - Bisnis.com - Market\n   Source: Bisnis.com - Market | 2026-07-10\n   Events: MACRO_EVENT\n3. [POSITIVE] IHSG Ditutup Menguat ke 5.912 Saham BMRI hingga RAJA Ramai Diborong Asing - achmadnurhidayat.id\n   Source: achmadnurhidayat.id | 2026-07-10\n   Events: MACRO_EVENT\n4. [POSITIVE] BMRI alihkan 91,75 juta saham treasury hasil buyback lewat ESOP - IDNFinancials.com\n   Source: IDNFinancials.com | 2026-07-09\n5. [POSITIVE] Rampungkan Program ESOP, BMRI Salurkan 91,75 Juta Saham Buyback ke Karyawan - Rmol.id\n   Source: Rmol.id | 2026-07-09",
+    "metadata": {
+      "prompt_version": "2026-06-30-cio-regime-labels-v27",
+      "run_id": "20260712_173441",
+      "regime": "DEFENSIVE",
+      "sector": "unknown",
+      "market_data_source": "yfinance",
+      "market_data_fetched_at": "2026-07-09T17:00:00+00:00",
+      "market_data_cached": true,
+      "flash_calls": 10,
+      "pro_calls": 0,
+      "tradeability_preflight": {
+        "status": "clean",
+        "atr14": 127.0,
+        "surrogate_gap": 280.0
+      },
+      "preflight_skipped": false,
+      "has_breaking_news": true,
+      "has_insider_selling": false,
+      "has_post_earnings": false,
+      "breaking_news_headlines": [
+        {
+          "title": "IHSG Sepekan Menguat: Investor Asing Genggam Saham BMRI Hingga BRMS di Akhir Pekan! - Sinar Harapan - Sinar Harapan",
+          "source": "Sinar Harapan",
+          "timestamp": "2026-07-12T03:34:26+00:00"
+        },
+        {
+          "title": "BMRI, ADRO, hingga BRMS Dikolek - investor.id",
+          "source": "investor.id",
+          "timestamp": "2026-07-12T03:00:00+00:00"
+        },
+        {
+          "title": "Indikasi Aksi Crossing Saham Jumbo di Pergerakan BMRI: Muncul Dua Aktor Utama - KabarBursa.com",
+          "source": "KabarBursa.com",
+          "timestamp": "2026-07-11T23:35:39+00:00"
+        }
+      ],
+      "news_confidence_adjustment": 0.1,
+      "news_overall_sentiment": "POSITIVE",
+      "news_brief": "=== NEWS BRIEF: BMRI ===\nPeriod: last 60 days\nSentiment: POSITIVE (score: +0.57)\nBREAKING NEWS DETECTED\nMACRO EVENT DETECTED\nConfidence adjustment: +0.10\nReason: Breaking positive news in last 48h - significant opportunity detected\nLanguage: ID/EN\n\nTOP NEWS:\n1. [POSITIVE] IHSG Sepekan Menguat: Investor Asing Genggam Saham BMRI Hingga BRMS di Akhir Pekan! - Sinar Harapan - Sinar Harapan\n   Source: Sinar Harapan | 2026-07-12\n   Events: BREAKING | MACRO_EVENT\n2. [POSITIVE] IHSG Ditutup Naik ke 5.924: Saham BBRI, BMRI hingga BRPT Melaju - Bisnis.com - Market\n   Source: Bisnis.com - Market | 2026-07-10\n   Events: MACRO_EVENT\n3. [POSITIVE] IHSG Ditutup Menguat ke 5.912 Saham BMRI hingga RAJA Ramai Diborong Asing - achmadnurhidayat.id\n   Source: achmadnurhidayat.id | 2026-07-10\n   Events: MACRO_EVENT\n4. [POSITIVE] BMRI alihkan 91,75 juta saham treasury hasil buyback lewat ESOP - IDNFinancials.com\n   Source: IDNFinancials.com | 2026-07-09\n5. [POSITIVE] Rampungkan Program ESOP, BMRI Salurkan 91,75 Juta Saham Buyback ke Karyawan - Rmol.id\n   Source: Rmol.id | 2026-07-09",
+      "exdate_tier": "CLEAR",
+      "rag_chunks_selected": 6,
+      "rag_chunks_considered": 15,
+      "rag_token_estimate": 574,
+      "rag_rendered_char_count": 2298,
+      "evidence_age_h": 0,
+      "evidence_age_hours": 0.0,
+      "rag_citation_ids": [
+        "BMRI_20260712_173441_fair_value_0",
+        "BMRI_20260712_173441_technical_0",
+        "BMRI_20260712_173441_technical_1",
+        "BMRI_20260712_173441_technical_2",
+        "BMRI_20260712_173441_technical_3",
+        "BMRI_20260712_173441_fundamental_3"
+      ],
+      "rag_citations": [
+        {
+          "chunk_id": "BMRI_20260712_173441_fair_value_0",
+          "category": "fair_value",
+          "source": "stockbit",
+          "relevance_score": 0.85,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "BMRI_20260712_173441_technical_0",
+          "category": "technical",
+          "source": "yfinance",
+          "relevance_score": 0.95,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "BMRI_20260712_173441_technical_1",
+          "category": "technical",
+          "source": "yfinance",
+          "relevance_score": 0.95,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "BMRI_20260712_173441_technical_2",
+          "category": "technical",
+          "source": "yfinance",
+          "relevance_score": 0.95,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "BMRI_20260712_173441_technical_3",
+          "category": "technical",
+          "source": "yfinance",
+          "relevance_score": 0.95,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "BMRI_20260712_173441_fundamental_3",
+          "category": "fundamental",
+          "source": "stockbit",
+          "relevance_score": 0.8,
+          "is_stale": false
+        }
+      ],
+      "rag_stale_citation_ids": [],
+      "fair_value_rag_verified": true,
+      "market_cap_idr": 380799987744768,
+      "duration_seconds": 115.26499999998487,
+      "batch_timestamp": "20260712_173908"
+    },
+    "regime": {
+      "label": "SIDEWAYS",
+      "confidence": 0.9467375021528672,
+      "probabilities": {
+        "SIDEWAYS": 0.9467375021528672,
+        "BULL": 0.019237603759281907,
+        "BEAR_STRESS": 0.034024894087631256
+      },
+      "msci_override": false,
+      "training_days": 756,
+      "detected_at": "2026-07-12T17:35:22.390083",
+      "notes": "MSCI review active: True"
+    },
+    "trading_params": {
+      "description": "IHSG flat, moderate volatility",
+      "max_position_pct": 0.01,
+      "min_risk_reward": 2.0,
+      "consensus_threshold": 0.7,
+      "max_concurrent_positions": 2,
+      "devil_advocate_weight": 0.3,
+      "regime_multiplier": 0.85,
+      "trading_allowed": true
+    },
+    "error": null,
+    "status": "success",
+    "conviction_score": 0.0,
+    "sector_key": "unknown",
+    "news_sentiment": "POSITIVE",
+    "news_confidence_adjustment": 0.1,
+    "has_breaking_news": true,
+    "breaking_news_headlines": [
+      {
+        "title": "IHSG Sepekan Menguat: Investor Asing Genggam Saham BMRI Hingga BRMS di Akhir Pekan! - Sinar Harapan - Sinar Harapan",
+        "source": "Sinar Harapan",
+        "timestamp": "2026-07-12T03:34:26+00:00"
+      },
+      {
+        "title": "BMRI, ADRO, hingga BRMS Dikolek - investor.id",
+        "source": "investor.id",
+        "timestamp": "2026-07-12T03:00:00+00:00"
+      },
+      {
+        "title": "Indikasi Aksi Crossing Saham Jumbo di Pergerakan BMRI: Muncul Dua Aktor Utama - KabarBursa.com",
+        "source": "KabarBursa.com",
+        "timestamp": "2026-07-11T23:35:39+00:00"
+      }
+    ],
+    "evidence_age_h": 0,
+    "model_confidence": 0.4,
+    "trade_conviction": 0.0,
+    "risk_governor": {
+      "ticker": "BMRI",
+      "status": "reject",
+      "sizing_allowed": false,
+      "reason_codes": [
+        "rr_too_low",
+        "invalid_entry_range",
+        "missing_target_price",
+        "missing_stop_loss"
+      ],
+      "message": "Setup ditolak karena data harga kunci belum valid.",
+      "current_price": 4080.0,
+      "entry_low": null,
+      "entry_high": null,
+      "target_price": null,
+      "stop_loss": null
+    },
+    "forecast_report": {
+      "ticker": "BMRI",
+      "as_of": "2026-07-12",
+      "horizon_days": 10,
+      "expected_return_net": null,
+      "p_target": null,
+      "p_stop": null,
+      "volatility_forecast": 0.33862633660673724,
+      "expected_value": null,
+      "decision": "AVOID",
+      "confidence": null,
+      "model_votes": [
+        {
+          "model_name": "naive",
+          "status": "validation_failed",
+          "reason": "validation_status:failed",
+          "r_hat_net": -0.011418291475345904,
+          "p_target": 0.41004351271011197,
+          "p_stop": 0.41397372576691144,
+          "volatility_forecast": 0.33862633660673724,
+          "weight": 0.0,
+          "validation_passed": false,
+          "ic": null,
+          "brier_target": 0.25,
+          "rmse": 0.04898508011794996,
+          "mae": 0.040922832275433765,
+          "mape": 1.458882538902434,
+          "directional_accuracy": 0.5666666666666667
+        },
+        {
+          "model_name": "xgboost",
+          "status": "active",
+          "reason": null,
+          "r_hat_net": 0.009051711298525333,
+          "p_target": 0.41473120605653013,
+          "p_stop": 0.40928805819030323,
+          "volatility_forecast": 0.33862633660673724,
+          "weight": 0.0,
+          "validation_passed": true,
+          "ic": 0.08911748871053514,
+          "brier_target": 0.25729373188409826,
+          "rmse": 0.059807906315187884,
+          "mae": 0.04832931948775253,
+          "mape": 2.5791220601132503,
+          "directional_accuracy": 0.47333333333333333
+        },
+        {
+          "model_name": "lstm",
+          "status": "experimental_unused",
+          "reason": "conservative_policy",
+          "r_hat_net": null,
+          "p_target": null,
+          "p_stop": null,
+          "volatility_forecast": null,
+          "weight": 0.0,
+          "validation_passed": false,
+          "ic": null,
+          "brier_target": null,
+          "rmse": null,
+          "mae": null,
+          "mape": null,
+          "directional_accuracy": null
+        },
+        {
+          "model_name": "prophet",
+          "status": "experimental_unused",
+          "reason": "conservative_policy_not_primary_return_model",
+          "r_hat_net": null,
+          "p_target": null,
+          "p_stop": null,
+          "volatility_forecast": null,
+          "weight": 0.0,
+          "validation_passed": false,
+          "ic": null,
+          "brier_target": null,
+          "rmse": null,
+          "mae": null,
+          "mape": null,
+          "directional_accuracy": null
+        },
+        {
+          "model_name": "tgarch",
+          "status": "active",
+          "reason": null,
+          "r_hat_net": null,
+          "p_target": null,
+          "p_stop": null,
+          "volatility_forecast": 0.33862633660673724,
+          "weight": 0.0,
+          "validation_passed": true,
+          "ic": null,
+          "brier_target": null,
+          "rmse": null,
+          "mae": null,
+          "mape": null,
+          "directional_accuracy": null
+        }
+      ],
+      "validation_summary": {
+        "horizon_days": 10,
+        "n_observations": 150,
+        "ic_mean": 0.08911748871053514,
+        "ic_t_stat": 0.7831343792255341,
+        "brier": 0.2536468659420491,
+        "rmse": 0.05439649321656892,
+        "mae": 0.04462607588159315,
+        "mape": 2.019002299507842,
+        "directional_accuracy": 0.52,
+        "dsr": 0.001283,
+        "bh_q_value_passed": false,
+        "status": "failed"
+      },
+      "validation_by_model": {
+        "naive": {
+          "horizon_days": 10,
+          "n_observations": 150,
+          "ic_mean": null,
+          "ic_t_stat": null,
+          "brier": 0.25,
+          "rmse": 0.04898508011794996,
+          "mae": 0.040922832275433765,
+          "mape": 1.458882538902434,
+          "directional_accuracy": 0.5666666666666667,
+          "dsr": 0.001283,
+          "bh_q_value_passed": false,
+          "status": "failed"
+        },
+        "xgboost": {
+          "horizon_days": 10,
+          "n_observations": 150,
+          "ic_mean": 0.08911748871053514,
+          "ic_t_stat": 0.7831343792255341,
+          "brier": 0.25729373188409826,
+          "rmse": 0.059807906315187884,
+          "mae": 0.04832931948775253,
+          "mape": 2.5791220601132503,
+          "directional_accuracy": 0.47333333333333333,
+          "dsr": 0.001283,
+          "bh_q_value_passed": false,
+          "status": "research_only"
+        }
+      },
+      "model_dispersion": 0.01023500138693562,
+      "model_disagreement_penalty": 0.1205,
+      "risk_adjusted_expected_value": null,
+      "data_quality_flags": [
+        "no_validated_return_model",
+        "experimental_unused:lstm",
+        "experimental_unused:prophet",
+        "model_disagreement_penalty:0.120",
+        "validation_status:failed"
+      ],
+      "volatility_fallback": false
+    },
+    "forecast_ev_ignored_reason": "validation_failed"
+  },
+  {
+    "ticker": "LSIP",
+    "verdict": {
+      "ticker": "LSIP",
+      "rating": "HOLD",
+      "confidence": 0.4,
+      "fair_value": 3311.0,
+      "fair_value_base": 3311.0,
+      "fair_value_low": 2814.0,
+      "fair_value_high": 3808.0,
+      "valuation_gap": null,
+      "entry_price_range": null,
+      "target_price": null,
+      "stop_loss": null,
+      "current_price": 1295.0,
+      "timeframe": "5-20 Trading Days",
+      "execution_horizon_days": 10,
+      "weighted_reasoning": "",
+      "critical_risk_factor": "",
+      "key_catalysts": [],
+      "key_risks": [],
+      "summary": "Setup ditolak: rr_too_low: R/R 0.23 < 1.4 (target 1325.0, entry_high 1295.0, stop 1165.0).",
+      "target_basis": null,
+      "expected_return": null,
+      "risk_reward_ratio": null,
+      "is_overvalued": false,
+      "risk_overvalued": false,
+      "wait_and_see": true,
+      "consensus_reached": false,
+      "consensus_method": null,
+      "dissenting_agents": [
+        "chartist",
+        "bull",
+        "bear"
+      ],
+      "reason_codes": [
+        "rr_too_low"
+      ],
+      "hypothetical_envelope": {
+        "entry_low": 1255.0,
+        "entry_high": 1295.0,
+        "target_price": 1325.0,
+        "target_basis": "Resistance 20-Day",
+        "stop_loss": 1165.0,
+        "risk_reward_ratio": 0.23
+      },
+      "trailing_stop_pct": null,
+      "trailing_stop_trigger_pct": null,
+      "partial_exit_t1_pct": 0.5,
+      "partial_exit_trail_remainder": true,
+      "momentum_play": false,
+      "model_confidence": 0.4
+    },
+    "debate_rounds": 3,
+    "consensus_reached": false,
+    "consensus_method": null,
+    "dissenting_agents": [
+      "chartist",
+      "bull",
+      "bear"
+    ],
+    "agent_votes": [
+      {
+        "agent": "fundamental_scout",
+        "position": "HOLD",
+        "confidence": 0.82,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.82,
+        "round": 0
+      },
+      {
+        "agent": "chartist",
+        "position": "BUY",
+        "confidence": 0.78,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.78,
+        "round": 0
+      },
+      {
+        "agent": "sentiment_specialist",
+        "position": "HOLD",
+        "confidence": 0.72,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.72,
+        "round": 0
+      },
+      {
+        "agent": "bull",
+        "position": "BUY",
+        "confidence": 0.62,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.62,
+        "round": 3
+      },
+      {
+        "agent": "bear",
+        "position": "AVOID",
+        "confidence": 0.66,
+        "calibration_weight": 0.85,
+        "effective_confidence": 0.561,
+        "round": 3
+      },
+      {
+        "agent": "devils_advocate",
+        "position": "AVOID",
+        "confidence": 0.4,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.4,
+        "round": 4
+      }
+    ],
+    "consensus_winner": null,
+    "disagreement_type": "timing",
+    "debate_history": [
+      {
+        "role": "system",
+        "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 1,295, Rp 3,311, Rp 1,228, Rp 1,205, Rp 1,238, Rp 1,362, Rp 1,128, Rp 1,256.5, Rp 90, Rp 44, Rp 88",
+        "round": 0,
+        "position": "UNKNOWN",
+        "confidence": null
+      },
+      {
+        "role": "system",
+        "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 1,295, Rp 3,311, Rp 1,228, Rp 1,205, Rp 1,238, Rp 1,362, Rp 1,128, Rp 1,256.5",
+        "round": 0,
+        "position": "UNKNOWN",
+        "confidence": null
+      },
+      {
+        "role": "bull",
+        "content": "…D: The only company-specific event shown is the dividend/corporate action in late June and early July, which is a **past event** and cannot be used as a future swing catalyst. No valid near-term 5-20 trading-day catalyst is provided, so the trade lacks the required trigger. Risk/reward from the brief is: Entry Rp 1,238-1,275 -> Target Rp 1,362 -> Stop Rp 1,128. Using the midpoint entry ~Rp 1,256.5, R/R is roughly 1.0:1.0 to 1.2:1, which is acceptable but not compelling enough without a live catalyst. Needs reconfirmation if a fresh flow trigger appears.\n\nPosition: HOLD  \nAgent Confidence: 0.41",
+        "round": 1,
+        "position": "BUY",
+        "confidence": 0.348
+      },
+      {
+        "role": "bear",
+        "content": "…ish, MA200 is above, RSI is **61.0**, and MACD is positive-expanding; there is no exact lower-high sequence or MA50/MA200 breakdown given to invalidate support. The only concrete risk I can state is execution risk: if price does not pull back into **Rp 1,238-1,275**, the setup loses its edge. On reward/risk, using the midpoint entry **Rp 1,256.5**, target **Rp 1,362**, and stop **Rp 1,128**, upside is about **8.4%** versus downside about **10.2%**, or roughly **0.82:1 reward/risk**. That is not attractive enough for a swing trade absent a fresh catalyst.\n\nPosition: AVOID\nAgent Confidence: 0.34",
+        "round": 1,
+        "position": "HOLD",
+        "confidence": 0.34
+      },
+      {
+        "role": "bull",
+        "content": "…hen the stop reference is revised to the secondary support instead of the Bear’s broad stop complaint. Using the current price structure, the downside to the AVWAP area is limited relative to the much larger gap toward fair value, and the existing breakout structure keeps the upside path open as long as the support cluster holds. The main caveat is that the chart is stretched above the upper band, so this is a buy-on-strength only if execution is disciplined; however, the technical and valuation evidence still favor bullish bias over the Bear’s avoid call.\n\nPosition: BUY\nAgent Confidence: 0.62",
+        "round": 2,
+        "position": "BUY",
+        "confidence": 0.527
+      },
+      {
+        "role": "bear",
+        "content": "…er sits only modestly below spot and does not offer much room for error.\n\nMargin of safety stress test fails as well: ATR(14) is Rp 44, so the maximum 1-week adverse move is Rp 88. That is greater than the Bull’s implied cushion from Rp 1,295 down to Rp 1,228, and essentially consumes the room to the next support at Rp 1,205. Trade is unviable for swing execution -- adverse move exceeds margin of safety. Also, the dividend headlines dated 2026-06-26 to 2026-07-03 are PAST_EVENT_NOT_CATALYST for a 5-20 trading-day trigger, so they cannot rescue the setup.\n\nPosition: AVOID\nAgent Confidence: 0.38",
+        "round": 2,
+        "position": "AVOID",
+        "confidence": 0.38
+      },
+      {
+        "role": "bull",
+        "content": "Position: BULLISH\nDebate Confidence: MEDIUM\n\nBear’s execution-risk point is fair, but its stop logic is too binary. The cited breakdown concern around Rp 1,238 is not the only reference: the technical sheet gives a secondary support at Rp 1,205, which is still above the 52-week low context and aligns with the AVWAP anchor, so the trade does not collapse immediately if the first shelf wobbles. Also, the bearish “ATR(14) = Rp 44, so 1-week adverse move = Rp 88” framing is a stress test, not a forecast; by itself it does not invalidate a swing if price remains above the deeper support.\n\nOn valuation, the gap to fair value is large enough that the Bear’s downside scenario is already absorbed. Current price is Rp 1,295 versus fair value base Rp 3,311, leaving a very wide discount, and even a move to the secondary support would still leave the stock materially below estimated value. That means the Bear is arguing over short-horizon volatility while the valuation cushion remains structurally substantial; the downside does not consume the core thesis unless price loses the support stack and the discount shrinks because fundamentals worsen.\n\nOn catalyst skepticism, the past dividend headlines from late June/early July are correctly labeled PAST_EVENT_NOT_CATALYST, so I will not lean on them as the trigger. The better 5-20 trading-day trigger is technical follow-through: LSIP is already above AVWAP and above VWAP with positive-expanding MACD and a BB squeeze, which often precedes directional continuation once volatility releases. If the stock pulls back and holds the Rp 1,205 area, that becomes the fallback confirmation for an entry on renewed strength rather than a failed breakout.\n\nRevised R/R is still workable when the stop is referenced to secondary support instead of the Bear’s broad objection. Using the current structure, upside to the existing breakout objective remains closer than the valuation gap suggests, while the downside is now defined by Rp 1,205 rather than a vague “unviable” claim. That does not make it a chase; it makes it a disciplined swing long with a tighter, chart-based invalidation level and a better reward profile than the Bear’s compressed risk framing implies.  \nPosition: BUY\nAgent Confidence: 0.62",
+        "round": 3,
+        "position": "BUY",
+        "confidence": 0.527
+      },
+      {
+        "role": "bear",
+        "content": "Position: BEARISH\nDebate Confidence: MEDIUM\n\nThe Bull’s cited support stack around Rp 1,238 and Rp 1,205 is not a durable safety net; if price is already stretched above the upper band, a pullback into those levels can happen without changing the larger trend, but that does not make them reliable defenses. The Bull’s own framework admits the stock is extended, so using Rp 1,205 as a “fallback confirmation” is really an admission that the initial setup is fragile, not resilient. On the cited Rp 1,295 spot, the issue is not whether support exists somewhere below, but whether it can absorb a routine volatility flush without invalidating the swing structure.\n\nIf Rp 1,238 breaks, the next support is Rp 1,205 — making the actual max loss Rp 90, not Rp 57 as the Bull claims. That gap matters because the Bull’s revised risk framing compresses the downside too tightly relative to the actual path the stock can take in a 5–20 trading-day swing. The support shelf at Rp 1,205 is also not a hard floor; it is simply an intermediate line in a rising tape, and once Rp 1,238 fails, the market has already shown that the first defense did not hold.\n\nMargin of safety stress test: ATR(14) is Rp 44, so the maximum 1-week adverse move is Rp 88. Compared with the Bull’s price reference at Rp 1,295 and the cited support at Rp 1,238, that adverse move essentially reaches the first cited support area; against Rp 1,205, it leaves very little protection. Trade is unviable for swing execution -- adverse move exceeds margin of safety.\n\nPosition: AVOID\nAgent Confidence: 0.66",
+        "round": 3,
+        "position": "AVOID",
+        "confidence": 0.66
+      },
+      {
+        "role": "devils_advocate",
+        "content": "Position: STRESS_TEST  \nAgent Confidence: 0.83\n\n**Challenge 1 — MACRO / COMPANY RISK**  \nIf the recent dividend/corporate-action flow fades and sellers hit the tape, could **Rp 1,238** fail quickly and drag LSIP through the stop cluster despite the current bullish structure?  \n\n**Challenge 2 — TRANSACTION COST STRESS TEST**  \nEntry price used: **Rp 1,256.5** (Entry Midpoint)\n\n- Buy commission: **0.15%**\n- Sell commission: **0.25%**\n- Final income tax: **0.10%**\n- Slippage: **0.15%** (entry price >= Rp 500)\n\nTotal round-trip cost = **0.15% + 0.25% + 0.10% + 0.15% = 0.65%**\n\nProjected target return% = **5.6%**  \nNet return after costs = **5.6% - 0.65% = 4.95%**\n\n**VIABLE after transaction costs.**\n\nPOSITION: AVOID CONFIDENCE: 0.40",
+        "round": 4,
+        "position": "AVOID",
+        "confidence": 0.4
+      }
+    ],
+    "raw_data_summary": "=== EVIDENCE BRIEF: LSIP ===\nQuery: swing trade analysis\n\n[FAIR_VALUE]\nEvidence ID: LSIP_20260712_173441_fair_value_0\nCurrent Price: 1295 | Fair Value Base: 3311 | Fair Value Range: 2814 - 3808 | Upside: 155.7% | Risk Overvalued: False\nSource: stockbit | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: LSIP_20260712_173441_technical_0\n{\"52w_high\":1674.0,\"52w_low\":1031.0,\"atr14\":44.0,\"avg_volume_20d\":8700385.0,\"avwap\":1205.0,\"avwap_anchor_bars_ago\":22,\"avwap_position\":\"ABOVE_AVWAP\",\"bb_position\":\"ABOVE_UPPER\",\"bb_squeeze\":true,\"bb_width\":9.54,\"brief\":\"Position: BULLISH Stock is in a structural uptrend. Swing long is trend-aligned. LSIP is holding above MA200 and trading constructively above VWAP/AVWAP, so the higher-timeframe\nSource: yfinance | Score: 0.95\n\n[TECHNICAL]\nEvidence ID: LSIP_20260712_173441_technical_1\nbias remains positive despite the short-term stretch. MA200 context is ABOVE, and MACD confirms breakout with POSITIVE_EXPANDING momentum. ENTRY ZONE: Rp 1,238 - Rp 1,275 TARGET: Rp 1,362 (approx. 5.6% from entry midpoint) STOP-LOSS: Rp 1,128 (2.5 x ATR below EMA20) RSI(14) at 61.0 is neutral-to-bullish, not overbought. Current volume confirms the move only modestly: volume surge ratio 1.06\nSource: yfinance | Score: 0.95\n\n[TECHNICAL]\nEvidence ID: LSIP_20260712_173441_technical_2\nsuggests participation, but not a strong expansion. Price is above VWAP (Rp 1,228) by 5.4% and above AVWAP (Rp 1,205) by 7.5%, indicating institutional flow remains supportive. Weekly trend is unavailable, so no weekly confirmation can be added. BB squeeze is detected and price is above the upper band, which means breakout conditions are active but also that price is extended — avoid chasing\nSource: yfinance | Score: 0.95\n\n[TECHNICAL]\nEvidence ID: LSIP_20260712_173441_technical_3\naggressively and prefer pullback...\",\"compression_type\":\"NONE\",\"current_price\":1295.0,\"divergence_strength\":null,\"ema20\":1238.0,\"entry_rationale\":\"Market closed (weekend). Plan entries for Monday\nSource: yfinance | Score: 0.95\n\n[FUNDAMENTAL]\nEvidence ID: LSIP_20260712_173441_fundamental_3\ndepan.\\n\",\"fair_value\":3311.0,\"fair_value_base\":3311.0,\"fair_value_high\":3808.0,\"fair_value_low\":2814.0,\"risk_overvalued\":false}\nSource: stockbit | Score: 0.80\n\n---\nTotal evidence: 6/15 chunks selected\nToken estimate: ~573\n\n=== NEWS BRIEF: LSIP ===\nPeriod: last 60 days\nSentiment: POSITIVE (score: +0.81)\nCORPORATE ACTION DETECTED\nPOST-EARNINGS WINDOW — recent financial results published\nConfidence adjustment: +0.05\nReason: Positive news sentiment supports trade\nLanguage: Bahasa Indonesia\n\nTOP NEWS:\n1. [POSITIVE] 11 Saham Cum Date Hari Ini (15/6): DLTA, LSIP, hingga SIMP Siap Tebar Dividen! - Ajaib\n   Source: Ajaib | 2026-07-03\n   Events: CORPORATE_ACTION\n2. [POSITIVE] LSIP Jadwal Dividen 30 Persen Laba, Tembus Rp566,05 Miliar - Emitennews.com\n   Source: Emitennews.com | 2026-06-30\n   Events: CORPORATE_ACTION\n3. [POSITIVE] Intip Jadwal Lengkap Dividen London Sumatra (LSIP) Rp566 Miliar - RCTI+\n   Source: RCTI+ | 2026-06-29\n   Events: CORPORATE_ACTION\n4. [POSITIVE] LSIP Tebar Dividen dengan Payout Ratio 29,99 Persen, Ini Jatah Pemegang Saham - IDX Channel\n   Source: IDX Channel | 2026-06-27\n   Events: CORPORATE_ACTION\n5. [POSITIVE] Lonsum (LSIP) Patok Dividen Rp83 per Saham, 30 Persen dari Laba Bersih - IDX Channel\n   Source: IDX Channel | 2026-06-26\n   Events: CORPORATE_ACTION | POST_EARNINGS\nMost recent news is 220h old",
+    "metadata": {
+      "prompt_version": "2026-06-30-cio-regime-labels-v27",
+      "run_id": "20260712_173441",
+      "regime": "DEFENSIVE",
+      "sector": "unknown",
+      "market_data_source": "yfinance",
+      "market_data_fetched_at": "2026-07-09T17:00:00+00:00",
+      "market_data_cached": true,
+      "flash_calls": 10,
+      "pro_calls": 0,
+      "tradeability_preflight": {
+        "status": "clean",
+        "atr14": 44.0,
+        "surrogate_gap": 170.0
+      },
+      "preflight_skipped": false,
+      "has_breaking_news": false,
+      "has_insider_selling": false,
+      "has_post_earnings": true,
+      "breaking_news_headlines": [],
+      "news_confidence_adjustment": 0.05,
+      "news_overall_sentiment": "POSITIVE",
+      "news_brief": "=== NEWS BRIEF: LSIP ===\nPeriod: last 60 days\nSentiment: POSITIVE (score: +0.81)\nCORPORATE ACTION DETECTED\nPOST-EARNINGS WINDOW — recent financial results published\nConfidence adjustment: +0.05\nReason: Positive news sentiment supports trade\nLanguage: Bahasa Indonesia\n\nTOP NEWS:\n1. [POSITIVE] 11 Saham Cum Date Hari Ini (15/6): DLTA, LSIP, hingga SIMP Siap Tebar Dividen! - Ajaib\n   Source: Ajaib | 2026-07-03\n   Events: CORPORATE_ACTION\n2. [POSITIVE] LSIP Jadwal Dividen 30 Persen Laba, Tembus Rp566,05 Miliar - Emitennews.com\n   Source: Emitennews.com | 2026-06-30\n   Events: CORPORATE_ACTION\n3. [POSITIVE] Intip Jadwal Lengkap Dividen London Sumatra (LSIP) Rp566 Miliar - RCTI+\n   Source: RCTI+ | 2026-06-29\n   Events: CORPORATE_ACTION\n4. [POSITIVE] LSIP Tebar Dividen dengan Payout Ratio 29,99 Persen, Ini Jatah Pemegang Saham - IDX Channel\n   Source: IDX Channel | 2026-06-27\n   Events: CORPORATE_ACTION\n5. [POSITIVE] Lonsum (LSIP) Patok Dividen Rp83 per Saham, 30 Persen dari Laba Bersih - IDX Channel\n   Source: IDX Channel | 2026-06-26\n   Events: CORPORATE_ACTION | POST_EARNINGS\nMost recent news is 220h old",
+      "exdate_tier": "CLEAR",
+      "rag_chunks_selected": 6,
+      "rag_chunks_considered": 15,
+      "rag_token_estimate": 573,
+      "rag_rendered_char_count": 2295,
+      "evidence_age_h": 0,
+      "evidence_age_hours": 0.0,
+      "rag_citation_ids": [
+        "LSIP_20260712_173441_fair_value_0",
+        "LSIP_20260712_173441_technical_0",
+        "LSIP_20260712_173441_technical_1",
+        "LSIP_20260712_173441_technical_2",
+        "LSIP_20260712_173441_technical_3",
+        "LSIP_20260712_173441_fundamental_3"
+      ],
+      "rag_citations": [
+        {
+          "chunk_id": "LSIP_20260712_173441_fair_value_0",
+          "category": "fair_value",
+          "source": "stockbit",
+          "relevance_score": 0.85,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "LSIP_20260712_173441_technical_0",
+          "category": "technical",
+          "source": "yfinance",
+          "relevance_score": 0.95,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "LSIP_20260712_173441_technical_1",
+          "category": "technical",
+          "source": "yfinance",
+          "relevance_score": 0.95,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "LSIP_20260712_173441_technical_2",
+          "category": "technical",
+          "source": "yfinance",
+          "relevance_score": 0.95,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "LSIP_20260712_173441_technical_3",
+          "category": "technical",
+          "source": "yfinance",
+          "relevance_score": 0.95,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "LSIP_20260712_173441_fundamental_3",
+          "category": "fundamental",
+          "source": "stockbit",
+          "relevance_score": 0.8,
+          "is_stale": false
+        }
+      ],
+      "rag_stale_citation_ids": [],
+      "fair_value_rag_verified": true,
+      "market_cap_idr": 8831853658112,
+      "duration_seconds": 109.92199999999139,
+      "batch_timestamp": "20260712_173908"
+    },
+    "regime": {
+      "label": "SIDEWAYS",
+      "confidence": 0.9467375021528672,
+      "probabilities": {
+        "SIDEWAYS": 0.9467375021528672,
+        "BULL": 0.019237603759281907,
+        "BEAR_STRESS": 0.034024894087631256
+      },
+      "msci_override": false,
+      "training_days": 756,
+      "detected_at": "2026-07-12T17:35:27.320620",
+      "notes": "MSCI review active: True"
+    },
+    "trading_params": {
+      "description": "IHSG flat, moderate volatility",
+      "max_position_pct": 0.01,
+      "min_risk_reward": 2.0,
+      "consensus_threshold": 0.7,
+      "max_concurrent_positions": 2,
+      "devil_advocate_weight": 0.3,
+      "regime_multiplier": 0.85,
+      "trading_allowed": true
+    },
+    "error": null,
+    "status": "success",
+    "conviction_score": 0.0,
+    "sector_key": "unknown",
+    "news_sentiment": "POSITIVE",
+    "news_confidence_adjustment": 0.05,
+    "has_breaking_news": false,
+    "breaking_news_headlines": [],
+    "evidence_age_h": 0,
+    "model_confidence": 0.4,
+    "trade_conviction": 0.0,
+    "risk_governor": {
+      "ticker": "LSIP",
+      "status": "reject",
+      "sizing_allowed": false,
+      "reason_codes": [
+        "rr_too_low",
+        "invalid_entry_range",
+        "missing_target_price",
+        "missing_stop_loss"
+      ],
+      "message": "Setup ditolak karena data harga kunci belum valid.",
+      "current_price": 1295.0,
+      "entry_low": null,
+      "entry_high": null,
+      "target_price": null,
+      "stop_loss": null
+    },
+    "forecast_report": {
+      "ticker": "LSIP",
+      "as_of": "2026-07-12",
+      "horizon_days": 10,
+      "expected_return_net": null,
+      "p_target": null,
+      "p_stop": null,
+      "volatility_forecast": 0.37549645513640206,
+      "expected_value": null,
+      "decision": "AVOID",
+      "confidence": null,
+      "model_votes": [
+        {
+          "model_name": "naive",
+          "status": "validation_failed",
+          "reason": "validation_status:failed",
+          "r_hat_net": 0.005625332324794035,
+          "p_target": 0.4222817963284684,
+          "p_stop": 0.4187718312445863,
+          "volatility_forecast": 0.37549645513640206,
+          "weight": 0.0,
+          "validation_passed": false,
+          "ic": null,
+          "brier_target": 0.25,
+          "rmse": 0.090419084371737,
+          "mae": 0.0774396937252267,
+          "mape": 1.2792856015526306,
+          "directional_accuracy": 0.4533333333333333
+        },
+        {
+          "model_name": "xgboost",
+          "status": "active",
+          "reason": null,
+          "r_hat_net": 0.015894874930381775,
+          "p_target": 0.424415027291281,
+          "p_stop": 0.41664476259301264,
+          "volatility_forecast": 0.37549645513640206,
+          "weight": 0.0,
+          "validation_passed": true,
+          "ic": 0.07115167836678644,
+          "brier_target": 0.26972188800554636,
+          "rmse": 0.10180565531962707,
+          "mae": 0.0819049551380595,
+          "mape": 1.9494130824976807,
+          "directional_accuracy": 0.5266666666666666
+        },
+        {
+          "model_name": "lstm",
+          "status": "experimental_unused",
+          "reason": "conservative_policy",
+          "r_hat_net": null,
+          "p_target": null,
+          "p_stop": null,
+          "volatility_forecast": null,
+          "weight": 0.0,
+          "validation_passed": false,
+          "ic": null,
+          "brier_target": null,
+          "rmse": null,
+          "mae": null,
+          "mape": null,
+          "directional_accuracy": null
+        },
+        {
+          "model_name": "prophet",
+          "status": "experimental_unused",
+          "reason": "conservative_policy_not_primary_return_model",
+          "r_hat_net": null,
+          "p_target": null,
+          "p_stop": null,
+          "volatility_forecast": null,
+          "weight": 0.0,
+          "validation_passed": false,
+          "ic": null,
+          "brier_target": null,
+          "rmse": null,
+          "mae": null,
+          "mape": null,
+          "directional_accuracy": null
+        },
+        {
+          "model_name": "tgarch",
+          "status": "active",
+          "reason": null,
+          "r_hat_net": null,
+          "p_target": null,
+          "p_stop": null,
+          "volatility_forecast": 0.37549645513640206,
+          "weight": 0.0,
+          "validation_passed": true,
+          "ic": null,
+          "brier_target": null,
+          "rmse": null,
+          "mae": null,
+          "mape": null,
+          "directional_accuracy": null
+        }
+      ],
+      "validation_summary": {
+        "horizon_days": 10,
+        "n_observations": 150,
+        "ic_mean": 0.07115167836678644,
+        "ic_t_stat": 0.3114227678124458,
+        "brier": 0.25986094400277315,
+        "rmse": 0.09611236984568203,
+        "mae": 0.0796723244316431,
+        "mape": 1.6143493420251556,
+        "directional_accuracy": 0.49,
+        "dsr": 0.082127,
+        "bh_q_value_passed": false,
+        "status": "failed"
+      },
+      "validation_by_model": {
+        "naive": {
+          "horizon_days": 10,
+          "n_observations": 150,
+          "ic_mean": null,
+          "ic_t_stat": null,
+          "brier": 0.25,
+          "rmse": 0.090419084371737,
+          "mae": 0.0774396937252267,
+          "mape": 1.2792856015526306,
+          "directional_accuracy": 0.4533333333333333,
+          "dsr": 0.082127,
+          "bh_q_value_passed": false,
+          "status": "failed"
+        },
+        "xgboost": {
+          "horizon_days": 10,
+          "n_observations": 150,
+          "ic_mean": 0.07115167836678644,
+          "ic_t_stat": 0.3114227678124458,
+          "brier": 0.26972188800554636,
+          "rmse": 0.10180565531962707,
+          "mae": 0.0819049551380595,
+          "mape": 1.9494130824976807,
+          "directional_accuracy": 0.5266666666666666,
+          "dsr": 0.082127,
+          "bh_q_value_passed": false,
+          "status": "research_only"
+        }
+      },
+      "model_dispersion": 0.00513477130279387,
+      "model_disagreement_penalty": 0.0103,
+      "risk_adjusted_expected_value": null,
+      "data_quality_flags": [
+        "no_validated_return_model",
+        "experimental_unused:lstm",
+        "experimental_unused:prophet",
+        "model_disagreement_penalty:0.010",
+        "validation_status:failed"
+      ],
+      "volatility_fallback": false
+    },
+    "forecast_ev_ignored_reason": "validation_failed"
+  },
+  {
+    "ticker": "ERAA",
+    "verdict": {
+      "ticker": "ERAA",
+      "rating": "HOLD",
+      "confidence": 0.4,
+      "fair_value": 1292.0,
+      "fair_value_base": 1292.0,
+      "fair_value_low": 1098.0,
+      "fair_value_high": 1486.0,
+      "valuation_gap": null,
+      "entry_price_range": null,
+      "target_price": null,
+      "stop_loss": null,
+      "current_price": 340.0,
+      "timeframe": "5-20 Trading Days",
+      "execution_horizon_days": 10,
+      "weighted_reasoning": "",
+      "critical_risk_factor": "",
+      "key_catalysts": [],
+      "key_risks": [],
+      "summary": "Setup ditolak: no_momentum_confirmation: return_5d -0.3% < 0 at RSI 49.6.",
+      "target_basis": null,
+      "expected_return": null,
+      "risk_reward_ratio": null,
+      "is_overvalued": false,
+      "risk_overvalued": false,
+      "wait_and_see": true,
+      "consensus_reached": true,
+      "consensus_method": "voting",
+      "dissenting_agents": [
+        "bear"
+      ],
+      "reason_codes": [
+        "no_momentum_confirmation"
+      ],
+      "hypothetical_envelope": {
+        "entry_low": 330.0,
+        "entry_high": 340.0,
+        "target_price": 358.0,
+        "target_basis": "Resistance 20-Day",
+        "stop_loss": 308.0,
+        "risk_reward_ratio": 0.56
+      },
+      "trailing_stop_pct": null,
+      "trailing_stop_trigger_pct": null,
+      "partial_exit_t1_pct": 0.5,
+      "partial_exit_trail_remainder": true,
+      "momentum_play": false,
+      "model_confidence": 0.4
+    },
+    "debate_rounds": 1,
+    "consensus_reached": true,
+    "consensus_method": "voting",
+    "dissenting_agents": [
+      "bear"
+    ],
+    "agent_votes": [
+      {
+        "agent": "fundamental_scout",
+        "position": "HOLD",
+        "confidence": 0.78,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.78,
+        "round": 0
+      },
+      {
+        "agent": "chartist",
+        "position": "HOLD",
+        "confidence": 0.72,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.72,
+        "round": 0
+      },
+      {
+        "agent": "sentiment_specialist",
+        "position": "HOLD",
+        "confidence": 0.61,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.61,
+        "round": 0
+      },
+      {
+        "agent": "bull",
+        "position": "HOLD",
+        "confidence": 0.44,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.44,
+        "round": 1
+      },
+      {
+        "agent": "bear",
+        "position": "AVOID",
+        "confidence": 0.42,
+        "calibration_weight": 0.85,
+        "effective_confidence": 0.357,
+        "round": 1
+      },
+      {
+        "agent": "devils_advocate",
+        "position": "AVOID",
+        "confidence": 0.4,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.4,
+        "round": 2
+      }
+    ],
+    "consensus_winner": {
+      "agent": "fundamental_scout",
+      "position": "HOLD",
+      "confidence": 0.78,
+      "calibration_weight": 1.0,
+      "effective_confidence": 0.78,
+      "round": 0
+    },
+    "disagreement_type": null,
+    "debate_history": [
+      {
+        "role": "bull",
+        "content": "Position: NEUTRAL  \nDebate Confidence: LOW\n\nData audit first: the brief does include one fundamental citation with an actual number, P/E implied via fair value data is available only indirectly as Current Price 340 vs Fair Value Base 1292, one technical citation with actual numbers is available (price Rp 340, EMA20 Rp 339, MA50 Rp 348, MA200 Rp 376, RSI 49.6, AVWAP Rp 335), and one company-specific catalyst with dates is available (ERAA dividend cum date on 2026-07-07). However, that catalyst date is in the past relative to Current Date 2026-07-12, so it is PAST_EVENT_NOT_CATALYST and cannot justify a 5-20 trading-day BUY. Because the near-term catalyst requirement is not satisfied, I must stop at NEUTRAL.\n\nFundamental floor: the valuation gap is large on paper, with Current Price Rp 340 versus Fair Value Base Rp 1,292, which suggests deep discounting. But for a 5-20 trading-day swing, the fair value gap alone is not enough, especially when the trade is counter-trend: price is below MA50 Rp 348 and below MA200 Rp 376, so the chart is not yet confirming a structural long. The evidence also says upside is capped conservatively and the setup is a counter-trend bounce, not a high-conviction trend reversal.\n\nTechnical entry: the reported entry zone is Rp 339-348, anchored by EMA20 Rp 339 and MA50 Rp 348, with price at Rp 340 and just above AVWAP Rp 335. That is a reasonable support band, but the brief also notes RSI 49.6, volume_surge_ratio 1.06, and “volume is not confirming strongly,” so the support has not yet shown decisive participation. BB squeeze is active, which can precede a move, but without a valid near-term catalyst this remains a watchlist setup rather than a BUY.\n\nCatalyst and risk/reward: the only company-specific catalyst provided is the 2026-07-07 dividend event, which is already past and therefore not usable as a future trigger. No other dated 5-20 trading-day catalyst is present, so I cannot responsibly name one. The brief does provide a working trade plan: Entry Rp 339-348 -> Target Rp 350 -> Stop Rp 311, implying a modest R/R around 1:1 from the midpoint and not an attractive asymmetric swing. Given the missing valid catalyst and counter-trend structure, the correct stance is NEUTRAL.\n\nPosition: HOLD  \nAgent Confidence: 0.44",
+        "round": 1,
+        "position": "HOLD",
+        "confidence": 0.374
+      },
+      {
+        "role": "bear",
+        "content": "Position: BEARISH\nDebate Confidence: LOW\n\nThe data audit is incomplete for a 5–20 trading-day swing. I do have one fundamental risk metric with an actual number: current price Rp 340 versus fair value base Rp 1,292, implying a very large discount or, more precisely, a valuation gap of about 280%. I also have technical risk numbers: price Rp 340 is below MA50 Rp 348 and below MA200 Rp 376, with RSI(14) at 49.6 and volume_surge_ratio only 1.06. The company-specific event in the brief is the dividend cum date on 2026-07-07, but that is a PAST_EVENT_NOT_CATALYST relative to 2026-07-12, so it cannot justify a 5–20 day entry. Because the near-term catalyst is invalid, this is not a BUY case; at best it remains NEUTRAL, and I will still challenge the setup below.\n\nOvervaluation is not the main issue here: the price is not above fair value, it is far below it, so there is no premium to quantify. That means the bullish thesis depends entirely on execution and timing, not valuation. But the chart says this is a counter-trend bounce, not a structural long: the brief explicitly places price below MA50 Rp 348 and below MA200 Rp 376, while also saying MA200 context is BELOW. The support band at Rp 339–348 is therefore fragile, because any loss of Rp 339 would push price back under the nearest trend reference, and the next cited downside anchor is the stop at Rp 311.\n\nTechnical breakdown risk is real because the “support” is sitting on weak confirmation. Price at Rp 340 is only 0.1% above VWAP Rp 340 and just above AVWAP Rp 335, while BB squeeze is active and MACD histogram is POSITIVE_SHRINKING; that combination can fail without volume. The brief already admits volume is not confirming strongly, with volume_surge_ratio 1.06, and the setup is capped conservatively because MA200 context is below. In other words, the cited entry zone Rp 339–348 is not backed by decisive participation, so a lower-high / failed bounce scenario remains plausible if price cannot reclaim Rp 348 with stronger volume.\n\nCatalyst risk is the decisive weakness. The only company-specific dated trigger provided is the 2026-07-07 dividend cum date, which is already past and therefore unusable as a forward catalyst inside a 5–20 trading-day window. No other company-specific negative or positive catalyst with a valid future date is given, so the bull case lacks a time-bound trigger. The trade plan in the brief implies Entry Rp 339–348, Target Rp 350, Stop Rp 311; using the midpoint entry around Rp 343.5, upside is about Rp 6.5 while downside to stop is about Rp 32.5, or roughly 0.2:1 reward/risk. That is an unfavorable R/R and makes the setup unattractive even before accounting for the invalid catalyst.\n\nPosition: AVOID\nAgent Confidence: 0.42",
+        "round": 1,
+        "position": "AVOID",
+        "confidence": 0.42
+      },
+      {
+        "role": "devils_advocate",
+        "content": "Position: STRESS_TEST  \nAgent Confidence: 0.48\n\n1) If foreign funds keep selling into a counter-trend bounce and price loses the cited support at Rp 339, won’t the below-MA200 setup snap back toward the Rp 311 stop within days?\n\n2) Entry price used: Rp 343.5 midpoint\n\nCost components:\n- Buy commission: 0.15%\n- Sell commission: 0.25%\n- Final income tax: 0.10%\n- Slippage: 0.15%  \n- Total round-trip cost: 0.65%\n\nProjected target return% from Entry Midpoint to Target Price:\n- Target Price: Rp 350\n- Expected Return From Entry Midpoint: 1.89%\n\nNet return after costs:\n- 1.89% - 0.65% = 1.24%\n\nINSUFFICIENT NET RETURN -- transaction costs consume too much of the projected gain.\n\nPOSITION: AVOID CONFIDENCE: 0.40",
+        "round": 2,
+        "position": "AVOID",
+        "confidence": 0.4
+      }
+    ],
+    "raw_data_summary": "=== EVIDENCE BRIEF: ERAA ===\nQuery: swing trade analysis\n\n[FAIR_VALUE]\nEvidence ID: ERAA_20260712_173441_fair_value_0\nCurrent Price: 340 | Fair Value Base: 1292 | Fair Value Range: 1098 - 1486 | Upside: 280.0% | Risk Overvalued: False\nSource: stockbit | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: ERAA_20260712_173441_technical_0\n{\"52w_high\":517.0,\"52w_low\":300.0,\"atr14\":11.0,\"avg_volume_20d\":31929785.0,\"avwap\":335.0,\"avwap_anchor_bars_ago\":23,\"avwap_position\":\"ABOVE_AVWAP\",\"bb_position\":\"LOWER_HALF\",\"bb_squeeze\":true,\"bb_width\":7.31,\"brief\":\"Position: NEUTRAL ma200_context is BELOW, so this is a counter-trend bounce, not a structural long. Stock-specific context: current price Rp 340 sits below MA50 Rp 348 and below\nSource: yfinance | Score: 0.95\n\n[TECHNICAL]\nEvidence ID: ERAA_20260712_173441_technical_1\nMA200 Rp 376, while EMA20 Rp 339 is the nearest trend reference. Weekly trend is INSUFFICIENT_DATA, so no higher-timeframe confirmation is available. MACD histogram is POSITIVE_SHRINKING, so momentum is still positive but decelerating; BB squeeze is active, which means a breakout is likely but needs volume confirmation before entry. ENTRY ZONE: Rp 339 - Rp 348. Counter-trend trade -- reduce\nSource: yfinance | Score: 0.95\n\n[TECHNICAL]\nEvidence ID: ERAA_20260712_173441_technical_2\nposition size to 50%. TARGET: Rp 350 (approx. 2.4% from entry midpoint), with upside capped conservatively because MA200 context is BELOW. STOP-LOSS: Rp 311 (2.5 x ATR below EMA20). RSI(14) is 49.6, so momentum is neutral. Volume is not confirming strongly: volume_surge_ratio 1.06 is only slightly above average, so price advance lacks decisive participation. VWAP: Rp 340 | Price is 0.1% at VWAP.\nSource: yfinance | Score: 0.95\n\n[TECHNICAL]\nEvidence ID: ERAA_20260712_173441_technical_3\nPrice is below POC (Rp 381) b...\",\"compression_type\":\"NONE\",\"current_price\":340.0,\"divergence_strength\":null,\"ema20\":339.0,\"entry_rationale\":\"Market closed (weekend). Plan entries for Monday\nSource: yfinance | Score: 0.95\n\n[EXDATE]\nEvidence ID: ERAA_20260712_173441_exdate_0\nDividend Ex-Date: === DIVIDEND EX-DATE SCAN: ERAA ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\nSource: stockbit | Score: 0.70\n\n---\nTotal evidence: 6/14 chunks selected\nToken estimate: ~568\n\n=== NEWS BRIEF: ERAA ===\nPeriod: last 60 days\nSentiment: POSITIVE (score: +1.00)\nCORPORATE ACTION DETECTED\nConfidence adjustment: +0.05\nReason: Positive news sentiment supports trade\nLanguage: ID/EN\n\nTOP NEWS:\n1. [POSITIVE] 9 Saham Cum Date Hari Ini (7/7): ERAA, RUIS, hingga DEWA Siap Tebar Dividen! - Ajaib\n   Source: Ajaib | 2026-07-07\n   Events: CORPORATE_ACTION\n2. [POSITIVE] Catat, Jadwal Cum Dividen Saham ERAA Hari Ini Selasa (7/7) - Bisnis.com - Market\n   Source: Bisnis.com - Market | 2026-07-07\n   Events: CORPORATE_ACTION\n3. [POSITIVE] Besok Cum Dividen, Saham ERAA Masih Dibuang Asing - KabarBursa.com\n   Source: KabarBursa.com | 2026-07-06\n   Events: CORPORATE_ACTION\n4. [POSITIVE] Grup Erajaya ERAA dan ERAL Kompak Tebar Dividen, Begini Penilaian Analis - RCTI+\n   Source: RCTI+ | 2026-07-04\n   Events: CORPORATE_ACTION\n5. [POSITIVE] Grup Erajaya (ERAA) Bertabur Dividen - investor.id\n   Source: investor.id | 2026-07-03\n   Events: CORPORATE_ACTION",
+    "metadata": {
+      "prompt_version": "2026-06-30-cio-regime-labels-v27",
+      "run_id": "20260712_173441",
+      "regime": "DEFENSIVE",
+      "sector": "unknown",
+      "market_data_source": "yfinance",
+      "market_data_fetched_at": "2026-07-09T17:00:00+00:00",
+      "market_data_cached": true,
+      "flash_calls": 6,
+      "pro_calls": 0,
+      "tradeability_preflight": {
+        "status": "clean",
+        "atr14": 11.0,
+        "surrogate_gap": 18.0
+      },
+      "preflight_skipped": false,
+      "has_breaking_news": false,
+      "has_insider_selling": false,
+      "has_post_earnings": false,
+      "breaking_news_headlines": [],
+      "news_confidence_adjustment": 0.0,
+      "news_overall_sentiment": "NEUTRAL",
+      "news_brief": "=== NEWS BRIEF: ERAA ===\nPeriod: last 60 days\nSentiment: POSITIVE (score: +1.00)\nCORPORATE ACTION DETECTED\nConfidence adjustment: +0.05\nReason: Positive news sentiment supports trade\nLanguage: ID/EN\n\nTOP NEWS:\n1. [POSITIVE] 9 Saham Cum Date Hari Ini (7/7): ERAA, RUIS, hingga DEWA Siap Tebar Dividen! - Ajaib\n   Source: Ajaib | 2026-07-07\n   Events: CORPORATE_ACTION\n2. [POSITIVE] Catat, Jadwal Cum Dividen Saham ERAA Hari Ini Selasa (7/7) - Bisnis.com - Market\n   Source: Bisnis.com - Market | 2026-07-07\n   Events: CORPORATE_ACTION\n3. [POSITIVE] Besok Cum Dividen, Saham ERAA Masih Dibuang Asing - KabarBursa.com\n   Source: KabarBursa.com | 2026-07-06\n   Events: CORPORATE_ACTION\n4. [POSITIVE] Grup Erajaya ERAA dan ERAL Kompak Tebar Dividen, Begini Penilaian Analis - RCTI+\n   Source: RCTI+ | 2026-07-04\n   Events: CORPORATE_ACTION\n5. [POSITIVE] Grup Erajaya (ERAA) Bertabur Dividen - investor.id\n   Source: investor.id | 2026-07-03\n   Events: CORPORATE_ACTION",
+      "exdate_tier": "CLEAR",
+      "rag_chunks_selected": 6,
+      "rag_chunks_considered": 14,
+      "rag_token_estimate": 568,
+      "rag_rendered_char_count": 2272,
+      "evidence_age_h": 0,
+      "evidence_age_hours": 0.0,
+      "rag_citation_ids": [
+        "ERAA_20260712_173441_fair_value_0",
+        "ERAA_20260712_173441_technical_0",
+        "ERAA_20260712_173441_technical_1",
+        "ERAA_20260712_173441_technical_2",
+        "ERAA_20260712_173441_technical_3",
+        "ERAA_20260712_173441_exdate_0"
+      ],
+      "rag_citations": [
+        {
+          "chunk_id": "ERAA_20260712_173441_fair_value_0",
+          "category": "fair_value",
+          "source": "stockbit",
+          "relevance_score": 0.85,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "ERAA_20260712_173441_technical_0",
+          "category": "technical",
+          "source": "yfinance",
+          "relevance_score": 0.95,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "ERAA_20260712_173441_technical_1",
+          "category": "technical",
+          "source": "yfinance",
+          "relevance_score": 0.95,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "ERAA_20260712_173441_technical_2",
+          "category": "technical",
+          "source": "yfinance",
+          "relevance_score": 0.95,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "ERAA_20260712_173441_technical_3",
+          "category": "technical",
+          "source": "yfinance",
+          "relevance_score": 0.95,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "ERAA_20260712_173441_exdate_0",
+          "category": "exdate",
+          "source": "stockbit",
+          "relevance_score": 0.7,
+          "is_stale": false
+        }
+      ],
+      "rag_stale_citation_ids": [],
+      "fair_value_rag_verified": true,
+      "market_cap_idr": 5318381142016,
+      "duration_seconds": 143.79699999999139,
+      "batch_timestamp": "20260712_173908"
+    },
+    "regime": {
+      "label": "SIDEWAYS",
+      "confidence": 0.9467375021528672,
+      "probabilities": {
+        "SIDEWAYS": 0.9467375021528672,
+        "BULL": 0.019237603759281907,
+        "BEAR_STRESS": 0.034024894087631256
+      },
+      "msci_override": false,
+      "training_days": 756,
+      "detected_at": "2026-07-12T17:36:51.047523",
+      "notes": "MSCI review active: True"
+    },
+    "trading_params": {
+      "description": "IHSG flat, moderate volatility",
+      "max_position_pct": 0.01,
+      "min_risk_reward": 2.0,
+      "consensus_threshold": 0.7,
+      "max_concurrent_positions": 2,
+      "devil_advocate_weight": 0.3,
+      "regime_multiplier": 0.85,
+      "trading_allowed": true
+    },
+    "error": null,
+    "status": "success",
+    "conviction_score": 0.0,
+    "sector_key": "unknown",
+    "news_sentiment": "NEUTRAL",
+    "news_confidence_adjustment": 0.0,
+    "has_breaking_news": false,
+    "breaking_news_headlines": [],
+    "evidence_age_h": 0,
+    "model_confidence": 0.4,
+    "trade_conviction": 0.0,
+    "risk_governor": {
+      "ticker": "ERAA",
+      "status": "reject",
+      "sizing_allowed": false,
+      "reason_codes": [
+        "no_momentum_confirmation",
+        "invalid_entry_range",
+        "missing_target_price",
+        "missing_stop_loss"
+      ],
+      "message": "Setup ditolak karena data harga kunci belum valid.",
+      "current_price": 340.0,
+      "entry_low": null,
+      "entry_high": null,
+      "target_price": null,
+      "stop_loss": null
+    },
+    "forecast_report": {
+      "ticker": "ERAA",
+      "as_of": "2026-07-12",
+      "horizon_days": 10,
+      "expected_return_net": null,
+      "p_target": null,
+      "p_stop": null,
+      "volatility_forecast": 0.29437590914803563,
+      "expected_value": null,
+      "decision": "AVOID",
+      "confidence": null,
+      "model_votes": [
+        {
+          "model_name": "naive",
+          "status": "validation_failed",
+          "reason": "validation_status:failed",
+          "r_hat_net": -0.006658149426735643,
+          "p_target": 0.3980493157407272,
+          "p_stop": 0.40004693161347055,
+          "volatility_forecast": 0.29437590914803563,
+          "weight": 0.0,
+          "validation_passed": false,
+          "ic": null,
+          "brier_target": 0.25,
+          "rmse": 0.058316900571691886,
+          "mae": 0.046967573188950715,
+          "mape": 1.0336774199480516,
+          "directional_accuracy": 0.6599999999999999
+        },
+        {
+          "model_name": "xgboost",
+          "status": "active",
+          "reason": null,
+          "r_hat_net": 0.013300804421305656,
+          "p_target": 0.4032695641837305,
+          "p_stop": 0.3948377983201915,
+          "volatility_forecast": 0.29437590914803563,
+          "weight": 0.0,
+          "validation_passed": true,
+          "ic": 0.24044883537891515,
+          "brier_target": 0.27890610944695937,
+          "rmse": 0.06624985227916708,
+          "mae": 0.054108522456808375,
+          "mape": 2.623269317840307,
+          "directional_accuracy": 0.5733333333333334
+        },
+        {
+          "model_name": "lstm",
+          "status": "experimental_unused",
+          "reason": "conservative_policy",
+          "r_hat_net": null,
+          "p_target": null,
+          "p_stop": null,
+          "volatility_forecast": null,
+          "weight": 0.0,
+          "validation_passed": false,
+          "ic": null,
+          "brier_target": null,
+          "rmse": null,
+          "mae": null,
+          "mape": null,
+          "directional_accuracy": null
+        },
+        {
+          "model_name": "prophet",
+          "status": "experimental_unused",
+          "reason": "conservative_policy_not_primary_return_model",
+          "r_hat_net": null,
+          "p_target": null,
+          "p_stop": null,
+          "volatility_forecast": null,
+          "weight": 0.0,
+          "validation_passed": false,
+          "ic": null,
+          "brier_target": null,
+          "rmse": null,
+          "mae": null,
+          "mape": null,
+          "directional_accuracy": null
+        },
+        {
+          "model_name": "tgarch",
+          "status": "active",
+          "reason": null,
+          "r_hat_net": null,
+          "p_target": null,
+          "p_stop": null,
+          "volatility_forecast": 0.29437590914803563,
+          "weight": 0.0,
+          "validation_passed": true,
+          "ic": null,
+          "brier_target": null,
+          "rmse": null,
+          "mae": null,
+          "mape": null,
+          "directional_accuracy": null
+        }
+      ],
+      "validation_summary": {
+        "horizon_days": 10,
+        "n_observations": 150,
+        "ic_mean": 0.24044883537891515,
+        "ic_t_stat": 1.3622574778762533,
+        "brier": 0.2644530547234797,
+        "rmse": 0.062283376425429485,
+        "mae": 0.050538047822879545,
+        "mape": 1.8284733688941794,
+        "directional_accuracy": 0.6166666666666667,
+        "dsr": 0.00018,
+        "bh_q_value_passed": false,
+        "status": "failed"
+      },
+      "validation_by_model": {
+        "naive": {
+          "horizon_days": 10,
+          "n_observations": 150,
+          "ic_mean": null,
+          "ic_t_stat": null,
+          "brier": 0.25,
+          "rmse": 0.058316900571691886,
+          "mae": 0.046967573188950715,
+          "mape": 1.0336774199480516,
+          "directional_accuracy": 0.6599999999999999,
+          "dsr": 0.00018,
+          "bh_q_value_passed": false,
+          "status": "failed"
+        },
+        "xgboost": {
+          "horizon_days": 10,
+          "n_observations": 150,
+          "ic_mean": 0.24044883537891515,
+          "ic_t_stat": 1.3622574778762533,
+          "brier": 0.27890610944695937,
+          "rmse": 0.06624985227916708,
+          "mae": 0.054108522456808375,
+          "mape": 2.623269317840307,
+          "directional_accuracy": 0.5733333333333334,
+          "dsr": 0.00018,
+          "bh_q_value_passed": false,
+          "status": "research_only"
+        }
+      },
+      "model_dispersion": 0.00997947692402065,
+      "model_disagreement_penalty": 0.12,
+      "risk_adjusted_expected_value": null,
+      "data_quality_flags": [
+        "no_validated_return_model",
+        "experimental_unused:lstm",
+        "experimental_unused:prophet",
+        "model_disagreement_penalty:0.120",
+        "validation_status:failed"
+      ],
+      "volatility_fallback": false
+    },
+    "forecast_ev_ignored_reason": "validation_failed"
+  },
+  {
+    "ticker": "BACH",
+    "verdict": {
+      "ticker": "BACH",
+      "rating": "INSUFFICIENT_DATA",
+      "confidence": 0.153,
+      "fair_value": null,
+      "fair_value_base": null,
+      "fair_value_low": null,
+      "fair_value_high": null,
+      "valuation_gap": "unverified",
+      "entry_price_range": null,
+      "target_price": null,
+      "stop_loss": null,
+      "current_price": 500.0,
+      "timeframe": "5-20 Trading Days",
+      "execution_horizon_days": 10,
+      "weighted_reasoning": "Fundamental + Technical = FAIL/FAIL, so the conflict-resolution matrix points to AVOID. Fair value is null in the Trade Envelope, while BACH_20260712_173441_fundamental_0 separately flags valuation concerns and no catalyst; this is insufficient fundamental support rather than a valid margin-of-safety case. Technically, BACH_20260712_173441_technical_0 and BACH_20260712_173441_technical_2 state that core technical inputs are missing, including MA50/MA200 context, ATR, RSI, VWAP, and weekly trend, while the market was closed and the entry window was not actionable. Devil's Advocate stress test was only partially answered: transaction costs are viable, but the macro/foreign-flow risk is unresolved because net foreign flow is null, and the stock could retest the stop area before a swing setup develops. With R/R only 1.79, no confirmed volume breakout, no near-term catalyst, and incomplete technical backbone, the plan should not be approved for execution. Fair value rejected because no matching current-run RAG evidence was available. News sentiment confidence adjustment applied: -0.20.",
+      "critical_risk_factor": "",
+      "key_catalysts": [
+        "Positive-to-mixed IPO-related news flow in the last 60 days",
+        "Potential future confirmation only if price acceptance improves above nearby offer resistance",
+        "Transaction-cost stress test remains viable after estimated round-trip costs"
+      ],
+      "key_risks": [
+        "No reliable fair value in the Python Trade Envelope due to insufficient data",
+        "Technical setup incomplete: MA50, MA200 context, ATR, RSI, VWAP, and weekly trend unavailable",
+        "No confirmed 5-20 trading-day catalyst",
+        "Weak recent close and risk of retesting the stop-loss area",
+        "Foreign-flow data unavailable, leaving institutional selling risk unresolved",
+        "Fair value tidak tersedia — validasi fundamental secara manual sebelum entry."
+      ],
+      "summary": "CIO verdict: REJECT the Python trade plan for new execution despite the mechanically acceptable target and stop structure. The entry, target, and stop-loss are used verbatim, but the setup fails validation because both fundamental and technical signals are incomplete or negative, with no reliable 5-20 trading-day trigger. The R/R of 1.79 is not enough to compensate for missing trend, volatility, valuation, and foreign-flow confirmation.",
+      "target_basis": "Minimum R/R (Swing Cap)",
+      "expected_return": null,
+      "risk_reward_ratio": null,
+      "is_overvalued": null,
+      "risk_overvalued": null,
+      "wait_and_see": true,
+      "consensus_reached": false,
+      "consensus_method": null,
+      "dissenting_agents": [
+        "bear"
+      ],
+      "reason_codes": [],
+      "hypothetical_envelope": null,
+      "trailing_stop_pct": null,
+      "trailing_stop_trigger_pct": null,
+      "partial_exit_t1_pct": 0.5,
+      "partial_exit_trail_remainder": true,
+      "momentum_play": false,
+      "reasons": [
+        "fair_value_quality_rejected",
+        "confidence_15pct_below_minimum"
+      ],
+      "action": "SKIP",
+      "entry_low": null,
+      "entry_high": null,
+      "model_confidence": 0.153
+    },
+    "debate_rounds": 3,
+    "consensus_reached": false,
+    "consensus_method": null,
+    "dissenting_agents": [
+      "bear"
+    ],
+    "agent_votes": [
+      {
+        "agent": "fundamental_scout",
+        "position": "HOLD",
+        "confidence": 0.62,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.62,
+        "round": 0
+      },
+      {
+        "agent": "chartist",
+        "position": "HOLD",
+        "confidence": 0.28,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.28,
+        "round": 0
+      },
+      {
+        "agent": "sentiment_specialist",
+        "position": "HOLD",
+        "confidence": 0.68,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.68,
+        "round": 0
+      },
+      {
+        "agent": "bull",
+        "position": "HOLD",
+        "confidence": 0.31,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.31,
+        "round": 3
+      },
+      {
+        "agent": "bear",
+        "position": "AVOID",
+        "confidence": 0.24,
+        "calibration_weight": 0.85,
+        "effective_confidence": 0.204,
+        "round": 3
+      },
+      {
+        "agent": "devils_advocate",
+        "position": "AVOID",
+        "confidence": 0.4,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.4,
+        "round": 4
+      }
+    ],
+    "consensus_winner": null,
+    "disagreement_type": null,
+    "debate_history": [
+      {
+        "role": "system",
+        "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 262, Rp 500, Rp 550, Rp 472, Rp 510, Rp 490, Rp 10",
+        "round": 0,
+        "position": "UNKNOWN",
+        "confidence": null
+      },
+      {
+        "role": "system",
+        "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 262, Rp 500, Rp 550, Rp 472, Rp 510",
+        "round": 0,
+        "position": "UNKNOWN",
+        "confidence": null
+      },
+      {
+        "role": "bull",
+        "content": "…lds, and the brief explicitly says the chart matrix is incomplete. With no RSI, trend, or volatility context, there is no high-probability swing entry zone to anchor a BUY case.\n\nCatalyst-wise, the news flow is positive-to-mixed, but all cited items are already dated and therefore cannot serve as the next 5–20 trading-day trigger under the date rules. Without a **future** company-specific event, the setup remains a watchlist name rather than an actionable swing long. Net: **avoid forcing a trade until a dated catalyst and full technicals are available**.\n\nPosition: AVOID\nAgent Confidence: 0.23",
+        "round": 1,
+        "position": "HOLD",
+        "confidence": 0.196
+      },
+      {
+        "role": "bear",
+        "content": "…sequence exists. That missing context prevents a valid 5–20 trading-day breakdown thesis and also prevents any verified risk/reward calculation.\n\nCatalyst risk is also unresolved: the cited news flow is past-dated, and no future company-specific event is supplied that could realistically trigger a move within the execution window. With the trigger already consumed by time, the trade lacks a near-term catalyst. Given the missing technical core and absent future catalyst, the only defensible stance is to stay out until the chart and timing can be reconciled.\n\nPosition: BUY\nAgent Confidence: 0.23",
+        "round": 1,
+        "position": "HOLD",
+        "confidence": 0.23
+      },
+      {
+        "role": "bull",
+        "content": "…er offer band would be the only usable short-term confirmation from the supplied tape. Until that happens, the setup remains incomplete rather than compelling.\n\nR/R also stays unresolved because the core volatility inputs are missing. Using Rp 490 as the revised stop reference instead of Rp 472 improves the framing slightly, but the absence of ATR and moving-average context means the reward leg cannot be measured cleanly. Net: the Bear is right that this is not a clean long, but the secondary support prevents an immediate crash thesis from being airtight.\n\nPosition: HOLD\nAgent Confidence: 0.23",
+        "round": 2,
+        "position": "HOLD",
+        "confidence": 0.196
+      },
+      {
+        "role": "bear",
+        "content": "… zone risks being too tight for a 5–20 trading-day swing.\n\nMargin-of-safety stress test cannot rescue the trade. The Bull’s current-price anchor is Rp 500, but ATR(14) is null, so I cannot compute the required 2 x ATR adverse move without fabricating data. Per the reliability rules, that missing core input forces a low-confidence assessment and prevents a verified volatility-based stop. Net conclusion: the Bull’s support claim is unproven, the fallback downside is already close, and the setup remains untradeable until ATR and trend context are available.\n\nPosition: AVOID\nAgent Confidence: 0.24",
+        "round": 2,
+        "position": "AVOID",
+        "confidence": 0.24
+      },
+      {
+        "role": "bull",
+        "content": "Position: NEUTRAL\nDebate Confidence: LOW\n\nBear’s stop-loss thesis leans on the breakdown area around Rp 500, but the tape also shows a lower bid shelf in the Rp 490–472 zone, so the downside is not a clean air-pocket collapse. That gives BACH a secondary support reference below the cited breakdown level, which matters for a 5–20 trading-day swing: the trade is not invalidated unless that deeper band gives way.\n\nOn valuation, the supplied fair-value data is internally incomplete: the model shows current price Rp 500 against a fair value base of Rp 0 with INSUFFICIENT_DATA for the range, while the fundamental brief separately estimates fair value at Rp 262. Because the fair-value inputs conflict and one is null-heavy, this is a NEEDS_RECONCILIATION case rather than a clean overvaluation call. Still, even using the Rp 262 estimate, the gap is large enough that a modest drawdown from Rp 500 would not by itself erase all downside cushion; the bigger issue is data quality, not a precise valuation target.\n\nOn trigger skepticism, the Bear is correct that the dated news items from 2026-07-09 to 2026-07-11 are PAST_EVENT_NOT_CATALYST and cannot be used as fresh 5–20 trading-day drivers. The best fallback trigger in the supplied evidence is not news but price acceptance: a reclaim and hold above the nearby offer stack around Rp 510–550 would be the first observable confirmation that demand is absorbing supply. Absent that, this remains an entry-planning watchlist name, not a confirmed long.\n\nR/R remains only marginally interesting because ATR(14) is null, so I cannot quantify the swing stop distance cleanly. Using the lower support band as the revised risk reference is better than anchoring to the breakdown level alone, but without volatility and trend context the reward leg is still not robustly measurable. Net: the Bear has the stronger case on execution quality, but the deeper support and unresolved valuation conflict keep this from being a hard sell.\n\nPosition: HOLD\nAgent Confidence: 0.31",
+        "round": 3,
+        "position": "HOLD",
+        "confidence": 0.264
+      },
+      {
+        "role": "bear",
+        "content": "Position: BEARISH\nDebate Confidence: LOW\n\nThe Bull’s setup is fragile because it leans on the Rp 500 area as a support/entry anchor, yet the tape already showed a weak close near Rp 472 after trading down from Rp 550. That means the cited Rp 500 line is not a validated floor; it is already being tested from above and has not demonstrated durable defense. With the technical backbone missing, there is no evidence that this level has held multiple times, so treating Rp 500 as dependable support is speculative rather than forensic.\n\nIf Rp 500 breaks, the next support is Rp 472 -- making the actual max loss Rp 28, not whatever tighter loss band the Bull implies. That downside is not theoretical; it is directly anchored in the provided session low, and it materially worsens the swing profile because the trade would be exposed to a full retest of that lower shelf before any credible stabilization. The key point is that the Bull’s risk framing depends on Rp 500 behaving like a floor, but the market has already shown it can trade materially below that level in-session.\n\nMargin-of-safety stress test also fails: ATR(14) is missing, so the mandatory 2 x ATR computation cannot be performed without fabrication. Per the reliability rules, that means the core volatility check is unresolved and confidence must stay low. Since the required swing-stop metric is null, the Bull cannot prove that the adverse move stays within a defendable margin of safety; this is an incomplete setup, not a completed one.\n\nThe valuation layer does not rescue the long. The evidence brief gives an internally inconsistent fair-value picture, with one source showing INSUFFICIENT_DATA and another implying Rp 262, while the current price is still Rp 500. That conflict is NEEDS_RECONCILIATION, and it does not justify aggressive entry. For a 5–20 trading-day swing, the lack of reliable ATR, trend, and coherent valuation makes the setup unfit for execution.\n\nPosition: AVOID\nAgent Confidence: 0.24",
+        "round": 3,
+        "position": "AVOID",
+        "confidence": 0.24
+      },
+      {
+        "role": "devils_advocate",
+        "content": "Position: STRESS_TEST  \nAgent Confidence: 0.27\n\nChallenge 1 — MACRO / COMPANY RISK  \nIf the stock is already near Rp 500 support and foreign funds keep selling, could the Rp 500 floor fail within 5–20 trading days and flush toward Rp 472? Net foreign flow data: null.\n\nChallenge 2 — TRANSACTION COST STRESS TEST  \nEntry price used: Rp 492\n\nProjected target return% (from Entry Midpoint): 11.8%\n\nCost components:\n- Buy commission: 0.15%\n- Sell commission: 0.25%\n- Final income tax: 0.10%\n- Slippage: 0.15%  (entry price >= Rp 500? No; but per rule, slippage is 0.30% if entry < Rp 500. Since entry is Rp 492, slippage = 0.30%)\n\nTotal round-trip cost: 0.15% + 0.25% + 0.10% + 0.30% = 0.80%\n\nNet return after costs = 11.8% - 0.80% = 11.0%\n\nVIABLE after transaction costs.\n\nChallenge 3 — ANTI-AVERAGING DOWN CHECK  \nSkipped: ma200_context is null, so the condition is not met.\n\nPOSITION: AVOID CONFIDENCE: 0.40",
+        "round": 4,
+        "position": "AVOID",
+        "confidence": 0.4
+      }
+    ],
+    "raw_data_summary": "=== EVIDENCE BRIEF: BACH ===\nQuery: swing trade analysis\n\n[FAIR_VALUE]\nEvidence ID: BACH_20260712_173441_fair_value_0\nCurrent Price: 500 | Fair Value Base: 0 | Fair Value Range: INSUFFICIENT_DATA - INSUFFICIENT_DATA | Upside: -100.0% | Risk Overvalued: False\nSource: stockbit | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: BACH_20260712_173441_technical_0\n{\"brief\":\"Position: NEUTRAL Market is closed, so this is an entry-planning setup only, not an actionable trade now. The provided pre-computed technicals are incomplete: core items required by the charting matrix are missing or null, including ma200_context, EMA20, MA50, ATR(14), RSI(14), weekly_trend, MACD histogram state, VWAP, POC/volume profile, AVWAP, and Fibonacci context. Because of that, I\nSource: yfinance | Score: 0.95\n\n[TECHNICAL]\nEvidence ID: BACH_20260712_173441_technical_1\ncannot build a valid swing-long or swing-short thesis from ground truth, and confidence must stay low. From the orderbook alone, BACH closed at Rp 500, down 9.09% from the previous close Rp 550, with heavy selling pressure and a weak close near the session low of Rp 472. Bid support is visible around Rp 500–490, while offers stack up above Rp 510–550, but this is not enough to override the\nSource: yfinance | Score: 0.95\n\n[TECHNICAL]\nEvidence ID: BACH_20260712_173441_technical_2\nmissing technical backbone. No reliable RSI, trend, or volatility-based stop can be stated without fabricating data. ENTRY WINDOW: AVOID (MARKET_CLOSED) — Market closed (weekend). Plan entries for Monday open. With th...\",\"entry_rationale\":\"Market closed (weekend). Plan entries for Monday open.\",\"entry_window\":\"AVOID\",\"idx_session\":\"MARKET_CLOSED\"}\nSource: yfinance | Score: 0.95\n\n[FUNDAMENTAL]\nEvidence ID: BACH_20260712_173441_fundamental_0\n{\"brief\":\"Position: HOLD Valuation Context: OVERVALUED Quality Flag: CONDITIONAL Catalyst Context: NONE Agent Confidence: 0.62 FAIR VALUE: Rp 262. Harga is 90.8% above fair value -- OVERVALUED. Support metrics: ROE 0.0% (3-year trend unavailable), RNOA/ROA proxy unavailable, OCF/Price unavailable, Net Margin 9.0%, Debt-to-Equity 0.49, Dividend Yield null. For DEFAULT sector, EV/EBITDA band is not\nSource: stockbit | Score: 0.80\n\n---\nTotal evidence: 5/11 chunks selected\nToken estimate: ~565\n\n=== NEWS BRIEF: BACH ===\nPeriod: last 60 days\nSentiment: POSITIVE (score: +0.24)\nBREAKING NEWS DETECTED\nMACRO EVENT DETECTED\nConfidence adjustment: +0.05\nReason: Positive news sentiment supports trade\nLanguage: ID/EN\n\nTOP NEWS:\n1. [POSITIVE] Baru IPO, Saham BACH, JECX, dan JELI Berguguran: IHSG Menguat Tipis - KabarBursa.com\n   Source: KabarBursa.com | 2026-07-10\n   Events: MACRO_EVENT\n2. [POSITIVE] IPO Update: PRDL dan JELI Kembali Lock ARA, BACH Naik 15%, JECX dan EMMI Terkoreksi - Ajaib\n   Source: Ajaib | 2026-07-09\n3. [NEUTRAL] Saham JELI & BACH Dibuang Investor, RANS Boyong Konglomerat - CNBC Indonesia\n   Source: CNBC Indonesia | 2026-07-11\n   Events: BREAKING\n4. [NEUTRAL] Pilah-Pilih Saham IPO Terlaris di BEI, dari BACH, PRDL, JECX Hingga RANS - Bisnis Indonesia Premium\n   Source: Bisnis Indonesia Premium | 2026-07-11\n   Events: BREAKING\n5. [NEUTRAL] Simak Prospek Kinerja Bach Multi Global (BACH) & Esa Medika (EMMI) Usai Sukses IPO - kontan.co.id\n   Source: kontan.co.id | 2026-07-10\n   Events: BREAKING",
+    "metadata": {
+      "prompt_version": "2026-06-30-cio-regime-labels-v27",
+      "run_id": "20260712_173441",
+      "regime": "DEFENSIVE",
+      "sector": "unknown",
+      "market_data_source": "yfinance",
+      "market_data_fetched_at": "2026-07-09T17:00:00+00:00",
+      "market_data_cached": true,
+      "flash_calls": 10,
+      "pro_calls": 1,
+      "tradeability_preflight": {
+        "status": "skip",
+        "reason": "no_technical_data"
+      },
+      "preflight_skipped": true,
+      "fair_value_rejected": true,
+      "valuation_gap": "unverified",
+      "reasons": [
+        "fair_value_quality_rejected"
+      ],
+      "has_breaking_news": true,
+      "has_insider_selling": false,
+      "has_post_earnings": false,
+      "breaking_news_headlines": [
+        {
+          "title": "Saham JELI & BACH Dibuang Investor, RANS Boyong Konglomerat - CNBC Indonesia",
+          "source": "CNBC Indonesia",
+          "timestamp": "2026-07-11T13:15:53+00:00"
+        },
+        {
+          "title": "Pilah-Pilih Saham IPO Terlaris di BEI, dari BACH, PRDL, JECX Hingga RANS - Bisnis Indonesia Premium",
+          "source": "Bisnis Indonesia Premium",
+          "timestamp": "2026-07-11T00:00:00+00:00"
+        },
+        {
+          "title": "Simak Prospek Kinerja Bach Multi Global (BACH) & Esa Medika (EMMI) Usai Sukses IPO - kontan.co.id",
+          "source": "kontan.co.id",
+          "timestamp": "2026-07-10T23:30:13+00:00"
+        }
+      ],
+      "news_confidence_adjustment": -0.2,
+      "news_overall_sentiment": "NEGATIVE",
+      "news_brief": "=== NEWS BRIEF: BACH ===\nPeriod: last 60 days\nSentiment: POSITIVE (score: +0.24)\nBREAKING NEWS DETECTED\nMACRO EVENT DETECTED\nConfidence adjustment: +0.05\nReason: Positive news sentiment supports trade\nLanguage: ID/EN\n\nTOP NEWS:\n1. [POSITIVE] Baru IPO, Saham BACH, JECX, dan JELI Berguguran: IHSG Menguat Tipis - KabarBursa.com\n   Source: KabarBursa.com | 2026-07-10\n   Events: MACRO_EVENT\n2. [POSITIVE] IPO Update: PRDL dan JELI Kembali Lock ARA, BACH Naik 15%, JECX dan EMMI Terkoreksi - Ajaib\n   Source: Ajaib | 2026-07-09\n3. [NEUTRAL] Saham JELI & BACH Dibuang Investor, RANS Boyong Konglomerat - CNBC Indonesia\n   Source: CNBC Indonesia | 2026-07-11\n   Events: BREAKING\n4. [NEUTRAL] Pilah-Pilih Saham IPO Terlaris di BEI, dari BACH, PRDL, JECX Hingga RANS - Bisnis Indonesia Premium\n   Source: Bisnis Indonesia Premium | 2026-07-11\n   Events: BREAKING\n5. [NEUTRAL] Simak Prospek Kinerja Bach Multi Global (BACH) & Esa Medika (EMMI) Usai Sukses IPO - kontan.co.id\n   Source: kontan.co.id | 2026-07-10\n   Events: BREAKING",
+      "exdate_tier": "CLEAR",
+      "rag_chunks_selected": 5,
+      "rag_chunks_considered": 11,
+      "rag_token_estimate": 565,
+      "rag_rendered_char_count": 2260,
+      "evidence_age_h": 0,
+      "evidence_age_hours": 0.0,
+      "rag_citation_ids": [
+        "BACH_20260712_173441_fair_value_0",
+        "BACH_20260712_173441_technical_0",
+        "BACH_20260712_173441_technical_1",
+        "BACH_20260712_173441_technical_2",
+        "BACH_20260712_173441_fundamental_0"
+      ],
+      "rag_citations": [
+        {
+          "chunk_id": "BACH_20260712_173441_fair_value_0",
+          "category": "fair_value",
+          "source": "stockbit",
+          "relevance_score": 0.85,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "BACH_20260712_173441_technical_0",
+          "category": "technical",
+          "source": "yfinance",
+          "relevance_score": 0.95,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "BACH_20260712_173441_technical_1",
+          "category": "technical",
+          "source": "yfinance",
+          "relevance_score": 0.95,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "BACH_20260712_173441_technical_2",
+          "category": "technical",
+          "source": "yfinance",
+          "relevance_score": 0.95,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "BACH_20260712_173441_fundamental_0",
+          "category": "fundamental",
+          "source": "stockbit",
+          "relevance_score": 0.8,
+          "is_stale": false
+        }
+      ],
+      "rag_stale_citation_ids": [],
+      "rag_citation_guard": {
+        "valid": true,
+        "cited_chunks": [
+          {
+            "chunk_id": "BACH_20260712_173441_fundamental_0",
+            "category": "fundamental",
+            "source": "stockbit",
+            "relevance_score": 0.8,
+            "is_stale": false
+          },
+          {
+            "chunk_id": "BACH_20260712_173441_technical_0",
+            "category": "technical",
+            "source": "yfinance",
+            "relevance_score": 0.95,
+            "is_stale": false
+          },
+          {
+            "chunk_id": "BACH_20260712_173441_technical_2",
+            "category": "technical",
+            "source": "yfinance",
+            "relevance_score": 0.95,
+            "is_stale": false
+          }
+        ],
+        "missing_citation_ids": [],
+        "stale_citation_ids": [],
+        "errors": []
+      },
+      "market_cap_idr": 2042215006208,
+      "duration_seconds": 213.43700000000536,
+      "batch_timestamp": "20260712_173908"
+    },
+    "regime": {
+      "label": "SIDEWAYS",
+      "confidence": 0.9467375021528672,
+      "probabilities": {
+        "SIDEWAYS": 0.9467375021528672,
+        "BULL": 0.019237603759281907,
+        "BEAR_STRESS": 0.034024894087631256
+      },
+      "msci_override": false,
+      "training_days": 756,
+      "detected_at": "2026-07-12T17:36:58.947160",
+      "notes": "MSCI review active: True"
+    },
+    "trading_params": {
+      "description": "IHSG flat, moderate volatility",
+      "max_position_pct": 0.01,
+      "min_risk_reward": 2.0,
+      "consensus_threshold": 0.7,
+      "max_concurrent_positions": 2,
+      "devil_advocate_weight": 0.3,
+      "regime_multiplier": 0.85,
+      "trading_allowed": true
+    },
+    "error": null,
+    "status": "success",
+    "conviction_score": 0.0,
+    "sector_key": "unknown",
+    "news_sentiment": "NEGATIVE",
+    "news_confidence_adjustment": -0.2,
+    "has_breaking_news": true,
+    "breaking_news_headlines": [
+      {
+        "title": "Saham JELI & BACH Dibuang Investor, RANS Boyong Konglomerat - CNBC Indonesia",
+        "source": "CNBC Indonesia",
+        "timestamp": "2026-07-11T13:15:53+00:00"
+      },
+      {
+        "title": "Pilah-Pilih Saham IPO Terlaris di BEI, dari BACH, PRDL, JECX Hingga RANS - Bisnis Indonesia Premium",
+        "source": "Bisnis Indonesia Premium",
+        "timestamp": "2026-07-11T00:00:00+00:00"
+      },
+      {
+        "title": "Simak Prospek Kinerja Bach Multi Global (BACH) & Esa Medika (EMMI) Usai Sukses IPO - kontan.co.id",
+        "source": "kontan.co.id",
+        "timestamp": "2026-07-10T23:30:13+00:00"
+      }
+    ],
+    "reasons": [
+      "fair_value_quality_rejected",
+      "confidence_15pct_below_minimum"
+    ],
+    "evidence_age_h": 0,
+    "sizing": "Skip — confidence below threshold",
+    "risk_gov": "reject",
+    "risk_governor": {
+      "ticker": "BACH",
+      "status": "reject",
+      "sizing_allowed": false,
+      "reason_codes": [
+        "confidence_15pct_below_minimum"
+      ],
+      "message": "Skip — confidence below threshold",
+      "current_price": null,
+      "entry_low": null,
+      "entry_high": null,
+      "target_price": null,
+      "stop_loss": null
+    },
+    "model_confidence": 0.153,
+    "trade_conviction": 0.0,
+    "forecast_report": {
+      "ticker": "BACH",
+      "as_of": "2026-07-12",
+      "horizon_days": 10,
+      "expected_return_net": null,
+      "p_target": null,
+      "p_stop": null,
+      "volatility_forecast": null,
+      "expected_value": null,
+      "decision": "AVOID",
+      "confidence": null,
+      "model_votes": [],
+      "validation_summary": null,
+      "validation_by_model": {},
+      "model_dispersion": null,
+      "model_disagreement_penalty": 0.0,
+      "risk_adjusted_expected_value": null,
+      "data_quality_flags": [
+        "insufficient_data"
+      ],
+      "volatility_fallback": false
+    },
+    "forecast_ev_ignored_reason": "validation_failed"
+  },
+  {
+    "ticker": "BAPA",
+    "verdict": {
+      "ticker": "BAPA",
+      "rating": "HOLD",
+      "confidence": 0.4,
+      "fair_value": null,
+      "fair_value_base": null,
+      "fair_value_low": null,
+      "fair_value_high": null,
+      "valuation_gap": null,
+      "entry_price_range": null,
+      "target_price": null,
+      "stop_loss": null,
+      "current_price": 282.0,
+      "timeframe": "5-20 Trading Days",
+      "execution_horizon_days": 10,
+      "weighted_reasoning": "",
+      "critical_risk_factor": "",
+      "key_catalysts": [],
+      "key_risks": [
+        "Fair value tidak tersedia — validasi fundamental secara manual sebelum entry."
+      ],
+      "summary": "Setup ditolak: no_momentum_confirmation: return_5d -25.4% < 0 at RSI 47.9.",
+      "target_basis": null,
+      "expected_return": null,
+      "risk_reward_ratio": null,
+      "is_overvalued": null,
+      "risk_overvalued": null,
+      "wait_and_see": true,
+      "consensus_reached": false,
+      "consensus_method": null,
+      "dissenting_agents": [
+        "sentiment_specialist",
+        "bear"
+      ],
+      "reason_codes": [
+        "no_momentum_confirmation"
+      ],
+      "hypothetical_envelope": {
+        "entry_low": 260.0,
+        "entry_high": 264.0,
+        "target_price": 290.0,
+        "target_basis": "Resistance 20-Day (Swing Cap)",
+        "stop_loss": 254.0,
+        "risk_reward_ratio": 2.6
+      },
+      "trailing_stop_pct": null,
+      "trailing_stop_trigger_pct": null,
+      "partial_exit_t1_pct": 0.5,
+      "partial_exit_trail_remainder": true,
+      "momentum_play": false,
+      "reasons": [
+        "fair_value_quality_rejected"
+      ],
+      "model_confidence": 0.4
+    },
+    "debate_rounds": 3,
+    "consensus_reached": false,
+    "consensus_method": null,
+    "dissenting_agents": [
+      "sentiment_specialist",
+      "bear"
+    ],
+    "agent_votes": [
+      {
+        "agent": "fundamental_scout",
+        "position": "UNKNOWN",
+        "confidence": 0.46,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.46,
+        "round": 0
+      },
+      {
+        "agent": "chartist",
+        "position": "UNKNOWN",
+        "confidence": 0.64,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.64,
+        "round": 0
+      },
+      {
+        "agent": "sentiment_specialist",
+        "position": "AVOID",
+        "confidence": 0.86,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.86,
+        "round": 0
+      },
+      {
+        "agent": "bull",
+        "position": "HOLD",
+        "confidence": 0.34,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.34,
+        "round": 3
+      },
+      {
+        "agent": "bear",
+        "position": "AVOID",
+        "confidence": 0.29,
+        "calibration_weight": 0.85,
+        "effective_confidence": 0.24649999999999997,
+        "round": 3
+      },
+      {
+        "agent": "devils_advocate",
+        "position": "AVOID",
+        "confidence": 0.4,
+        "calibration_weight": 1.0,
+        "effective_confidence": 0.4,
+        "round": 4
+      }
+    ],
+    "consensus_winner": null,
+    "disagreement_type": "timing",
+    "debate_history": [
+      {
+        "role": "system",
+        "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 282, Rp 308, Rp 259, Rp 318, Rp 238, Rp 215, Rp 67, Rp 28, Rp 56, Rp 70",
+        "round": 0,
+        "position": "UNKNOWN",
+        "confidence": null
+      },
+      {
+        "role": "system",
+        "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 282, Rp 308, Rp 259, Rp 318, Rp 238",
+        "round": 0,
+        "position": "UNKNOWN",
+        "confidence": null
+      },
+      {
+        "role": "bull",
+        "content": "…hat makes the entry zone a conditional support area at best, not a high-probability long entry backed by a confirmed catalyst.\n\nThe catalyst requirement is not met. Recent news is negative ownership-flow commentary dated 2026-07-07 to 2026-07-10, which are past events and therefore PAST_EVENT_NOT_CATALYST for a 5–20 trading-day swing. There is no identified near-term technical or flow trigger with a clear date/event that can justify a BUY thesis. Given the missing fundamental valuation and missing catalyst, the correct stance is HOLD/NEUTRAL, not bullish.\n\nPosition: HOLD\nAgent Confidence: 0.18",
+        "round": 1,
+        "position": "HOLD",
+        "confidence": 0.153
+      },
+      {
+        "role": "bear",
+        "content": "…quirement is not met for a 5–20 trading-day swing. The news items are dated 2026-07-07 to 2026-07-10, so they are past events and therefore PAST_EVENT_NOT_CATALYST; ownership-change headlines do not create a confirmed near-term operational trigger. The bull’s target at Rp 318 versus stop Rp 238 implies an unverified R/R of roughly 1.5:1 from the midpoint of the stated entry zone, which is not compelling enough to offset the missing valuation floor and missing catalyst. Given the null fair value and no valid near-term catalyst, the setup is not actionable.\n\nPosition: HOLD\nAgent Confidence: 0.18",
+        "round": 1,
+        "position": "HOLD",
+        "confidence": 0.18
+      },
+      {
+        "role": "bull",
+        "content": "…s positive but is shrinking.\n\nRevised risk/reward using Rp 215 as the secondary stop reference is materially better than the Bear implies: from Rp 282, downside to Rp 215 is larger than the original stop, but it also creates a wider, more survivable swing structure under the AVWAP rather than a tight noise stop. In short, the Bear is right that the setup is not pristine, yet the combination of structural uptrend, above-AVWAP positioning, and a deeper support reference keeps the long case alive for traders willing to use confirmation and disciplined sizing.\n\nPosition: BUY\nAgent Confidence: 0.39",
+        "round": 2,
+        "position": "BUY",
+        "confidence": 0.332
+      },
+      {
+        "role": "bear",
+        "content": "…e lower half of the range, which weakens any claim that the market is coiling just above support.\n\nMargin of safety stress test: ATR(14) is Rp 28, so the maximum 1-week adverse move is Rp 56. The Bull’s claimed margin of safety from Rp 308 support down to Rp 238 is Rp 70, so 2 x ATR does not exceed that margin on a pure arithmetic basis. However, because the stock is already below Rp 308, the practical cushion is thinner than the headline stop implies; the setup is structurally damaged and requires a fresh reclaim before any swing-long logic is credible.\n\nPosition: AVOID\nAgent Confidence: 0.34",
+        "round": 2,
+        "position": "AVOID",
+        "confidence": 0.34
+      },
+      {
+        "role": "bull",
+        "content": "Position: NEUTRAL\nDebate Confidence: LOW\n\nBear’s stop-loss critique at Rp 238 is valid, but it is not the only reference. A secondary support sits at Rp 215, which is already identified in the technical summary as the AVWAP zone; that gives the long case a deeper invalidation line below the cited breakdown, and it is more meaningful than treating the Rp 238 level as the sole decision point. Yes, price at Rp 282 is still below EMA20 Rp 308 and the lower-half BB context confirms damage, but the question for a 5–20 trading-day swing is whether there is a tradable shelf beneath the break, and Rp 215 is that shelf.\n\nOn valuation, the Bear’s “no fair value floor” objection is directionally fair because fair value is null, so the model cannot prove undervaluation. Still, the downside scenario is not automatically fatal: the current tape already reflects a large de-rating from the 52-week high, and the chart-based support stack means the market does not need a precise intrinsic anchor to avoid immediate further collapse. Because fair value is INSUFFICIENT_DATA, I cannot claim discounted valuation; I can only say the Bear’s downside thesis is not yet validated by a second hard leg lower.\n\nTrigger skepticism is also only partially decisive. The recent 2026-07-07 to 2026-07-10 ownership headlines are correctly marked PAST_EVENT_NOT_CATALYST, so they cannot be used as a forward trigger. The better fallback catalyst is technical confirmation: a reclaim and hold back above the EMA20 zone, or a reaction from the Rp 215 AVWAP area with improving momentum. The MACD histogram remains positive, even if shrinking, so momentum is not broken outright; that supports a watchlist stance rather than an immediate dismissal.\n\nRisk/reward, using Rp 215 as the revised stop reference, is less attractive than a clean breakout setup but still usable for nimble traders if entry is disciplined. The Bear’s concern that the setup is damaged is justified, yet the presence of a deeper support reference below the breakdown level means the trade is not structurally dead. Because core valuation data is missing and catalyst quality is weak, this is not a high-conviction BUY; it is a wait-for-confirmation setup, with the long bias only becoming actionable if price stabilizes around the secondary support and reclaims short-term trend control.\n\nPosition: HOLD\nAgent Confidence: 0.34",
+        "round": 3,
+        "position": "HOLD",
+        "confidence": 0.289
+      },
+      {
+        "role": "bear",
+        "content": "Position: BEARISH\nDebate Confidence: LOW\n\nBull’s cited support at Rp 308 is already compromised: the stock is trading at Rp 282, which is beneath that level and also below the short-term trend marker in the technical brief. That means the Bull’s “support” is no longer acting as support in live price action; it has become overhead resistance. The Bull’s fallback shelf at Rp 215 is not a confirmation of strength, but a lower AVWAP-based reference that effectively admits the original support thesis has failed. In other words, the chart is not defending Rp 308; it is searching for a lower equilibrium.\n\nIf Rp 308 breaks, the next support is Rp 215 -- making the actual max loss Rp 67, not Rp 70 as the Bull claims. That is not a minor nuance: the Bull’s risk framing assumes a controlled pullback, but the current tape already sits Rp 26 below the cited support, so the downside path is active rather than hypothetical. Because price is already under Rp 308 and the technical summary flags bearish reversal context plus gap-down pressure, the supposed “support stack” is not a reliable floor for a 5–20 trading-day swing.\n\nMargin of safety stress test fails for execution quality: ATR(14) is Rp 28, so 2 x ATR = Rp 56 maximum one-week adverse move. Against the Bull’s own claimed margin of safety from Rp 308 to Rp 238, that cushion is only Rp 70, which does not provide a robust buffer once you factor in that price is already trading below the cited support and momentum is decelerating. This is not a clean swing setup; the trade remains vulnerable to a routine volatility move that can erase most of the remaining cushion.\n\nThe fundamental-floor argument is also weak: the fair value field is null/INSUFFICIENT_DATA, so there is no defensible valuation anchor to offset the technical breakdown. The recent ownership headlines dated 2026-07-07 to 2026-07-10 are PAST_EVENT_NOT_CATALYST and cannot rescue the setup as a forward trigger. With the Bull’s key level already broken, missing fair value data, and no fresh catalyst, the setup is too damaged for a confident long and should not be treated as an actionable swing buy.\n\nPosition: AVOID\nAgent Confidence: 0.29",
+        "round": 3,
+        "position": "AVOID",
+        "confidence": 0.29
+      },
+      {
+        "role": "devils_advocate",
+        "content": "Position: STRESS_TEST  \nAgent Confidence: 0.30\n\n**Challenge 1 — Macro / company risk**  \nIf net foreign flows stay **Net Foreign Sell** on top of the recent selling headlines, could the already-broken **Rp 308** support fail again and drag BAPA toward the **Rp 238** stop within 5–20 trading days?\n\n**Challenge 2 — Transaction cost stress test**  \nEntry price used: **Rp 282**  \nTarget price used: **Rp 318**\n\nProjected target return from entry midpoint = **(318 - 282) / 282 = 12.77%**\n\nCost components:\n- Buy commission: **0.15%**\n- Sell commission: **0.25%**\n- Final income tax: **0.10%**\n- Slippage: **0.15%** (entry price ≥ Rp 500 rule does not apply; but since entry is Rp 282, slippage is **0.30%**)\n\nTotal round-trip cost = **0.15% + 0.25% + 0.10% + 0.30% = 0.80%**\n\nNet return after costs = **12.77% - 0.80% = 11.97%**\n\n**VIABLE after transaction costs.**\n\n**Challenge 3 — Anti-averaging down check**  \nPrice is still more than 10% below the 52w high (**Rp 454**) and MA200 context is not provided as BELOW, so this check is **not triggered**.\n\nPOSITION: AVOID CONFIDENCE: 0.40",
+        "round": 4,
+        "position": "AVOID",
+        "confidence": 0.4
+      }
+    ],
+    "raw_data_summary": "=== EVIDENCE BRIEF: BAPA ===\nQuery: swing trade analysis\n\n[FAIR_VALUE]\nEvidence ID: BAPA_20260712_173441_fair_value_0\nCurrent Price: 282 | Fair Value Base: 0 | Fair Value Range: INSUFFICIENT_DATA - INSUFFICIENT_DATA | Upside: -100.0% | Risk Overvalued: False\nSource: stockbit | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: BAPA_20260712_173441_technical_0\n{\"52w_high\":454.0,\"52w_low\":50.0,\"atr14\":28.0,\"avg_volume_20d\":21582020.0,\"avwap\":215.0,\"avwap_anchor_bars_ago\":59,\"avwap_position\":\"ABOVE_AVWAP\",\"bb_position\":\"LOWER_HALF\",\"bb_squeeze\":false,\"bb_width\":93.25,\"brief\":\"Position: NEUTRAL Stock is in a structural uptrend. Swing long is trend-aligned. Ticker-specific context: current price Rp 282 is below EMA20 (Rp 308) and near the 61.8% Fibonacci\nSource: yfinance | Score: 0.95\n\n[TECHNICAL]\nEvidence ID: BAPA_20260712_173441_technical_1\nretracement, so the trend-aligned bias is weakened by short-term price damage. ENTRY ZONE: Rp 259 - Rp 308. TARGET: Rp 318 (approx. 9.3% from entry midpoint). STOP-LOSS: Rp 238 (2.5 x ATR below EMA20). RSI(14) at 47.9 is neutral, not oversold or overbought. Current volume confirms the move only partially: surge ratio 7.76 is strong, but the latest orderbook shows heavy overhead supply near Rp\nSource: yfinance | Score: 0.95\n\n[TECHNICAL]\nEvidence ID: BAPA_20260712_173441_technical_2\n282-308, so follow-through needs confirmation. Weekly trend data unavailable, so no higher-timeframe weekly bias can be confirmed. MACD histogram state is POSITIVE_SHRINKING, which means momentum is still positive but decelerating; take-profit discipline is prudent. Candlestick pattern is BEARISH_REVERSAL (shooting star), which is a warning, and the GAP_DOWN adds a bearish opening context. Price\nSource: yfinance | Score: 0.95\n\n[TECHNICAL]\nEvidence ID: BAPA_20260712_173441_technical_3\nis below the upper BB hal...\",\"compression_type\":\"NONE\",\"current_price\":282.0,\"divergence_strength\":null,\"ema20\":308.0,\"entry_rationale\":\"Market closed (weekend). Plan entries for Monday\nSource: yfinance | Score: 0.95\n\n[FUNDAMENTAL]\nEvidence ID: BAPA_20260712_173441_fundamental_3\ndepan.\\n\",\"fair_value\":0.0,\"fair_value_base\":0.0,\"fair_value_high\":null,\"fair_value_low\":null,\"risk_overvalued\":false}\nSource: stockbit | Score: 0.80\n\n---\nTotal evidence: 6/15 chunks selected\nToken estimate: ~576\n\n=== NEWS BRIEF: BAPA ===\nPeriod: last 60 days\nSentiment: NEGATIVE (score: -0.66)\nMACRO EVENT DETECTED\nConfidence adjustment: -0.10\nReason: Negative news sentiment in last 60 days\nLanguage: ID/EN\n\nTOP NEWS:\n1. [NEGATIVE] Perubahan Kepemilikan Saham BAPA, Jual - Indo Premier Sekuritas\n   Source: Indo Premier Sekuritas | 2026-07-10\n2. [NEGATIVE] Aksi Jual Berlanjut! PT Inti Fikasa Sekuritas Kembali Lepas 100 Ribu Saham BAPA - pasardana.id\n   Source: pasardana.id | 2026-07-09\n3. [NEGATIVE] Perubahan Kepemilikan Saham BAPA, Jual Bersih - Indo Premier Sekuritas\n   Source: Indo Premier Sekuritas | 2026-07-07\n4. [NEGATIVE] BEI Cabut BAPA dari FCA, Saham Terbang 505% dan Kepemilikan Belvin Tannadi Disorot - achmadnurhidayat.id\n   Source: achmadnurhidayat.id | 2026-07-07\n5. [NEGATIVE] Perubahan Kepemilikan Saham BAPA, Jual - Indo Premier Sekuritas\n   Source: Indo Premier Sekuritas | 2026-07-07",
+    "metadata": {
+      "prompt_version": "2026-06-30-cio-regime-labels-v27",
+      "run_id": "20260712_173441",
+      "regime": "DEFENSIVE",
+      "sector": "unknown",
+      "market_data_source": "yfinance",
+      "market_data_fetched_at": "2026-07-09T17:00:00+00:00",
+      "market_data_cached": true,
+      "flash_calls": 10,
+      "pro_calls": 0,
+      "tradeability_preflight": {
+        "status": "clean",
+        "atr14": 28.0,
+        "surrogate_gap": 62.0
+      },
+      "preflight_skipped": false,
+      "fair_value_rejected": true,
+      "valuation_gap": "unverified",
+      "reasons": [
+        "fair_value_quality_rejected"
+      ],
+      "has_breaking_news": false,
+      "has_insider_selling": false,
+      "has_post_earnings": false,
+      "breaking_news_headlines": [],
+      "news_confidence_adjustment": -0.1,
+      "news_overall_sentiment": "NEGATIVE",
+      "news_brief": "=== NEWS BRIEF: BAPA ===\nPeriod: last 60 days\nSentiment: NEGATIVE (score: -0.66)\nMACRO EVENT DETECTED\nConfidence adjustment: -0.10\nReason: Negative news sentiment in last 60 days\nLanguage: ID/EN\n\nTOP NEWS:\n1. [NEGATIVE] Perubahan Kepemilikan Saham BAPA, Jual - Indo Premier Sekuritas\n   Source: Indo Premier Sekuritas | 2026-07-10\n2. [NEGATIVE] Aksi Jual Berlanjut! PT Inti Fikasa Sekuritas Kembali Lepas 100 Ribu Saham BAPA - pasardana.id\n   Source: pasardana.id | 2026-07-09\n3. [NEGATIVE] Perubahan Kepemilikan Saham BAPA, Jual Bersih - Indo Premier Sekuritas\n   Source: Indo Premier Sekuritas | 2026-07-07\n4. [NEGATIVE] BEI Cabut BAPA dari FCA, Saham Terbang 505% dan Kepemilikan Belvin Tannadi Disorot - achmadnurhidayat.id\n   Source: achmadnurhidayat.id | 2026-07-07\n5. [NEGATIVE] Perubahan Kepemilikan Saham BAPA, Jual - Indo Premier Sekuritas\n   Source: Indo Premier Sekuritas | 2026-07-07",
+      "exdate_tier": "CLEAR",
+      "rag_chunks_selected": 6,
+      "rag_chunks_considered": 15,
+      "rag_token_estimate": 576,
+      "rag_rendered_char_count": 2305,
+      "evidence_age_h": 0,
+      "evidence_age_hours": 0.0,
+      "rag_citation_ids": [
+        "BAPA_20260712_173441_fair_value_0",
+        "BAPA_20260712_173441_technical_0",
+        "BAPA_20260712_173441_technical_1",
+        "BAPA_20260712_173441_technical_2",
+        "BAPA_20260712_173441_technical_3",
+        "BAPA_20260712_173441_fundamental_3"
+      ],
+      "rag_citations": [
+        {
+          "chunk_id": "BAPA_20260712_173441_fair_value_0",
+          "category": "fair_value",
+          "source": "stockbit",
+          "relevance_score": 0.85,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "BAPA_20260712_173441_technical_0",
+          "category": "technical",
+          "source": "yfinance",
+          "relevance_score": 0.95,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "BAPA_20260712_173441_technical_1",
+          "category": "technical",
+          "source": "yfinance",
+          "relevance_score": 0.95,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "BAPA_20260712_173441_technical_2",
+          "category": "technical",
+          "source": "yfinance",
+          "relevance_score": 0.95,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "BAPA_20260712_173441_technical_3",
+          "category": "technical",
+          "source": "yfinance",
+          "relevance_score": 0.95,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "BAPA_20260712_173441_fundamental_3",
+          "category": "fundamental",
+          "source": "stockbit",
+          "relevance_score": 0.8,
+          "is_stale": false
+        }
+      ],
+      "rag_stale_citation_ids": [],
+      "market_cap_idr": 186623229952,
+      "duration_seconds": 184.7029999999795,
+      "batch_timestamp": "20260712_173908"
+    },
+    "regime": {
+      "label": "SIDEWAYS",
+      "confidence": 0.9467375021528672,
+      "probabilities": {
+        "SIDEWAYS": 0.9467375021528672,
+        "BULL": 0.019237603759281907,
+        "BEAR_STRESS": 0.034024894087631256
+      },
+      "msci_override": false,
+      "training_days": 756,
+      "detected_at": "2026-07-12T17:37:03.506939",
+      "notes": "MSCI review active: True"
+    },
+    "trading_params": {
+      "description": "IHSG flat, moderate volatility",
+      "max_position_pct": 0.01,
+      "min_risk_reward": 2.0,
+      "consensus_threshold": 0.7,
+      "max_concurrent_positions": 2,
+      "devil_advocate_weight": 0.3,
+      "regime_multiplier": 0.85,
+      "trading_allowed": true
+    },
+    "error": null,
+    "status": "success",
+    "conviction_score": 0.0,
+    "sector_key": "unknown",
+    "news_sentiment": "NEGATIVE",
+    "news_confidence_adjustment": -0.1,
+    "has_breaking_news": false,
+    "breaking_news_headlines": [],
+    "reasons": [
+      "fair_value_quality_rejected"
+    ],
+    "evidence_age_h": 0,
+    "model_confidence": 0.4,
+    "trade_conviction": 0.0,
+    "risk_governor": {
+      "ticker": "BAPA",
+      "status": "reject",
+      "sizing_allowed": false,
+      "reason_codes": [
+        "no_momentum_confirmation",
+        "fair_value_quality_rejected",
+        "invalid_entry_range",
+        "missing_target_price",
+        "missing_stop_loss"
+      ],
+      "message": "Setup ditolak karena data harga kunci belum valid.",
+      "current_price": 282.0,
+      "entry_low": null,
+      "entry_high": null,
+      "target_price": null,
+      "stop_loss": null
+    },
+    "forecast_report": {
+      "ticker": "BAPA",
+      "as_of": "2026-07-12",
+      "horizon_days": 10,
+      "expected_return_net": null,
+      "p_target": null,
+      "p_stop": null,
+      "volatility_forecast": 0.0,
+      "expected_value": null,
+      "decision": "AVOID",
+      "confidence": null,
+      "model_votes": [
+        {
+          "model_name": "naive",
+          "status": "validation_failed",
+          "reason": "validation_status:failed",
+          "r_hat_net": 0.0322911331758398,
+          "p_target": null,
+          "p_stop": null,
+          "volatility_forecast": 0.0,
+          "weight": 0.0,
+          "validation_passed": false,
+          "ic": null,
+          "brier_target": 0.25,
+          "rmse": 0.21864028549820813,
+          "mae": 0.150902519519454,
+          "mape": 1.5421116760785136,
+          "directional_accuracy": 0.5133333333333333
+        },
+        {
+          "model_name": "xgboost",
+          "status": "active",
+          "reason": null,
+          "r_hat_net": 0.2546951174736023,
+          "p_target": null,
+          "p_stop": null,
+          "volatility_forecast": 0.0,
+          "weight": 0.0,
+          "validation_passed": true,
+          "ic": 0.06939603932622397,
+          "brier_target": 0.2745436841213154,
+          "rmse": 0.25227762241802415,
+          "mae": 0.204555428891724,
+          "mape": 6.880343560576837,
+          "directional_accuracy": 0.39333333333333337
+        },
+        {
+          "model_name": "lstm",
+          "status": "experimental_unused",
+          "reason": "conservative_policy",
+          "r_hat_net": null,
+          "p_target": null,
+          "p_stop": null,
+          "volatility_forecast": null,
+          "weight": 0.0,
+          "validation_passed": false,
+          "ic": null,
+          "brier_target": null,
+          "rmse": null,
+          "mae": null,
+          "mape": null,
+          "directional_accuracy": null
+        },
+        {
+          "model_name": "prophet",
+          "status": "experimental_unused",
+          "reason": "conservative_policy_not_primary_return_model",
+          "r_hat_net": null,
+          "p_target": null,
+          "p_stop": null,
+          "volatility_forecast": null,
+          "weight": 0.0,
+          "validation_passed": false,
+          "ic": null,
+          "brier_target": null,
+          "rmse": null,
+          "mae": null,
+          "mape": null,
+          "directional_accuracy": null
+        },
+        {
+          "model_name": "tgarch",
+          "status": "validation_failed",
+          "reason": "volatility_fallback",
+          "r_hat_net": null,
+          "p_target": null,
+          "p_stop": null,
+          "volatility_forecast": 0.0,
+          "weight": 0.0,
+          "validation_passed": false,
+          "ic": null,
+          "brier_target": null,
+          "rmse": null,
+          "mae": null,
+          "mape": null,
+          "directional_accuracy": null
+        }
+      ],
+      "validation_summary": {
+        "horizon_days": 10,
+        "n_observations": 150,
+        "ic_mean": 0.06939603932622397,
+        "ic_t_stat": 0.4106024482010027,
+        "brier": 0.2622718420606577,
+        "rmse": 0.23545895395811614,
+        "mae": 0.177728974205589,
+        "mape": 4.211227618327675,
+        "directional_accuracy": 0.45333333333333337,
+        "dsr": 1.0,
+        "bh_q_value_passed": false,
+        "status": "failed"
+      },
+      "validation_by_model": {
+        "naive": {
+          "horizon_days": 10,
+          "n_observations": 150,
+          "ic_mean": null,
+          "ic_t_stat": null,
+          "brier": 0.25,
+          "rmse": 0.21864028549820813,
+          "mae": 0.150902519519454,
+          "mape": 1.5421116760785136,
+          "directional_accuracy": 0.5133333333333333,
+          "dsr": 1.0,
+          "bh_q_value_passed": false,
+          "status": "failed"
+        },
+        "xgboost": {
+          "horizon_days": 10,
+          "n_observations": 150,
+          "ic_mean": 0.06939603932622397,
+          "ic_t_stat": 0.4106024482010027,
+          "brier": 0.2745436841213154,
+          "rmse": 0.25227762241802415,
+          "mae": 0.204555428891724,
+          "mape": 6.880343560576837,
+          "directional_accuracy": 0.39333333333333337,
+          "dsr": 1.0,
+          "bh_q_value_passed": false,
+          "status": "research_only"
+        }
+      },
+      "model_dispersion": 0.11120199214888124,
+      "model_disagreement_penalty": 0.2,
+      "risk_adjusted_expected_value": null,
+      "data_quality_flags": [
+        "tgarch_fallback",
+        "no_validated_return_model",
+        "experimental_unused:lstm",
+        "experimental_unused:prophet",
+        "model_disagreement_penalty:0.200",
+        "validation_status:failed"
+      ],
+      "volatility_fallback": true
+    },
+    "forecast_ev_ignored_reason": "validation_failed"
+  }
+]

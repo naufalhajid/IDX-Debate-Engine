@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict
 
 from core.settings import settings
 from utils.logger_config import logger
+from utils.ticker import InvalidIDXTicker, normalize_idx_ticker, resolve_within_root
 
 
 DEFAULT_PATH = settings.audit_log_path
@@ -671,8 +672,15 @@ def main() -> None:
     parser.add_argument("--ticker", required=True, help="IDX ticker, e.g. BBCA")
     args = parser.parse_args()
 
-    ticker = args.ticker.upper()
-    debate_path = settings.debates_dir / ticker / "latest_debate.json"
+    try:
+        ticker = normalize_idx_ticker(args.ticker)
+    except InvalidIDXTicker as exc:
+        parser.error(str(exc))
+    debate_path = resolve_within_root(
+        settings.debates_dir,
+        ticker,
+        "latest_debate.json",
+    )
     packet = DEFAULT_AUDITOR.audit_from_file(debate_path)
     print(DEFAULT_AUDITOR.format_report(packet))
 

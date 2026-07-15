@@ -8,6 +8,8 @@ from utils.trade_math import (
     LARGE_CAP_THRESHOLD_IDR,
     _load_largecap_fallback,
     calculate_rr,
+    get_required_rr_minimum,
+    get_required_rr_resolution,
     get_rr_minimum,
 )
 
@@ -185,3 +187,50 @@ def test_get_rr_minimum_unknown_regime_no_scaling() -> None:
     yf_info = {"marketCap": 5_000_000_000_000}
     result = get_rr_minimum("CYBR", regime="UNKNOWN_REGIME", yf_info=yf_info)
     assert result == DEFAULT_RR_MINIMUM
+
+
+def test_required_rr_large_cap_normal_respects_user_floor() -> None:
+    yf_info = {"marketCap": 400_000_000_000_000}
+
+    resolution = get_required_rr_resolution("BMRI", "NORMAL", yf_info)
+
+    assert resolution.base_rr_minimum == 1.4
+    assert resolution.regime_rr_minimum == 1.4
+    assert resolution.required_rr == 2.0
+    assert resolution.tier_name == "large_cap"
+
+
+def test_required_rr_large_cap_defensive_respects_user_floor() -> None:
+    yf_info = {"marketCap": 400_000_000_000_000}
+
+    assert get_required_rr_minimum("BMRI", "DEFENSIVE", yf_info) == 2.0
+
+
+def test_required_rr_non_large_cap_normal_respects_user_floor() -> None:
+    yf_info = {"marketCap": 5_000_000_000_000}
+
+    assert get_required_rr_minimum("CYBR", "NORMAL", yf_info) == 2.0
+
+
+def test_required_rr_non_large_cap_defensive_keeps_stricter_regime_floor() -> None:
+    yf_info = {"marketCap": 5_000_000_000_000}
+
+    resolution = get_required_rr_resolution("CYBR", "DEFENSIVE", yf_info)
+
+    assert resolution.regime_multiplier == 1.3
+    assert resolution.regime_rr_minimum == pytest.approx(2.106)
+    assert resolution.required_rr == pytest.approx(2.106)
+
+
+def test_required_rr_missing_market_cap_uses_static_fallback_with_provenance() -> None:
+    resolution = get_required_rr_resolution(
+        "BBCA",
+        "SIDEWAYS",
+        {"previousClose": 6175},
+    )
+
+    assert resolution.required_rr == 2.0
+    assert resolution.tier_name == "large_cap"
+    assert resolution.tier_source == "static_fallback"
+    assert resolution.execution_regime == "SIDEWAYS"
+    assert resolution.regime_multiplier == 1.2

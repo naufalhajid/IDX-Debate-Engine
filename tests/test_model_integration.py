@@ -15,6 +15,7 @@ import asyncio
 import os
 import time
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -262,6 +263,157 @@ class TestCodexResponsesPayload:
             )
 
 
+class TestCodexResponsesAuthLifecycle:
+    def test_oauth_uses_chatgpt_codex_transport(self):
+        from providers.codex_responses_llm import ChatCodexResponses
+
+        llm = ChatCodexResponses(
+            model="gpt-5.5",
+            api_key=SecretStr("oauth-token"),
+            credential_type="oauth",
+        )
+
+        assert str(llm._sync_client.base_url).rstrip("/") == (
+            "https://chatgpt.com/backend-api/codex"
+        )
+
+    def test_managed_api_key_uses_openai_api_transport(self):
+        from providers.codex_responses_llm import ChatCodexResponses
+
+        llm = ChatCodexResponses(
+            model="gpt-5.5",
+            api_key=SecretStr("sk-managed-test-token"),
+            credential_type="managed_api_key",
+        )
+
+        assert str(llm._sync_client.base_url).rstrip("/") == (
+            "https://api.openai.com/v1"
+        )
+
+    def test_sync_request_replays_only_once_after_401(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        from providers.codex_responses_llm import ChatCodexResponses
+
+        class ExpiredTokenError(RuntimeError):
+            status_code = 401
+
+        class Responses:
+            calls = 0
+
+            def create(self, **_kwargs):
+                self.calls += 1
+                if self.calls == 1:
+                    raise ExpiredTokenError("token_expired")
+                return iter(
+                    [
+                        SimpleNamespace(
+                            type="response.completed",
+                            response=SimpleNamespace(error=None),
+                        )
+                    ]
+                )
+
+        responses = Responses()
+        llm = ChatCodexResponses(
+            model="gpt-5.5",
+            api_key=SecretStr("oauth-token"),
+        )
+        llm._sync_client = SimpleNamespace(responses=responses)
+        monkeypatch.setattr(
+            ChatCodexResponses,
+            "_recover_auth_sync",
+            lambda self, exc: None,
+            raising=False,
+        )
+
+        assert list(llm._stream([HumanMessage(content="ping")])) == []
+        assert responses.calls == 2
+
+    def test_sync_request_stops_after_second_401(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        from providers.codex_responses_llm import ChatCodexResponses
+
+        class ExpiredTokenError(RuntimeError):
+            status_code = 401
+
+        class Responses:
+            calls = 0
+
+            def create(self, **_kwargs):
+                self.calls += 1
+                raise ExpiredTokenError("token_expired")
+
+        responses = Responses()
+        llm = ChatCodexResponses(
+            model="gpt-5.5",
+            api_key=SecretStr("oauth-token"),
+        )
+        llm._sync_client = SimpleNamespace(responses=responses)
+        monkeypatch.setattr(
+            ChatCodexResponses,
+            "_recover_auth_sync",
+            lambda self, exc: None,
+            raising=False,
+        )
+
+        with pytest.raises(RuntimeError, match="after one credential recovery"):
+            list(llm._stream([HumanMessage(content="ping")]))
+        assert responses.calls == 2
+
+    @pytest.mark.asyncio
+    async def test_async_request_replays_only_once_after_401(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        from providers.codex_responses_llm import ChatCodexResponses
+
+        class ExpiredTokenError(RuntimeError):
+            status_code = 401
+
+        class Responses:
+            calls = 0
+
+            async def create(self, **_kwargs):
+                self.calls += 1
+                if self.calls == 1:
+                    raise ExpiredTokenError("token_expired")
+
+                async def events():
+                    yield SimpleNamespace(
+                        type="response.completed",
+                        response=SimpleNamespace(error=None),
+                    )
+
+                return events()
+
+        async def fake_recovery(self, exc):
+            return None
+
+        responses = Responses()
+        llm = ChatCodexResponses(
+            model="gpt-5.5",
+            api_key=SecretStr("oauth-token"),
+        )
+        llm._client = SimpleNamespace(responses=responses)
+        monkeypatch.setattr(
+            ChatCodexResponses,
+            "_recover_auth_async",
+            fake_recovery,
+            raising=False,
+        )
+
+        chunks = [
+            chunk
+            async for chunk in llm._astream([HumanMessage(content="ping")])
+        ]
+        assert chunks == []
+        assert responses.calls == 2
+
+
 # ---------------------------------------------------------------------------
 # Codex adapter settings
 # ---------------------------------------------------------------------------
@@ -300,6 +452,42 @@ class TestCodexAdapter:
         assert calls[0]["request_timeout"] == 120
         assert calls[0]["max_tokens"] == 4000
         assert calls[0]["temperature"] == 0.0
+
+    def test_codex_adapter_error_log_redacts_secret(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        from providers import codex_adapter
+
+        secret = "sk-adapter-secret-sentinel"
+        captured: list[str] = []
+
+        class FailingChatCodexResponses:
+            def __init__(self, **_kwargs):
+                raise RuntimeError(f"api_key={secret}")
+
+        monkeypatch.setattr(codex_adapter, "resolve_codex_token", lambda: secret)
+        monkeypatch.setattr(
+            codex_adapter,
+            "get_codex_credential_type",
+            lambda _token: "managed_api_key",
+        )
+        monkeypatch.setattr(
+            "providers.codex_responses_llm.ChatCodexResponses",
+            FailingChatCodexResponses,
+        )
+        monkeypatch.setattr(
+            codex_adapter.logger,
+            "error",
+            lambda message, *args: captured.append(str(message).format(*args)),
+        )
+
+        with pytest.raises(RuntimeError):
+            codex_adapter.get_codex_flash_llm()
+
+        rendered = "\n".join(captured)
+        assert secret not in rendered
+        assert "[REDACTED]" in rendered
 
     def test_codex_pro_uses_xhigh_reasoning(self, monkeypatch: pytest.MonkeyPatch):
         calls = []

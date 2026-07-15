@@ -9,7 +9,9 @@ from core.backtest_outcome_evaluator import (
     PriceBar,
     evaluate_memory,
     evaluate_trade_outcome,
+    fetch_yfinance_price_bars,
 )
+from utils.ticker import InvalidIDXTicker
 
 
 def _record(
@@ -219,3 +221,65 @@ def test_evaluate_memory_empty_price_data_skips_record(tmp_path: Path) -> None:
 
     assert summary.updated_records == 0
     assert summary.details[0].reason == "no_price_data"
+
+
+def test_evaluate_memory_skips_invalid_artifact_identity_per_record(
+    tmp_path: Path,
+) -> None:
+    memory_path = tmp_path / "backtest_memory.jsonl"
+    memory = BacktestMemory(memory_path)
+    memory.record(_record(ticker="BBCA", run_id="../../escape"))
+
+    summary = evaluate_memory(
+        memory_path=memory_path,
+        debates_dir=tmp_path / "debates",
+        write=True,
+        price_fetcher=lambda *_: pytest.fail(
+            "invalid artifact identity reached market-data fetch"
+        ),
+    )
+
+    assert summary.updated_records == 0
+    assert summary.skipped_records == 1
+    assert summary.details[0].status == "skipped"
+    assert summary.details[0].reason == "invalid_artifact_identity"
+
+
+def test_fetch_yfinance_rejects_invalid_ticker_before_provider_access(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import core.backtest_outcome_evaluator as evaluator
+
+    monkeypatch.setattr(
+        evaluator,
+        "_get_yfinance",
+        lambda: pytest.fail("invalid ticker reached yfinance provider"),
+    )
+
+    with pytest.raises(InvalidIDXTicker):
+        fetch_yfinance_price_bars("../escape", date(2026, 1, 1), date(2026, 1, 2))
+
+
+def test_evaluate_memory_deduplicates_base_and_jk_alias_fetches(tmp_path: Path) -> None:
+    memory_path = tmp_path / "backtest_memory.jsonl"
+    debates_dir = tmp_path / "debates"
+    memory = BacktestMemory(memory_path)
+    first = _record(ticker="BBCA", run_id="run-1")
+    second = _record(ticker="BBCA.JK", run_id="run-2")
+    memory.record(first)
+    memory.record(second)
+    _create_artifact(debates_dir, first)
+    _create_artifact(debates_dir, second)
+    calls: list[str] = []
+
+    def fetcher(ticker: str, *_args) -> list[PriceBar]:
+        calls.append(ticker)
+        return []
+
+    evaluate_memory(
+        memory_path=memory_path,
+        debates_dir=debates_dir,
+        price_fetcher=fetcher,
+    )
+
+    assert calls == ["BBCA"]

@@ -8,6 +8,8 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from utils.secret_redaction import redact_secrets
+
 
 class ErrorCode(str, Enum):
     DNS = "DNS"
@@ -72,7 +74,7 @@ _RETRYABLE_BY_CODE = {
 
 def classify_exception(e: Exception, source: str) -> FailureRecord:
     """Map common provider/debate exceptions into a normalized failure record."""
-    raw_message = str(e)
+    raw_message = redact_secrets(e)
     message = raw_message.strip() or "Empty LLM response"
     lower_message = message.lower()
     exc_name = type(e).__name__.lower()

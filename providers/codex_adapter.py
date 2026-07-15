@@ -15,8 +15,9 @@ from typing import TYPE_CHECKING, Iterator
 
 from core.failure_taxonomy import classify_exception
 from core.settings import settings
-from providers.oauth_manager import resolve_codex_token
+from providers.oauth_manager import get_codex_credential_type, resolve_codex_token
 from utils.logger_config import logger
+from utils.secret_redaction import redact_secrets
 
 if TYPE_CHECKING:
     from providers.codex_responses_llm import ChatCodexResponses
@@ -95,6 +96,7 @@ def get_codex_flash_llm() -> "ChatCodexResponses":
         kwargs = {
             "model": model_name,
             "api_key": SecretStr(access_token),
+            "credential_type": get_codex_credential_type(access_token),
             "request_timeout": _codex_request_timeout("flash"),
             "reasoning_effort": _codex_reasoning_effort("flash"),
         }
@@ -112,7 +114,10 @@ def get_codex_flash_llm() -> "ChatCodexResponses":
         return ChatCodexResponses(**kwargs)
     except Exception as exc:
         failure = classify_exception(exc, source="codex")
-        logger.error(f"[Codex] Flash init failed: {failure.model_dump()}")
+        logger.error(
+            "[Codex] Flash init failed: {}",
+            redact_secrets(failure.model_dump()),
+        )
         raise
 
 
@@ -132,6 +137,7 @@ def get_codex_pro_llm() -> "ChatCodexResponses":
         kwargs = {
             "model": model_name,
             "api_key": SecretStr(access_token),
+            "credential_type": get_codex_credential_type(access_token),
             "request_timeout": _codex_request_timeout("pro"),
             "reasoning_effort": _codex_reasoning_effort("pro"),
         }
@@ -153,5 +159,8 @@ def get_codex_pro_llm() -> "ChatCodexResponses":
         return ChatCodexResponses(**kwargs)
     except Exception as exc:
         failure = classify_exception(exc, source="codex")
-        logger.error(f"[Codex] Pro init failed: {failure.model_dump()}")
+        logger.error(
+            "[Codex] Pro init failed: {}",
+            redact_secrets(failure.model_dump()),
+        )
         raise

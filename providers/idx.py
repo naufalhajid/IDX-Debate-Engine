@@ -46,6 +46,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 from schemas.stock import Stock
 from utils.logger_config import logger
+from utils.ticker import InvalidIDXTicker, normalize_idx_ticker
 
 
 class IDX:
@@ -178,8 +179,19 @@ class IDX:
         # Append data, use array of stock schema
         stocks = []
         for index in range(len(tickers)):
+            raw_ticker = tickers[index].text
+            try:
+                ticker = normalize_idx_ticker(raw_ticker)
+            except InvalidIDXTicker as exc:
+                logger.warning(
+                    "[IDX] Skipping row {} with invalid ticker {!r}: {}",
+                    index + 1,
+                    raw_ticker,
+                    exc,
+                )
+                continue
             stock = Stock(
-                ticker=tickers[index].text,
+                ticker=ticker,
                 name=names[index].text,
                 ipo_date=ipo_dates[index].text,
                 market_cap=float(re.sub(r"\D", "", market_caps[index].text)),

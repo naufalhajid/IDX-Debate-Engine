@@ -1,0 +1,503 @@
+{
+  "ticker": "BMRI",
+  "verdict": {
+    "ticker": "BMRI",
+    "rating": "HOLD",
+    "confidence": 0.4,
+    "fair_value": 5911.0,
+    "fair_value_base": 5911.0,
+    "fair_value_low": 5024.0,
+    "fair_value_high": 6798.0,
+    "valuation_gap": null,
+    "entry_price_range": null,
+    "target_price": null,
+    "stop_loss": null,
+    "current_price": 4080.0,
+    "timeframe": "5-20 Trading Days",
+    "execution_horizon_days": 10,
+    "weighted_reasoning": "",
+    "critical_risk_factor": "",
+    "key_catalysts": [],
+    "key_risks": [],
+    "summary": "Setup ditolak: rr_too_low: R/R 1.08 < 1.4 (target 4490.0, entry_high 4080.0, stop 3700.0).",
+    "target_basis": null,
+    "expected_return": null,
+    "risk_reward_ratio": null,
+    "is_overvalued": false,
+    "risk_overvalued": false,
+    "wait_and_see": true,
+    "consensus_reached": false,
+    "consensus_method": null,
+    "dissenting_agents": [
+      "bear"
+    ],
+    "reason_codes": [
+      "rr_too_low"
+    ],
+    "hypothetical_envelope": {
+      "entry_low": 3960.0,
+      "entry_high": 4080.0,
+      "target_price": 4490.0,
+      "target_basis": "Resistance 20-Day (Swing Cap)",
+      "stop_loss": 3700.0,
+      "risk_reward_ratio": 1.08
+    },
+    "trailing_stop_pct": null,
+    "trailing_stop_trigger_pct": null,
+    "partial_exit_t1_pct": 0.5,
+    "partial_exit_trail_remainder": true,
+    "momentum_play": false,
+    "model_confidence": 0.4
+  },
+  "debate_rounds": 3,
+  "consensus_reached": false,
+  "consensus_method": null,
+  "dissenting_agents": [
+    "bear"
+  ],
+  "agent_votes": [
+    {
+      "agent": "fundamental_scout",
+      "position": "UNKNOWN",
+      "confidence": 0.79,
+      "calibration_weight": 1.0,
+      "effective_confidence": 0.79,
+      "round": 0
+    },
+    {
+      "agent": "chartist",
+      "position": "HOLD",
+      "confidence": 0.67,
+      "calibration_weight": 1.0,
+      "effective_confidence": 0.67,
+      "round": 0
+    },
+    {
+      "agent": "sentiment_specialist",
+      "position": "HOLD",
+      "confidence": 0.62,
+      "calibration_weight": 1.0,
+      "effective_confidence": 0.62,
+      "round": 0
+    },
+    {
+      "agent": "bull",
+      "position": "HOLD",
+      "confidence": 0.61,
+      "calibration_weight": 1.0,
+      "effective_confidence": 0.61,
+      "round": 3
+    },
+    {
+      "agent": "bear",
+      "position": "AVOID",
+      "confidence": 0.38,
+      "calibration_weight": 0.85,
+      "effective_confidence": 0.323,
+      "round": 3
+    },
+    {
+      "agent": "devils_advocate",
+      "position": "AVOID",
+      "confidence": 0.4,
+      "calibration_weight": 1.0,
+      "effective_confidence": 0.4,
+      "round": 4
+    }
+  ],
+  "consensus_winner": null,
+  "disagreement_type": null,
+  "debate_history": [
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 4,080, Rp 5,911, Rp 4,049, Rp 4,116, Rp 4,276, Rp 4,219, Rp 3,731, Rp 127, Rp 5,024, Rp 6,798, Rp 3,647, Rp 254",
+      "round": 0,
+      "position": "UNKNOWN",
+      "confidence": null
+    },
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 4,080, Rp 5,911, Rp 4,049, Rp 4,116, Rp 4,276, Rp 4,219, Rp 3,731, Rp 127",
+      "round": 0,
+      "position": "UNKNOWN",
+      "confidence": null
+    },
+    {
+      "role": "bull",
+      "content": "…oreign buying and the ESOP/treasury-share distribution on 2026-07-09, but that event is the context, not the direct swing trigger. The actionable trigger is a close above the entry band/MA50 area with follow-through volume; without that, it remains just a counter-trend bounce.\n\nEntry Rp 4,080 -> Target Rp 4,219 -> Stop Rp 3,731 -> R/R: 1.1:1. Because this is only a modest reward versus stop distance and the trend is still below MA200, position size should remain conservative. If price loses the Rp 4,049–4,116 support zone, the trade thesis weakens quickly.\n\nPosition: BUY\nAgent Confidence: 0.67",
+      "round": 1,
+      "position": "BUY",
+      "confidence": 0.57
+    },
+    {
+      "role": "bear",
+      "content": "…edibly claim a negative near-term catalyst from the supplied evidence. The bull’s NR7-based breakout timing is plausible, but the brief does not provide a bearish company event that would prevent that trigger from materialising within 5–20 trading days. R/R is also not compelling enough to override the missing data problem: the cited target Rp 4,219 versus stop Rp 3,731 implies only about **1.1:1** reward/risk, which is thin for a counter-trend trade, but I cannot verify this as a rejection-grade AVOID case without the missing fundamental risk metric.  \n\nPosition: HOLD  \nAgent Confidence: 0.42",
+      "round": 1,
+      "position": "HOLD",
+      "confidence": 0.42
+    },
+    {
+      "role": "bull",
+      "content": "…pport as the revised stop reference is still acceptable for a tactical bounce: the downside is now anchored closer to Rp 4,049 rather than the deeper breakdown level the Bear emphasized, while the upside remains toward the technical target area above current price. This improves trade structure versus the Bear’s critique because the stop distance narrows materially without requiring the thesis to depend on a full trend reversal. The key caveat is that volume confirmation is still weak, so this is a controlled swing setup, not an aggressive conviction long.\n\nPosition: BUY\nAgent Confidence: 0.64",
+      "round": 2,
+      "position": "BUY",
+      "confidence": 0.544
+    },
+    {
+      "role": "bear",
+      "content": "… 52-week low area, which is a much harsher swing-execution profile than the Bull acknowledges.\n\nMargin of safety stress test: ATR(14) is Rp 127, so maximum 1-week adverse move = 2 x ATR = Rp 254. Relative to the Bull’s claimed protection around Rp 4,049, that is a meaningful hit in a 5–20 trading-day frame, especially because the trade is explicitly counter-trend and volume confirmation is weak. With no verified strong support above Rp 4,049 and with current price Rp 4,080 still under MA50 Rp 4,116, the setup lacks enough cushion for a clean swing entry.\n\nPosition: AVOID\nAgent Confidence: 0.38",
+      "round": 2,
+      "position": "AVOID",
+      "confidence": 0.38
+    },
+    {
+      "role": "bull",
+      "content": "Position: NEUTRAL\nDebate Confidence: MEDIUM\n\nBear’s stop-loss critique leans on the downside corridor around Rp 4,049, but the chart still offers a lower secondary support near the recent pivot around Rp 3,647, which is materially below that breakdown area and closer to the 52-week floor; that gives the tape a defined “next shelf” if the first line fails. That said, I cannot repeat the Round 1 levels, so the key point is simply that the Bear’s stress test does not remove all technical structure — it shifts the trade from a tight bounce to a deeper support-reclaim attempt. On valuation, the fair-value base at Rp 5,911 still leaves a large buffer versus the current Rp 4,080 print, so even if the Bear’s downside path plays out, the market is still pricing BMRI below the modeled intrinsic anchor; the gap is wide enough that a tactical pullback alone does not invalidate the longer re-rating case.\n\nOn trigger skepticism, the latest 48-hour flow is the strongest corroboration: foreign buying showed up in the same window as the positive macro tape, and the NR7 compression plus POSITIVE_EXPANDING MACD histogram suggests a move can occur within the next 1–2 sessions even without a fresh company-specific headline. If the Bear argues the ESOP/buyback transfer is stale, I agree it is not the catalyst itself; the fallback 5–20 trading-day trigger is a close-and-hold back above the AVWAP/short-term moving-average cluster with volume expansion, which would confirm that the recent institutional accumulation is being accepted by the market.\n\nFor R/R, using the secondary support as the revised stop reference materially changes the profile versus the Bear’s complaint: the downside is no longer measured against the first broken shelf, but against a lower structural floor, while upside still points toward the fair-value reversion zone above spot. Because the stock remains under the medium-term trend filters and volume confirmation is still weak, this is not a clean high-conviction long; it is a tactical swing only if the reclaim trigger fires. So the Bear is right that the setup is not pristine, but the combination of discounted valuation, nearby compression, and fallback support keeps it in actionable-bullish territory rather than outright avoid.\n\nPosition: BUY\nAgent Confidence: 0.61",
+      "round": 3,
+      "position": "HOLD",
+      "confidence": 0.518
+    },
+    {
+      "role": "bear",
+      "content": "Position: BEARISH\nDebate Confidence: MEDIUM\n\nBull’s cited support at Rp 4,049–4,116 is not a reliable floor for swing execution because the same evidence says BMRI is still below MA50 Rp 4,116 and below MA200 Rp 4,276, with “overhead supply remains significant.” That means the Bull’s own support zone sits inside a broader downtrend regime, so a brief touch of Rp 4,116 does not prove acceptance. Also, the tape is still below AVWAP Rp 4,134, which weakens any claim that the rebound has been structurally reclaimed rather than just mechanically bounced.\n\nIf Rp 4,049 breaks, the next support is Rp 3,647 -- making the actual max loss materially larger than the Bull’s implied tight-risk bounce, not the shallow dip the Bull implies. This is important because the Bull’s setup is framed as a counter-trend bounce with a compact target, yet the downside path can extend to a prior swing low that is far enough away to distort the reward-to-risk profile once the first shelf fails. In other words, the trade is not protected by a single local support; it is exposed to a deeper air pocket if sellers reassert.\n\nMargin of safety stress test: ATR(14) is Rp 127, so maximum 1-week adverse move = Rp 254. Against the Bull’s cited entry band around Rp 4,049–4,116, that is a large enough shock to threaten the whole bounce thesis within the 5–20 trading-day window. Since the Bull’s own framing is a narrow counter-trend setup, a two-ATR hit is enough to consume the practical margin of safety; therefore, this trade is unviable for swing execution if the price cannot quickly reclaim the short-term trend cluster with real volume.\n\nPosition: AVOID\nAgent Confidence: 0.38",
+      "round": 3,
+      "position": "AVOID",
+      "confidence": 0.38
+    },
+    {
+      "role": "devils_advocate",
+      "content": "Position: STRESS_TEST  \nAgent Confidence: 0.86\n\n**Challenge 1 — Macro / company risk**  \nIf foreign buying fades and BMRI loses the Rp 4,049 support while still below MA50 Rp 4,116, could the support shelf fail within 5-20 trading days and force stops toward Rp 3,731?\n\n**Challenge 2 — Transaction cost stress test**  \nEntry price used: **Rp 4,080**  \nProjected target return from entry midpoint to target: **(4,219 - 4,080) / 4,080 = 3.41%**\n\nCost components:\n- Buy commission: **0.15%**\n- Sell commission: **0.25%**\n- Final income tax: **0.10%**\n- Slippage: **0.15%** because entry price is >= Rp 500\n\nTotal round-trip cost: **0.65%**\n\nNet return after costs: **3.41% - 0.65% = 2.76%**\n\n**MARGINAL -- proceed only if conviction is high.**\n\n**Challenge 3 — Anti-averaging down check**  \nPrice is below MA200 Rp 4,276, but it has not clearly declined 10% from the recent high of Rp 4,937. Skip.\n\nPOSITION: AVOID CONFIDENCE: 0.40",
+      "round": 4,
+      "position": "AVOID",
+      "confidence": 0.4
+    }
+  ],
+  "raw_data_summary": "=== EVIDENCE BRIEF: BMRI ===\nQuery: swing trade analysis\n\n[FAIR_VALUE]\nEvidence ID: BMRI_20260712_173441_fair_value_0\nCurrent Price: 4080 | Fair Value Base: 5911 | Fair Value Range: 5024 - 6798 | Upside: 44.9% | Risk Overvalued: False\nSource: stockbit | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: BMRI_20260712_173441_technical_0\n{\"52w_high\":4937.0,\"52w_low\":3647.0,\"atr14\":127.0,\"avg_volume_20d\":194630970.0,\"avwap\":4134.0,\"avwap_anchor_bars_ago\":22,\"avwap_position\":\"BELOW_AVWAP\",\"bb_position\":\"LOWER_HALF\",\"bb_squeeze\":false,\"bb_width\":19.57,\"brief\":\"Position: NEUTRAL Stock is in a structural downtrend. This is a counter-trend bounce — use a conservative target and reduce position size to 50%. Ticker context: current price\nSource: yfinance | Score: 0.95\n\n[TECHNICAL]\nEvidence ID: BMRI_20260712_173441_technical_1\nRp 4,080 is still below MA200 Rp 4,276 and below MA50 Rp 4,116, so overhead supply remains significant. ENTRY ZONE: Rp 4,049 - Rp 4,116. Counter-trend trade -- reduce position size to 50%. TARGET: Rp 4,219 (approx. 2.6% from entry midpoint). STOP-LOSS: Rp 3,731 (2.5 x ATR below EMA20). RSI(14) at 50.6 is neutral, so momentum is neither oversold nor overbought. Current volume is not confirming\nSource: yfinance | Score: 0.95\n\n[TECHNICAL]\nEvidence ID: BMRI_20260712_173441_technical_2\nstrongly; volume surge ratio 0.38 suggests the move lacks strong participation. Weekly trend is unavailable, so no higher-timeframe bias can be confirmed. MACD histogram is POSITIVE_EXPANDING, meaning momentum is accelerating higher; however, because MA200 context is BELOW, this is only a counter-trend improvement, not a full bullish reversal. NR7 compression is present, so a breakout may come\nSource: yfinance | Score: 0.95\n\n[TECHNICAL]\nEvidence ID: BMRI_20260712_173441_technical_3\nwithin 1-2 sessions, but confir...\",\"compression_type\":\"NR7\",\"current_price\":4080.0,\"divergence_strength\":null,\"ema20\":4049.0,\"entry_rationale\":\"Market closed (weekend). Plan entries for Monday\nSource: yfinance | Score: 0.95\n\n[FUNDAMENTAL]\nEvidence ID: BMRI_20260712_173441_fundamental_3\ndepan.\\n\",\"fair_value\":5911.0,\"fair_value_base\":5911.0,\"fair_value_high\":6798.0,\"fair_value_low\":5024.0,\"risk_overvalued\":false}\nSource: stockbit | Score: 0.80\n\n---\nTotal evidence: 6/15 chunks selected\nToken estimate: ~574\n\n=== NEWS BRIEF: BMRI ===\nPeriod: last 60 days\nSentiment: POSITIVE (score: +0.57)\nBREAKING NEWS DETECTED\nMACRO EVENT DETECTED\nConfidence adjustment: +0.10\nReason: Breaking positive news in last 48h - significant opportunity detected\nLanguage: ID/EN\n\nTOP NEWS:\n1. [POSITIVE] IHSG Sepekan Menguat: Investor Asing Genggam Saham BMRI Hingga BRMS di Akhir Pekan! - Sinar Harapan - Sinar Harapan\n   Source: Sinar Harapan | 2026-07-12\n   Events: BREAKING | MACRO_EVENT\n2. [POSITIVE] IHSG Ditutup Naik ke 5.924: Saham BBRI, BMRI hingga BRPT Melaju - Bisnis.com - Market\n   Source: Bisnis.com - Market | 2026-07-10\n   Events: MACRO_EVENT\n3. [POSITIVE] IHSG Ditutup Menguat ke 5.912 Saham BMRI hingga RAJA Ramai Diborong Asing - achmadnurhidayat.id\n   Source: achmadnurhidayat.id | 2026-07-10\n   Events: MACRO_EVENT\n4. [POSITIVE] BMRI alihkan 91,75 juta saham treasury hasil buyback lewat ESOP - IDNFinancials.com\n   Source: IDNFinancials.com | 2026-07-09\n5. [POSITIVE] Rampungkan Program ESOP, BMRI Salurkan 91,75 Juta Saham Buyback ke Karyawan - Rmol.id\n   Source: Rmol.id | 2026-07-09",
+  "metadata": {
+    "prompt_version": "2026-06-30-cio-regime-labels-v27",
+    "run_id": "20260712_173441",
+    "regime": "DEFENSIVE",
+    "sector": "unknown",
+    "market_data_source": "yfinance",
+    "market_data_fetched_at": "2026-07-09T17:00:00+00:00",
+    "market_data_cached": true,
+    "flash_calls": 10,
+    "pro_calls": 0,
+    "tradeability_preflight": {
+      "status": "clean",
+      "atr14": 127.0,
+      "surrogate_gap": 280.0
+    },
+    "preflight_skipped": false,
+    "has_breaking_news": true,
+    "has_insider_selling": false,
+    "has_post_earnings": false,
+    "breaking_news_headlines": [
+      {
+        "title": "IHSG Sepekan Menguat: Investor Asing Genggam Saham BMRI Hingga BRMS di Akhir Pekan! - Sinar Harapan - Sinar Harapan",
+        "source": "Sinar Harapan",
+        "timestamp": "2026-07-12T03:34:26+00:00"
+      },
+      {
+        "title": "BMRI, ADRO, hingga BRMS Dikolek - investor.id",
+        "source": "investor.id",
+        "timestamp": "2026-07-12T03:00:00+00:00"
+      },
+      {
+        "title": "Indikasi Aksi Crossing Saham Jumbo di Pergerakan BMRI: Muncul Dua Aktor Utama - KabarBursa.com",
+        "source": "KabarBursa.com",
+        "timestamp": "2026-07-11T23:35:39+00:00"
+      }
+    ],
+    "news_confidence_adjustment": 0.1,
+    "news_overall_sentiment": "POSITIVE",
+    "news_brief": "=== NEWS BRIEF: BMRI ===\nPeriod: last 60 days\nSentiment: POSITIVE (score: +0.57)\nBREAKING NEWS DETECTED\nMACRO EVENT DETECTED\nConfidence adjustment: +0.10\nReason: Breaking positive news in last 48h - significant opportunity detected\nLanguage: ID/EN\n\nTOP NEWS:\n1. [POSITIVE] IHSG Sepekan Menguat: Investor Asing Genggam Saham BMRI Hingga BRMS di Akhir Pekan! - Sinar Harapan - Sinar Harapan\n   Source: Sinar Harapan | 2026-07-12\n   Events: BREAKING | MACRO_EVENT\n2. [POSITIVE] IHSG Ditutup Naik ke 5.924: Saham BBRI, BMRI hingga BRPT Melaju - Bisnis.com - Market\n   Source: Bisnis.com - Market | 2026-07-10\n   Events: MACRO_EVENT\n3. [POSITIVE] IHSG Ditutup Menguat ke 5.912 Saham BMRI hingga RAJA Ramai Diborong Asing - achmadnurhidayat.id\n   Source: achmadnurhidayat.id | 2026-07-10\n   Events: MACRO_EVENT\n4. [POSITIVE] BMRI alihkan 91,75 juta saham treasury hasil buyback lewat ESOP - IDNFinancials.com\n   Source: IDNFinancials.com | 2026-07-09\n5. [POSITIVE] Rampungkan Program ESOP, BMRI Salurkan 91,75 Juta Saham Buyback ke Karyawan - Rmol.id\n   Source: Rmol.id | 2026-07-09",
+    "exdate_tier": "CLEAR",
+    "rag_chunks_selected": 6,
+    "rag_chunks_considered": 15,
+    "rag_token_estimate": 574,
+    "rag_rendered_char_count": 2298,
+    "evidence_age_h": 0,
+    "evidence_age_hours": 0.0,
+    "rag_citation_ids": [
+      "BMRI_20260712_173441_fair_value_0",
+      "BMRI_20260712_173441_technical_0",
+      "BMRI_20260712_173441_technical_1",
+      "BMRI_20260712_173441_technical_2",
+      "BMRI_20260712_173441_technical_3",
+      "BMRI_20260712_173441_fundamental_3"
+    ],
+    "rag_citations": [
+      {
+        "chunk_id": "BMRI_20260712_173441_fair_value_0",
+        "category": "fair_value",
+        "source": "stockbit",
+        "relevance_score": 0.85,
+        "is_stale": false
+      },
+      {
+        "chunk_id": "BMRI_20260712_173441_technical_0",
+        "category": "technical",
+        "source": "yfinance",
+        "relevance_score": 0.95,
+        "is_stale": false
+      },
+      {
+        "chunk_id": "BMRI_20260712_173441_technical_1",
+        "category": "technical",
+        "source": "yfinance",
+        "relevance_score": 0.95,
+        "is_stale": false
+      },
+      {
+        "chunk_id": "BMRI_20260712_173441_technical_2",
+        "category": "technical",
+        "source": "yfinance",
+        "relevance_score": 0.95,
+        "is_stale": false
+      },
+      {
+        "chunk_id": "BMRI_20260712_173441_technical_3",
+        "category": "technical",
+        "source": "yfinance",
+        "relevance_score": 0.95,
+        "is_stale": false
+      },
+      {
+        "chunk_id": "BMRI_20260712_173441_fundamental_3",
+        "category": "fundamental",
+        "source": "stockbit",
+        "relevance_score": 0.8,
+        "is_stale": false
+      }
+    ],
+    "rag_stale_citation_ids": [],
+    "fair_value_rag_verified": true,
+    "market_cap_idr": 380799987744768,
+    "duration_seconds": 115.26499999998487,
+    "batch_timestamp": "20260712_173908",
+    "versioned_output": true
+  },
+  "regime": {
+    "label": "SIDEWAYS",
+    "confidence": 0.9467375021528672,
+    "probabilities": {
+      "SIDEWAYS": 0.9467375021528672,
+      "BULL": 0.019237603759281907,
+      "BEAR_STRESS": 0.034024894087631256
+    },
+    "msci_override": false,
+    "training_days": 756,
+    "detected_at": "2026-07-12T17:35:22.390083",
+    "notes": "MSCI review active: True"
+  },
+  "trading_params": {
+    "description": "IHSG flat, moderate volatility",
+    "max_position_pct": 0.01,
+    "min_risk_reward": 2.0,
+    "consensus_threshold": 0.7,
+    "max_concurrent_positions": 2,
+    "devil_advocate_weight": 0.3,
+    "regime_multiplier": 0.85,
+    "trading_allowed": true
+  },
+  "error": null,
+  "status": "success",
+  "conviction_score": 0.0,
+  "sector_key": "unknown",
+  "news_sentiment": "POSITIVE",
+  "news_confidence_adjustment": 0.1,
+  "has_breaking_news": true,
+  "breaking_news_headlines": [
+    {
+      "title": "IHSG Sepekan Menguat: Investor Asing Genggam Saham BMRI Hingga BRMS di Akhir Pekan! - Sinar Harapan - Sinar Harapan",
+      "source": "Sinar Harapan",
+      "timestamp": "2026-07-12T03:34:26+00:00"
+    },
+    {
+      "title": "BMRI, ADRO, hingga BRMS Dikolek - investor.id",
+      "source": "investor.id",
+      "timestamp": "2026-07-12T03:00:00+00:00"
+    },
+    {
+      "title": "Indikasi Aksi Crossing Saham Jumbo di Pergerakan BMRI: Muncul Dua Aktor Utama - KabarBursa.com",
+      "source": "KabarBursa.com",
+      "timestamp": "2026-07-11T23:35:39+00:00"
+    }
+  ],
+  "evidence_age_h": 0,
+  "model_confidence": 0.4,
+  "trade_conviction": 0.0,
+  "risk_governor": {
+    "ticker": "BMRI",
+    "status": "reject",
+    "sizing_allowed": false,
+    "reason_codes": [
+      "rr_too_low",
+      "invalid_entry_range",
+      "missing_target_price",
+      "missing_stop_loss"
+    ],
+    "message": "Setup ditolak karena data harga kunci belum valid.",
+    "current_price": 4080.0,
+    "entry_low": null,
+    "entry_high": null,
+    "target_price": null,
+    "stop_loss": null
+  },
+  "forecast_report": {
+    "ticker": "BMRI",
+    "as_of": "2026-07-12",
+    "horizon_days": 10,
+    "expected_return_net": null,
+    "p_target": null,
+    "p_stop": null,
+    "volatility_forecast": 0.33862633660673724,
+    "expected_value": null,
+    "decision": "AVOID",
+    "confidence": null,
+    "model_votes": [
+      {
+        "model_name": "naive",
+        "status": "validation_failed",
+        "reason": "validation_status:failed",
+        "r_hat_net": -0.011418291475345904,
+        "p_target": 0.41004351271011197,
+        "p_stop": 0.41397372576691144,
+        "volatility_forecast": 0.33862633660673724,
+        "weight": 0.0,
+        "validation_passed": false,
+        "ic": null,
+        "brier_target": 0.25,
+        "rmse": 0.04898508011794996,
+        "mae": 0.040922832275433765,
+        "mape": 1.458882538902434,
+        "directional_accuracy": 0.5666666666666667
+      },
+      {
+        "model_name": "xgboost",
+        "status": "active",
+        "reason": null,
+        "r_hat_net": 0.009051711298525333,
+        "p_target": 0.41473120605653013,
+        "p_stop": 0.40928805819030323,
+        "volatility_forecast": 0.33862633660673724,
+        "weight": 0.0,
+        "validation_passed": true,
+        "ic": 0.08911748871053514,
+        "brier_target": 0.25729373188409826,
+        "rmse": 0.059807906315187884,
+        "mae": 0.04832931948775253,
+        "mape": 2.5791220601132503,
+        "directional_accuracy": 0.47333333333333333
+      },
+      {
+        "model_name": "lstm",
+        "status": "experimental_unused",
+        "reason": "conservative_policy",
+        "r_hat_net": null,
+        "p_target": null,
+        "p_stop": null,
+        "volatility_forecast": null,
+        "weight": 0.0,
+        "validation_passed": false,
+        "ic": null,
+        "brier_target": null,
+        "rmse": null,
+        "mae": null,
+        "mape": null,
+        "directional_accuracy": null
+      },
+      {
+        "model_name": "prophet",
+        "status": "experimental_unused",
+        "reason": "conservative_policy_not_primary_return_model",
+        "r_hat_net": null,
+        "p_target": null,
+        "p_stop": null,
+        "volatility_forecast": null,
+        "weight": 0.0,
+        "validation_passed": false,
+        "ic": null,
+        "brier_target": null,
+        "rmse": null,
+        "mae": null,
+        "mape": null,
+        "directional_accuracy": null
+      },
+      {
+        "model_name": "tgarch",
+        "status": "active",
+        "reason": null,
+        "r_hat_net": null,
+        "p_target": null,
+        "p_stop": null,
+        "volatility_forecast": 0.33862633660673724,
+        "weight": 0.0,
+        "validation_passed": true,
+        "ic": null,
+        "brier_target": null,
+        "rmse": null,
+        "mae": null,
+        "mape": null,
+        "directional_accuracy": null
+      }
+    ],
+    "validation_summary": {
+      "horizon_days": 10,
+      "n_observations": 150,
+      "ic_mean": 0.08911748871053514,
+      "ic_t_stat": 0.7831343792255341,
+      "brier": 0.2536468659420491,
+      "rmse": 0.05439649321656892,
+      "mae": 0.04462607588159315,
+      "mape": 2.019002299507842,
+      "directional_accuracy": 0.52,
+      "dsr": 0.001283,
+      "bh_q_value_passed": false,
+      "status": "failed"
+    },
+    "validation_by_model": {
+      "naive": {
+        "horizon_days": 10,
+        "n_observations": 150,
+        "ic_mean": null,
+        "ic_t_stat": null,
+        "brier": 0.25,
+        "rmse": 0.04898508011794996,
+        "mae": 0.040922832275433765,
+        "mape": 1.458882538902434,
+        "directional_accuracy": 0.5666666666666667,
+        "dsr": 0.001283,
+        "bh_q_value_passed": false,
+        "status": "failed"
+      },
+      "xgboost": {
+        "horizon_days": 10,
+        "n_observations": 150,
+        "ic_mean": 0.08911748871053514,
+        "ic_t_stat": 0.7831343792255341,
+        "brier": 0.25729373188409826,
+        "rmse": 0.059807906315187884,
+        "mae": 0.04832931948775253,
+        "mape": 2.5791220601132503,
+        "directional_accuracy": 0.47333333333333333,
+        "dsr": 0.001283,
+        "bh_q_value_passed": false,
+        "status": "research_only"
+      }
+    },
+    "model_dispersion": 0.01023500138693562,
+    "model_disagreement_penalty": 0.1205,
+    "risk_adjusted_expected_value": null,
+    "data_quality_flags": [
+      "no_validated_return_model",
+      "experimental_unused:lstm",
+      "experimental_unused:prophet",
+      "model_disagreement_penalty:0.120",
+      "validation_status:failed"
+    ],
+    "volatility_fallback": false
+  },
+  "forecast_ev_ignored_reason": "validation_failed"
+}

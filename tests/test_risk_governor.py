@@ -1,6 +1,6 @@
 import pytest
 
-from core.risk_governor import evaluate_risk
+from core.risk_governor import annotate_risk, evaluate_risk
 from core.settings import settings
 
 
@@ -32,6 +32,28 @@ def test_current_price_inside_entry_range_is_deployable() -> None:
     assert decision.status == "deployable"
     assert decision.sizing_allowed is True
     assert decision.reason_codes == ["price_inside_entry_range"]
+
+
+def test_annotate_risk_persists_canonical_rr_provenance() -> None:
+    candidate = _candidate(
+        execution_regime="SIDEWAYS",
+        metadata={
+            "execution_regime": "SIDEWAYS",
+            "market_cap_idr": 400_000_000_000_000,
+        },
+    )
+
+    decision = annotate_risk(candidate)
+
+    assert decision.status == "deployable"
+    artifact = candidate["risk_governor"]
+    assert artifact["required_rr"] == 2.0
+    assert artifact["rr_base_minimum"] == 1.4
+    assert artifact["rr_regime_minimum"] == 1.68
+    assert artifact["rr_regime_multiplier"] == 1.2
+    assert artifact["rr_tier"] == "large_cap"
+    assert artifact["rr_tier_source"] == "market_cap"
+    assert artifact["rr_requirement_source"] == "max_user_floor_tier_x_regime"
 
 
 def test_current_price_inside_entry_range_stays_deployable_in_normal_regime() -> None:
@@ -122,10 +144,40 @@ def test_defensive_regime_downgrades_deployable_buy_to_watchlist() -> None:
     assert "price_inside_entry_range" in decision.reason_codes
 
 
+def test_risk_governor_prefers_canonical_defensive_over_diagnostic_sideways() -> None:
+    decision = evaluate_risk(
+        _candidate(
+            execution_regime="DEFENSIVE",
+            regime_context={"execution_regime": "DEFENSIVE"},
+            hmm_regime={"label": "SIDEWAYS", "confidence": 0.9467},
+            market_regime={"regime": "NORMAL"},
+        )
+    )
+
+    assert decision.status == "watchlist_only"
+    assert decision.sizing_allowed is False
+    assert "market_regime_defensive" in decision.reason_codes
+
+
+def test_risk_governor_does_not_let_legacy_defensive_override_canonical_sideways() -> None:
+    decision = evaluate_risk(
+        _candidate(
+            execution_regime="SIDEWAYS",
+            regime_context={"execution_regime": "SIDEWAYS"},
+            hmm_regime={"label": "BEAR_STRESS", "confidence": 0.99},
+            market_regime={"regime": "DEFENSIVE"},
+        )
+    )
+
+    assert decision.status == "deployable"
+    assert decision.sizing_allowed is True
+    assert "market_regime_defensive" not in decision.reason_codes
+
+
 def test_current_price_above_entry_high_waits_for_pullback() -> None:
     # target=1230: (1230-1050)/(1050-930)=1.5 — at floor, no rr_too_low; price above range.
     decision = evaluate_risk(
-        _candidate(verdict={"current_price": 1100, "target_price": 1230})
+        _candidate(verdict={"current_price": 1100, "target_price": 1290})
     )
 
     assert decision.status == "wait_for_pullback"
@@ -228,7 +280,9 @@ def test_stop_loss_at_or_above_current_price_rejects() -> None:
 def test_current_price_below_entry_low_is_watchlist_only() -> None:
     # stop=890: (1290-1050)/(1050-890)=240/160=1.5 — at floor, no rr_too_low; price below range.
     decision = evaluate_risk(
-        _candidate(verdict={"current_price": 900, "stop_loss": 890})
+        _candidate(
+            verdict={"current_price": 900, "target_price": 1370, "stop_loss": 890}
+        )
     )
 
     assert decision.status == "watchlist_only"
@@ -531,8 +585,10 @@ def test_counter_trend_hold_with_string_rr_does_not_crash() -> None:
         )
     )
 
-    # R/R >= 3.5 with only counter-trend + hold soft flags deploys directly.
-    assert decision.status == "deployable"
+    # HOLD is a watchlist opinion even when R/R is high; it must never size.
+    assert decision.status == "conditional_deployable"
+    assert decision.sizing_allowed is False
+    assert "rating_hold" in decision.reason_codes
 
 
 def test_thousand_dot_entry_range_parses_as_full_idr_prices() -> None:
@@ -544,7 +600,7 @@ def test_thousand_dot_entry_range_parses_as_full_idr_prices() -> None:
             verdict={
                 "current_price": 4500,
                 "entry_price_range": "4.300 - 4.600",
-                "target_price": "Rp 5.350",
+                "target_price": "Rp 5.600",
                 "stop_loss": "Rp 4.100",
                 "risk_reward_ratio": 2.0,
             }
@@ -553,7 +609,7 @@ def test_thousand_dot_entry_range_parses_as_full_idr_prices() -> None:
 
     assert decision.entry_low == 4300.0
     assert decision.entry_high == 4600.0
-    assert decision.target_price == 5350.0
+    assert decision.target_price == 5600.0
     assert decision.stop_loss == 4100.0
     assert decision.status == "deployable"
 

@@ -1,0 +1,407 @@
+{
+  "ticker": "BACH",
+  "verdict": {
+    "ticker": "BACH",
+    "rating": "INSUFFICIENT_DATA",
+    "confidence": 0.153,
+    "fair_value": null,
+    "fair_value_base": null,
+    "fair_value_low": null,
+    "fair_value_high": null,
+    "valuation_gap": "unverified",
+    "entry_price_range": null,
+    "target_price": null,
+    "stop_loss": null,
+    "current_price": 500.0,
+    "timeframe": "5-20 Trading Days",
+    "execution_horizon_days": 10,
+    "weighted_reasoning": "Fundamental + Technical = FAIL/FAIL, so the conflict-resolution matrix points to AVOID. Fair value is null in the Trade Envelope, while BACH_20260712_173441_fundamental_0 separately flags valuation concerns and no catalyst; this is insufficient fundamental support rather than a valid margin-of-safety case. Technically, BACH_20260712_173441_technical_0 and BACH_20260712_173441_technical_2 state that core technical inputs are missing, including MA50/MA200 context, ATR, RSI, VWAP, and weekly trend, while the market was closed and the entry window was not actionable. Devil's Advocate stress test was only partially answered: transaction costs are viable, but the macro/foreign-flow risk is unresolved because net foreign flow is null, and the stock could retest the stop area before a swing setup develops. With R/R only 1.79, no confirmed volume breakout, no near-term catalyst, and incomplete technical backbone, the plan should not be approved for execution. Fair value rejected because no matching current-run RAG evidence was available. News sentiment confidence adjustment applied: -0.20.",
+    "critical_risk_factor": "",
+    "key_catalysts": [
+      "Positive-to-mixed IPO-related news flow in the last 60 days",
+      "Potential future confirmation only if price acceptance improves above nearby offer resistance",
+      "Transaction-cost stress test remains viable after estimated round-trip costs"
+    ],
+    "key_risks": [
+      "No reliable fair value in the Python Trade Envelope due to insufficient data",
+      "Technical setup incomplete: MA50, MA200 context, ATR, RSI, VWAP, and weekly trend unavailable",
+      "No confirmed 5-20 trading-day catalyst",
+      "Weak recent close and risk of retesting the stop-loss area",
+      "Foreign-flow data unavailable, leaving institutional selling risk unresolved",
+      "Fair value tidak tersedia — validasi fundamental secara manual sebelum entry."
+    ],
+    "summary": "CIO verdict: REJECT the Python trade plan for new execution despite the mechanically acceptable target and stop structure. The entry, target, and stop-loss are used verbatim, but the setup fails validation because both fundamental and technical signals are incomplete or negative, with no reliable 5-20 trading-day trigger. The R/R of 1.79 is not enough to compensate for missing trend, volatility, valuation, and foreign-flow confirmation.",
+    "target_basis": "Minimum R/R (Swing Cap)",
+    "expected_return": null,
+    "risk_reward_ratio": null,
+    "is_overvalued": null,
+    "risk_overvalued": null,
+    "wait_and_see": true,
+    "consensus_reached": false,
+    "consensus_method": null,
+    "dissenting_agents": [
+      "bear"
+    ],
+    "reason_codes": [],
+    "hypothetical_envelope": null,
+    "trailing_stop_pct": null,
+    "trailing_stop_trigger_pct": null,
+    "partial_exit_t1_pct": 0.5,
+    "partial_exit_trail_remainder": true,
+    "momentum_play": false,
+    "reasons": [
+      "fair_value_quality_rejected",
+      "confidence_15pct_below_minimum"
+    ],
+    "action": "SKIP",
+    "entry_low": null,
+    "entry_high": null,
+    "model_confidence": 0.153
+  },
+  "debate_rounds": 3,
+  "consensus_reached": false,
+  "consensus_method": null,
+  "dissenting_agents": [
+    "bear"
+  ],
+  "agent_votes": [
+    {
+      "agent": "fundamental_scout",
+      "position": "HOLD",
+      "confidence": 0.62,
+      "calibration_weight": 1.0,
+      "effective_confidence": 0.62,
+      "round": 0
+    },
+    {
+      "agent": "chartist",
+      "position": "HOLD",
+      "confidence": 0.28,
+      "calibration_weight": 1.0,
+      "effective_confidence": 0.28,
+      "round": 0
+    },
+    {
+      "agent": "sentiment_specialist",
+      "position": "HOLD",
+      "confidence": 0.68,
+      "calibration_weight": 1.0,
+      "effective_confidence": 0.68,
+      "round": 0
+    },
+    {
+      "agent": "bull",
+      "position": "HOLD",
+      "confidence": 0.31,
+      "calibration_weight": 1.0,
+      "effective_confidence": 0.31,
+      "round": 3
+    },
+    {
+      "agent": "bear",
+      "position": "AVOID",
+      "confidence": 0.24,
+      "calibration_weight": 0.85,
+      "effective_confidence": 0.204,
+      "round": 3
+    },
+    {
+      "agent": "devils_advocate",
+      "position": "AVOID",
+      "confidence": 0.4,
+      "calibration_weight": 1.0,
+      "effective_confidence": 0.4,
+      "round": 4
+    }
+  ],
+  "consensus_winner": null,
+  "disagreement_type": null,
+  "debate_history": [
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 262, Rp 500, Rp 550, Rp 472, Rp 510, Rp 490, Rp 10",
+      "round": 0,
+      "position": "UNKNOWN",
+      "confidence": null
+    },
+    {
+      "role": "system",
+      "content": "PRICES CITED IN ROUND 1 (hard evidence — do NOT forget):\nRp 262, Rp 500, Rp 550, Rp 472, Rp 510",
+      "round": 0,
+      "position": "UNKNOWN",
+      "confidence": null
+    },
+    {
+      "role": "bull",
+      "content": "…lds, and the brief explicitly says the chart matrix is incomplete. With no RSI, trend, or volatility context, there is no high-probability swing entry zone to anchor a BUY case.\n\nCatalyst-wise, the news flow is positive-to-mixed, but all cited items are already dated and therefore cannot serve as the next 5–20 trading-day trigger under the date rules. Without a **future** company-specific event, the setup remains a watchlist name rather than an actionable swing long. Net: **avoid forcing a trade until a dated catalyst and full technicals are available**.\n\nPosition: AVOID\nAgent Confidence: 0.23",
+      "round": 1,
+      "position": "HOLD",
+      "confidence": 0.196
+    },
+    {
+      "role": "bear",
+      "content": "…sequence exists. That missing context prevents a valid 5–20 trading-day breakdown thesis and also prevents any verified risk/reward calculation.\n\nCatalyst risk is also unresolved: the cited news flow is past-dated, and no future company-specific event is supplied that could realistically trigger a move within the execution window. With the trigger already consumed by time, the trade lacks a near-term catalyst. Given the missing technical core and absent future catalyst, the only defensible stance is to stay out until the chart and timing can be reconciled.\n\nPosition: BUY\nAgent Confidence: 0.23",
+      "round": 1,
+      "position": "HOLD",
+      "confidence": 0.23
+    },
+    {
+      "role": "bull",
+      "content": "…er offer band would be the only usable short-term confirmation from the supplied tape. Until that happens, the setup remains incomplete rather than compelling.\n\nR/R also stays unresolved because the core volatility inputs are missing. Using Rp 490 as the revised stop reference instead of Rp 472 improves the framing slightly, but the absence of ATR and moving-average context means the reward leg cannot be measured cleanly. Net: the Bear is right that this is not a clean long, but the secondary support prevents an immediate crash thesis from being airtight.\n\nPosition: HOLD\nAgent Confidence: 0.23",
+      "round": 2,
+      "position": "HOLD",
+      "confidence": 0.196
+    },
+    {
+      "role": "bear",
+      "content": "… zone risks being too tight for a 5–20 trading-day swing.\n\nMargin-of-safety stress test cannot rescue the trade. The Bull’s current-price anchor is Rp 500, but ATR(14) is null, so I cannot compute the required 2 x ATR adverse move without fabricating data. Per the reliability rules, that missing core input forces a low-confidence assessment and prevents a verified volatility-based stop. Net conclusion: the Bull’s support claim is unproven, the fallback downside is already close, and the setup remains untradeable until ATR and trend context are available.\n\nPosition: AVOID\nAgent Confidence: 0.24",
+      "round": 2,
+      "position": "AVOID",
+      "confidence": 0.24
+    },
+    {
+      "role": "bull",
+      "content": "Position: NEUTRAL\nDebate Confidence: LOW\n\nBear’s stop-loss thesis leans on the breakdown area around Rp 500, but the tape also shows a lower bid shelf in the Rp 490–472 zone, so the downside is not a clean air-pocket collapse. That gives BACH a secondary support reference below the cited breakdown level, which matters for a 5–20 trading-day swing: the trade is not invalidated unless that deeper band gives way.\n\nOn valuation, the supplied fair-value data is internally incomplete: the model shows current price Rp 500 against a fair value base of Rp 0 with INSUFFICIENT_DATA for the range, while the fundamental brief separately estimates fair value at Rp 262. Because the fair-value inputs conflict and one is null-heavy, this is a NEEDS_RECONCILIATION case rather than a clean overvaluation call. Still, even using the Rp 262 estimate, the gap is large enough that a modest drawdown from Rp 500 would not by itself erase all downside cushion; the bigger issue is data quality, not a precise valuation target.\n\nOn trigger skepticism, the Bear is correct that the dated news items from 2026-07-09 to 2026-07-11 are PAST_EVENT_NOT_CATALYST and cannot be used as fresh 5–20 trading-day drivers. The best fallback trigger in the supplied evidence is not news but price acceptance: a reclaim and hold above the nearby offer stack around Rp 510–550 would be the first observable confirmation that demand is absorbing supply. Absent that, this remains an entry-planning watchlist name, not a confirmed long.\n\nR/R remains only marginally interesting because ATR(14) is null, so I cannot quantify the swing stop distance cleanly. Using the lower support band as the revised risk reference is better than anchoring to the breakdown level alone, but without volatility and trend context the reward leg is still not robustly measurable. Net: the Bear has the stronger case on execution quality, but the deeper support and unresolved valuation conflict keep this from being a hard sell.\n\nPosition: HOLD\nAgent Confidence: 0.31",
+      "round": 3,
+      "position": "HOLD",
+      "confidence": 0.264
+    },
+    {
+      "role": "bear",
+      "content": "Position: BEARISH\nDebate Confidence: LOW\n\nThe Bull’s setup is fragile because it leans on the Rp 500 area as a support/entry anchor, yet the tape already showed a weak close near Rp 472 after trading down from Rp 550. That means the cited Rp 500 line is not a validated floor; it is already being tested from above and has not demonstrated durable defense. With the technical backbone missing, there is no evidence that this level has held multiple times, so treating Rp 500 as dependable support is speculative rather than forensic.\n\nIf Rp 500 breaks, the next support is Rp 472 -- making the actual max loss Rp 28, not whatever tighter loss band the Bull implies. That downside is not theoretical; it is directly anchored in the provided session low, and it materially worsens the swing profile because the trade would be exposed to a full retest of that lower shelf before any credible stabilization. The key point is that the Bull’s risk framing depends on Rp 500 behaving like a floor, but the market has already shown it can trade materially below that level in-session.\n\nMargin-of-safety stress test also fails: ATR(14) is missing, so the mandatory 2 x ATR computation cannot be performed without fabrication. Per the reliability rules, that means the core volatility check is unresolved and confidence must stay low. Since the required swing-stop metric is null, the Bull cannot prove that the adverse move stays within a defendable margin of safety; this is an incomplete setup, not a completed one.\n\nThe valuation layer does not rescue the long. The evidence brief gives an internally inconsistent fair-value picture, with one source showing INSUFFICIENT_DATA and another implying Rp 262, while the current price is still Rp 500. That conflict is NEEDS_RECONCILIATION, and it does not justify aggressive entry. For a 5–20 trading-day swing, the lack of reliable ATR, trend, and coherent valuation makes the setup unfit for execution.\n\nPosition: AVOID\nAgent Confidence: 0.24",
+      "round": 3,
+      "position": "AVOID",
+      "confidence": 0.24
+    },
+    {
+      "role": "devils_advocate",
+      "content": "Position: STRESS_TEST  \nAgent Confidence: 0.27\n\nChallenge 1 — MACRO / COMPANY RISK  \nIf the stock is already near Rp 500 support and foreign funds keep selling, could the Rp 500 floor fail within 5–20 trading days and flush toward Rp 472? Net foreign flow data: null.\n\nChallenge 2 — TRANSACTION COST STRESS TEST  \nEntry price used: Rp 492\n\nProjected target return% (from Entry Midpoint): 11.8%\n\nCost components:\n- Buy commission: 0.15%\n- Sell commission: 0.25%\n- Final income tax: 0.10%\n- Slippage: 0.15%  (entry price >= Rp 500? No; but per rule, slippage is 0.30% if entry < Rp 500. Since entry is Rp 492, slippage = 0.30%)\n\nTotal round-trip cost: 0.15% + 0.25% + 0.10% + 0.30% = 0.80%\n\nNet return after costs = 11.8% - 0.80% = 11.0%\n\nVIABLE after transaction costs.\n\nChallenge 3 — ANTI-AVERAGING DOWN CHECK  \nSkipped: ma200_context is null, so the condition is not met.\n\nPOSITION: AVOID CONFIDENCE: 0.40",
+      "round": 4,
+      "position": "AVOID",
+      "confidence": 0.4
+    }
+  ],
+  "raw_data_summary": "=== EVIDENCE BRIEF: BACH ===\nQuery: swing trade analysis\n\n[FAIR_VALUE]\nEvidence ID: BACH_20260712_173441_fair_value_0\nCurrent Price: 500 | Fair Value Base: 0 | Fair Value Range: INSUFFICIENT_DATA - INSUFFICIENT_DATA | Upside: -100.0% | Risk Overvalued: False\nSource: stockbit | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: BACH_20260712_173441_technical_0\n{\"brief\":\"Position: NEUTRAL Market is closed, so this is an entry-planning setup only, not an actionable trade now. The provided pre-computed technicals are incomplete: core items required by the charting matrix are missing or null, including ma200_context, EMA20, MA50, ATR(14), RSI(14), weekly_trend, MACD histogram state, VWAP, POC/volume profile, AVWAP, and Fibonacci context. Because of that, I\nSource: yfinance | Score: 0.95\n\n[TECHNICAL]\nEvidence ID: BACH_20260712_173441_technical_1\ncannot build a valid swing-long or swing-short thesis from ground truth, and confidence must stay low. From the orderbook alone, BACH closed at Rp 500, down 9.09% from the previous close Rp 550, with heavy selling pressure and a weak close near the session low of Rp 472. Bid support is visible around Rp 500–490, while offers stack up above Rp 510–550, but this is not enough to override the\nSource: yfinance | Score: 0.95\n\n[TECHNICAL]\nEvidence ID: BACH_20260712_173441_technical_2\nmissing technical backbone. No reliable RSI, trend, or volatility-based stop can be stated without fabricating data. ENTRY WINDOW: AVOID (MARKET_CLOSED) — Market closed (weekend). Plan entries for Monday open. With th...\",\"entry_rationale\":\"Market closed (weekend). Plan entries for Monday open.\",\"entry_window\":\"AVOID\",\"idx_session\":\"MARKET_CLOSED\"}\nSource: yfinance | Score: 0.95\n\n[FUNDAMENTAL]\nEvidence ID: BACH_20260712_173441_fundamental_0\n{\"brief\":\"Position: HOLD Valuation Context: OVERVALUED Quality Flag: CONDITIONAL Catalyst Context: NONE Agent Confidence: 0.62 FAIR VALUE: Rp 262. Harga is 90.8% above fair value -- OVERVALUED. Support metrics: ROE 0.0% (3-year trend unavailable), RNOA/ROA proxy unavailable, OCF/Price unavailable, Net Margin 9.0%, Debt-to-Equity 0.49, Dividend Yield null. For DEFAULT sector, EV/EBITDA band is not\nSource: stockbit | Score: 0.80\n\n---\nTotal evidence: 5/11 chunks selected\nToken estimate: ~565\n\n=== NEWS BRIEF: BACH ===\nPeriod: last 60 days\nSentiment: POSITIVE (score: +0.24)\nBREAKING NEWS DETECTED\nMACRO EVENT DETECTED\nConfidence adjustment: +0.05\nReason: Positive news sentiment supports trade\nLanguage: ID/EN\n\nTOP NEWS:\n1. [POSITIVE] Baru IPO, Saham BACH, JECX, dan JELI Berguguran: IHSG Menguat Tipis - KabarBursa.com\n   Source: KabarBursa.com | 2026-07-10\n   Events: MACRO_EVENT\n2. [POSITIVE] IPO Update: PRDL dan JELI Kembali Lock ARA, BACH Naik 15%, JECX dan EMMI Terkoreksi - Ajaib\n   Source: Ajaib | 2026-07-09\n3. [NEUTRAL] Saham JELI & BACH Dibuang Investor, RANS Boyong Konglomerat - CNBC Indonesia\n   Source: CNBC Indonesia | 2026-07-11\n   Events: BREAKING\n4. [NEUTRAL] Pilah-Pilih Saham IPO Terlaris di BEI, dari BACH, PRDL, JECX Hingga RANS - Bisnis Indonesia Premium\n   Source: Bisnis Indonesia Premium | 2026-07-11\n   Events: BREAKING\n5. [NEUTRAL] Simak Prospek Kinerja Bach Multi Global (BACH) & Esa Medika (EMMI) Usai Sukses IPO - kontan.co.id\n   Source: kontan.co.id | 2026-07-10\n   Events: BREAKING",
+  "metadata": {
+    "prompt_version": "2026-06-30-cio-regime-labels-v27",
+    "run_id": "20260712_173441",
+    "regime": "DEFENSIVE",
+    "sector": "unknown",
+    "market_data_source": "yfinance",
+    "market_data_fetched_at": "2026-07-09T17:00:00+00:00",
+    "market_data_cached": true,
+    "flash_calls": 10,
+    "pro_calls": 1,
+    "tradeability_preflight": {
+      "status": "skip",
+      "reason": "no_technical_data"
+    },
+    "preflight_skipped": true,
+    "fair_value_rejected": true,
+    "valuation_gap": "unverified",
+    "reasons": [
+      "fair_value_quality_rejected"
+    ],
+    "has_breaking_news": true,
+    "has_insider_selling": false,
+    "has_post_earnings": false,
+    "breaking_news_headlines": [
+      {
+        "title": "Saham JELI & BACH Dibuang Investor, RANS Boyong Konglomerat - CNBC Indonesia",
+        "source": "CNBC Indonesia",
+        "timestamp": "2026-07-11T13:15:53+00:00"
+      },
+      {
+        "title": "Pilah-Pilih Saham IPO Terlaris di BEI, dari BACH, PRDL, JECX Hingga RANS - Bisnis Indonesia Premium",
+        "source": "Bisnis Indonesia Premium",
+        "timestamp": "2026-07-11T00:00:00+00:00"
+      },
+      {
+        "title": "Simak Prospek Kinerja Bach Multi Global (BACH) & Esa Medika (EMMI) Usai Sukses IPO - kontan.co.id",
+        "source": "kontan.co.id",
+        "timestamp": "2026-07-10T23:30:13+00:00"
+      }
+    ],
+    "news_confidence_adjustment": -0.2,
+    "news_overall_sentiment": "NEGATIVE",
+    "news_brief": "=== NEWS BRIEF: BACH ===\nPeriod: last 60 days\nSentiment: POSITIVE (score: +0.24)\nBREAKING NEWS DETECTED\nMACRO EVENT DETECTED\nConfidence adjustment: +0.05\nReason: Positive news sentiment supports trade\nLanguage: ID/EN\n\nTOP NEWS:\n1. [POSITIVE] Baru IPO, Saham BACH, JECX, dan JELI Berguguran: IHSG Menguat Tipis - KabarBursa.com\n   Source: KabarBursa.com | 2026-07-10\n   Events: MACRO_EVENT\n2. [POSITIVE] IPO Update: PRDL dan JELI Kembali Lock ARA, BACH Naik 15%, JECX dan EMMI Terkoreksi - Ajaib\n   Source: Ajaib | 2026-07-09\n3. [NEUTRAL] Saham JELI & BACH Dibuang Investor, RANS Boyong Konglomerat - CNBC Indonesia\n   Source: CNBC Indonesia | 2026-07-11\n   Events: BREAKING\n4. [NEUTRAL] Pilah-Pilih Saham IPO Terlaris di BEI, dari BACH, PRDL, JECX Hingga RANS - Bisnis Indonesia Premium\n   Source: Bisnis Indonesia Premium | 2026-07-11\n   Events: BREAKING\n5. [NEUTRAL] Simak Prospek Kinerja Bach Multi Global (BACH) & Esa Medika (EMMI) Usai Sukses IPO - kontan.co.id\n   Source: kontan.co.id | 2026-07-10\n   Events: BREAKING",
+    "exdate_tier": "CLEAR",
+    "rag_chunks_selected": 5,
+    "rag_chunks_considered": 11,
+    "rag_token_estimate": 565,
+    "rag_rendered_char_count": 2260,
+    "evidence_age_h": 0,
+    "evidence_age_hours": 0.0,
+    "rag_citation_ids": [
+      "BACH_20260712_173441_fair_value_0",
+      "BACH_20260712_173441_technical_0",
+      "BACH_20260712_173441_technical_1",
+      "BACH_20260712_173441_technical_2",
+      "BACH_20260712_173441_fundamental_0"
+    ],
+    "rag_citations": [
+      {
+        "chunk_id": "BACH_20260712_173441_fair_value_0",
+        "category": "fair_value",
+        "source": "stockbit",
+        "relevance_score": 0.85,
+        "is_stale": false
+      },
+      {
+        "chunk_id": "BACH_20260712_173441_technical_0",
+        "category": "technical",
+        "source": "yfinance",
+        "relevance_score": 0.95,
+        "is_stale": false
+      },
+      {
+        "chunk_id": "BACH_20260712_173441_technical_1",
+        "category": "technical",
+        "source": "yfinance",
+        "relevance_score": 0.95,
+        "is_stale": false
+      },
+      {
+        "chunk_id": "BACH_20260712_173441_technical_2",
+        "category": "technical",
+        "source": "yfinance",
+        "relevance_score": 0.95,
+        "is_stale": false
+      },
+      {
+        "chunk_id": "BACH_20260712_173441_fundamental_0",
+        "category": "fundamental",
+        "source": "stockbit",
+        "relevance_score": 0.8,
+        "is_stale": false
+      }
+    ],
+    "rag_stale_citation_ids": [],
+    "rag_citation_guard": {
+      "valid": true,
+      "cited_chunks": [
+        {
+          "chunk_id": "BACH_20260712_173441_fundamental_0",
+          "category": "fundamental",
+          "source": "stockbit",
+          "relevance_score": 0.8,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "BACH_20260712_173441_technical_0",
+          "category": "technical",
+          "source": "yfinance",
+          "relevance_score": 0.95,
+          "is_stale": false
+        },
+        {
+          "chunk_id": "BACH_20260712_173441_technical_2",
+          "category": "technical",
+          "source": "yfinance",
+          "relevance_score": 0.95,
+          "is_stale": false
+        }
+      ],
+      "missing_citation_ids": [],
+      "stale_citation_ids": [],
+      "errors": []
+    },
+    "market_cap_idr": 2042215006208,
+    "duration_seconds": 213.43700000000536,
+    "batch_timestamp": "20260712_173908",
+    "versioned_output": true
+  },
+  "regime": {
+    "label": "SIDEWAYS",
+    "confidence": 0.9467375021528672,
+    "probabilities": {
+      "SIDEWAYS": 0.9467375021528672,
+      "BULL": 0.019237603759281907,
+      "BEAR_STRESS": 0.034024894087631256
+    },
+    "msci_override": false,
+    "training_days": 756,
+    "detected_at": "2026-07-12T17:36:58.947160",
+    "notes": "MSCI review active: True"
+  },
+  "trading_params": {
+    "description": "IHSG flat, moderate volatility",
+    "max_position_pct": 0.01,
+    "min_risk_reward": 2.0,
+    "consensus_threshold": 0.7,
+    "max_concurrent_positions": 2,
+    "devil_advocate_weight": 0.3,
+    "regime_multiplier": 0.85,
+    "trading_allowed": true
+  },
+  "error": null,
+  "status": "success",
+  "conviction_score": 0.0,
+  "sector_key": "unknown",
+  "news_sentiment": "NEGATIVE",
+  "news_confidence_adjustment": -0.2,
+  "has_breaking_news": true,
+  "breaking_news_headlines": [
+    {
+      "title": "Saham JELI & BACH Dibuang Investor, RANS Boyong Konglomerat - CNBC Indonesia",
+      "source": "CNBC Indonesia",
+      "timestamp": "2026-07-11T13:15:53+00:00"
+    },
+    {
+      "title": "Pilah-Pilih Saham IPO Terlaris di BEI, dari BACH, PRDL, JECX Hingga RANS - Bisnis Indonesia Premium",
+      "source": "Bisnis Indonesia Premium",
+      "timestamp": "2026-07-11T00:00:00+00:00"
+    },
+    {
+      "title": "Simak Prospek Kinerja Bach Multi Global (BACH) & Esa Medika (EMMI) Usai Sukses IPO - kontan.co.id",
+      "source": "kontan.co.id",
+      "timestamp": "2026-07-10T23:30:13+00:00"
+    }
+  ],
+  "reasons": [
+    "fair_value_quality_rejected",
+    "confidence_15pct_below_minimum"
+  ],
+  "evidence_age_h": 0,
+  "sizing": "Skip — confidence below threshold",
+  "risk_gov": "reject",
+  "risk_governor": {
+    "ticker": "BACH",
+    "status": "reject",
+    "sizing_allowed": false,
+    "reason_codes": [
+      "confidence_15pct_below_minimum"
+    ],
+    "message": "Skip — confidence below threshold",
+    "current_price": null,
+    "entry_low": null,
+    "entry_high": null,
+    "target_price": null,
+    "stop_loss": null
+  },
+  "model_confidence": 0.153,
+  "trade_conviction": 0.0,
+  "forecast_report": {
+    "ticker": "BACH",
+    "as_of": "2026-07-12",
+    "horizon_days": 10,
+    "expected_return_net": null,
+    "p_target": null,
+    "p_stop": null,
+    "volatility_forecast": null,
+    "expected_value": null,
+    "decision": "AVOID",
+    "confidence": null,
+    "model_votes": [],
+    "validation_summary": null,
+    "validation_by_model": {},
+    "model_dispersion": null,
+    "model_disagreement_penalty": 0.0,
+    "risk_adjusted_expected_value": null,
+    "data_quality_flags": [
+      "insufficient_data"
+    ],
+    "volatility_fallback": false
+  },
+  "forecast_ev_ignored_reason": "validation_failed"
+}

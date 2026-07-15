@@ -443,7 +443,7 @@ class XlsxDataAdapter:
         ticker: str,
         current_price: float = 0.0,
         include_ev_ebitda: bool = True,
-    ) -> tuple[str, float]:
+    ) -> tuple[str, float | None]:
         """
         Drop-in replacement untuk build_fair_value_report(api_response, ticker, price)
         dari fair_value_calculator.py.
@@ -456,8 +456,7 @@ class XlsxDataAdapter:
 
         Returns:
             (report_str, fair_value_float)
-            fair_value_float = 0.0 jika semua metode gagal (bukan None,
-            agar caller tidak crash saat unpack).
+            fair_value_float = None jika semua metode gagal.
         """
         from services.fair_value_calculator import FairValueCalculator
 
@@ -497,7 +496,7 @@ class XlsxDataAdapter:
             current_price=current_price,
         )
 
-        fv = result.get("fair_value") or 0.0
+        fv = result.get("fair_value")
         return report_str, fv
 
     def _weighted_average_with_ev(
@@ -552,15 +551,27 @@ class XlsxDataAdapter:
                 "valuation_verdict": "DATA_UNAVAILABLE",
             }
 
-        total_weight = sum(w4[m] for m in results if m in w4)
+        active_results = {
+            method: value
+            for method, value in results.items()
+            if w4.get(method, 0) > 0
+        }
+        configured_active_method_count = sum(
+            1 for weight in w4.values() if weight > 0
+        )
+        total_weight = sum(w4[m] for m in active_results)
         if total_weight == 0:
             return calc.fair_value_weighted()
 
         weighted_fv = round(
-            sum(results[m] * (w4[m] / total_weight) for m in results if m in w4), 0
+            sum(
+                active_results[m] * (w4[m] / total_weight)
+                for m in active_results
+            ),
+            0,
         )
 
-        n = len(results)
+        n = len(active_results)
         confidence = "HIGH" if n >= 3 else ("MEDIUM" if n == 2 else "LOW")
 
         mos, verdict = None, "DATA_UNAVAILABLE"
@@ -584,6 +595,10 @@ class XlsxDataAdapter:
             "confidence": confidence,
             "margin_of_safety_pct": mos,
             "valuation_verdict": verdict,
+            "active_method_count": n,
+            "valid_method_count": n,
+            "available_method_count": len(results),
+            "configured_active_method_count": configured_active_method_count,
         }
 
     def _build_extended_report(
@@ -605,8 +620,11 @@ class XlsxDataAdapter:
         conf = result["confidence"]
         verdict = result["valuation_verdict"]
 
-        n_methods = len(bdown)
-        max_methods = 4 if ev_fv is not None and sektor != "bank" else 3
+        n_methods = result.get("active_method_count", len(bdown))
+        max_methods = result.get(
+            "configured_active_method_count",
+            4 if ev_fv is not None and sektor != "bank" else 3,
+        )
 
         lines = [
             "╔══════════════════════════════════════════════════════════════╗",
@@ -682,7 +700,8 @@ class XlsxDataAdapter:
             "",
             "── HASIL AKHIR ─────────────────────────────────────────────────",
             f"  FAIR VALUE (weighted avg) : {fv_str}",
-            f"  Kalkulasi confidence      : {conf} ({n_methods}/{max_methods} metode valid)",
+            f"  Kalkulasi confidence      : {conf} "
+            f"({n_methods}/{max_methods} metode aktif)",
             "",
         ]
 

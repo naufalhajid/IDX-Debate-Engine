@@ -61,6 +61,15 @@ class DebateMessage(BaseDataClass):
 
 
 ConsensusMethod = Literal["voting", "confidence_winner", "soft_hold", "deadlock_hold"]
+ModelRating = Literal["STRONG_BUY", "BUY", "HOLD", "SELL", "AVOID"]
+DecisionSource = Literal["cio", "preflight", "risk_guard"]
+ExecutionStatus = Literal[
+    "EXECUTABLE_BUY",
+    "WAITLIST",
+    "NO_TRADE",
+    "AVOID",
+    "INSUFFICIENT_DATA",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -89,13 +98,51 @@ class CIOVerdict(BaseDataClass):
     ticker: str = ""
 
     # ── Core verdict ─────────────────────────────────────────────────────────
-    rating: Literal["STRONG_BUY", "BUY", "HOLD", "SELL", "AVOID"] = "HOLD"
+    rating: ModelRating = "HOLD"
 
     confidence: float = Field(
         default=0.0,
         ge=0.0,
         le=1.0,
         description="CIO confidence in the verdict, 0-1.",
+    )
+
+    # Explicit decision contract. The legacy ``rating`` and ``confidence``
+    # fields remain available during migration, but they must not be used as
+    # proof that a setup is executable.
+    model_rating: ModelRating | None = Field(
+        default=None,
+        description="CIO model opinion; null when no valid CIO verdict exists.",
+    )
+    decision_source: DecisionSource | None = Field(
+        default=None,
+        description="Authority that produced the decision semantics.",
+    )
+    model_confidence: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="CIO certainty only; null when the CIO did not produce a verdict.",
+    )
+    policy_confidence: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Certainty that a deterministic policy condition matched. This is "
+            "not a trade win probability and must not enter conviction scoring."
+        ),
+    )
+    execution_status: ExecutionStatus | None = Field(
+        default=None,
+        description=(
+            "Canonical action category. EXECUTABLE_BUY may only be assigned "
+            "after risk approval and lot-sized position sizing."
+        ),
+    )
+    risk_flags: list[str] = Field(
+        default_factory=list,
+        description="Backward-compatible deterministic preflight guard flags.",
     )
 
     # ── Swing-trade price levels (LLM must supply these) ─────────────────────
@@ -207,6 +254,24 @@ class CIOVerdict(BaseDataClass):
             "entry-midpoint basis. null if invalid."
         ),
     )
+
+    required_rr: float | None = Field(
+        default=None,
+        description=(
+            "Canonical execution floor: max(2.0, tier minimum x execution "
+            "regime multiplier)."
+        ),
+    )
+    rr_base_minimum: float | None = None
+    rr_regime_minimum: float | None = None
+    rr_user_floor: float | None = None
+    rr_regime: str | None = None
+    rr_regime_multiplier: float | None = None
+    rr_tier: str | None = None
+    rr_tier_label: str | None = None
+    rr_tier_source: str | None = None
+    rr_requirement_source: str | None = None
+    rr_market_cap_idr: int | None = None
 
     is_overvalued: bool | None = Field(
         default=None,
@@ -323,6 +388,8 @@ class CIOVerdict(BaseDataClass):
                   ranges like '48000 - 50000' when a stray minus appears in
                   the string.  Now uses a regex to extract the two numbers.
         """
+        original_rating = self.model_rating or self.rating
+
         # 1. Parse entry midpoint from 'XXXX - YYYY' string
         entry_mid = self._parse_entry_mid()
 
@@ -423,6 +490,61 @@ class CIOVerdict(BaseDataClass):
         if self.momentum_play and self.rating in ("BUY", "STRONG_BUY"):
             self.confidence = min(self.confidence, 0.65)
 
+        # 9. Separate model opinion from deterministic policy output. Legacy
+        # preflight paths used HOLD/0.40 placeholders even though no CIO model
+        # ran; those values must not become model confidence.
+        normalized_codes = {
+            str(code).strip().lower() for code in self.reason_codes
+        }
+        preflight_codes = {
+            "rr_too_low",
+            "stop_inside_noise",
+            "target_collapsed",
+            "no_momentum_confirmation",
+            "preflight_noise_reject",
+            "no_technical_data",
+            "insufficient_data",
+        }
+        has_preflight_guard = bool(normalized_codes & preflight_codes) or any(
+            str(flag).strip().upper() == "PREFLIGHT_NOISE_REJECT"
+            for flag in self.risk_flags
+        )
+
+        if has_preflight_guard:
+            self.decision_source = self.decision_source or "preflight"
+            self.policy_confidence = (
+                1.0 if self.policy_confidence is None else self.policy_confidence
+            )
+        else:
+            schema_policy_modified = self.rating != original_rating
+            self.decision_source = self.decision_source or (
+                "risk_guard" if schema_policy_modified else "cio"
+            )
+            self.model_rating = self.model_rating or original_rating
+            self.model_confidence = (
+                self.confidence
+                if self.model_confidence is None
+                else self.model_confidence
+            )
+            if self.decision_source == "risk_guard" and self.policy_confidence is None:
+                self.policy_confidence = 1.0
+
+        if self.execution_status is None:
+            if normalized_codes & {"no_technical_data", "insufficient_data"}:
+                self.execution_status = "INSUFFICIENT_DATA"
+            elif has_preflight_guard:
+                self.execution_status = "NO_TRADE"
+            elif self.rating in ("SELL", "AVOID"):
+                self.execution_status = "AVOID"
+            elif self.rating in ("BUY", "STRONG_BUY"):
+                # Debate output is not executable until deterministic risk and
+                # position-sizing stages have both passed.
+                self.execution_status = "WAITLIST"
+            elif self.entry_price_range and self.target_price and self.stop_loss:
+                self.execution_status = "WAITLIST"
+            else:
+                self.execution_status = "NO_TRADE"
+
         return self
 
     # ── Helpers ───────────────────────────────────────────────────────────────
@@ -498,6 +620,12 @@ class CIOVerdict(BaseDataClass):
         return {
             "ticker": self.ticker,
             "rating": self.rating,
+            "model_rating": self.model_rating,
+            "decision_source": self.decision_source,
+            "model_confidence": self.model_confidence,
+            "policy_confidence": self.policy_confidence,
+            "execution_status": self.execution_status,
+            "actionable": self.execution_status == "EXECUTABLE_BUY",
             "buy_at": self.entry_price_range,
             "sell_at": self.target_price,
             "cut_loss": self.stop_loss,
@@ -700,11 +828,15 @@ class DebateChamberState(TypedDict):
     technical_indicators: dict
 
     # Parsed fair value estimate for CIO trade envelope computation
-    fair_value_estimate: float
+    fair_value_estimate: float | None
     fair_value_base: float | None
     fair_value_low: float | None
     fair_value_high: float | None
     fair_value_range_pct: float | None
+    dps: float | None
+    dps_source: str | None
+    dps_yield_pct: float | None
+    dps_price_used: float | None
     risk_overvalued: bool
     valuation_band_context: str | None  # C3: self-relative PE/PBV percentile vs own history
     range_52w_signal: str | None  # C4: price position in 52-week high/low range
@@ -726,11 +858,14 @@ class DebateChamberState(TypedDict):
     final_verdict: str  # JSON-serialized CIOVerdict
     metadata: Annotated[dict, metadata_updater]
 
-    # Regime detection — populated by regime_gate node (Phase 5) before scouts run.
-    # regime holds RegimeState fields as a plain dict for LangGraph serialization.
-    # trading_params is REGIME_RULES[regime["label"]] — position limits and thresholds.
-    # should_trade is False when trading_allowed=False or max_concurrent_positions=0.
-    regime: NotRequired[dict]
+    # Canonical regime context — populated before scouts run. HMM is diagnostic;
+    # execution_regime is the sole authority for policy/threshold consumers.
+    regime_context: NotRequired[dict]
+    hmm_regime: NotRequired[dict]
+    trend_regime: NotRequired[dict]
+    volatility_regime: NotRequired[str]
+    execution_regime: NotRequired[str]
+    execution_regime_reason: NotRequired[str]
     trading_params: NotRequired[dict]
     should_trade: NotRequired[bool]
 

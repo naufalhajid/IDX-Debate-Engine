@@ -1,0 +1,321 @@
+[
+  {
+    "ticker": "BBCA",
+    "verdict": {
+      "ticker": "BBCA",
+      "rating": "AVOID",
+      "confidence": 0.77,
+      "fair_value": 4496.0,
+      "fair_value_base": 4496.0,
+      "fair_value_low": null,
+      "fair_value_high": null,
+      "valuation_gap": null,
+      "entry_price_range": null,
+      "target_price": null,
+      "stop_loss": null,
+      "current_price": 4000.0,
+      "timeframe": "5-20 Trading Days",
+      "execution_horizon_days": 10,
+      "weighted_reasoning": "Dry-run mock verdict untuk validasi pipeline.",
+      "critical_risk_factor": "Dry-run: bukan rekomendasi investasi aktual.",
+      "key_catalysts": [
+        "Template dry-run umum untuk validasi konfigurasi pipeline.",
+        "Risk/reward mock memenuhi ambang awal."
+      ],
+      "key_risks": [
+        "Data sintetis tidak merepresentasikan kondisi emiten aktual.",
+        "Dry-run memakai data sintetis."
+      ],
+      "summary": "Ini adalah hasil simulasi dry-run untuk menguji parsing, scoring, persistensi, dan report generation tanpa API call.",
+      "target_basis": null,
+      "expected_return": null,
+      "risk_reward_ratio": null,
+      "is_overvalued": false,
+      "risk_overvalued": false,
+      "wait_and_see": true,
+      "consensus_reached": true,
+      "consensus_method": "voting",
+      "dissenting_agents": [
+        "bear"
+      ],
+      "reason_codes": [],
+      "hypothetical_envelope": null,
+      "trailing_stop_pct": null,
+      "trailing_stop_trigger_pct": null,
+      "partial_exit_t1_pct": 0.5,
+      "partial_exit_trail_remainder": true,
+      "momentum_play": false,
+      "rr_tier": "large_cap",
+      "rr_minimum": 1.4,
+      "rr_tier_label": "Large Cap",
+      "rr_tier_source": "static_fallback",
+      "rr_tier_note": "R/R threshold: 1.4x (Large Cap tier)",
+      "entry_low": null,
+      "entry_high": null,
+      "reasons": [
+        "R/R (0.41x) below minimum threshold of 1.4x (large_cap tier - static fallback)"
+      ],
+      "model_confidence": 0.77
+    },
+    "debate_rounds": 3,
+    "consensus_reached": true,
+    "consensus_method": "voting",
+    "dissenting_agents": [],
+    "consensus_winner": {
+      "agent": "fundamental_scout",
+      "position": "HOLD",
+      "confidence": 0.77
+    },
+    "agent_votes": [
+      {
+        "agent": "fundamental_scout",
+        "position": "BUY",
+        "confidence": 0.66,
+        "round": 0
+      },
+      {
+        "agent": "chartist",
+        "position": "BUY",
+        "confidence": 0.64,
+        "round": 0
+      },
+      {
+        "agent": "sentiment_specialist",
+        "position": "HOLD",
+        "confidence": 0.55,
+        "round": 0
+      },
+      {
+        "agent": "bull",
+        "position": "BUY",
+        "confidence": 0.7,
+        "round": 1
+      },
+      {
+        "agent": "bear",
+        "position": "AVOID",
+        "confidence": 0.58,
+        "round": 1
+      }
+    ],
+    "debate_history": [
+      {
+        "role": "bull",
+        "content": "Dry-run bull case: setup teknikal mock mendukung entry bertahap.\n\nPosition: BUY\nAgent Confidence: 0.70",
+        "round": 1,
+        "position": "BUY",
+        "confidence": 0.7
+      },
+      {
+        "role": "bear",
+        "content": "Dry-run bear case: kualitas data sintetis tidak boleh dipakai untuk trading.\n\nPosition: AVOID\nAgent Confidence: 0.58",
+        "round": 1,
+        "position": "AVOID",
+        "confidence": 0.58
+      },
+      {
+        "role": "devils_advocate",
+        "content": "Dry-run challenge: konfirmasi ulang semua level harga dengan data live.",
+        "round": 2,
+        "position": "HOLD",
+        "confidence": 0.0
+      }
+    ],
+    "raw_data_summary": "DRY_RUN mock data; no provider or Gemini call executed.",
+    "error": null,
+    "conviction_score": 0.0,
+    "sector_key": "unknown",
+    "metadata": {
+      "dry_run": true,
+      "mock_profile": "unknown",
+      "prompt_version": "2026-06-30-cio-regime-labels-v27",
+      "rr_tier": "large_cap",
+      "rr_minimum": 1.4,
+      "rr_tier_label": "Large Cap",
+      "rr_tier_source": "static_fallback",
+      "batch_timestamp": "20260712_105050",
+      "run_id": "20260712_105045"
+    },
+    "status": "success",
+    "rr_tier": "large_cap",
+    "rr_minimum": 1.4,
+    "rr_tier_label": "Large Cap",
+    "rr_tier_source": "static_fallback",
+    "rr_tier_note": "R/R threshold: 1.4x (Large Cap tier)",
+    "reasons": [
+      "R/R (0.41x) below minimum threshold of 1.4x (large_cap tier - static fallback)"
+    ],
+    "risk_gov": "reject",
+    "risk_governor": {
+      "ticker": "BBCA",
+      "status": "reject",
+      "sizing_allowed": false,
+      "reason_codes": [
+        "setup_coherence_failed"
+      ],
+      "message": "R/R (0.41x) below minimum threshold of 1.4x (large_cap tier - static fallback)",
+      "current_price": null,
+      "entry_low": null,
+      "entry_high": null,
+      "target_price": null,
+      "stop_loss": null
+    },
+    "model_confidence": 0.77,
+    "trade_conviction": 0.0,
+    "forecast_report": {
+      "ticker": "BBCA",
+      "as_of": "2026-07-12",
+      "horizon_days": 10,
+      "expected_return_net": null,
+      "p_target": null,
+      "p_stop": null,
+      "volatility_forecast": 0.4091469096233647,
+      "expected_value": null,
+      "decision": "AVOID",
+      "confidence": null,
+      "model_votes": [
+        {
+          "model_name": "naive",
+          "status": "validation_failed",
+          "reason": "validation_status:failed",
+          "r_hat_net": -0.015013294713065038,
+          "p_target": 0.4246612220444722,
+          "p_stop": 0.4293125517308321,
+          "volatility_forecast": 0.4091469096233647,
+          "weight": 0.0,
+          "validation_passed": false,
+          "ic": null,
+          "brier_target": 0.25,
+          "rmse": 0.051860773283009275,
+          "mae": 0.04086515337931153,
+          "mape": 1.060221610841999,
+          "directional_accuracy": 0.7933333333333333
+        },
+        {
+          "model_name": "xgboost",
+          "status": "active",
+          "reason": null,
+          "r_hat_net": -0.008862276561558247,
+          "p_target": 0.4258349374911289,
+          "p_stop": 0.4281369199503362,
+          "volatility_forecast": 0.4091469096233647,
+          "weight": 0.0,
+          "validation_passed": true,
+          "ic": 0.3127816906231605,
+          "brier_target": 0.25608659933777583,
+          "rmse": 0.07801145240918704,
+          "mae": 0.0679453261375618,
+          "mape": 3.491992838710973,
+          "directional_accuracy": 0.6
+        },
+        {
+          "model_name": "lstm",
+          "status": "experimental_unused",
+          "reason": "conservative_policy",
+          "r_hat_net": null,
+          "p_target": null,
+          "p_stop": null,
+          "volatility_forecast": null,
+          "weight": 0.0,
+          "validation_passed": false,
+          "ic": null,
+          "brier_target": null,
+          "rmse": null,
+          "mae": null,
+          "mape": null,
+          "directional_accuracy": null
+        },
+        {
+          "model_name": "prophet",
+          "status": "experimental_unused",
+          "reason": "conservative_policy_not_primary_return_model",
+          "r_hat_net": null,
+          "p_target": null,
+          "p_stop": null,
+          "volatility_forecast": null,
+          "weight": 0.0,
+          "validation_passed": false,
+          "ic": null,
+          "brier_target": null,
+          "rmse": null,
+          "mae": null,
+          "mape": null,
+          "directional_accuracy": null
+        },
+        {
+          "model_name": "tgarch",
+          "status": "active",
+          "reason": null,
+          "r_hat_net": null,
+          "p_target": null,
+          "p_stop": null,
+          "volatility_forecast": 0.4091469096233647,
+          "weight": 0.0,
+          "validation_passed": true,
+          "ic": null,
+          "brier_target": null,
+          "rmse": null,
+          "mae": null,
+          "mape": null,
+          "directional_accuracy": null
+        }
+      ],
+      "validation_summary": {
+        "horizon_days": 10,
+        "n_observations": 150,
+        "ic_mean": 0.3127816906231605,
+        "ic_t_stat": 2.569496254180587,
+        "brier": 0.25304329966888794,
+        "rmse": 0.06493611284609815,
+        "mae": 0.05440523975843666,
+        "mape": 2.276107224776486,
+        "directional_accuracy": 0.6966666666666667,
+        "dsr": 6e-06,
+        "bh_q_value_passed": true,
+        "status": "failed"
+      },
+      "validation_by_model": {
+        "naive": {
+          "horizon_days": 10,
+          "n_observations": 150,
+          "ic_mean": null,
+          "ic_t_stat": null,
+          "brier": 0.25,
+          "rmse": 0.051860773283009275,
+          "mae": 0.04086515337931153,
+          "mape": 1.060221610841999,
+          "directional_accuracy": 0.7933333333333333,
+          "dsr": 6e-06,
+          "bh_q_value_passed": false,
+          "status": "failed"
+        },
+        "xgboost": {
+          "horizon_days": 10,
+          "n_observations": 150,
+          "ic_mean": 0.3127816906231605,
+          "ic_t_stat": 2.569496254180587,
+          "brier": 0.25608659933777583,
+          "rmse": 0.07801145240918704,
+          "mae": 0.0679453261375618,
+          "mape": 3.491992838710973,
+          "directional_accuracy": 0.6,
+          "dsr": 6e-06,
+          "bh_q_value_passed": true,
+          "status": "production"
+        }
+      },
+      "model_dispersion": 0.0030755090757533955,
+      "model_disagreement_penalty": 0.0062,
+      "risk_adjusted_expected_value": null,
+      "data_quality_flags": [
+        "no_validated_return_model",
+        "experimental_unused:lstm",
+        "experimental_unused:prophet",
+        "model_disagreement_penalty:0.006",
+        "validation_status:failed"
+      ],
+      "volatility_fallback": false
+    },
+    "forecast_ev_ignored_reason": "validation_failed"
+  }
+]

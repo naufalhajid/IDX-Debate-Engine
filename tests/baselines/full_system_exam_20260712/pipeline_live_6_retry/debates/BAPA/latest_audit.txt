@@ -1,0 +1,49 @@
+╔══════════════════════════════════════════╗
+║  AUDIT REPORT: BAPA — HOLD       ║
+╚══════════════════════════════════════════╝
+
+Summary : BAPA→HOLD: unknown won by unknown (0.40) after 3 round(s). 2 agent(s) dissented. Fair value tidak tersedia — validasi fundamental secara manual sebelum entry.
+Run ID  : 20260712_173441
+Generated: 2026-07-12T10:39:08.294836+00:00
+
+VERDICT
+───────
+Rating     : HOLD (confidence: 40%)
+Method     : unknown
+Winner    : unknown
+Consensus  : no
+Rounds     : 3
+Dissent    : 40% (2 of 5 agents)
+
+AGENT VOTES
+───────────
+  fundamental_scout      UNKNOWN  conf= 0.46 eff= 0.46  ❌
+  chartist               UNKNOWN  conf= 0.64 eff= 0.64  ❌
+  sentiment_specialist   AVOID    conf= 0.86 eff= 0.86  ❌
+  bull                   HOLD     conf= 0.34 eff= 0.34  ✅
+  bear                   AVOID    conf= 0.29 eff= 0.25  ❌
+  devils_advocate        AVOID    conf= 0.40 eff= 0.40  ❌
+
+KEY ARGUMENTS
+─────────────
+Bull  : Position: NEUTRAL
+Debate Confidence: LOW
+
+Bear’s stop-loss critique at Rp 238 is valid, but it is not the only reference. A secondary support sits at Rp 215, which is already identified in the technical summary as the AVWAP zone; that gives the long case a deeper invalidation line below the cited br
+Bear  : Position: BEARISH
+Debate Confidence: LOW
+
+Bull’s cited support at Rp 308 is already compromised: the stock is trading at Rp 282, which is beneath that level and also below the short-term trend marker in the technical brief. That means the Bull’s “support” is no longer acting as support in live price
+Devil : Position: STRESS_TEST  
+Agent Confidence: 0.30
+
+**Challenge 1 — Macro / company risk**  
+If net foreign flows stay **Net Foreign Sell** on top of the recent selling headlines, could the already-broken **Rp 308** support fail again and drag BAPA toward the **Rp 238** stop within 5–20 trading days?
+
+*
+
+DATA QUALITY
+────────────
+Freshness OK : False
+Stale sources: sentiment
+Missing      : none

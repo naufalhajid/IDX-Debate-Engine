@@ -1,3 +1,6 @@
+import re
+
+import pytest
 from rich.console import Console
 
 from services.explainability_auditor import (
@@ -204,6 +207,42 @@ def test_generate_ticker_report_contains_execution_horizon() -> None:
     assert "| **Execution Horizon** | 10 trading days |" in report
 
 
+def test_ticker_report_uses_canonical_execution_regime_authority() -> None:
+    result = _mock_result()
+    result.update(
+        {
+            "execution_regime": "DEFENSIVE",
+            "execution_regime_reason": "rule_based_defensive_override",
+            "trend_regime": {"label": "SIDEWAYS", "confidence": 0.9467},
+            "volatility_regime": "HIGH",
+        }
+    )
+    result["metadata"]["regime"] = "NORMAL"
+
+    report = MarkdownFormatter().generate_ticker_report(result)
+
+    assert "| **Execution Regime** | DEFENSIVE |" in report
+    assert "| **Execution Regime Reason** | rule_based_defensive_override |" in report
+    assert "| **Trend Regime (diagnostic)** | SIDEWAYS (94.7%) |" in report
+    assert "| **Volatility Regime (diagnostic)** | HIGH |" in report
+    assert "| **Legacy Regime (diagnostic)** |" not in report
+    assert "| **Execution Regime** | NORMAL |" not in report
+
+
+def test_ticker_report_marks_old_regime_as_legacy_diagnostic() -> None:
+    result = _mock_result()
+    result["metadata"]["regime"] = "DEFENSIVE"
+
+    report = MarkdownFormatter().generate_ticker_report(result)
+
+    assert "| **Execution Regime** | UNKNOWN |" in report
+    assert (
+        "| **Execution Regime Reason** | "
+        "legacy_artifact_missing_execution_regime |"
+    ) in report
+    assert "| **Legacy Regime (diagnostic)** | DEFENSIVE |" in report
+
+
 def test_generate_ticker_report_buy_contains_catalyst_section() -> None:
     report = MarkdownFormatter().generate_ticker_report(_mock_result("BUY"))
 
@@ -364,6 +403,113 @@ def test_generate_batch_summary_contains_buy_ticker_in_results_table() -> None:
 
     assert "BBCA" in report
     assert "| BUY |" in report
+
+
+def test_markdown_reports_include_market_snapshot_provenance() -> None:
+    result = _mock_result()
+    result["metadata"]["market_snapshot"] = {
+        "snapshot_id": "snap-bbca-20260713",
+        "data_hash": "sha256-bbca-full",
+    }
+
+    ticker_report = MarkdownFormatter().generate_ticker_report(result)
+    batch_report = MarkdownFormatter().generate_batch_summary([result], "run-123")
+
+    assert "snap-bbca-20260713" in ticker_report
+    assert "sha256-bbca-full" in ticker_report
+    assert "snap-bbca-20260713" in batch_report
+    assert "sha256-bbca-full" in batch_report
+
+
+def test_batch_summary_uses_execution_contract_for_actionability() -> None:
+    no_trade = _mock_result("BUY")
+    no_trade["execution_decision"] = {
+        "execution_status": "NO_TRADE",
+        "decision_source": "risk_guard",
+        "actionable": False,
+    }
+    no_trade["execution_status"] = "NO_TRADE"
+    no_trade["decision_source"] = "risk_guard"
+
+    report = MarkdownFormatter().generate_batch_summary([no_trade], "run-123")
+    ticker_report = MarkdownFormatter().generate_ticker_report(no_trade)
+
+    assert "| NO_TRADE | 1 | BBCA |" in report
+    assert "## Executable Stocks\n\nNone." in report
+    assert "| **Recommendation** | **NO_TRADE** |" in ticker_report
+    assert "| **Model Opinion** | BUY |" in ticker_report
+
+
+def test_batch_summary_shows_execution_authority_and_diagnostics() -> None:
+    result = _mock_result()
+    result["regime_context"] = {
+        "execution_regime": "SIDEWAYS",
+        "execution_regime_reason": "hmm_sideways",
+        "trend_regime": {"label": "SIDEWAYS", "confidence": 0.8},
+        "volatility_regime": "NORMAL",
+    }
+
+    report = MarkdownFormatter().generate_batch_summary([result], "run-123")
+
+    assert "## Execution Regime Authority" in report
+    assert "| BBCA | SIDEWAYS | hmm_sideways | SIDEWAYS (80.0%) | NORMAL |" in report
+
+
+def test_rich_ticker_and_batch_show_canonical_regime() -> None:
+    ticker_console = Console(record=True, width=180)
+    batch_console = Console(record=True, width=220)
+    result = _mock_result()
+    result.update(
+        {
+            "execution_regime": "DEFENSIVE",
+            "execution_regime_reason": "rule_based_defensive_override",
+            "trend_regime": {"label": "SIDEWAYS", "confidence": 0.9},
+            "volatility_regime": "HIGH",
+        }
+    )
+
+    RichFormatter(console=ticker_console).render_ticker_panel(result)
+    RichFormatter(console=batch_console).render_batch_summary([result])
+    ticker_output = ticker_console.export_text()
+    batch_output = batch_console.export_text()
+
+    assert "Execution Regime" in ticker_output
+    assert "DEFENSIVE" in ticker_output
+    assert "rule_based_defensive_override" in ticker_output
+    assert "Trend (diagnostic)" in ticker_output
+    assert "REGIME AUTHORITY" in batch_output
+    assert "rule_based_defensive_override" in batch_output
+
+
+def test_generate_batch_summary_includes_all_ratings_and_counts_total() -> None:
+    buy = _mock_result("BUY")
+    insufficient = _mock_result("INSUFFICIENT_DATA")
+    insufficient["ticker"] = "BACH"
+    insufficient["verdict"]["ticker"] = "BACH"
+
+    report = MarkdownFormatter().generate_batch_summary(
+        [buy, insufficient],
+        "run-123",
+    )
+
+    # Scope to the "Overall Results" rating table only — the report also has
+    # a separate "Canonical Execution Decisions" table using the same
+    # "| LABEL | count | ... |" row shape, which a repo-wide regex would
+    # double count.
+    overall_results = report.split("## Overall Results", 1)[1].split("##", 1)[0]
+    counts = {
+        rating: int(count)
+        for rating, count in re.findall(
+            r"^\| ([A-Z_]+) \| (\d+) \|",
+            overall_results,
+            flags=re.MULTILINE,
+        )
+    }
+
+    assert "**Total Stocks**: 2" in report
+    assert "| INSUFFICIENT_DATA | 1 | BACH |" in report
+    assert counts["INSUFFICIENT_DATA"] == 1
+    assert sum(counts.values()) == 2
 
 
 def test_vote_table_soft_hold_uses_override_note() -> None:

@@ -22,6 +22,7 @@ from collections import Counter
 from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
 import json
+import math
 import re
 from pathlib import Path
 from time import perf_counter
@@ -54,6 +55,10 @@ from core.adaptive_planner import (
     PlanAction,
 )
 from core.execution_ledger import DEFAULT_LEDGER
+from core.execution_regime import (
+    execution_regime_from_payload,
+    resolve_execution_regime,
+)
 from core.failure_taxonomy import classify_exception
 from core.handoff_envelope import make_envelope
 from core.idx_market_params import SWING_EXECUTION_HORIZON_DAYS, SWING_TIMEFRAME_LABEL
@@ -80,7 +85,11 @@ from services.fair_value_calculator import build_fair_value_payload, compute_52w
 from services.indobert_sentiment import sentiment_prior as indobert_sentiment_prior
 from services.debate_prompt_registry import PROMPT_REGISTRY, PROMPT_VERSION
 from services.debate_run_guard import run_with_guard
+from services.trade_setup import (
+    build_trade_setup_snapshot as build_predebate_trade_setup,
+)
 from utils.logger_config import logger
+from utils.ticker import normalize_idx_ticker
 from utils.market_data_cache import (
     derive_current_price,
     prefetch_market_data,
@@ -109,7 +118,7 @@ from utils.technicals import (
 )
 from core.quant_filter.pipeline import compute_weekly_trend, fetch_weekly_data
 from core.regime_gate import regime_gate_node, regime_gate_router
-from utils.trade_math import LARGE_CAP_RR_MINIMUM, calculate_rr
+from utils.trade_math import calculate_rr, get_required_rr_resolution
 
 
 def _compute_exdate_gate(exdate_info: Any) -> str:
@@ -218,10 +227,10 @@ def _extract_regime_str(market_regime: Any) -> str:
 
 
 def _regime_label_from_state(state: "DebateChamberState") -> str:
-    """Return the active regime label from HMM dict (new pipeline) or legacy metadata string."""
-    hmm_label = str((state.get("regime") or {}).get("label", "")).upper()
-    if hmm_label:
-        return hmm_label
+    """Return the sole canonical execution-regime label."""
+    canonical = execution_regime_from_payload(state)
+    if canonical:
+        return canonical
     return _extract_regime_str((state.get("metadata") or {}).get("regime", ""))
 
 
@@ -598,13 +607,15 @@ def _reject_unverified_fair_value_if_needed(
     run_id: str,
     fair_value: Any,
     metadata: dict[str, Any],
-) -> tuple[float, dict[str, Any]]:
+) -> tuple[float | None, dict[str, Any]]:
+    if fair_value is None:
+        return None, metadata
     try:
-        fair_value_number = float(fair_value or 0.0)
+        fair_value_number = float(fair_value)
     except (TypeError, ValueError):
-        fair_value_number = 0.0
-    if fair_value_number <= 0:
-        return 0.0, metadata
+        return None, metadata
+    if not math.isfinite(fair_value_number) or fair_value_number <= 0:
+        return None, metadata
     if _has_current_run_fair_value_evidence(
         metadata=metadata,
         ticker=ticker,
@@ -624,7 +635,7 @@ def _reject_unverified_fair_value_if_needed(
     if "fair_value_unverified" not in reasons:
         reasons.append("fair_value_unverified")
     metadata["reasons"] = reasons
-    return 0.0, metadata
+    return None, metadata
 
 
 def _planner_decision_for_state(
@@ -948,6 +959,12 @@ class DebateChamber:
                                                          │
                                                         END
     """
+
+    #: Preflight setups older than this are refetched in run() rather than
+    #: reused verbatim -- prepare_trade_setup() locks in price and the
+    #: entry/target/stop envelope, and a ticker can queue behind rate
+    #: limiting for a while before the debate that actually consumes it.
+    _PREPARED_SETUP_MAX_AGE_SECONDS: float = 120.0
 
     def __init__(
         self,
@@ -1824,6 +1841,9 @@ class DebateChamber:
     ) -> DebateChamberState:
         """Create the canonical initial debate state."""
 
+        regime_context, hmm_regime, rule_regime_snapshot = (
+            self._canonical_regime_inputs()
+        )
         return {
             "ticker": ticker,
             "current_price": current_price,
@@ -1836,11 +1856,15 @@ class DebateChamber:
             "raw_data": "",
             "decision_brief": "",
             "technical_indicators": {},
-            "fair_value_estimate": 0.0,
+            "fair_value_estimate": None,
             "fair_value_base": None,
             "fair_value_low": None,
             "fair_value_high": None,
             "fair_value_range_pct": None,
+            "dps": None,
+            "dps_source": None,
+            "dps_yield_pct": None,
+            "dps_price_used": None,
             "risk_overvalued": False,
             "valuation_band_context": None,
             "range_52w_signal": None,
@@ -1854,10 +1878,24 @@ class DebateChamber:
             "disagreement_type": None,
             "devils_advocate_question": "",
             "final_verdict": "",
+            "regime_context": regime_context,
+            "hmm_regime": hmm_regime,
+            "trend_regime": regime_context.get("trend_regime"),
+            "volatility_regime": regime_context.get("volatility_regime"),
+            "execution_regime": regime_context.get("execution_regime"),
+            "execution_regime_reason": regime_context.get(
+                "execution_regime_reason"
+            ),
+            "trading_params": regime_context.get("execution_params", {}),
+            "should_trade": None,
             "metadata": {
                 "prompt_version": getattr(self, "prompt_version", PROMPT_VERSION),
                 "run_id": run_id,
-                "regime": _extract_regime_str(getattr(self, "market_regime", None)),
+                "rule_regime_snapshot": rule_regime_snapshot,
+                "execution_regime": regime_context.get("execution_regime"),
+                "execution_regime_reason": regime_context.get(
+                    "execution_regime_reason"
+                ),
                 "market_data_source": market_data.get("source", "unknown"),
                 "market_data_fetched_at": _market_data_timestamp(market_data),
                 "market_data_cached": True,
@@ -1866,6 +1904,20 @@ class DebateChamber:
             },
             "error": None,
         }
+
+    def _canonical_regime_inputs(
+        self,
+    ) -> tuple[dict[str, Any], dict[str, Any], Any]:
+        """Return non-ambiguous regime inputs, including terminal preflight paths."""
+        hmm_regime = dict(getattr(self, "hmm_regime", {}) or {})
+        rule_regime_snapshot = getattr(self, "market_regime", None)
+        regime_context = dict(getattr(self, "regime_context", {}) or {})
+        if not regime_context.get("execution_regime"):
+            regime_context = resolve_execution_regime(
+                rule_snapshot=rule_regime_snapshot,
+                hmm_state=hmm_regime or None,
+            )
+        return regime_context, hmm_regime, rule_regime_snapshot
 
     @staticmethod
     def _message_field(message: Any, field: str, default: Any = None) -> Any:
@@ -1892,10 +1944,14 @@ class DebateChamber:
                 "current_price": state.get("current_price", 0.0),
             },
             "fundamental": {
-                "fair_value": state.get("fair_value_estimate", 0.0),
+                "fair_value": state.get("fair_value_estimate"),
                 "fair_value_base": state.get("fair_value_base"),
                 "fair_value_low": state.get("fair_value_low"),
                 "fair_value_high": state.get("fair_value_high"),
+                "dps": state.get("dps"),
+                "dps_source": state.get("dps_source"),
+                "dps_yield_pct": state.get("dps_yield_pct"),
+                "dps_price_used": state.get("dps_price_used"),
                 "risk_overvalued": state.get("risk_overvalued", False),
                 "position": self._extract_agent_signal(
                     str(state.get("fundamental_data", "")),
@@ -2161,6 +2217,10 @@ Current Date (Asia/Jakarta): {current_date}
                 "fair_value_low": fv_result.get("fair_value_low"),
                 "fair_value_high": fv_result.get("fair_value_high"),
                 "fair_value_range_pct": fv_result.get("range_pct"),
+                "dps": fv_result.get("dps"),
+                "dps_source": fv_result.get("dps_source"),
+                "dps_yield_pct": fv_result.get("dps_yield_pct"),
+                "dps_price_used": fv_result.get("dps_price_used"),
                 "risk_overvalued": fv_result.get("risk_overvalued"),
                 "valuation_band_context": fv_result.get("valuation_band_context"),
             }
@@ -2952,15 +3012,37 @@ Current Date (Asia/Jakarta): {current_date}
         )
 
         # ── Margin-of-Safety pre-check (pure Python, zero token cost) ──────
-        fair_value_estimate = state.get("fair_value_estimate") or 0.0
-        fair_value_base = state.get("fair_value_base") or fair_value_estimate
+        fair_value_estimate = state.get("fair_value_estimate")
+        try:
+            fair_value_estimate = (
+                float(fair_value_estimate)
+                if fair_value_estimate is not None
+                else None
+            )
+        except (TypeError, ValueError):
+            fair_value_estimate = None
+        if (
+            fair_value_estimate is not None
+            and (
+                not math.isfinite(fair_value_estimate)
+                or fair_value_estimate <= 0
+            )
+        ):
+            fair_value_estimate = None
+        fair_value_base = state.get("fair_value_base")
+        if fair_value_base is None:
+            fair_value_base = fair_value_estimate
         fair_value_low = state.get("fair_value_low")
         fair_value_high = state.get("fair_value_high")
         fair_value_range_pct = state.get("fair_value_range_pct")
         risk_overvalued = bool(state.get("risk_overvalued"))
         current_price = state.get("current_price") or 0.0
 
-        if fair_value_estimate > 0 and current_price > 0:
+        if (
+            fair_value_estimate is not None
+            and fair_value_estimate > 0
+            and current_price > 0
+        ):
             validation = validate_swing_targets(
                 current_price=current_price,
                 fair_value=fair_value_estimate,
@@ -3214,7 +3296,7 @@ Current Date (Asia/Jakarta): {current_date}
             )
         )
         state["fair_value_estimate"] = fair_value_estimate
-        if fair_value_estimate <= 0:
+        if fair_value_estimate is None or fair_value_estimate <= 0:
             fair_value_base = None
             fair_value_low = None
             fair_value_high = None
@@ -3563,15 +3645,19 @@ Current Date (Asia/Jakarta): {current_date}
         """Build the deterministic trade-envelope block used by Devil's Advocate."""
         current_price = state.get("current_price", 0.0)
         tech = dict(state.get("technical_indicators") or {})
-        meta_regime = _extract_regime_str((state.get("metadata") or {}).get("regime", ""))
-        if meta_regime:
-            tech["regime"] = meta_regime
+        execution_regime = _regime_label_from_state(state)
+        if execution_regime:
+            tech["regime"] = execution_regime
+        tech["ticker"] = str(state.get("ticker") or "UNKNOWN")
+        _market_info = (state.get("market_data") or {}).get("info")
+        if isinstance(_market_info, dict):
+            tech["_rr_yf_info"] = _market_info
 
         state_metadata = dict(_state_metadata(state))
         fair_value = (
-            0.0
+            None
             if state_metadata.get("fair_value_rejected")
-            else state.get("fair_value_estimate", 0.0)
+            else state.get("fair_value_estimate")
         )
 
         if not current_price or current_price <= 0:
@@ -3606,7 +3692,7 @@ Current Date (Asia/Jakarta): {current_date}
     def _classify_signals(
         self,
         current_price: float,
-        fair_value: float,
+        fair_value: float | None,
         ma50: float,
         fair_value_high: float | None = None,
     ) -> tuple[bool | None, bool | None, bool, str]:
@@ -3773,7 +3859,7 @@ Current Date (Asia/Jakarta): {current_date}
     def _compute_trade_envelope(
         self,
         current_price: float,
-        fair_value: float,
+        fair_value: float | None,
         tech: dict,
     ) -> dict:
         """Compute entry/target/stop in Python. All prices snapped to IHSG tick sizes.
@@ -3829,7 +3915,31 @@ Current Date (Asia/Jakarta): {current_date}
 
         # Stop loss with buffer and hard floor — ATR multiplier scaled by market regime
         _regime_key = str(tech.get("regime", "NORMAL")).upper()
-        k_atr = REGIME_ATR_STOP_MULTIPLIER.get(_regime_key, REGIME_ATR_STOP_MULTIPLIER_DEFAULT)
+        k_atr = REGIME_ATR_STOP_MULTIPLIER.get(
+            _regime_key,
+            REGIME_ATR_STOP_MULTIPLIER_DEFAULT,
+        )
+        _rr_yf_info = tech.get("_rr_yf_info")
+        _rr_yf_info = _rr_yf_info if isinstance(_rr_yf_info, dict) else None
+        rr_requirement = get_required_rr_resolution(
+            str(tech.get("ticker") or "UNKNOWN"),
+            regime=_regime_key,
+            yf_info=_rr_yf_info,
+        )
+        rr_contract = {
+            "required_rr": rr_requirement.required_rr,
+            "rr_base_minimum": rr_requirement.base_rr_minimum,
+            "rr_regime_minimum": rr_requirement.regime_rr_minimum,
+            "rr_user_floor": rr_requirement.user_execution_floor,
+            "rr_regime": rr_requirement.execution_regime,
+            "rr_regime_multiplier": rr_requirement.regime_multiplier,
+            "rr_tier": rr_requirement.tier_name,
+            "rr_tier_label": rr_requirement.tier_label,
+            "rr_tier_source": rr_requirement.tier_source,
+            "rr_requirement_source": "max_user_floor_tier_x_regime",
+        }
+        if rr_requirement.market_cap_idr is not None:
+            rr_contract["rr_market_cap_idr"] = rr_requirement.market_cap_idr
 
         if atr14 > 0 and sma20 > 0:
             swing_low = min(
@@ -3895,7 +4005,9 @@ Current Date (Asia/Jakarta): {current_date}
             nearest_resistance, target_basis = min(resistance_candidates, key=lambda x: x[0])
             target_candidate = max(snap_to_tick(nearest_resistance), snap_to_tick(min_target))
         else:
-            rr_target = entry_high + (risk_from_entry_high * 2.0)
+            rr_target = entry_high + (
+                risk_from_entry_high * rr_requirement.required_rr
+            )
             target_candidate = max(rr_target, min_target)
             target_basis = "Minimum R/R"
 
@@ -3908,6 +4020,20 @@ Current Date (Asia/Jakarta): {current_date}
         if 0 < capped < target:
             target = capped
             target_basis += " (Swing Cap)"
+
+        # ``snap_to_tick`` may round a regime-aware minimum target down by one
+        # tick (for example 2.106x becomes 2.08x). When the target came from the
+        # minimum-R/R seed and the swing cap still has room, advance ticks until
+        # the canonical floor is genuinely met. Resistance targets are never
+        # inflated this way; they must pass or be rejected as observed.
+        if target_basis == "Minimum R/R" and target < capped:
+            for _ in range(4):
+                if calculate_rr(entry_high, target, stop) >= rr_requirement.required_rr:
+                    break
+                next_target = self._next_tick_above(target)
+                if next_target > capped:
+                    break
+                target = next_target
 
         if target <= entry_high:
             rejections.append((
@@ -3930,11 +4056,12 @@ Current Date (Asia/Jakarta): {current_date}
         # Reject below the absolute R/R floor so bad setups don't propagate
         # silently. Non-large-cap stocks face a higher threshold (1.5x) in the
         # governor; this catches the worst cases early.
-        if rr_ratio < LARGE_CAP_RR_MINIMUM:
+        if rr_ratio < rr_requirement.required_rr:
             rejections.append((
                 "rr_too_low",
                 (
-                    f"rr_too_low: R/R {rr_ratio:.2f} < {LARGE_CAP_RR_MINIMUM}"
+                    f"rr_too_low: R/R {rr_ratio:.2f} < "
+                    f"{rr_requirement.required_rr:.3f}"
                     f" (target {target}, entry_high {entry_high}, stop {stop})"
                 ),
             ))
@@ -3955,6 +4082,7 @@ Current Date (Asia/Jakarta): {current_date}
                     "target_basis": target_basis,
                     "stop_loss": stop,
                     "risk_reward_ratio": rr_ratio,
+                    **rr_contract,
                 },
             }
 
@@ -3968,6 +4096,7 @@ Current Date (Asia/Jakarta): {current_date}
             "expected_return_pct": round(gain_pct, 1),
             "max_risk_pct": round(loss_pct, 1),
             "risk_reward_ratio": rr_ratio,
+            **rr_contract,
             "fair_value": fair_value if (fair_value and fair_value > 0) else None,
             "atr14": atr14,
             "stop_near_noise": _stop_near_noise,
@@ -3995,6 +4124,10 @@ Current Date (Asia/Jakarta): {current_date}
             f"EXPECTED RETURN    : +{envelope['expected_return_pct']:.1f}% (dari entry midpoint)\n"
             f"MAX RISK           : -{envelope['max_risk_pct']:.1f}% (dari entry midpoint)\n"
             f"RISK/REWARD RATIO  : {envelope['risk_reward_ratio']:.2f} (dari entry_high / worst-case fill)\n"
+            f"REQUIRED R/R       : {envelope['required_rr']:.3f} "
+            f"({envelope['rr_tier_label']}, {envelope['rr_regime']} "
+            f"x{envelope['rr_regime_multiplier']:.2f}, user floor "
+            f"{envelope['rr_user_floor']:.1f})\n"
             f"\n"
             f"⚠️ These prices are IHSG tick-rounded and Python-computed.\n"
             f"   CIO must use these VERBATIM — do NOT override."
@@ -4344,20 +4477,23 @@ Current Date (Asia/Jakarta): {current_date}
         ticker = state["ticker"]
         current_price = state.get("current_price", 0.0)
         tech = dict(state.get("technical_indicators") or {})
-        # Inject regime so _compute_trade_envelope can scale ATR multiplier correctly.
-        # The regime string is stored in metadata["regime"] by run() from the chamber's
-        # market_regime attribute (set by the orchestrator before calling run()).
-        _meta_regime = _extract_regime_str((state.get("metadata") or {}).get("regime", ""))
-        if _meta_regime:
-            tech["regime"] = _meta_regime
+        tech["ticker"] = ticker
+        _market_info = (state.get("market_data") or {}).get("info")
+        if isinstance(_market_info, dict):
+            tech["_rr_yf_info"] = _market_info
+        # Inject the canonical execution regime so the deterministic envelope uses
+        # the same authority as consensus, risk, ranking, and sizing.
+        execution_regime = _regime_label_from_state(state)
+        if execution_regime:
+            tech["regime"] = execution_regime
         _meta_sector = str((state.get("metadata") or {}).get("sector", "") or "")
         if _meta_sector:
             tech["sector"] = _meta_sector
         state_metadata = dict(_state_metadata(state))
         fair_value = (
-            0.0
+            None
             if state_metadata.get("fair_value_rejected")
-            else state.get("fair_value_estimate", 0.0)
+            else state.get("fair_value_estimate")
         )
         fair_value_base = (
             None
@@ -4438,10 +4574,31 @@ Current Date (Asia/Jakarta): {current_date}
                 ticker,
                 envelope.get("reason", "unknown"),
             )
+            rejected_envelope = envelope.get("hypothetical_envelope")
+            rejected_envelope = (
+                rejected_envelope if isinstance(rejected_envelope, dict) else {}
+            )
+            rejected_rr_context = {
+                key: rejected_envelope[key]
+                for key in (
+                    "required_rr",
+                    "rr_base_minimum",
+                    "rr_regime_minimum",
+                    "rr_user_floor",
+                    "rr_regime",
+                    "rr_regime_multiplier",
+                    "rr_tier",
+                    "rr_tier_label",
+                    "rr_tier_source",
+                    "rr_requirement_source",
+                    "rr_market_cap_idr",
+                )
+                if rejected_envelope.get(key) is not None
+            }
             noise_verdict = CIOVerdict(
                 ticker=ticker,
                 rating="HOLD",
-                confidence=0.40,
+                confidence=0.0,
                 summary=f"Setup ditolak: {envelope.get('reason', 'stop inside noise')}.",
                 current_price=current_price,
                 fair_value=fair_value if fair_value and fair_value > 0 else None,
@@ -4449,6 +4606,11 @@ Current Date (Asia/Jakarta): {current_date}
                 fair_value_low=fair_value_low,
                 fair_value_high=fair_value_high,
                 risk_overvalued=risk_overvalued,
+                valuation_gap=(
+                    "unverified"
+                    if state_metadata.get("fair_value_rejected")
+                    else None
+                ),
                 entry_price_range=None,
                 target_price=None,
                 target_basis=None,
@@ -4460,6 +4622,7 @@ Current Date (Asia/Jakarta): {current_date}
                     [envelope["reason_code"]] if envelope.get("reason_code") else []
                 ),
                 hypothetical_envelope=envelope.get("hypothetical_envelope"),
+                **rejected_rr_context,
             )
             _ledger_stage_success(
                 state,
@@ -4654,6 +4817,21 @@ Start your response with '{' and end with '}'. Nothing else."""
                     p["risk_reward_ratio"] = float(rr_env)
                 except (TypeError, ValueError):
                     pass
+            for key in (
+                "required_rr",
+                "rr_base_minimum",
+                "rr_regime_minimum",
+                "rr_user_floor",
+                "rr_regime",
+                "rr_regime_multiplier",
+                "rr_tier",
+                "rr_tier_label",
+                "rr_tier_source",
+                "rr_requirement_source",
+                "rr_market_cap_idr",
+            ):
+                if envelope.get(key) is not None:
+                    p[key] = envelope[key]
             fv_env = envelope.get("fair_value")
             if fv_env is not None and fv_env != 0:
                 try:
@@ -4931,10 +5109,11 @@ Start your response with '{' and end with '}'. Nothing else."""
         self, state: DebateChamberState
     ) -> dict:
         """Terminal node when regime gate blocks trading. Emits a HOLD verdict."""
-        regime = state.get("regime", {})
-        label = regime.get("label", "UNKNOWN")
-        confidence = regime.get("confidence", 0.0)
-        msci = regime.get("msci_override", False)
+        label = _regime_label_from_state(state) or "UNKNOWN"
+        trend = state.get("trend_regime") or {}
+        confidence = float(trend.get("confidence") or 0.0)
+        hmm = state.get("hmm_regime") or {}
+        msci = bool(hmm.get("msci_override", False))
         ticker = state.get("ticker", "")
         verdict = CIOVerdict(
             ticker=ticker,
@@ -5008,19 +5187,38 @@ Start your response with '{' and end with '}'. Nothing else."""
 
         return graph.compile()
 
-    async def _run_scouts(self, ticker: str) -> dict[str, Any]:
+    async def _run_scouts(
+        self,
+        ticker: str,
+        prepared_setup: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Run specialist scouts and return technical/fundamental/sentiment metrics.
         """
 
-        market_data = await self._fetch_market_data(ticker)
-        current_price = derive_current_price(market_data)
+        prepared = prepared_setup or await self.prepare_trade_setup(ticker)
+        market_data = prepared.get("market_data")
+        if not isinstance(market_data, dict):
+            raise ValueError("Prepared trade setup is missing market_data.")
+        current_price = float(prepared.get("current_price") or 0.0)
         state = self._new_initial_state(
             ticker=ticker,
             current_price=current_price,
             market_data=market_data,
             run_id=getattr(self, "run_id", "unknown"),
         )
+        snapshot = prepared.get("trade_setup_snapshot")
+        if isinstance(snapshot, dict):
+            state["technical_indicators"] = dict(
+                snapshot.get("technical_indicators") or {}
+            )
+            metadata = dict(state.get("metadata") or {})
+            metadata["trade_setup_snapshot"] = snapshot
+            metadata["execution_status"] = snapshot.get("status")
+            metadata["tradeability_preflight"] = dict(
+                snapshot.get("preflight") or {}
+            )
+            state["metadata"] = metadata
         self._reset_llm_counters(state)
 
         scout_states = [dict(state), dict(state), dict(state)]
@@ -5136,7 +5334,7 @@ Start your response with '{' and end with '}'. Nothing else."""
         Stream the debate pipeline node-by-node as SSE-friendly event dicts.
         """
 
-        ticker = ticker.strip().upper()
+        ticker = normalize_idx_ticker(ticker)
         try:
             yield {
                 "type": "progress",
@@ -5146,7 +5344,28 @@ Start your response with '{' and end with '}'. Nothing else."""
             }
             await asyncio.sleep(0)
 
-            scout_metrics = await self._run_scouts(ticker)
+            prepared = await self.prepare_trade_setup(ticker)
+            snapshot = prepared.get("trade_setup_snapshot")
+            snapshot = snapshot if isinstance(snapshot, dict) else {}
+            if not bool(snapshot.get("debate_eligible")):
+                raw_result = await self.run(ticker, prepared_setup=prepared)
+                from app.api.result_adapter import adapt_result
+
+                yield {
+                    "type": "verdict",
+                    "ticker": ticker,
+                    "result": adapt_result(ticker, raw_result),
+                    "raw_state": raw_result,
+                }
+                await asyncio.sleep(0)
+                yield {"type": "done", "ticker": ticker}
+                await asyncio.sleep(0)
+                return
+
+            scout_metrics = await self._run_scouts(
+                ticker,
+                prepared_setup=prepared,
+            )
             public_scout_metrics = {
                 key: value
                 for key, value in scout_metrics.items()
@@ -5236,7 +5455,175 @@ Start your response with '{' and end with '}'. Nothing else."""
 
     # ── Public API ───────────────────────────────────────────────────────────
 
-    async def run(self, ticker: str, current_price: float = 0.0, sector: str = "") -> dict:
+    async def prepare_trade_setup(
+        self,
+        ticker: str,
+        current_price: float = 0.0,
+        sector: str = "",
+    ) -> dict[str, Any]:
+        """Fetch once and build the deterministic pre-debate setup contract.
+
+        The packet retains ``market_data`` for in-process reuse. Calling
+        ``run(..., prepared_setup=packet)`` therefore performs neither a second
+        provider fetch nor a second pre-debate envelope calculation.
+        """
+
+        ticker = normalize_idx_ticker(ticker)
+        market_data = await self._fetch_market_data(ticker)
+        effective_price = float(current_price or 0.0)
+        if effective_price <= 0:
+            effective_price = derive_current_price(market_data)
+        regime_context, hmm_regime, rule_regime_snapshot = (
+            self._canonical_regime_inputs()
+        )
+        history = (market_data or {}).get("history")
+        technical_indicators = self._compute_technical_indicators(history)
+        preflight = self._run_tradeability_preflight(
+            technical_indicators,
+            effective_price,
+        )
+        rr_yf_info = market_data.get("info")
+        rr_yf_info = rr_yf_info if isinstance(rr_yf_info, dict) else None
+
+        def canonical_envelope(
+            price: float,
+            fair_value: float | None,
+            tech: dict[str, Any],
+        ) -> dict[str, Any]:
+            envelope_tech = dict(tech)
+            envelope_tech["ticker"] = ticker
+            if rr_yf_info is not None:
+                envelope_tech["_rr_yf_info"] = rr_yf_info
+            return self._compute_trade_envelope(
+                price,
+                fair_value,
+                envelope_tech,
+            )
+
+        snapshot = build_predebate_trade_setup(
+            ticker=ticker,
+            market_data=market_data,
+            current_price=effective_price,
+            execution_regime=str(
+                regime_context.get("execution_regime") or "UNKNOWN"
+            ),
+            sector=sector,
+            technical_indicators=technical_indicators,
+            preflight=preflight,
+            envelope_calculator=canonical_envelope,
+        )
+        return {
+            "ticker": ticker,
+            "current_price": effective_price,
+            "sector": sector,
+            "market_data": market_data,
+            "regime_context": regime_context,
+            "hmm_regime": hmm_regime,
+            "rule_regime_snapshot": rule_regime_snapshot,
+            "trade_setup_snapshot": snapshot,
+            "prepared_at": perf_counter(),
+        }
+
+    @staticmethod
+    def _terminal_trade_setup_result(
+        initial_state: DebateChamberState,
+        snapshot: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Return an auditable zero-LLM terminal state for a failed setup gate."""
+
+        status = str(snapshot.get("status") or "INSUFFICIENT_DATA")
+        reason_code = str(snapshot.get("reason_code") or "trade_setup_rejected")
+        reason = str(snapshot.get("reason") or "Trade setup is not executable.")
+        envelope = snapshot.get("envelope")
+        envelope = envelope if isinstance(envelope, dict) else {}
+        hypothetical = snapshot.get("hypothetical_envelope")
+        hypothetical = hypothetical if isinstance(hypothetical, dict) else {}
+        threshold_envelope = envelope or hypothetical
+        preserve_levels = status == "WAIT_FOR_PULLBACK" and bool(envelope)
+        entry_range = None
+        if preserve_levels:
+            entry_range = (
+                f"{int(envelope['entry_low'])} - {int(envelope['entry_high'])}"
+            )
+        threshold_keys = (
+            "required_rr",
+            "rr_base_minimum",
+            "rr_regime_minimum",
+            "rr_user_floor",
+            "rr_regime",
+            "rr_regime_multiplier",
+            "rr_tier",
+            "rr_tier_label",
+            "rr_tier_source",
+            "rr_requirement_source",
+            "rr_market_cap_idr",
+        )
+        level_fields: dict[str, Any] = {
+            key: threshold_envelope[key]
+            for key in threshold_keys
+            if threshold_envelope.get(key) is not None
+        }
+        if preserve_levels:
+            level_fields.update(
+                risk_reward_ratio=envelope.get("risk_reward_ratio"),
+                execution_horizon_days=SWING_EXECUTION_HORIZON_DAYS,
+            )
+
+        verdict = CIOVerdict(
+            ticker=str(initial_state.get("ticker") or ""),
+            rating="HOLD",
+            confidence=0.0,
+            current_price=float(initial_state.get("current_price") or 0.0),
+            summary=f"{status}: {reason}",
+            weighted_reasoning=(
+                f"Deterministic pre-debate gate returned {status} "
+                f"({reason_code}). No LLM evaluation was performed."
+            ),
+            critical_risk_factor=reason,
+            entry_price_range=entry_range,
+            target_price=envelope.get("target_price") if preserve_levels else None,
+            target_basis=envelope.get("target_basis") if preserve_levels else None,
+            stop_loss=envelope.get("stop_loss") if preserve_levels else None,
+            reason_codes=[reason_code],
+            hypothetical_envelope=snapshot.get("hypothetical_envelope"),
+            consensus_reached=False,
+            consensus_method=None,
+            dissenting_agents=[],
+            **level_fields,
+        )
+        metadata = dict(initial_state.get("metadata") or {})
+        preflight = snapshot.get("preflight")
+        preflight = preflight if isinstance(preflight, dict) else {}
+        metadata.update(
+            {
+                "trade_setup_snapshot": snapshot,
+                "tradeability_preflight": preflight,
+                "preflight_skipped": preflight.get("status") == "skip",
+                "execution_status": status,
+                "decision_source": "preflight",
+                "flash_calls": 0,
+                "pro_calls": 0,
+                "llm_calls": 0,
+                "guard_status": "ok",
+            }
+        )
+        return {
+            **initial_state,
+            "technical_indicators": dict(
+                snapshot.get("technical_indicators") or {}
+            ),
+            "final_verdict": verdict.model_dump_json(),
+            "metadata": metadata,
+            "error": None,
+        }
+
+    async def run(
+        self,
+        ticker: str,
+        current_price: float = 0.0,
+        sector: str = "",
+        prepared_setup: dict[str, Any] | None = None,
+    ) -> dict:
         """
         Execute the full swing-trade debate pipeline for a given IHSG ticker.
 
@@ -5255,9 +5642,51 @@ Start your response with '{' and end with '}'. Nothing else."""
             Access the verdict via: json.loads(result["final_verdict"])
             For the Svelte trade card: CIOVerdict(**json.loads(...)).to_trade_card()
         """
-        market_data = await self._fetch_market_data(ticker)
-        if current_price <= 0:
-            current_price = derive_current_price(market_data)
+        ticker = normalize_idx_ticker(ticker)
+        prepared = prepared_setup or await self.prepare_trade_setup(
+            ticker,
+            current_price=current_price,
+            sector=sector,
+        )
+        prepared_at = prepared.get("prepared_at")
+        if prepared_setup is not None and isinstance(prepared_at, (int, float)):
+            prepared_age = perf_counter() - float(prepared_at)
+            if prepared_age > self._PREPARED_SETUP_MAX_AGE_SECONDS:
+                logger.warning(
+                    "[DebateChamber] Prepared setup for {} is {:.0f}s old "
+                    "(queued behind rate limiting); refetching a fresh setup "
+                    "before debate so price/entry/target/stop are not stale.",
+                    ticker,
+                    prepared_age,
+                )
+                prepared = await self.prepare_trade_setup(
+                    ticker,
+                    current_price=current_price,
+                    sector=sector,
+                )
+        prepared_raw_ticker = str(prepared.get("ticker") or "").strip()
+        prepared_ticker = (
+            normalize_idx_ticker(prepared_raw_ticker) if prepared_raw_ticker else ""
+        )
+        if prepared_ticker and prepared_ticker != ticker:
+            raise ValueError(
+                f"Prepared trade setup ticker {prepared_ticker} does not match {ticker}."
+            )
+        market_data = prepared.get("market_data")
+        if not isinstance(market_data, dict):
+            raise ValueError("Prepared trade setup is missing market_data.")
+        snapshot = prepared.get("trade_setup_snapshot")
+        if not isinstance(snapshot, dict):
+            raise ValueError("Prepared trade setup is missing trade_setup_snapshot.")
+        current_price = float(prepared.get("current_price") or current_price or 0.0)
+        sector = str(prepared.get("sector") or sector or "")
+        regime_context = prepared.get("regime_context")
+        regime_context = (
+            dict(regime_context) if isinstance(regime_context, dict) else {}
+        )
+        hmm_regime = prepared.get("hmm_regime")
+        hmm_regime = dict(hmm_regime) if isinstance(hmm_regime, dict) else {}
+        rule_regime_snapshot = prepared.get("rule_regime_snapshot")
         initial_state: DebateChamberState = {
             "ticker": ticker,
             "current_price": current_price,
@@ -5269,12 +5698,18 @@ Start your response with '{' and end with '}'. Nothing else."""
             "news_confidence_adjustment": 0.0,
             "raw_data": "",
             "decision_brief": "",
-            "technical_indicators": {},
-            "fair_value_estimate": 0.0,
+            "technical_indicators": dict(
+                snapshot.get("technical_indicators") or {}
+            ),
+            "fair_value_estimate": None,
             "fair_value_base": None,
             "fair_value_low": None,
             "fair_value_high": None,
             "fair_value_range_pct": None,
+            "dps": None,
+            "dps_source": None,
+            "dps_yield_pct": None,
+            "dps_price_used": None,
             "risk_overvalued": False,
             "debate_history": [],
             "round_count": 0,
@@ -5286,16 +5721,32 @@ Start your response with '{' and end with '}'. Nothing else."""
             "disagreement_type": None,
             "devils_advocate_question": "",
             "final_verdict": "",
+            "regime_context": regime_context,
+            "hmm_regime": hmm_regime,
+            "trend_regime": regime_context.get("trend_regime"),
+            "volatility_regime": regime_context.get("volatility_regime"),
+            "execution_regime": regime_context.get("execution_regime"),
+            "execution_regime_reason": regime_context.get(
+                "execution_regime_reason"
+            ),
+            "trading_params": regime_context.get("execution_params", {}),
+            "should_trade": None,
             "metadata": {
                 "prompt_version": getattr(self, "prompt_version", PROMPT_VERSION),
                 "run_id": getattr(self, "run_id", "unknown"),
-                "regime": _extract_regime_str(getattr(self, "market_regime", None)),
+                "rule_regime_snapshot": rule_regime_snapshot,
+                "execution_regime": regime_context.get("execution_regime"),
+                "execution_regime_reason": regime_context.get(
+                    "execution_regime_reason"
+                ),
                 "sector": sector,
                 "market_data_source": market_data.get("source", "unknown"),
                 "market_data_fetched_at": _market_data_timestamp(market_data),
                 "market_data_cached": True,
                 "flash_calls": 0,
                 "pro_calls": 0,
+                "trade_setup_snapshot": snapshot,
+                "execution_status": snapshot.get("status"),
             },
             "valuation_band_context": None,
             "error": None,
@@ -5303,47 +5754,18 @@ Start your response with '{' and end with '}'. Nothing else."""
         self._reset_llm_counters(initial_state)
 
         # ── Early preflight: hard-reject noise setups before any LLM call ───────
-        _preflight_df = (market_data or {}).get("history")
-        _preflight_tech = self._compute_technical_indicators(_preflight_df)
-        _preflight = self._run_tradeability_preflight(_preflight_tech, current_price)
+        if not bool(snapshot.get("debate_eligible")):
+            logger.info(
+                "[DebateChamber] Pre-debate terminal {} for {}: {}",
+                snapshot.get("status"),
+                ticker,
+                snapshot.get("reason"),
+            )
+            return self._terminal_trade_setup_result(initial_state, snapshot)
+
+        _preflight = dict(snapshot.get("preflight") or {})
         initial_state["metadata"]["tradeability_preflight"] = _preflight
         initial_state["metadata"]["preflight_skipped"] = _preflight["status"] == "skip"
-        if _preflight["status"] == "reject":
-            logger.info(
-                f"[DebateChamber] Preflight HOLD {ticker}: {_preflight['reason']}"
-            )
-            _pf_verdict = json.dumps({
-                "rating": "HOLD",
-                "confidence": 0.40,
-                "ticker": ticker,
-                "current_price": current_price,
-                "timeframe": SWING_TIMEFRAME_LABEL,
-                "execution_horizon_days": SWING_EXECUTION_HORIZON_DAYS,
-                "risk_flags": ["PREFLIGHT_NOISE_REJECT"],
-                "reasoning": _preflight["reason"],
-                "weighted_reasoning": (
-                    f"Preflight noise gate: {_preflight['reason']}. "
-                    "Setup rejected deterministically — no LLM evaluation performed."
-                ),
-                "entry_price_range": None,
-                "target_price": None,
-                "stop_loss": None,
-                "fair_value": None,
-                "r_r_ratio": None,
-                "consensus_reached": False,
-                "consensus_method": None,
-                "dissenting_agents": [],
-            })
-            return {
-                **initial_state,
-                "final_verdict": _pf_verdict,
-                "metadata": {
-                    **initial_state["metadata"],
-                    "guard_status": "ok",
-                    "preflight_skipped": False,
-                },
-                "error": None,
-            }
 
         logger.info(
             f"[DebateChamber] ▶ Starting swing-trade pipeline for {ticker} @ Rp {current_price:,.0f}"

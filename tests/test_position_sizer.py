@@ -41,6 +41,13 @@ def test_position_priced_and_risked_at_entry_high() -> None:
     assert position["max_loss_rp"] == position["shares"] * (1050.0 - 930.0)
 
 
+def test_hold_candidate_never_receives_lot_allocation() -> None:
+    result = calculate_positions([_candidate(rating="HOLD")], USER_CONFIG)
+
+    assert result["positions"] == []
+    assert result["summary"]["total_positions"] == 0
+
+
 def test_expected_return_pct_shares_entry_price_basis() -> None:
     result = calculate_positions([_candidate()], USER_CONFIG)
 
@@ -208,4 +215,32 @@ def test_no_regime_params_backward_compatible() -> None:
 
     assert (
         result_without["positions"][0]["lot"] == result_with_none["positions"][0]["lot"]
+    )
+
+
+def test_candidate_execution_regime_controls_trailing_stop_in_conflict() -> None:
+    config = {
+        **USER_CONFIG,
+        "regime_params": {
+            "max_position_pct": 0.02,
+            "max_concurrent_positions": 3,
+            "label": "SIDEWAYS",
+        },
+    }
+    result = calculate_positions(
+        [
+            _candidate(
+                atr14=20.0,
+                execution_regime="DEFENSIVE",
+                regime_context={"execution_regime": "DEFENSIVE"},
+                market_regime="NORMAL",
+            )
+        ],
+        config,
+    )
+
+    [position] = result["positions"]
+    assert position["execution_regime"] == "DEFENSIVE"
+    assert position["trailing_stop_pct"] == pytest.approx(
+        round((20.0 * 2.5) / 1050.0, 4)
     )

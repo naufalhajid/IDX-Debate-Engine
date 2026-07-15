@@ -45,8 +45,8 @@ def test_non_deployable_top_pick_is_annotated_but_not_sized() -> None:
 
 
 def test_deployable_top_pick_keeps_legacy_sizing_candidate_shape() -> None:
-    # target=1290: (1290-1050)/(1050-900)=240/150=1.6x recomputed R/R; rr_ratio=2.0 from verdict (LLM value stored in candidate).
-    top_n = [_entry("BBRI", current_price=1000, entry_range="950 - 1050", target=1290)]
+    # target=1350: (1350-1050)/(1050-900)=300/150=2.0x canonical R/R.
+    top_n = [_entry("BBRI", current_price=1000, entry_range="950 - 1050", target=1350)]
     top_n[0]["verdict"].update({"risk_overvalued": False, "is_overvalued": False})
 
     _annotate_risk_governor(top_n)
@@ -62,7 +62,7 @@ def test_deployable_top_pick_keeps_legacy_sizing_candidate_shape() -> None:
             "rating": "BUY",
             "confidence": 0.75,
             "rr_ratio": 2.0,
-            "target_price": 1290,
+            "target_price": 1350,
             "expected_return": "+10.0%",
         }
     ]

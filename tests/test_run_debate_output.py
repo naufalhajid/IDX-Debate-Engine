@@ -3,10 +3,33 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from run_debate import _debate_one, _ledger_call
+import run_debate
+from run_debate import _attach_risk_governor, _debate_one, _ledger_call
 
 
 class FakeDebateChamber:
+    market_regime = {
+        "regime": "DEFENSIVE",
+        "volatility_regime": "HIGH",
+        "reasons": ["market_drawdown"],
+    }
+    hmm_regime = {"label": "SIDEWAYS", "confidence": 0.94}
+    regime_context = {
+        "rule_based_regime": "DEFENSIVE",
+        "rule_based_reasons": ["market_drawdown"],
+        "trend_regime": {
+            "label": "SIDEWAYS",
+            "confidence": 0.94,
+            "source": "hmm",
+        },
+        "volatility_regime": "HIGH",
+        "execution_regime": "DEFENSIVE",
+        "execution_regime_reason": "rule_based_defensive_override",
+        "execution_policy_profile": "BEAR_STRESS",
+        "execution_params": {"consensus_threshold": 0.8},
+        "operational_params": {"top_n_selection": 0},
+    }
+
     async def run(self, ticker: str, current_price: float = 0.0, sector: str = "") -> dict:
         return {
             "ticker": ticker,
@@ -89,6 +112,17 @@ def test_run_debate_writes_timestamped_and_legacy_outputs(tmp_path: Path) -> Non
     assert payload["consensus_winner"]["agent"] == "bull"
     assert payload["debate_history"][0]["position"] == "BUY"
     assert payload["debate_history"][0]["confidence"] == 0.72
+    assert payload["rule_regime_snapshot"]["regime"] == "DEFENSIVE"
+    assert payload["regime_context"] == FakeDebateChamber.regime_context
+    assert payload["hmm_regime"]["label"] == "SIDEWAYS"
+    assert payload["trend_regime"]["source"] == "hmm"
+    assert payload["volatility_regime"] == "HIGH"
+    assert payload["execution_regime"] == "DEFENSIVE"
+    assert (
+        payload["execution_regime_reason"] == "rule_based_defensive_override"
+    )
+    assert payload["trading_params"] == {"consensus_threshold": 0.8}
+    assert "regime" not in payload["metadata"]
     assert json.loads(latest_file.read_text(encoding="utf-8")) == payload
     assert json.loads(legacy_file.read_text(encoding="utf-8")) == payload
 
@@ -107,3 +141,47 @@ def test_run_debate_ledger_call_accepts_action_payload() -> None:
     )
 
     assert captured == {"action": "RETRY", "stage": "DEBATE"}
+
+
+def test_standalone_risk_entry_uses_canonical_execution_regime(
+    monkeypatch,
+) -> None:
+    captured: dict = {}
+
+    def fake_annotate_risk(entry: dict):
+        captured.update(entry)
+        decision = SimpleNamespace(
+            ticker="BBCA",
+            status="HOLD",
+            reason_codes=["defensive_regime"],
+            sizing_allowed=False,
+            model_dump=lambda: {"status": "HOLD"},
+        )
+        entry["risk_governor"] = decision.model_dump()
+        return decision
+
+    monkeypatch.setattr(run_debate, "annotate_risk", fake_annotate_risk)
+    context = FakeDebateChamber.regime_context
+    report = {
+        "verdict": {"ticker": "BBCA", "rating": "BUY"},
+        "rule_regime_snapshot": FakeDebateChamber.market_regime,
+        "regime_context": context,
+        "hmm_regime": FakeDebateChamber.hmm_regime,
+        "trend_regime": context["trend_regime"],
+        "volatility_regime": "HIGH",
+        "execution_regime": "DEFENSIVE",
+        "execution_regime_reason": "rule_based_defensive_override",
+        "trading_params": context["execution_params"],
+    }
+    result = {"metadata": {"source": "test"}}
+
+    _attach_risk_governor(
+        ticker="BBCA", run_id="20260713_000000", report=report, result=result
+    )
+
+    assert captured["execution_regime"] == "DEFENSIVE"
+    assert captured["regime_context"] == context
+    assert captured["hmm_regime"]["label"] == "SIDEWAYS"
+    assert captured["rule_regime_snapshot"]["regime"] == "DEFENSIVE"
+    assert captured["risk_context"]["execution_regime"] == "DEFENSIVE"
+    assert "market_regime" not in captured

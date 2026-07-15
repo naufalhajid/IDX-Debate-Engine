@@ -28,6 +28,26 @@ both live in the same function and should be addressed in a single coordinated c
 
 ---
 
+## Status Tracking (verified against code, 2026-07-09)
+
+All seven tasks have shipped. Verified by direct code inspection (grep + read), not
+by assuming the plan was executed.
+
+| Task | Status | Evidence in code |
+|---|---|---|
+| A — Remove FV ceiling from trade targets | ✅ Done | `debate_chamber.py` `_compute_trade_envelope` — target is resistance-based with a sector-aware swing cap only (`_SECTOR_MAX_TARGET`); no fair-value ceiling remains in the target path |
+| B — Resistance-first target seeding | ✅ Done | `debate_chamber.py` (~line 3886) — resistance candidates (20d/50d/52w ≤ 1.30× price) are collected first; the 2.0x R/R seed is only the fallback when none qualify |
+| C — Reduce DDM weight in swing FV composite | ✅ Done | `fair_value_calculator.py` `SECTOR_WEIGHTS` (~line 842) — DDM weight is 0.00–0.05 across all sector profiles |
+| D — Regime-aware R/R minimums | ✅ Done | `utils/trade_math.py` — `REGIME_RR_SCALING` applied inside `get_rr_minimum()` |
+| E — Relax FAIL/PASS matrix for momentum | ✅ Done 2026-06-21 | `PROMPT_MIGRATION.md` — `taskE-failpass-v19` |
+| F — Liquidity gate in Risk Governor | ✅ Done | `risk_governor.py` — "Task F" ADT gate: hard-reject < Rp 2B, soft-flag < Rp 10B (`ADT_HARD_REJECT_THRESHOLD_IDR`) |
+| G — Calendar-event gap risk enforced | ✅ Done | `risk_governor.py` — ex-date tiers enforced deterministically (`exdate_imminent` reject, `exdate_cap65` confidence cap) |
+
+Note: R/R floor constants referenced in Task D have since moved to 1.4x large-cap /
+1.62x default (transaction-cost adjustment C7, `CALCULATION_AUDIT_TASKS.md`, 2026-06-22).
+
+---
+
 ## Sequencing
 
 ```

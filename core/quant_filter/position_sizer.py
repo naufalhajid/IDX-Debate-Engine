@@ -5,6 +5,7 @@ from __future__ import annotations
 from math import floor
 from typing import Any
 
+from core.execution_regime import execution_regime_from_payload
 from core.idx_market_params import ARB_LOWER_LIMIT, LOT_SIZE
 from utils.logger_config import logger
 from utils.trade_math import compute_trailing_stop
@@ -372,7 +373,7 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
 
     for candidate in candidates:
         rating = str(candidate.get("rating", "")).upper()
-        if rating == "AVOID":
+        if rating not in {"STRONG_BUY", "BUY"}:
             continue
 
         base_allocation = RATING_BASE_ALLOCATION.get(rating)
@@ -404,7 +405,10 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
         )
         kelly_f = compute_kelly_fraction(confidence, rr_ratio)
         atr14 = _to_float(candidate.get("atr14") or candidate.get("ATR (14)"), None)
-        market_regime = str(candidate.get("market_regime") or "NORMAL").upper()
+        execution_regime = (
+            execution_regime_from_payload(candidate)
+            or (_regime_label if _regime_label != "N/A" else "UNKNOWN")
+        )
         eligible.append(
             {
                 "ticker": ticker,
@@ -418,7 +422,7 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
                 "weight": weight,
                 "kelly_fraction": kelly_f,
                 "atr14": atr14,
-                "market_regime": market_regime,
+                "execution_regime": execution_regime,
             }
         )
 
@@ -462,13 +466,14 @@ def calculate_positions(candidates: list[dict], user_config: dict) -> dict:
             "entry_price": item["entry_price"],
             "stop_loss": item["stop_loss"],
             "rr_ratio": item["rr_ratio"],
+            "execution_regime": item["execution_regime"],
         }
         _recompute_position(position, total_capital)
 
         # Task 8: Attach trailing stop when ATR is available
         if item["atr14"] and item["atr14"] > 0:
             trail = compute_trailing_stop(
-                item["entry_price"], item["atr14"], item["market_regime"]
+                item["entry_price"], item["atr14"], item["execution_regime"]
             )
             position["trailing_stop_pct"] = trail["trailing_stop_pct"]
             position["trailing_stop_trigger_pct"] = trail["trailing_stop_trigger_pct"]

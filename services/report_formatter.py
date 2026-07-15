@@ -59,6 +59,28 @@ def _dict_or_empty(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def _snapshot_provenance(result: dict[str, Any]) -> tuple[str, str]:
+    metadata = _dict_or_empty(result.get("metadata"))
+    snapshot = _dict_or_empty(metadata.get("market_snapshot"))
+    snapshot_id = snapshot.get("snapshot_id") or metadata.get("snapshot_id") or "-"
+    data_hash = snapshot.get("data_hash") or metadata.get("data_hash") or "-"
+    return str(snapshot_id), str(data_hash)
+
+
+def _execution_contract(result: dict[str, Any]) -> dict[str, Any]:
+    decision = _dict_or_empty(result.get("execution_decision"))
+    if decision:
+        return decision
+    status = result.get("execution_status")
+    if status:
+        return {
+            "execution_status": status,
+            "decision_source": result.get("decision_source"),
+            "actionable": result.get("actionable"),
+        }
+    return {}
+
+
 def _list_or_empty(value: Any) -> list[Any]:
     return value if isinstance(value, list) else []
 
@@ -76,6 +98,82 @@ def _canonical_position(value: Any) -> str:
     if token in {"HOLD", "NEUTRAL", "WAIT", "WAIT_AND_SEE"}:
         return "HOLD"
     return token or "UNKNOWN"
+
+
+def _regime_value(value: Any, *keys: str) -> str:
+    """Return a compact uppercase regime label from strings or mappings."""
+    if isinstance(value, dict):
+        for key in keys:
+            candidate = value.get(key)
+            if candidate not in (None, ""):
+                return str(candidate).strip().upper()
+        return ""
+    return str(value or "").strip().upper()
+
+
+def _regime_display(result: dict[str, Any]) -> dict[str, Any]:
+    """Extract execution authority without promoting legacy regime metadata."""
+    data = result if isinstance(result, dict) else {}
+    context = _dict_or_empty(data.get("regime_context"))
+    metadata = _dict_or_empty(data.get("metadata"))
+
+    execution = _regime_value(data.get("execution_regime"))
+    if not execution:
+        execution = _regime_value(context.get("execution_regime"))
+    if not execution:
+        execution = _regime_value(metadata.get("execution_regime"))
+
+    reason = str(
+        data.get("execution_regime_reason")
+        or context.get("execution_regime_reason")
+        or metadata.get("execution_regime_reason")
+        or ""
+    ).strip()
+
+    trend_payload = (
+        data.get("trend_regime")
+        or context.get("trend_regime")
+        or data.get("hmm_regime")
+    )
+    trend = _regime_value(trend_payload, "label", "regime") or "UNKNOWN"
+    trend_confidence = None
+    if isinstance(trend_payload, dict):
+        trend_confidence = _confidence(trend_payload.get("confidence"))
+
+    volatility = _regime_value(
+        data.get("volatility_regime") or context.get("volatility_regime")
+    )
+    if not volatility:
+        snapshot = _dict_or_empty(
+            metadata.get("rule_regime_snapshot")
+            or metadata.get("regime_snapshot")
+        )
+        volatility = _regime_value(snapshot.get("volatility_regime"))
+
+    legacy = _regime_value(metadata.get("regime"))
+    if not legacy:
+        legacy = _regime_value(data.get("regime"), "label", "regime")
+
+    if not execution:
+        execution = "UNKNOWN"
+        reason = reason or "legacy_artifact_missing_execution_regime"
+    else:
+        reason = reason or "reason_not_recorded"
+
+    return {
+        "execution": execution,
+        "reason": reason,
+        "trend": trend,
+        "trend_confidence": trend_confidence,
+        "volatility": volatility or "UNKNOWN",
+        "legacy": legacy,
+    }
+
+
+def _trend_regime_text(regime: dict[str, Any]) -> str:
+    confidence = regime.get("trend_confidence")
+    suffix = "" if confidence is None else f" ({confidence:.1%})"
+    return f"{regime.get('trend') or 'UNKNOWN'}{suffix}"
 
 
 def _is_devils_advocate_agent(value: Any) -> bool:
@@ -1083,6 +1181,7 @@ class RichFormatter:
             upside = _move_pct(target, current_price)
             downside = _downside_pct(stop, current_price)
             risk = _risk(data)
+            regime = _regime_display(data)
 
             consensus = data.get("consensus_reached")
             if consensus is None:
@@ -1226,6 +1325,21 @@ class RichFormatter:
             sys_table.add_column(style="bold cyan", no_wrap=True, width=18)
             sys_table.add_column(style="white")
             sys_table.add_row("Risk Governor", self._terminal_risk_governor_line(risk))
+            sys_table.add_row("Execution Regime", regime["execution"])
+            sys_table.add_row("Regime Reason", regime["reason"])
+            sys_table.add_row(
+                "Trend (diagnostic)",
+                _trend_regime_text(regime),
+            )
+            sys_table.add_row(
+                "Volatility (diagnostic)",
+                regime["volatility"],
+            )
+            if regime["execution"] == "UNKNOWN" and regime["legacy"]:
+                sys_table.add_row(
+                    "Legacy Regime (diagnostic)",
+                    regime["legacy"],
+                )
 
             if risks:
                 sys_table.add_row("Key Risks", "\n".join(f"• {r}" for r in risks))
@@ -1312,12 +1426,14 @@ class RichFormatter:
             table.add_column("Entry Zone")
             table.add_column("Target")
             table.add_column("Risk Gov")
+            table.add_column("Execution Regime")
 
             for row in rows:
                 verdict = _verdict(row)
                 rating = "ERROR" if row.get("error") else _rating(row)
                 low, high = _entry_bounds(verdict)
                 risk = _risk(row)
+                regime = _regime_display(row)
                 current_price = verdict.get("current_price") or risk.get(
                     "current_price"
                 )
@@ -1330,6 +1446,27 @@ class RichFormatter:
                     f"{_money(low, include_prefix=False)}-{_money(high, include_prefix=False)}",
                     _money(verdict.get("target_price")),
                     self._terminal_risk_governor_line(risk),
+                    regime["execution"],
+                )
+
+            regime_table = Table(
+                show_header=True,
+                header_style="bold",
+                expand=True,
+            )
+            regime_table.add_column("Ticker", style="bold", no_wrap=True)
+            regime_table.add_column("Execution Regime", no_wrap=True)
+            regime_table.add_column("Reason")
+            regime_table.add_column("Trend (diagnostic)")
+            regime_table.add_column("Volatility (diagnostic)")
+            for row in rows:
+                regime = _regime_display(row)
+                regime_table.add_row(
+                    _ticker(row),
+                    regime["execution"],
+                    regime["reason"],
+                    _trend_regime_text(regime),
+                    regime["volatility"],
                 )
 
             duration_text = ""
@@ -1343,7 +1480,12 @@ class RichFormatter:
 
             self.console.print(
                 Panel(
-                    Group(table, footer),
+                    Group(
+                        table,
+                        Rule("REGIME AUTHORITY", style="dim"),
+                        regime_table,
+                        footer,
+                    ),
                     title="DEBATE RESULTS",
                     border_style="cyan",
                     padding=(1, 2),
@@ -1467,6 +1609,11 @@ class MarkdownFormatter:
             news_sentiment, news_adj = _get_news(data)
             sources = _sources(data, packet)
             missing = _missing_fields(data, packet)
+            regime = _regime_display(data)
+            snapshot_id, data_hash = _snapshot_provenance(data)
+            execution = _execution_contract(data)
+            recommendation = execution.get("execution_status") or rating
+            decision_source = execution.get("decision_source") or "legacy"
 
             lines = [
                 "---",
@@ -1481,8 +1628,21 @@ class MarkdownFormatter:
                 "",
                 "| Item | Detail |",
                 "|------|--------|",
-                f"| **Recommendation** | **{rating}** |",
+                f"| **Recommendation** | **{recommendation}** |",
+                f"| **Model Opinion** | {rating} |",
+                f"| **Decision Source** | {decision_source} |",
                 f"| **Trade Setup Conviction** | {confidence_text} |",
+                f"| **Execution Regime** | {regime['execution']} |",
+                f"| **Execution Regime Reason** | {regime['reason']} |",
+                f"| **Trend Regime (diagnostic)** | {_trend_regime_text(regime)} |",
+                f"| **Volatility Regime (diagnostic)** | {regime['volatility']} |",
+                *(
+                    [
+                        f"| **Legacy Regime (diagnostic)** | {regime['legacy']} |"
+                    ]
+                    if regime["execution"] == "UNKNOWN" and regime["legacy"]
+                    else []
+                ),
                 f"| **Current Price** | {_money(current_price)} |",
                 *(
                     []
@@ -1590,6 +1750,8 @@ class MarkdownFormatter:
                     f"| **Available Data** | {', '.join(sources) if sources else 'None'} |",
                     f"| **Missing Fields** | {', '.join(missing) if missing else 'None'} |",
                     f"| **Data Quality Warnings** | {'; '.join(quality_lines) if quality_lines else 'None'} |",
+                    f"| **Market Snapshot ID** | {snapshot_id} |",
+                    f"| **Market Snapshot Data Hash** | {data_hash} |",
                     "",
                     "---",
                     "",
@@ -1636,15 +1798,29 @@ class MarkdownFormatter:
             grouped = {"BUY": [], "HOLD": [], "AVOID": []}
             for row in rows:
                 grouped.setdefault(_rating(row), []).append(row)
+            execution_grouped: dict[str, list[dict[str, Any]]] = {}
+            for row in rows:
+                status = str(
+                    _execution_contract(row).get("execution_status")
+                    or "UNCLASSIFIED"
+                ).upper()
+                execution_grouped.setdefault(status, []).append(row)
             deployable = [
                 row
-                for row in grouped.get("BUY", [])
-                if _risk(row).get("status") == "deployable"
+                for row in rows
+                if str(
+                    _execution_contract(row).get("execution_status") or ""
+                ).upper()
+                == "EXECUTABLE_BUY"
+                and _execution_contract(row).get("actionable") is True
             ]
             waiting = [
                 row
-                for row in grouped.get("BUY", [])
-                if _risk(row).get("status") == "wait_for_pullback"
+                for row in rows
+                if str(
+                    _execution_contract(row).get("execution_status") or ""
+                ).upper()
+                == "WAITLIST"
             ]
             lines = [
                 "---",
@@ -1660,6 +1836,32 @@ class MarkdownFormatter:
                 self._rating_summary_row("BUY", grouped.get("BUY", [])),
                 self._rating_summary_row("HOLD", grouped.get("HOLD", [])),
                 self._rating_summary_row("AVOID", grouped.get("AVOID", [])),
+                *[
+                    self._rating_summary_row(label, grouped[label])
+                    for label in sorted(grouped)
+                    if label not in ("BUY", "HOLD", "AVOID")
+                ],
+                "",
+                "## Canonical Execution Decisions",
+                "",
+                "| Execution Status | Count | Stocks |",
+                "|------------------|-------|--------|",
+                *[
+                    self._execution_summary_row(label, status_rows)
+                    for label, status_rows in sorted(execution_grouped.items())
+                ],
+                "",
+                "## Execution Regime Authority",
+                "",
+                "| Stock | Execution Regime | Reason | Trend (diagnostic) | Volatility (diagnostic) |",
+                "|-------|------------------|--------|--------------------|-------------------------|",
+                *[self._regime_summary_row(row) for row in rows],
+                "",
+                "## Market Snapshot Provenance",
+                "",
+                "| Stock | Snapshot ID | Data Hash |",
+                "|-------|-------------|-----------|",
+                *[self._snapshot_summary_row(row) for row in rows],
                 "",
                 "## Executable Stocks",
                 "",
@@ -1724,6 +1926,25 @@ class MarkdownFormatter:
     def _rating_summary_row(self, label: str, rows: list[dict[str, Any]]) -> str:
         tickers = ", ".join(_ticker(row) for row in rows) if rows else "-"
         return f"| {label} | {len(rows)} | {tickers} |"
+
+    def _execution_summary_row(
+        self,
+        label: str,
+        rows: list[dict[str, Any]],
+    ) -> str:
+        tickers = ", ".join(_ticker(row) for row in rows) if rows else "-"
+        return f"| {label} | {len(rows)} | {tickers} |"
+
+    def _regime_summary_row(self, result: dict[str, Any]) -> str:
+        regime = _regime_display(result)
+        return (
+            f"| {_ticker(result)} | {regime['execution']} | {regime['reason']} | "
+            f"{_trend_regime_text(regime)} | {regime['volatility']} |"
+        )
+
+    def _snapshot_summary_row(self, result: dict[str, Any]) -> str:
+        snapshot_id, data_hash = _snapshot_provenance(result)
+        return f"| {_ticker(result)} | {snapshot_id} | {data_hash} |"
 
     def _deployable_summary(self, result: dict[str, Any]) -> list[str]:
         verdict = _verdict(result)

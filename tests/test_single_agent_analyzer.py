@@ -304,3 +304,19 @@ async def test_analyze_verdict_model_used_reflects_configured_provider(
 
     assert result.verdict is not None
     assert result.verdict.model_used == "codex-flash"
+
+
+def test_parse_response_preserves_missing_fair_value_as_none() -> None:
+    analyzer = SingleAgentAnalyzer()
+
+    result = analyzer._parse_response(
+        _valid_response(),
+        "BBCA",
+        _context(),
+        fair_value=None,
+        run_id="run-missing-fv",
+        duration=0.1,
+    )
+
+    assert result.verdict is not None
+    assert result.verdict.fair_value is None

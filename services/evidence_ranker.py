@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from core.settings import settings
 from services.context_pack_builder import ContextPack, build_context_pack
+from utils.ticker import normalize_idx_ticker, resolve_within_root
 
 
 STALE_THRESHOLD_SECONDS = 86_400
@@ -749,7 +750,12 @@ def _clamp_score(score: float) -> float:
 
 
 def _load_debate_payload(ticker: str) -> dict[str, Any]:
-    path = settings.debates_dir / ticker.upper() / "latest_debate.json"
+    ticker = normalize_idx_ticker(ticker)
+    path = resolve_within_root(
+        settings.debates_dir,
+        ticker,
+        "latest_debate.json",
+    )
     if not path.exists():
         raise FileNotFoundError(f"No latest_debate.json found at {path}")
     return json.loads(path.read_text(encoding="utf-8"))
@@ -830,7 +836,8 @@ def main() -> None:
     args = parser.parse_args()
 
     payload = _load_debate_payload(args.ticker)
-    pack = _build_dummy_pack_from_debate(args.ticker.upper(), payload)
+    ticker = normalize_idx_ticker(args.ticker)
+    pack = _build_dummy_pack_from_debate(ticker, payload)
     run_id = str(payload.get("metadata", {}).get("run_id") or "manual-cli")
     bundle = DEFAULT_RANKER.build_bundle(pack, run_id=run_id)
     print(DEFAULT_RANKER.bundle_to_prompt_string(bundle))

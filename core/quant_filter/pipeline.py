@@ -4,7 +4,7 @@ import json
 import logging
 import os
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
@@ -14,6 +14,7 @@ from core.fundamental_factors import (
     calculate_ocf_price_ratio,
     calculate_profitability_score,
 )
+from core.execution_regime import EXECUTION_REGIMES
 from core.quant_filter.config import (
     FINANCIAL_SECTORS,
     FREE_FLOAT_ESTIMATES,
@@ -36,6 +37,17 @@ from utils.exdate_scanner import (
     scan_exdate,
 )
 from utils.logger_config import logger
+from utils.market_snapshot import (
+    SNAPSHOT_AUTO_ADJUST,
+    SNAPSHOT_INTERVAL,
+    MarketSnapshot,
+    build_market_snapshots,
+    candidate_snapshot_provenance,
+    persist_market_snapshots,
+    resample_daily_to_weekly,
+    snapshot_window,
+    snapshots_to_multiindex,
+)
 from utils.trade_math import is_lq45_ticker
 from utils.dynamic_atr import calculate_dynamic_atr
 from utils.technicals import (
@@ -46,6 +58,7 @@ from utils.technicals import (
     compute_rsi,
     snap_to_tick,
 )
+from utils.ticker import InvalidIDXTicker, normalize_idx_ticker, to_yfinance_symbol
 
 try:
     from utils.xlsx_adapter import XlsxDataAdapter
@@ -59,6 +72,42 @@ def _get_yfinance():
     import yfinance as yf
 
     return yf
+
+
+def _normalize_workbook_tickers(
+    frame: pd.DataFrame,
+    *,
+    sheet_name: str,
+) -> pd.DataFrame:
+    """Reject unsafe workbook ticker rows before merge/provider/filesystem use."""
+    if "Ticker" not in frame.columns:
+        raise ValueError(f"Sheet {sheet_name!r} is missing required Ticker column.")
+
+    normalized_values: list[str | None] = []
+    for row_index, raw in frame["Ticker"].items():
+        try:
+            normalized_values.append(normalize_idx_ticker(raw))
+        except InvalidIDXTicker as exc:
+            logger.warning(
+                "[TickerValidation] sheet={} row={} reason_code=invalid_idx_ticker: {}",
+                sheet_name,
+                row_index,
+                exc,
+            )
+            normalized_values.append(None)
+
+    cleaned = frame.copy()
+    cleaned["Ticker"] = normalized_values
+    cleaned = cleaned[cleaned["Ticker"].notna()].copy()
+    duplicate_count = int(cleaned["Ticker"].duplicated(keep="first").sum())
+    if duplicate_count:
+        logger.warning(
+            "[TickerValidation] sheet={} reason_code=duplicate_idx_ticker count={}",
+            sheet_name,
+            duplicate_count,
+        )
+        cleaned = cleaned.drop_duplicates(subset=["Ticker"], keep="first")
+    return cleaned
 
 
 def _row_float(row: pd.Series | dict, *keys: str, default: float = 0.0) -> float:
@@ -616,8 +665,18 @@ def download_yf_with_retry(
     retries: int,
     delay: int,
     logger: logging.Logger,
+    *,
+    as_of: date | None = None,
+    lookback_calendar_days: int = 630,
+    min_complete_bars: int = 400,
+    snapshot_sink: dict[str, MarketSnapshot] | None = None,
 ) -> pd.DataFrame:
-    """Download yfinance OHLCV dengan retry + paksa MultiIndex untuk single ticker."""
+    """Download and canonicalize one explicit daily snapshot per ticker."""
+    _ = period  # compatibility only; provider calls use explicit dates below
+    requested_start, requested_end = snapshot_window(
+        as_of,
+        lookback_calendar_days=lookback_calendar_days,
+    )
     for attempt in range(1, retries + 1):
         try:
             logger.info(
@@ -625,10 +684,12 @@ def download_yf_with_retry(
             )
             data = _get_yfinance().download(
                 tickers,
-                period=period,
+                start=requested_start.isoformat(),
+                end=(requested_end + timedelta(days=1)).isoformat(),
+                interval=SNAPSHOT_INTERVAL,
                 group_by="ticker",
                 progress=False,
-                auto_adjust=True,
+                auto_adjust=SNAPSHOT_AUTO_ADJUST,
                 timeout=30,
             )
             if data.empty:
@@ -639,7 +700,24 @@ def download_yf_with_retry(
                 logger.warning("Flat columns dari yfinance — paksa MultiIndex wrapper")
                 data = pd.concat({tickers[0]: data}, axis=1)
 
-            logger.info(f"Download berhasil. Shape: {data.shape}")
+            snapshots = build_market_snapshots(
+                data,
+                tickers,
+                requested_start=requested_start,
+                requested_end=requested_end,
+                min_complete_bars=min_complete_bars,
+            )
+            if snapshot_sink is not None:
+                snapshot_sink.clear()
+                snapshot_sink.update(snapshots)
+            data = snapshots_to_multiindex(snapshots, ready_only=False)
+            if data.empty:
+                raise ValueError("yfinance tidak menghasilkan complete OHLCV bars.")
+            ready_count = sum(snapshot.is_ready for snapshot in snapshots.values())
+            logger.info(
+                f"Download berhasil. Shape: {data.shape}; "
+                f"snapshot_ready={ready_count}/{len(snapshots)}"
+            )
             return data
 
         except Exception as exc:
@@ -1063,14 +1141,23 @@ def _analyze_ticker(
 
     # ── P3.4: 52-Week Range Signal ────────────────────────────────────────────
     range_52w_signal: str | None = None
-    if weekly_df is not None and len(weekly_df) >= 4:
+    if weekly_df is None:
+        range_52w_status = "no_weekly_data"
+    elif len(weekly_df) < 4:
+        range_52w_status = "insufficient_weekly_bars"
+    else:
         try:
             recent_52w = weekly_df.tail(52)
             high_52w = float(recent_52w["High"].max())
             low_52w = float(recent_52w["Low"].min())
             range_52w_signal = compute_52w_range_signal(current_px, high_52w, low_52w)
-        except Exception:
-            pass
+            range_52w_status = "ok"
+        except Exception as exc:
+            range_52w_status = "calculation_failed"
+            logger.warning(
+                f"[52W] {t}: range signal calculation failed "
+                f"exception_type={type(exc).__name__}: {exc}"
+            )
 
     # ── Quality Flags dari xlsx ───────────────────────────────────────────────
     # Catatan: piotroski sudah didefinisikan di atas (blok Piotroski adjustment)
@@ -1135,6 +1222,7 @@ def _analyze_ticker(
         "weekly_above_ma13": weekly_trend_data["weekly_above_ma13"],
         # P3.4
         "range_52w_signal": range_52w_signal,
+        "range_52w_status": range_52w_status,
         # Task 21
         "is_lq45": is_lq45_ticker(t),
     }
@@ -1336,9 +1424,24 @@ def _safe_analyze_price_candidate(
     regime: str = "NORMAL",
     weekly_data: "pd.DataFrame | None" = None,
     gate_counters: "dict[str, int] | None" = None,
+    market_snapshot: MarketSnapshot | None = None,
+    snapshot_artifact_path: str | None = None,
 ) -> dict | None:
     ticker = str(row["Ticker"])
     t_yf = f"{ticker}.JK"
+
+    if market_snapshot is not None and not market_snapshot.is_ready:
+        _record_price_failure(
+            failures,
+            ticker,
+            stage="price_bars",
+            reason=(
+                f"snapshot {market_snapshot.status}: "
+                + ",".join(market_snapshot.reason_codes)
+            ),
+            logger=logger,
+        )
+        return None
 
     try:
         available_tickers = set(data.columns.get_level_values(0))
@@ -1423,7 +1526,7 @@ def _safe_analyze_price_candidate(
             weekly_df_t = None
 
     try:
-        return _analyze_ticker(
+        result = _analyze_ticker(
             row,
             df_t,
             cfg,
@@ -1434,6 +1537,14 @@ def _safe_analyze_price_candidate(
             weekly_df=weekly_df_t,
             gate_counters=gate_counters,
         )
+        if result is not None and market_snapshot is not None:
+            result.update(
+                candidate_snapshot_provenance(
+                    market_snapshot,
+                    artifact_path=snapshot_artifact_path,
+                )
+            )
+        return result
     except (KeyError, TypeError, ValueError, IndexError) as exc:
         _record_price_failure(
             failures,
@@ -1493,6 +1604,11 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
     df_prices = pd.read_excel(cfg["input_file"], sheet_name="stock-prices")
     df_anal = pd.read_excel(cfg["input_file"], sheet_name="analysis")
     df_idx = pd.read_excel(cfg["input_file"], sheet_name="idx-stocks")
+
+    df_ks = _normalize_workbook_tickers(df_ks, sheet_name="key-statistics")
+    df_prices = _normalize_workbook_tickers(df_prices, sheet_name="stock-prices")
+    df_anal = _normalize_workbook_tickers(df_anal, sheet_name="analysis")
+    df_idx = _normalize_workbook_tickers(df_idx, sheet_name="idx-stocks")
 
     # Merge semua sheet
     df = (
@@ -1682,27 +1798,42 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
     filtered["Prof_Score"] = filtered.apply(lambda r: _compute_prof_score(r, cfg), axis=1)
 
     # ── 6. DYNAMIC TECHNICALS VIA YFINANCE ───────────────────────────────────
-    valid_tickers = filtered["Ticker"].tolist()
-    tickers_yf = [t + ".JK" for t in valid_tickers]
+    valid_tickers = [normalize_idx_ticker(t) for t in filtered["Ticker"].tolist()]
+    tickers_yf = [to_yfinance_symbol(t) for t in valid_tickers]
 
+    market_snapshots: dict[str, MarketSnapshot] = {}
     data = download_yf_with_retry(
         tickers_yf,
         period=cfg["yf_period"],
         retries=cfg["yf_retries"],
         delay=cfg["yf_retry_delay"],
         logger=logger,
+        lookback_calendar_days=int(cfg.get("yf_lookback_calendar_days", 630)),
+        min_complete_bars=int(cfg.get("snapshot_min_complete_bars", 400)),
+        snapshot_sink=market_snapshots,
     )
+    snapshot_output_root = Path(cfg["output_dir"])
+    snapshot_paths_on_disk = persist_market_snapshots(
+        market_snapshots,
+        snapshot_output_root / "market_snapshots",
+    )
+    snapshot_paths = {
+        ticker: path.relative_to(snapshot_output_root).as_posix()
+        for ticker, path in snapshot_paths_on_disk.items()
+    }
 
-    # ── Task 2: Batch weekly download (one call for all tickers) ──────────────
+    # ── Task 2: Derive weekly bars from the exact persisted daily snapshot ───
     weekly_data_batch: pd.DataFrame | None = None
     try:
-        _raw_weekly = _get_yfinance().download(
-            tickers_yf,
-            period="2y",
-            interval="1wk",
-            auto_adjust=True,
-            progress=False,
-            group_by="ticker",
+        _weekly_frames = {
+            f"{snapshot.ticker}.JK": resample_daily_to_weekly(snapshot.history)
+            for snapshot in market_snapshots.values()
+            if not snapshot.history.empty
+        }
+        _raw_weekly = (
+            pd.concat(_weekly_frames, axis=1)
+            if _weekly_frames
+            else pd.DataFrame()
         )
         # yfinance returns flat columns (not MultiIndex) for single-ticker downloads.
         # Without this guard, weekly_data[t_yf] extraction below fails silently and
@@ -1712,9 +1843,12 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
             _raw_weekly = pd.concat({tickers_yf[0]: _raw_weekly}, axis=1)
         weekly_data_batch = None if _raw_weekly.empty else _raw_weekly
         if weekly_data_batch is not None:
-            logger.info(f"[Weekly] Batch weekly data fetched for {len(tickers_yf)} tickers")
+            logger.info(
+                f"[Weekly] Batch weekly data built from daily snapshots "
+                f"for {len(tickers_yf)} tickers"
+            )
     except Exception as _e:
-        logger.warning(f"[Weekly] Batch weekly download failed, skipping: {_e}")
+        logger.warning(f"[Weekly] Daily-to-weekly resample failed, skipping: {_e}")
 
     ihsg_close = None
     ihsg_return_1m: float = 0.0
@@ -1757,8 +1891,27 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         ihsg_return_1m = 0.0
 
     # ── Regime — self-computed so the screener works standalone (no orchestrator) ──
-    regime: str = str(cfg.get("regime") or "").upper()
-    if not regime:
+    raw_execution_regime = str(cfg.get("execution_regime") or "").upper()
+    external_execution_regime = bool(raw_execution_regime)
+    execution_regime = (
+        raw_execution_regime
+        if raw_execution_regime in EXECUTION_REGIMES
+        else ("UNKNOWN" if raw_execution_regime else "")
+    )
+    if raw_execution_regime and execution_regime == "UNKNOWN":
+        logger.warning(
+            "[Regime] Invalid external execution regime {}; fail closed to UNKNOWN.",
+            raw_execution_regime,
+        )
+    scoring_regime_profile: str = str(cfg.get("regime") or "").upper()
+    if external_execution_regime:
+        scoring_regime_profile = {
+            "DEFENSIVE": "DEFENSIVE",
+            "SIDEWAYS": "HIGH",
+            "BULL": "NORMAL",
+            "UNKNOWN": "DEFENSIVE",
+        }.get(execution_regime, "DEFENSIVE")
+    if not scoring_regime_profile:
         try:
             if ihsg_close is None or ihsg_close.empty:
                 raise ValueError("IHSG close series tidak tersedia untuk regime.")
@@ -1770,19 +1923,45 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
                 defensive_weekly_drop_threshold=settings.REGIME_DEFENSIVE_WEEKLY_DROP_THRESHOLD,
                 recovery_weekly_threshold=settings.REGIME_HIGH_RECOVERY_WEEKLY_THRESHOLD,
             )
-            regime = regime_snapshot.regime
+            scoring_regime_profile = regime_snapshot.regime
             logger.info(
-                f"[Regime] Screener self-computed regime: {regime} "
+                "[Regime] Screener self-computed scoring profile: "
+                f"{scoring_regime_profile} "
                 f"(reasons={','.join(regime_snapshot.reasons) or '-'})"
             )
         except (ValueError, KeyError, IndexError) as e:
             logger.warning(f"Gagal hitung regime, fallback NORMAL: {e}")
-            regime = "NORMAL"
+            scoring_regime_profile = "NORMAL"
+
+    if not execution_regime:
+        execution_regime = {
+            "DEFENSIVE": "DEFENSIVE",
+            "HIGH": "SIDEWAYS",
+            "RECOVERY": "SIDEWAYS",
+            "NORMAL": "SIDEWAYS",
+            "LOW": "SIDEWAYS",
+        }.get(scoring_regime_profile, "UNKNOWN")
+
+    execution_regime_reason = str(
+        cfg.get("execution_regime_reason")
+        or (
+            "standalone_rule_based_caution"
+            if not external_execution_regime
+            else "unspecified"
+        )
+    )
+    logger.info(
+        "[Regime] Screener authority execution={} scoring_profile={} reason={}",
+        execution_regime,
+        scoring_regime_profile,
+        execution_regime_reason,
+    )
 
     gate_counters: dict[str, int] = {}
     results = []
     price_failures: list[dict[str, str]] = []
     for _, row in filtered.iterrows():
+        snapshot_ticker = str(row["Ticker"]).strip().upper().removesuffix(".JK")
         result = _safe_analyze_price_candidate(
             row=row,
             data=data,
@@ -1790,11 +1969,13 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
             logger=logger,
             ihsg_close=ihsg_close,
             ihsg_return_1m=ihsg_return_1m,
-            regime=regime,
+            regime=scoring_regime_profile,
             adapter=adapter,
             failures=price_failures,
             weekly_data=weekly_data_batch,
             gate_counters=gate_counters,
+            market_snapshot=market_snapshots.get(snapshot_ticker),
+            snapshot_artifact_path=snapshot_paths.get(snapshot_ticker),
         )
         if result:
             results.append(result)
@@ -1804,9 +1985,9 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
     # ── 7. FINALIZE & OUTPUT ──────────────────────────────────────────────────
     final_df = pd.DataFrame(results)
 
-    if regime == "DEFENSIVE":
+    if scoring_regime_profile == "DEFENSIVE":
         score_floor = cfg.get("score_floor_defensive_regime", 45)
-    elif regime == "HIGH":
+    elif scoring_regime_profile == "HIGH":
         score_floor = cfg.get("score_floor_high_regime", 35)
     else:
         score_floor = cfg.get("score_floor_normal_regime", 35)
@@ -1821,6 +2002,13 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         # Always stamp staleness metadata so JSON schema is consistent across runs.
         final_df["xlsx_staleness"] = _staleness["xlsx_staleness"]
         final_df["xlsx_staleness_note"] = _staleness["xlsx_staleness_note"]
+        final_df["execution_regime"] = execution_regime
+        final_df["execution_regime_reason"] = execution_regime_reason
+        final_df["trend_regime"] = str(cfg.get("trend_regime") or "UNKNOWN")
+        final_df["volatility_regime"] = str(
+            cfg.get("volatility_regime") or "UNKNOWN"
+        ).upper()
+        final_df["scoring_regime_profile"] = scoring_regime_profile
 
         # DEGRADED staleness: kurangi composite score 10 poin sebelum ranking
         if _staleness["xlsx_staleness"] == "DEGRADED":
@@ -1835,7 +2023,8 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         if len(final_df) < before_floor:
             logger.info(
                 f"[ScoreFloor] {before_floor - len(final_df)} kandidat dibuang "
-                f"(Composite Score < {score_floor} untuk regime {regime})."
+                "(Composite Score < "
+                f"{score_floor} untuk scoring profile {scoring_regime_profile})."
             )
         _n_after_floor = len(final_df)
         final_df = final_df.sort_values("Composite Score", ascending=False).head(
@@ -1854,7 +2043,8 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
         )
     print(
         f"\n{_sep}\n"
-        f"  Filter Funnel  [{regime} regime]\n"
+        "  Filter Funnel  "
+        f"[execution={execution_regime}; scoring={scoring_regime_profile}]\n"
         f"{_sep}\n"
         f"  Universe (XLSX)            : {_n_universe:>4}\n"
         f"  Setelah exclude PEMANTAUAN : {_n_after_pemantauan:>4}\n"
@@ -1880,7 +2070,7 @@ def run_pipeline(cfg: dict) -> pd.DataFrame:
     if not _pre_floor_sorted.empty:
         wl_path = os.path.join(cfg["output_dir"], "watchlist_candidates.json")
         wl_export = _pre_floor_sorted.drop(columns=["_exdate_info"], errors="ignore").copy()
-        wl_export["regime"] = regime
+        wl_export["scoring_regime_profile"] = scoring_regime_profile
         wl_export["score_floor"] = score_floor
         wl_export.to_json(wl_path, orient="records", indent=2, force_ascii=False)
         logger.info(f"Watchlist JSON diekspor -> {wl_path}")

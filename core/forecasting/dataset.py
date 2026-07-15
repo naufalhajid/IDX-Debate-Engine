@@ -6,13 +6,15 @@ import io
 import logging
 import warnings
 from datetime import date, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Mapping
 
 import numpy as np
 import pandas as pd
 
+from utils.ticker import normalize_idx_ticker, normalize_idx_tickers, to_yfinance_symbol
+
 if TYPE_CHECKING:
-    pass
+    from utils.market_snapshot import MarketSnapshot
 
 _YF_TIMEOUT_S: int = 15
 _MIN_BARS: int = 60
@@ -33,9 +35,7 @@ def _download_ohlcv(
     end: date,
 ) -> pd.DataFrame:
     """Download full OHLCV from yfinance with .JK suffix for IDX tickers."""
-    symbol = ticker.upper()
-    if not symbol.endswith(".JK"):
-        symbol = f"{symbol}.JK"
+    symbol = to_yfinance_symbol(ticker)
 
     yf_log = logging.getLogger("yfinance")
     prev_disabled = yf_log.disabled
@@ -91,14 +91,35 @@ class DatasetBuilder:
         start: date,
         end: date,
         horizons: tuple[int, ...] = (5, 10, 20),
+        snapshots: Mapping[str, "MarketSnapshot"] | None = None,
     ) -> pd.DataFrame:
+        normalized_tickers = normalize_idx_tickers(tickers)
+        normalized_snapshots: dict[str, MarketSnapshot] = {}
+        if snapshots:
+            for key, snapshot in snapshots.items():
+                normalized_key = normalize_idx_ticker(key)
+                normalized_snapshot_ticker = normalize_idx_ticker(snapshot.ticker)
+                if normalized_key != normalized_snapshot_ticker:
+                    raise ValueError(
+                        "Forecast snapshot mapping key does not match snapshot ticker."
+                    )
+                normalized_snapshots[normalized_key] = snapshot
+
         # Download IHSG once for the full window — shared across all tickers
         ihsg_regimes = _compute_ihsg_regimes(start, end)
 
         frames: list[pd.DataFrame] = []
-        for ticker in tickers:
+        for ticker in normalized_tickers:
             try:
-                df = self._build_ticker(ticker, start, end, horizons, ihsg_regimes)
+                snapshot = normalized_snapshots.get(ticker)
+                df = self._build_ticker(
+                    ticker,
+                    start,
+                    end,
+                    horizons,
+                    ihsg_regimes,
+                    snapshot=snapshot,
+                )
                 if df is not None and len(df) >= _MIN_BARS:
                     frames.append(df)
             except Exception:
@@ -116,8 +137,15 @@ class DatasetBuilder:
         end: date,
         horizons: tuple[int, ...],
         ihsg_regimes: pd.DataFrame | None = None,
+        snapshot: "MarketSnapshot | None" = None,
     ) -> pd.DataFrame | None:
-        raw = _download_ohlcv(ticker, start - timedelta(days=100), end)
+        if snapshot is not None:
+            raw = snapshot.history_copy()
+            raw.columns = [str(column).lower() for column in raw.columns]
+            raw.index = pd.to_datetime(raw.index)
+            raw = raw.sort_index()
+        else:
+            raw = _download_ohlcv(ticker, start - timedelta(days=100), end)
         if raw.empty or len(raw) < _MIN_BARS:
             return None
 

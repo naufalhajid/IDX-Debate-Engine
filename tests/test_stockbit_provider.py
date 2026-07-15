@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from unittest.mock import MagicMock
+
+import pytest
 
 from providers import stockbit as stockbit_module
 from providers.stockbit import StockBit
 from schemas.stock import Stock
+from utils.ticker import InvalidIDXTicker
 
 
 def _provider(stocks: list[Stock]) -> StockBit:
@@ -133,3 +137,53 @@ def test_ticker_does_not_eagerly_str_the_stock() -> None:
 
 def test_ticker_falls_back_to_str_for_plain_strings() -> None:
     assert StockBit._ticker("BBCA") == "BBCA"
+
+
+@pytest.mark.parametrize(
+    "operation",
+    [
+        lambda provider, stock: provider.key_statistic_by_stock(stock),
+        lambda provider, stock: provider.stock_price_by_stock(stock),
+        lambda provider, stock: provider.stream_pinned_by_stock(stock),
+        lambda provider, stock: provider.stream_by_stock(stock.ticker),
+    ],
+)
+def test_url_methods_reject_invalid_ticker_before_client_call(operation) -> None:
+    provider = _provider([])
+    provider.stockbit_api_client = MagicMock()
+    stock = Stock(ticker="../../../login/refresh")
+
+    with pytest.raises(InvalidIDXTicker):
+        operation(provider, stock)
+
+    provider.stockbit_api_client.assert_not_called()
+    assert provider.stockbit_api_client.method_calls == []
+
+
+def test_constructor_normalizes_tickers_before_client_initialization(
+    monkeypatch,
+) -> None:
+    from services import stockbit_api_client as client_module
+
+    fake_client = MagicMock()
+    monkeypatch.setattr(client_module, "StockbitApiClient", lambda: fake_client)
+    stock = Stock(ticker=" bbca.jk ")
+
+    provider = StockBit(stocks=[stock])
+
+    assert provider.stocks[0].ticker == "BBCA"
+
+
+def test_constructor_rejects_invalid_ticker_before_client_initialization(
+    monkeypatch,
+) -> None:
+    from services import stockbit_api_client as client_module
+
+    monkeypatch.setattr(
+        client_module,
+        "StockbitApiClient",
+        lambda: pytest.fail("invalid ticker reached Stockbit client initialization"),
+    )
+
+    with pytest.raises(InvalidIDXTicker):
+        StockBit(stocks=[Stock(ticker="../escape")])

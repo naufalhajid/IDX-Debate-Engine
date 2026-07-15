@@ -522,6 +522,23 @@ def test_signals_to_outcomes_includes_regime_in_notes(tmp_path):
     assert "regime=DEFENSIVE" in (outcomes[0].notes or "")
 
 
+def test_backtester_prefers_canonical_execution_regime_over_legacy_metadata(
+    tmp_path,
+):
+    data = _make_debate_json("BBRI")
+    data["execution_regime"] = "SIDEWAYS"
+    data["regime_context"] = {"execution_regime": "SIDEWAYS"}
+    data["metadata"]["execution_regime"] = "SIDEWAYS"
+    data["metadata"]["regime"] = "DEFENSIVE"
+    _write_debate(tmp_path, "BBRI", "v20260610_161217", data)
+
+    signals = scan_debate_dir(tmp_path)
+    outcomes = signals_to_outcomes(signals, existing_run_ids=set())
+
+    assert len(outcomes) == 1
+    assert "regime=SIDEWAYS" in (outcomes[0].notes or "")
+
+
 def test_signals_to_outcomes_unknown_regime_when_missing(tmp_path):
     _write_debate(tmp_path, "BBRI", "v20260610_161217", _make_debate_json("BBRI"))
     signals = scan_debate_dir(tmp_path)

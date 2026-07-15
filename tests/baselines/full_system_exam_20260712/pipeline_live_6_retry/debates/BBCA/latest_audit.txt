@@ -1,0 +1,49 @@
+╔══════════════════════════════════════════╗
+║  AUDIT REPORT: BBCA — HOLD       ║
+╚══════════════════════════════════════════╝
+
+Summary : BBCA→HOLD: unknown won by unknown (0.40) after 3 round(s). 2 agent(s) dissented. Fair value tidak tersedia — validasi fundamental secara manual sebelum entry.
+Run ID  : 20260712_173441
+Generated: 2026-07-12T10:39:08.143762+00:00
+
+VERDICT
+───────
+Rating     : HOLD (confidence: 40%)
+Method     : unknown
+Winner    : unknown
+Consensus  : no
+Rounds     : 3
+Dissent    : 40% (2 of 5 agents)
+
+AGENT VOTES
+───────────
+  fundamental_scout      UNKNOWN  conf= 0.62 eff= 0.62  ❌
+  chartist               AVOID    conf= 0.70 eff= 0.70  ❌
+  sentiment_specialist   HOLD     conf= 0.72 eff= 0.72  ✅
+  bull                   HOLD     conf= 0.31 eff= 0.31  ✅
+  bear                   AVOID    conf= 0.36 eff= 0.31  ❌
+  devils_advocate        AVOID    conf= 0.40 eff= 0.40  ❌
+
+KEY ARGUMENTS
+─────────────
+Bull  : Position: NEUTRAL
+Debate Confidence: LOW
+
+Bear’s cited breakdown zone is Rp 5,936, but the next technical cushion below that is the 52-week low at Rp 4,850, which gives the chart a deeper structural backstop than the Bear’s near-term failure point implies. That does not make the trade “safe,” but it
+Bear  : Position: BEARISH
+Debate Confidence: LOW
+
+The Bull’s cited support at Rp 5,936 is not a dependable floor for a 5–20 trading-day swing: the technical brief explicitly says BBCA is in a structural downtrend and only a counter-trend bounce, with the price still below the long-term trend filter. That me
+Devil : Position: STRESS_TEST  
+Agent Confidence: 0.39
+
+**Challenge 1 — Macro / company risk**  
+If foreign flow flips back to net selling and BBCA loses the exact support at **Rp 5,936**, could that break the counter-trend bounce and trigger stops toward **Rp 5,436** within 5–20 trading days?
+
+**Challenge 
+
+DATA QUALITY
+────────────
+Freshness OK : False
+Stale sources: sentiment
+Missing      : none

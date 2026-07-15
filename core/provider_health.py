@@ -8,6 +8,7 @@ import sys
 from pydantic import BaseModel, ConfigDict
 
 from core.failure_taxonomy import FailureRecord, classify_exception
+from utils.ticker import normalize_idx_ticker, normalize_idx_tickers
 
 
 DEFAULT_TICKER = "BBCA"
@@ -44,8 +45,11 @@ def _get_stockbit_api_client_class():
 
 async def check_all_providers(tickers: list[str]) -> ProviderHealthReport:
     """Check Stockbit and yfinance without raising exceptions to callers."""
+    normalized_tickers = normalize_idx_tickers(
+        tickers or [DEFAULT_TICKER],
+    )
     stockbit_status, yfinance_status = await asyncio.gather(
-        _check_stockbit(tickers),
+        _check_stockbit(normalized_tickers),
         _check_yfinance(),
     )
 
@@ -97,11 +101,7 @@ def _ping_yfinance() -> None:
 
 
 def _select_stockbit_ticker(tickers: list[str]) -> str:
-    for ticker in tickers:
-        normalized = str(ticker or "").strip().upper()
-        if normalized:
-            return normalized.removesuffix(".JK")
-    return DEFAULT_TICKER
+    return normalize_idx_ticker(tickers[0] if tickers else DEFAULT_TICKER)
 
 
 def _format_failure(failure: FailureRecord) -> str:

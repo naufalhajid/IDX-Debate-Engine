@@ -117,3 +117,12 @@ def test_fetch_broker_summary_empty_response_returns_empty() -> None:
 def test_normalize_ticker_strips_jk_suffix() -> None:
     assert _normalize_ticker(" dssa.jk ") == "DSSA"
     assert _normalize_ticker(None) == ""
+
+
+def test_fetch_broker_summary_rejects_invalid_ticker_before_client_call() -> None:
+    client = MagicMock()
+
+    snap = fetch_broker_summary("../escape", client)
+
+    assert snap == _empty("")
+    client.get.assert_not_called()

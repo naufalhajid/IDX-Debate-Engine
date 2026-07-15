@@ -1,0 +1,51 @@
+╔══════════════════════════════════════════╗
+║  AUDIT REPORT: ERAA — HOLD       ║
+╚══════════════════════════════════════════╝
+
+Summary : ERAA→HOLD: fundamental_scout won by voting (0.40) after 1 round(s). 1 agent(s) dissented.
+Run ID  : 20260712_173441
+Generated: 2026-07-12T10:39:08.242137+00:00
+
+VERDICT
+───────
+Rating     : HOLD (confidence: 40%)
+Method     : voting
+Winner    : fundamental_scout
+Consensus  : yes
+Rounds     : 1
+Dissent    : 20% (1 of 5 agents)
+
+AGENT VOTES
+───────────
+  fundamental_scout      HOLD     conf= 0.78 eff= 0.78  ✅
+  chartist               HOLD     conf= 0.72 eff= 0.72  ✅
+  sentiment_specialist   HOLD     conf= 0.61 eff= 0.61  ✅
+  bull                   HOLD     conf= 0.44 eff= 0.44  ✅
+  bear                   AVOID    conf= 0.42 eff= 0.36  ❌
+  devils_advocate        AVOID    conf= 0.40 eff= 0.40  ❌
+
+KEY ARGUMENTS
+─────────────
+Bull  : Position: NEUTRAL  
+Debate Confidence: LOW
+
+Data audit first: the brief does include one fundamental citation with an actual number, P/E implied via fair value data is available only indirectly as Current Price 340 vs Fair Value Base 1292, one technical citation with actual numbers is available (pri
+Bear  : Position: BEARISH
+Debate Confidence: LOW
+
+The data audit is incomplete for a 5–20 trading-day swing. I do have one fundamental risk metric with an actual number: current price Rp 340 versus fair value base Rp 1,292, implying a very large discount or, more precisely, a valuation gap of about 280%. I 
+Devil : Position: STRESS_TEST  
+Agent Confidence: 0.48
+
+1) If foreign funds keep selling into a counter-trend bounce and price loses the cited support at Rp 339, won’t the below-MA200 setup snap back toward the Rp 311 stop within days?
+
+2) Entry price used: Rp 343.5 midpoint
+
+Cost components:
+- Buy commissi
+
+DATA QUALITY
+────────────
+Freshness OK : False
+Stale sources: sentiment
+Missing      : none

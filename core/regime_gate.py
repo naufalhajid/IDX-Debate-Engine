@@ -3,8 +3,9 @@ core/regime_gate.py — LangGraph node: IDX regime detection gate
 
 Runs before the scout fan-out in the debate pipeline.  Detects the current
 IHSG market regime via IDXRegimeDetector (HMM) and writes:
-    regime         — RegimeState fields as plain dict (LangGraph-serializable)
-    trading_params — REGIME_RULES[label] dict (position limits, R/R thresholds)
+    hmm_regime       — HMM diagnostic only
+    regime_context   — canonical execution authority and provenance
+    trading_params   — policy derived only from execution_regime
     should_trade   — False when trading_allowed=False or max_concurrent=0
 
 Routing (regime_gate_router):
@@ -21,6 +22,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 from core.idx_market_params import REGIME_RULES
+from core.execution_regime import resolve_execution_regime
 from core.regime_hmm import IDXRegimeDetector
 from schemas.debate import DebateChamberState
 
@@ -51,7 +53,7 @@ def _get_detector() -> IDXRegimeDetector:
     return _detector
 
 
-async def regime_gate_node(state: "DebateChamberState") -> dict:
+async def detect_hmm_regime() -> dict:
     """
     Async LangGraph node: fetch IHSG prices and detect current regime.
 
@@ -148,32 +150,21 @@ async def regime_gate_node(state: "DebateChamberState") -> dict:
         regime_state = await _loop.run_in_executor(
             None, lambda: detector.predict(prices, usd_idr=_usd)
         )
-        rules = detector.get_trading_rules(regime_state)
-        should_trade = (
-            rules.get("trading_allowed", False)
-            and rules.get("max_concurrent_positions", 0) > 0
-        )
-
         logger.info(
-            "[RegimeGate] %s | confidence=%.1f%% | msci_override=%s | trade=%s",
+            "[RegimeGate] HMM %s | confidence=%.1f%% | msci_override=%s",
             regime_state.label,
             regime_state.confidence * 100,
             regime_state.msci_override,
-            should_trade,
         )
 
         return {
-            "regime": {
-                "label": regime_state.label,
-                "confidence": regime_state.confidence,
-                "probabilities": regime_state.probabilities,
-                "msci_override": regime_state.msci_override,
-                "training_days": regime_state.training_days,
-                "detected_at": regime_state.detected_at,
-                "notes": regime_state.notes,
-            },
-            "trading_params": dict(rules),
-            "should_trade": should_trade,
+            "label": regime_state.label,
+            "confidence": regime_state.confidence,
+            "probabilities": regime_state.probabilities,
+            "msci_override": regime_state.msci_override,
+            "training_days": regime_state.training_days,
+            "detected_at": regime_state.detected_at,
+            "notes": regime_state.notes,
         }
 
     except Exception as exc:
@@ -182,18 +173,72 @@ async def regime_gate_node(state: "DebateChamberState") -> dict:
             exc,
         )
         return {
-            "regime": {
-                "label": "UNKNOWN",
-                "confidence": 0.0,
-                "probabilities": {},
-                "msci_override": False,
-                "training_days": 0,
-                "detected_at": datetime.now().isoformat(),
-                "notes": f"Detection failed: {exc}",
-            },
-            "trading_params": dict(REGIME_RULES["UNKNOWN"]),
-            "should_trade": False,
+            "label": "UNKNOWN",
+            "confidence": 0.0,
+            "probabilities": {},
+            "msci_override": False,
+            "training_days": 0,
+            "detected_at": datetime.now().isoformat(),
+            "notes": f"Detection failed: {exc}",
         }
+
+
+async def regime_gate_node(state: "DebateChamberState") -> dict:
+    """Resolve HMM and rule-based diagnostics into one execution authority."""
+    precomputed_context = state.get("regime_context")
+    precomputed_hmm = state.get("hmm_regime")
+    if (
+        isinstance(precomputed_context, dict)
+        and precomputed_context.get("execution_regime")
+        and isinstance(precomputed_hmm, dict)
+    ):
+        context = dict(precomputed_context)
+        hmm_state = dict(precomputed_hmm)
+    else:
+        hmm_state = await detect_hmm_regime()
+        metadata = state.get("metadata") or {}
+        rule_snapshot = (
+            metadata.get("rule_regime_snapshot")
+            or metadata.get("market_regime")
+        )
+        if rule_snapshot is None and metadata.get("regime"):
+            rule_snapshot = {
+                "regime": metadata.get("regime"),
+                "volatility_regime": metadata.get("volatility_regime"),
+            }
+        context = resolve_execution_regime(
+            rule_snapshot=rule_snapshot,
+            hmm_state=hmm_state,
+        )
+
+    execution_params = dict(
+        context.get("execution_params") or REGIME_RULES["UNKNOWN"]
+    )
+    should_trade = bool(
+        execution_params.get("trading_allowed", False)
+        and execution_params.get("max_concurrent_positions", 0) > 0
+    )
+    execution_regime = str(
+        context.get("execution_regime") or "UNKNOWN"
+    ).upper()
+    logger.info(
+        "[RegimeGate] execution=%s reason=%s trend=%s volatility=%s trade=%s",
+        execution_regime,
+        context.get("execution_regime_reason"),
+        (context.get("trend_regime") or {}).get("label"),
+        context.get("volatility_regime"),
+        should_trade,
+    )
+    return {
+        "hmm_regime": hmm_state,
+        "regime_context": context,
+        "trend_regime": context.get("trend_regime"),
+        "volatility_regime": context.get("volatility_regime"),
+        "execution_regime": execution_regime,
+        "execution_regime_reason": context.get("execution_regime_reason"),
+        "trading_params": execution_params,
+        "should_trade": should_trade,
+    }
 
 
 def regime_gate_router(state: "DebateChamberState") -> str:
@@ -204,7 +249,7 @@ def regime_gate_router(state: "DebateChamberState") -> str:
     to skip all LLM work and emit a regime-halted HOLD verdict.
     """
     if not state.get("should_trade", False):
-        label = state.get("regime", {}).get("label", "UNKNOWN")
+        label = str(state.get("execution_regime") or "UNKNOWN")
         logger.info("[RegimeGate] Trading halted -- regime=%s", label)
         return "trading_halted"
     return "scout_dispatcher"

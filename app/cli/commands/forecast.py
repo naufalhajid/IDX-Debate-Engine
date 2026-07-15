@@ -7,8 +7,16 @@ from typing import Annotated
 import typer
 
 from app.cli.ui.console import console
+from utils.ticker import InvalidIDXTicker, normalize_idx_ticker, normalize_idx_tickers
 
 app = typer.Typer(help="Forecasting model commands.", no_args_is_help=True)
+
+
+def _ticker_list(value: str) -> list[str]:
+    try:
+        return normalize_idx_tickers(value.split(","))
+    except InvalidIDXTicker as exc:
+        raise typer.BadParameter(str(exc)) from exc
 
 
 def _get_service():
@@ -33,7 +41,7 @@ def build_dataset_command(
     """Build feature dataset and print summary statistics."""
     from core.forecasting.dataset import DatasetBuilder
 
-    ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()]
+    ticker_list = _ticker_list(tickers)
     start_date = date.fromisoformat(start)
     end_date = date.today()
 
@@ -70,7 +78,7 @@ def validate_command(
     from core.forecasting.models.naive import NaiveModel
     from core.forecasting.validation import validate_model, walk_forward_splits
 
-    ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()]
+    ticker_list = _ticker_list(tickers)
     end = date.today()
     start = date(end.year - 2, end.month, end.day)
 
@@ -119,11 +127,15 @@ def predict_command(
     ] = "ensemble",
 ) -> None:
     """Generate a ForecastReport for one ticker."""
+    try:
+        ticker = normalize_idx_ticker(ticker)
+    except InvalidIDXTicker as exc:
+        raise typer.BadParameter(str(exc)) from exc
     service = _get_service()
 
     with console.status(f"[idx.muted]Forecasting {ticker}...[/idx.muted]"):
         report = service.predict(
-            ticker.upper(),
+            ticker,
             as_of=date.today(),
             horizons=(horizon,),
             mode=mode,  # type: ignore[arg-type]

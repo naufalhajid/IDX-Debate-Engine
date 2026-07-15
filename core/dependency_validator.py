@@ -20,10 +20,12 @@ from pathlib import Path
 
 from sqlalchemy import text
 
+from core.execution_regime import EXECUTION_REGIMES
 from core.quant_filter.config import canonical_screener_mode
 from core.settings import settings
 from db import database, db_path
 from utils.logger_config import logger
+from utils.secret_redaction import redact_secrets
 
 
 @dataclass
@@ -156,6 +158,32 @@ def read_candidates_screener_mode(path: Path) -> str:
     return "momentum"
 
 
+def read_candidates_execution_regime(path: Path) -> str:
+    """Return one canonical execution regime shared by every cached candidate.
+
+    Missing, malformed, untagged, or internally mixed artifacts return
+    ``UNKNOWN``. Callers can therefore fail closed and regenerate candidates
+    instead of silently reusing a cache produced under another risk policy.
+    """
+    try:
+        records = json.loads(Path(path).read_text(encoding="utf-8"))
+        if not isinstance(records, list) or not records:
+            return "UNKNOWN"
+        if any(not isinstance(record, dict) for record in records):
+            return "UNKNOWN"
+        labels = {
+            str(record.get("execution_regime") or "").strip().upper()
+            for record in records
+        }
+        if len(labels) == 1:
+            label = labels.pop()
+            if label in EXECUTION_REGIMES:
+                return label
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        pass
+    return "UNKNOWN"
+
+
 def check_llm_api_key(required: bool = True) -> DependencyCheck:
     """Verify that the API key for the active provider is available."""
     provider = settings.DEFAULT_LLM_PROVIDER.lower()
@@ -180,7 +208,7 @@ def check_llm_api_key(required: bool = True) -> DependencyCheck:
                     is_valid=False,
                     message=(
                         "Kredensial Anthropic tidak valid atau tidak tersedia: "
-                        f"{exc}"
+                        f"{redact_secrets(exc)}"
                     ),
                     hint=(
                         "Isi ANTHROPIC_API_KEY/CLAUDE_CODE_OAUTH_TOKEN atau "
@@ -204,8 +232,11 @@ def check_llm_api_key(required: bool = True) -> DependencyCheck:
             return DependencyCheck(
                 name="llm_api_key",
                 is_valid=False,
-                message=f"Token Codex tidak valid atau tidak tersedia: {exc}",
-                hint="Jalankan `idx auth codex` atau refresh login Codex CLI.",
+                message=(
+                    "Token Codex tidak valid atau tidak tersedia: "
+                    f"{redact_secrets(exc)}"
+                ),
+                hint="Jalankan `idx auth add codex` atau refresh login Codex CLI.",
                 blocking=required,
             )
         if not str(token or "").strip():
@@ -213,7 +244,7 @@ def check_llm_api_key(required: bool = True) -> DependencyCheck:
                 name="llm_api_key",
                 is_valid=False,
                 message="Token Codex kosong.",
-                hint="Jalankan `idx auth codex` atau refresh login Codex CLI.",
+                hint="Jalankan `idx auth add codex` atau refresh login Codex CLI.",
                 blocking=required,
             )
         return DependencyCheck(
@@ -249,12 +280,55 @@ def check_llm_api_key(required: bool = True) -> DependencyCheck:
 def _invoke_llm_probe(provider: str, tier: str) -> None:
     """Run a tiny live model call for providers that need real access proof."""
     from providers.llm_factory import get_llm
+    from providers.oauth_manager import codex_token_fingerprint
 
     model = get_llm("flash" if tier == "flash" else "pro", provider=provider)
-    response = model.invoke("Reply with OK only.")
+    try:
+        response = model.invoke("Reply with OK only.")
+    except Exception as exc:
+        api_key = getattr(model, "api_key", None)
+        token = (
+            api_key.get_secret_value()
+            if hasattr(api_key, "get_secret_value")
+            else str(api_key or "")
+        )
+        fingerprint = codex_token_fingerprint(token)
+        if fingerprint:
+            try:
+                setattr(exc, "codex_token_fingerprint", fingerprint)
+            except (AttributeError, TypeError):
+                wrapped = RuntimeError("Codex live probe failed")
+                wrapped.codex_token_fingerprint = fingerprint
+                raise wrapped from exc
+        raise
     content = getattr(response, "content", response)
     if content is None or not str(content).strip():
         raise RuntimeError(f"{provider} {tier} probe returned an empty response")
+
+
+def _run_codex_probe_round(provider: str) -> None:
+    """Run Flash and Pro once, collecting both outcomes before returning."""
+    import concurrent.futures
+
+    errors: list[Exception] = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(_invoke_llm_probe, provider, "flash"),
+            executor.submit(_invoke_llm_probe, provider, "pro"),
+        ]
+        for future in futures:
+            try:
+                future.result()
+            except Exception as exc:
+                errors.append(exc)
+    if errors:
+        from providers.oauth_manager import is_codex_auth_expiry_error
+
+        auth_error = next(
+            (error for error in errors if is_codex_auth_expiry_error(error)),
+            None,
+        )
+        raise auth_error or errors[0]
 
 
 def check_database_connection() -> DependencyCheck:
@@ -344,19 +418,47 @@ def check_llm_models(required: bool = True) -> DependencyCheck:
                 blocking=False,
             )
         if provider == "codex" and required:
-            import concurrent.futures
-
             try:
-                with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-                    f1 = executor.submit(_invoke_llm_probe, provider, "flash")
-                    f2 = executor.submit(_invoke_llm_probe, provider, "pro")
-                    f1.result()
-                    f2.result()
+                _run_codex_probe_round(provider)
             except Exception as exc:
+                from providers.oauth_manager import (
+                    CodexAuthRecoveryExhausted,
+                    is_codex_auth_expiry_error,
+                    recover_codex_token_after_auth_failure,
+                )
+
+                if (
+                    not isinstance(exc, CodexAuthRecoveryExhausted)
+                    and is_codex_auth_expiry_error(exc)
+                ):
+                    try:
+                        recover_codex_token_after_auth_failure(
+                            rejected_token_fingerprint=getattr(
+                                exc,
+                                "codex_token_fingerprint",
+                                None,
+                            )
+                        )
+                        _run_codex_probe_round(provider)
+                    except Exception as retry_exc:
+                        exc = retry_exc
+                    else:
+                        return DependencyCheck(
+                            name="llm_models",
+                            is_valid=True,
+                            message=(
+                                f"Model {provider} live probe OK setelah satu "
+                                f"credential recovery: flash={flash}, pro={pro}."
+                            ),
+                            blocking=False,
+                        )
                 return DependencyCheck(
                     name="llm_models",
                     is_valid=False,
-                    message=f"Codex model live probe gagal: {exc}",
+                    message=(
+                        "Codex model live probe gagal: "
+                        f"{redact_secrets(exc)}"
+                    ),
                     hint=(
                         "Periksa DEFAULT_LLM_PROVIDER, CODEX_FLASH_MODEL, "
                         "CODEX_PRO_MODEL, dan token Codex."
@@ -391,11 +493,24 @@ def check_all_dependencies(
     required_disk_gb: float = 5.0,
 ) -> DependencyCheckResult:
     """Run orchestrator pre-flight checks and return an aggregate report."""
+    llm_api_key = check_llm_api_key(required=require_llm)
+    if require_llm and not llm_api_key.is_valid:
+        llm_models = DependencyCheck(
+            name="llm_models",
+            is_valid=False,
+            message=(
+                "Live model probe dilewati karena credential preflight gagal."
+            ),
+            hint=llm_api_key.hint,
+            blocking=False,
+        )
+    else:
+        llm_models = check_llm_models(required=require_llm)
     checks = {
-        "llm_api_key": check_llm_api_key(required=require_llm),
+        "llm_api_key": llm_api_key,
         "database": check_database_connection(),
         "disk_space": check_disk_space(output_dir, required_gb=required_disk_gb),
-        "llm_models": check_llm_models(required=require_llm),
+        "llm_models": llm_models,
     }
     failed = [name for name, result in checks.items() if not result.is_valid]
     blocking = [
@@ -415,6 +530,10 @@ def maybe_rerun_quant_filter(
     script_path: str = "run_quant_filter.py",
     output_dir: Path | str | None = None,
     mode: str = "momentum",
+    execution_regime: str | None = None,
+    execution_regime_reason: str | None = None,
+    trend_regime: str | None = None,
+    volatility_regime: str | None = None,
 ) -> bool:
     """
     Jalankan run_quant_filter.py via subprocess jika CANDIDATES_AUTO_RERUN=True.
@@ -436,6 +555,16 @@ def maybe_rerun_quant_filter(
         command.extend(["--output-dir", str(output_dir)])
     norm_mode = canonical_screener_mode(mode)
     command.extend(["--mode", norm_mode])
+    if execution_regime:
+        command.extend(["--execution-regime", str(execution_regime)])
+    if execution_regime_reason:
+        command.extend(
+            ["--execution-regime-reason", str(execution_regime_reason)]
+        )
+    if trend_regime:
+        command.extend(["--trend-regime", str(trend_regime)])
+    if volatility_regime:
+        command.extend(["--volatility-regime", str(volatility_regime)])
 
     logger.info("[Validator] Auto-rerun: menjalankan " + " ".join(command[1:]) + " ...")
     # Capture verbose quant-filter logs so the orchestrator console can show a

@@ -46,7 +46,7 @@ import sys
 import time
 import traceback
 import warnings
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from threading import Lock
 from typing import Any, Callable
@@ -91,9 +91,11 @@ from core.dependency_validator import (
     check_all_dependencies,
     check_candidates_file,
     maybe_rerun_quant_filter,
+    read_candidates_execution_regime,
     read_candidates_screener_mode,
 )
 from core.execution_ledger import DEFAULT_LEDGER, EventSeverity, EventType, LedgerEvent
+from core.execution_regime import execution_regime_from_payload, resolve_execution_regime
 from core.historical_scorer import (
     apply_ev_adjustment,
     apply_historical_adjustment,
@@ -113,10 +115,10 @@ from core.portfolio_optimizer import diversify_portfolio
 from core.prompt_pack_linter import lint_prompt_pack
 from core.provider_health import check_all_providers
 from core.regime import (
-    RegimeType,
     detect_market_regime,
-    get_regime_params,
+    get_regime_params as _get_legacy_regime_params,
 )
+from core.regime_gate import detect_hmm_regime
 from core.report_consistency import check_consistency
 from core.risk_governor import RR_IMPLAUSIBLE_CEILING, annotate_risk
 from core.settings import settings
@@ -137,11 +139,17 @@ from services.report_formatter import DEFAULT_MD, MarkdownFormatter, RichFormatt
 from services.single_agent_analyzer import SingleAgentAnalyzer
 from utils.logger_config import logger
 from utils.price_fetcher import fetch_current_price
+from utils.ticker import (
+    IDX_TICKER_PATTERN,
+    InvalidIDXTicker,
+    canonicalize_result_identity,
+    normalize_idx_ticker,
+    normalize_idx_tickers,
+    resolve_within_root,
+)
 from utils.trade_math import (
-    DEFAULT_RR_TIER_NAME,
     calculate_rr,
-    format_rr_resolution_context,
-    get_rr_resolution,
+    get_required_rr_resolution,
 )
 
 
@@ -411,7 +419,7 @@ class BatchProgressView:
         )
         error = result.get("error")
         rating = str(verdict.get("rating") or ("ERROR" if error else "-"))
-        confidence = _format_cli_pct(verdict.get("confidence"))
+        confidence = _format_cli_pct(extract_model_confidence(verdict))
         row_state = _progress_row_state(result)
         self.update(
             ticker,
@@ -1144,15 +1152,36 @@ class CliRenderer:
         self,
         *,
         volatility: float | None,
-        regime: str,
+        execution_regime: str,
+        regime_context: dict[str, Any],
         regime_params: dict[str, Any],
         snapshot: dict[str, Any] | None = None,
     ) -> None:
         vol_text = "-" if volatility is None else f"vol {volatility * 100:.2f}%"
         override_text = _format_overrides(regime_params)
-        detail = _market_regime_summary_label(
-            snapshot,
-            fallback=f"{regime} ({vol_text})",
+        context = dict(regime_context or {})
+        trend_payload = context.get("trend_regime")
+        if isinstance(trend_payload, dict):
+            trend_label = str(trend_payload.get("label") or "UNKNOWN")
+            trend_confidence = trend_payload.get("confidence")
+        else:
+            trend_label = str(trend_payload or "UNKNOWN")
+            trend_confidence = None
+        if (
+            isinstance(trend_confidence, (int, float))
+            and not isinstance(trend_confidence, bool)
+        ):
+            trend_text = f"{trend_label} ({float(trend_confidence) * 100:.1f}%)"
+        else:
+            trend_text = trend_label
+        volatility_regime = str(context.get("volatility_regime") or "UNKNOWN")
+        rule_based_regime = str(context.get("rule_based_regime") or "UNKNOWN")
+        execution_reason = str(
+            context.get("execution_regime_reason") or "unspecified"
+        )
+        detail = (
+            f"{execution_regime} ({vol_text}); trend={trend_text}; "
+            f"volatility={volatility_regime}; reason={execution_reason}"
         )
         if regime_params:
             detail = f"{detail}; {override_text}"
@@ -1169,9 +1198,12 @@ class CliRenderer:
             if volatility is None
             else f"{volatility:.4f} ({volatility * 100:.2f}%)",
         )
-        table.add_row("Regime", regime)
+        table.add_row("Execution regime", execution_regime)
+        table.add_row("Execution reason", execution_reason)
+        table.add_row("Trend regime (diagnostic)", trend_text)
+        table.add_row("Volatility regime", volatility_regime)
+        table.add_row("Rule-based regime (diagnostic)", rule_based_regime)
         if snapshot:
-            table.add_row("Volatility regime", str(snapshot.get("volatility_regime")))
             weekly_return = snapshot.get("weekly_return")
             table.add_row(
                 "IHSG 5d return",
@@ -1186,7 +1218,7 @@ class CliRenderer:
             )
             reasons = snapshot.get("reasons")
             if isinstance(reasons, list) and reasons:
-                table.add_row("Regime reasons", _format_regime_reasons(reasons))
+                table.add_row("Rule-based reasons", _format_regime_reasons(reasons))
         table.add_row("Overrides", _format_overrides(regime_params))
         diagnostics = [
             message
@@ -1208,10 +1240,10 @@ class CliRenderer:
             table.add_row("Diagnostics", Text(notes))
         border = (
             "red"
-            if regime in {"DEFENSIVE", "HIGH"}
+            if execution_regime in {"DEFENSIVE", "UNKNOWN"}
             else "green"
-            if regime == "LOW"
-            else "cyan"
+            if execution_regime == "BULL"
+            else "yellow"
         )
         self.con.print(Panel(table, title="Market Regime", border_style=border))
         self.regime_events = []
@@ -1589,7 +1621,7 @@ class CliRenderer:
             setup_table.add_row(
                 ticker,
                 Text(rating, style=_rating_cell_style(rating)),
-                _format_cli_pct(verdict.get("confidence")),
+                _format_cli_pct(extract_model_confidence(verdict)),
                 _format_cli_money(current_price),
                 str(verdict.get("entry_price_range") or "-"),
                 _format_cli_money(verdict.get("target_price")),
@@ -1730,10 +1762,14 @@ class CliRenderer:
         flash_budget = int(self.budget_usage.get("flash_budget", 0))
         estimated_tokens = pro_calls * 2000 + flash_calls * 800
         portfolio_note = self._portfolio_threshold_note(sizing_result)
+        regime_context = ORCHESTRATOR_CONFIG.get("regime_context") or {}
         regime_detail = _market_regime_summary_label(
-            ORCHESTRATOR_CONFIG.get("market_regime"),
+            regime_context,
             fallback=regime,
         )
+        execution_reason = regime_context.get("execution_regime_reason")
+        if execution_reason:
+            regime_detail = f"{regime_detail} | reason={execution_reason}"
 
         if self.verbose:
             table = Table(box=box.SIMPLE, expand=False, show_edge=False, pad_edge=False)
@@ -1746,7 +1782,7 @@ class CliRenderer:
             )
             table.add_row("Pro usage", f"{pro_calls}/{pro_budget}")
             table.add_row("Flash usage", f"{flash_calls}/{flash_budget}")
-            table.add_row("Regime", regime_detail)
+            table.add_row("Execution regime", regime_detail)
             table.add_row(
                 "Total deployed", _format_cli_money(summary.get("total_deployed"))
             )
@@ -1923,7 +1959,7 @@ def _progress_row_state(result: dict[str, Any]) -> str:
     )
     if risk.get("sizing_allowed") is False:
         return "warning"
-    confidence = _coerce_confidence(verdict.get("confidence"))
+    confidence = extract_model_confidence(verdict)
     if confidence is not None and confidence < 0.60:
         return "warning"
     return "success"
@@ -1955,7 +1991,7 @@ def _result_warning_notes(result: dict[str, Any]) -> list[str]:
     rating = str(verdict.get("rating") or "").upper()
     if rating == "HOLD":
         notes.append("Hold/wait-and-see verdict")
-    confidence = _coerce_confidence(verdict.get("confidence"))
+    confidence = extract_model_confidence(verdict)
     if confidence is not None and confidence < 0.60:
         notes.append(f"Low confidence: {confidence:.0%}")
     risk = (
@@ -2294,7 +2330,11 @@ def _market_regime_summary_label(
 ) -> str:
     if not isinstance(snapshot, dict):
         return fallback
-    regime = str(snapshot.get("regime") or fallback)
+    regime = str(
+        snapshot.get("execution_regime")
+        or snapshot.get("regime")
+        or fallback
+    )
     parts = [regime]
     volatility_regime = snapshot.get("volatility_regime")
     if volatility_regime and str(volatility_regime) != regime:
@@ -2450,6 +2490,8 @@ ORCHESTRATOR_CONFIG: dict[str, Any] = {
     # Diisi oleh regime detection di main()
     "min_conviction_override": settings.PORTFOLIO_MIN_CONVICTION,
     "market_regime": None,
+    "hmm_regime": None,
+    "regime_context": None,
 }
 
 
@@ -2462,6 +2504,8 @@ def _orchestrator_runtime_defaults() -> dict[str, Any]:
         "batch_delay": _runtime_batch_delay(),
         "min_conviction_override": settings.PORTFOLIO_MIN_CONVICTION,
         "market_regime": None,
+        "hmm_regime": None,
+        "regime_context": None,
     }
 
 
@@ -2488,6 +2532,11 @@ def _apply_regime_params(regime_params: dict[str, Any]) -> None:
         ]
 
 
+def get_regime_params(regime: str) -> dict[str, Any]:
+    """Compatibility facade; new execution code uses regime_context instead."""
+    return dict(_get_legacy_regime_params(regime))
+
+
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", "output"))
 JSON_PATH = OUTPUT_DIR / "top10_candidates.json"
 FULL_RESULTS_PATH = OUTPUT_DIR / "full_batch_results.json"
@@ -2502,7 +2551,7 @@ EXCLUDED_RATINGS: set[str] = ORCHESTRATOR_CONFIG["excluded_ratings"]
 
 # IDX saham biasa: tepat 4 huruf kapital, opsional suffix .JK
 # Catatan: warrant/right issue (5 huruf) sengaja dikecualikan dari scope ini.
-TICKER_PATTERN = re.compile(r"^[A-Z]{4}(?:\.JK)?$")
+TICKER_PATTERN = IDX_TICKER_PATTERN
 PROMPT_MANIFEST_PATH = "services/debate_prompts/manifest.json"
 CLI_TICKERS_OVERRIDE: list[str] | None = None
 CLI_MODE: str = "multi"
@@ -2662,6 +2711,20 @@ def configure_output_dir(output_dir: Path) -> None:
     TOP3_REPORT_PATH = OUTPUT_DIR / "TOP_3_SWING_TRADES.md"
 
 
+def _candidate_cache_context_mismatch(
+    *,
+    cached_mode: str | None,
+    requested_mode: str,
+    cached_execution_regime: str | None,
+    execution_regime: str,
+) -> bool:
+    """Fail closed when cached candidates were produced under another context."""
+    return (
+        cached_mode != requested_mode
+        or cached_execution_regime != execution_regime
+    )
+
+
 def _prompt_user_config() -> dict:
     """Tanya input modal, max loss, max posisi ke user via terminal."""
     _ensure_utf8_stdout()
@@ -2786,46 +2849,51 @@ def validate_ticker(ticker: str) -> bool:
     Menerima: "ERAA", "ERAA.JK" (akan di-uppercase sebelum validasi).
     Menolak: string kosong, karakter non-alfabet, panjang selain 4 huruf.
     """
-    if not ticker or not isinstance(ticker, str):
+    try:
+        normalize_idx_ticker(ticker)
+    except (InvalidIDXTicker, TypeError):
         return False
-    return bool(TICKER_PATTERN.match(ticker.strip().upper()))
+    return True
 
 
 def _normalize_cli_tickers(tickers: list[str]) -> list[str]:
-    normalized: list[str] = []
-    seen: set[str] = set()
-    for raw in tickers:
-        ticker = str(raw or "").strip().upper()
-        if not validate_ticker(ticker):
-            raise ValueError(f"Ticker tidak valid: {raw}")
-        ticker = ticker.removesuffix(".JK")
-        if ticker not in seen:
-            seen.add(ticker)
-            normalized.append(ticker)
-    return normalized
+    return normalize_idx_tickers(tickers)
+
+
+def _ticker_artifact_path(output_dir: Path, ticker: str, *parts: str) -> Path:
+    canonical_ticker = normalize_idx_ticker(ticker)
+    return resolve_within_root(output_dir, "debates", canonical_ticker, *parts)
 
 
 def _load_quant_candidates(json_path: Path = JSON_PATH) -> list[dict]:
     """
     Baca kandidat hasil quant filter sebagai list dict mentah.
     """
-    if not json_path.exists():
+    safe_path = resolve_within_root(json_path.parent, json_path.name)
+    if not safe_path.exists():
         raise FileNotFoundError(
-            f"Candidates tidak ditemukan di {json_path}. "
+            f"Candidates tidak ditemukan di {safe_path}. "
             "Jalankan run_quant_filter.py terlebih dahulu."
         )
 
-    data = json.loads(json_path.read_text(encoding="utf-8"))
+    data = json.loads(safe_path.read_text(encoding="utf-8"))
     if not isinstance(data, list):
         raise ValueError(
-            f"Format candidates tidak valid di {json_path}: expected list."
+            f"Format candidates tidak valid di {safe_path}: expected list."
         )
     return [row for row in data if isinstance(row, dict)]
 
 
 def _candidate_ticker(candidate: dict) -> str:
     raw = candidate.get("ticker") or candidate.get("Ticker") or ""
-    return raw.strip().upper() if isinstance(raw, str) else ""
+    if not isinstance(raw, str):
+        return ""
+    try:
+        return normalize_idx_ticker(raw)
+    except InvalidIDXTicker:
+        # Preserve the untrusted value as data so candidate intake can emit an
+        # explicit rejection. Filesystem writers revalidate before any I/O.
+        return raw.strip()
 
 
 def _candidate_for_intake(candidate: dict) -> dict:
@@ -2851,44 +2919,130 @@ def _candidate_for_intake(candidate: dict) -> dict:
     }
 
 
-def _apply_candidate_intake(candidates: list[dict]) -> list[dict]:
+def _candidate_intake_terminal_result(
+    candidate: dict[str, Any],
+    *,
+    error: str,
+) -> dict[str, Any]:
+    result = _pre_cio_terminal_result(
+        candidate,
+        reason_code="candidate_intake_invalid",
+        reason=f"Candidate intake rejected: {error}",
+    )
+    result["decision_source"] = "preflight"
+    result["execution_status"] = "INSUFFICIENT_DATA"
+    result["verdict"]["decision_source"] = "preflight"
+    result["verdict"]["execution_status"] = "INSUFFICIENT_DATA"
+    metadata = result["metadata"]
+    metadata.pop("pre_cio_rejection", None)
+    metadata["candidate_intake_rejection"] = {
+        "reason_code": "candidate_intake_invalid",
+        "reason": error,
+        "technical_data_complete": False,
+    }
+    metadata["artifact_scope"] = "batch_only"
+    metadata["raw_ticker"] = str(
+        candidate.get("ticker") or candidate.get("Ticker") or ""
+    )
+    # Untrusted identity is retained only as inert audit data.  Primary/nested
+    # ticker fields must never carry report, log, ledger, or path injection.
+    result["ticker"] = None
+    result["verdict"]["ticker"] = None
+    result["risk_governor"]["ticker"] = None
+    return result
+
+
+def _apply_candidate_intake(
+    candidates: list[dict],
+    rejected_results: list[dict[str, Any]] | None = None,
+) -> list[dict]:
     """Validate candidate intake without changing the quant-filter payload shape."""
     normalized, rejected = normalize_batch(
         [_candidate_for_intake(c) for c in candidates]
     )
     for item in rejected:
         rejected_candidate = item.get("candidate", {})
-        ticker = (
+        raw_ticker = (
             rejected_candidate.get("ticker")
             or rejected_candidate.get("Ticker")
-            or "UNKNOWN"
+            or ""
         )
-        decision = _plan_orchestrator_decision(
-            ticker=str(ticker),
-            run_id="candidate_intake",
-            stage=PipelineStage.CANDIDATE_INTAKE,
+        try:
+            ticker = normalize_idx_ticker(str(raw_ticker))
+        except InvalidIDXTicker:
+            ticker = None
+        if ticker is not None:
+            decision = _plan_orchestrator_decision(
+                ticker=ticker,
+                run_id="candidate_intake",
+                stage=PipelineStage.CANDIDATE_INTAKE,
+            )
+            if decision is not None and decision.action is PlanAction.SKIP_TICKER:
+                logger.info(
+                    f"[CandidateIntake] Planner confirmed skip for {ticker}"
+                )
+        logger.warning(
+            "[CandidateIntake] Rejected {}: {}",
+            ticker or "<invalid-ticker>",
+            item.get("error"),
         )
-        if decision is not None and decision.action is PlanAction.SKIP_TICKER:
-            logger.info(f"[CandidateIntake] Planner confirmed skip for {ticker}")
-        logger.warning(f"[CandidateIntake] Rejected {ticker}: {item.get('error')}")
+        if rejected_results is not None:
+            rejected_results.append(
+                _candidate_intake_terminal_result(
+                    rejected_candidate,
+                    error=str(item.get("error") or "invalid candidate payload"),
+                )
+            )
 
     if not normalized:
         logger.warning(
-            "[CandidateIntake] No candidates normalized; continuing with raw candidates "
-            "for backward compatibility."
+            "[CandidateIntake] No candidates normalized; all candidates are "
+            "preserved as terminal INSUFFICIENT_DATA outcomes."
         )
-        return candidates
+        return []
 
     valid_tickers = {candidate.ticker for candidate in normalized}
-    filtered = [
-        candidate
-        for candidate in candidates
-        if _candidate_ticker(candidate) in valid_tickers
-    ]
+    filtered: list[dict] = []
+    seen_tickers: set[str] = set()
+    for candidate in candidates:
+        ticker = _candidate_ticker(candidate)
+        if ticker not in valid_tickers or ticker in seen_tickers:
+            continue
+        canonical_candidate = dict(candidate)
+        canonical_candidate["Ticker"] = ticker
+        if "ticker" in canonical_candidate:
+            canonical_candidate["ticker"] = ticker
+        filtered.append(canonical_candidate)
+        seen_tickers.add(ticker)
     logger.info(
         f"[CandidateIntake] {len(filtered)} valid candidates, {len(rejected)} rejected."
     )
     return filtered
+
+
+def _apply_critical_risk_filter(
+    candidates: list[dict],
+    rejected_results: list[dict[str, Any]] | None = None,
+) -> list[dict]:
+    """Preserve parser-level critical-risk skips as explicit terminal outcomes."""
+    accepted: list[dict] = []
+    for candidate in candidates:
+        strategy = str(candidate.get("Entry Strategy") or "")
+        if "critical risk" not in strategy.lower():
+            accepted.append(candidate)
+            continue
+        ticker = _candidate_ticker(candidate) or "UNKNOWN"
+        reason = "Quant filter marked Entry Strategy as critical risk."
+        logger.warning(f"[Parser] {ticker} – Critical Risk flag, terminal NO_TRADE")
+        if rejected_results is not None:
+            rejected_results.append(
+                _pre_cio_terminal_result(
+                    candidate,
+                    reason_code="critical_risk_flag",
+                    reason=reason,
+                )
+            )
+    return accepted
 
 
 def _candidate_exdate_days(candidate: dict) -> int | None:
@@ -2913,7 +3067,172 @@ def _candidate_ma200_context(candidate: dict) -> str:
     ).upper()
 
 
-def _apply_pre_cio_filters(candidates: list[dict], regime: str) -> list[dict]:
+def _candidate_snapshot_reference(candidate: dict[str, Any]) -> dict[str, str] | None:
+    """Return the persisted MarketSnapshot reference carried by a filter row."""
+    nested = (
+        candidate.get("market_snapshot")
+        if isinstance(candidate.get("market_snapshot"), dict)
+        else {}
+    )
+    snapshot_id = candidate.get("snapshot_id") or nested.get("snapshot_id")
+    data_hash = candidate.get("data_hash") or nested.get("data_hash")
+    snapshot_path = (
+        candidate.get("snapshot_path")
+        or nested.get("artifact_path")
+        or nested.get("snapshot_path")
+    )
+    requested_end = candidate.get("requested_end") or nested.get("requested_end")
+    if not all((snapshot_id, data_hash, snapshot_path)):
+        return None
+    reference = {
+        "snapshot_id": str(snapshot_id),
+        "data_hash": str(data_hash),
+        "snapshot_path": str(snapshot_path),
+    }
+    if requested_end:
+        reference["requested_end"] = str(requested_end)
+    return reference
+
+
+def _candidate_file_has_snapshot_contract(
+    path: Path,
+    *,
+    expected_requested_end: date | None = None,
+) -> bool:
+    """Require a cross-process OHLC handoff before reusing candidate cache."""
+    from utils.market_snapshot import IDX_TIMEZONE
+
+    try:
+        candidates = _load_quant_candidates(path)
+    except (FileNotFoundError, ValueError, OSError):
+        return False
+    expected = expected_requested_end or datetime.now(IDX_TIMEZONE).date()
+    return bool(candidates) and all(
+        (
+            (reference := _candidate_snapshot_reference(candidate)) is not None
+            and reference.get("requested_end") == expected.isoformat()
+        )
+        for candidate in candidates
+    )
+
+
+async def _seed_candidate_market_snapshots(
+    candidates: list[dict[str, Any]],
+    *,
+    output_dir: Path,
+) -> dict[str, dict[str, Any]]:
+    """Integrity-check filter artifacts and seed the debate process cache.
+
+    Candidate paths are constrained to output_dir. Any missing, corrupt, or
+    mismatched artifact fails closed so the debate cannot silently download a
+    different OHLC frame than the filter used.
+    """
+    from utils.market_data_cache import seed_market_snapshots
+    from utils.market_snapshot import load_market_snapshot
+
+    snapshots = []
+    provenance: dict[str, dict[str, Any]] = {}
+    for candidate in candidates:
+        ticker = _candidate_ticker(candidate) or "UNKNOWN"
+        reference = _candidate_snapshot_reference(candidate)
+        if reference is None:
+            raise ValueError(
+                f"{ticker}: candidate is missing snapshot_id/data_hash/snapshot_path"
+            )
+        raw_path = Path(reference["snapshot_path"])
+        resolved_path = resolve_within_root(output_dir, raw_path)
+        root = output_dir.resolve()
+        snapshot = load_market_snapshot(
+            resolved_path,
+            expected_snapshot_id=reference["snapshot_id"],
+            expected_data_hash=reference["data_hash"],
+        )
+        if snapshot.ticker != ticker:
+            raise ValueError(
+                f"{ticker}: snapshot ticker mismatch ({snapshot.ticker})"
+            )
+        snapshots.append(snapshot)
+        provenance[ticker] = snapshot.provenance(
+            artifact_path=str(resolved_path.relative_to(root))
+        )
+
+    await seed_market_snapshots(snapshots)
+    logger.info(
+        "[MarketSnapshot] Seeded {} verified filter snapshots into debate cache.",
+        len(snapshots),
+    )
+    return provenance
+
+
+def _pre_cio_terminal_result(
+    candidate: dict[str, Any],
+    *,
+    reason_code: str,
+    reason: str,
+) -> dict[str, Any]:
+    ticker = _candidate_ticker(candidate) or "UNKNOWN"
+    current_price = candidate.get("Current Price") or candidate.get("current_price")
+    market_snapshot = (
+        candidate.get("market_snapshot")
+        if isinstance(candidate.get("market_snapshot"), dict)
+        else {}
+    )
+    metadata: dict[str, Any] = {
+        "pre_cio_rejection": {
+            "reason_code": reason_code,
+            "reason": reason,
+            "technical_data_complete": True,
+        },
+        "flash_calls": 0,
+        "pro_calls": 0,
+        "llm_calls": 0,
+    }
+    if market_snapshot:
+        metadata["market_snapshot"] = dict(market_snapshot)
+        metadata["snapshot_id"] = market_snapshot.get("snapshot_id")
+        metadata["data_hash"] = market_snapshot.get("data_hash")
+    return {
+        "ticker": ticker,
+        "verdict": {
+            "ticker": ticker,
+            "rating": "HOLD",
+            "confidence": 0.0,
+            "model_rating": None,
+            "model_confidence": None,
+            "policy_confidence": 1.0,
+            "decision_source": "risk_guard",
+            "execution_status": "NO_TRADE",
+            "current_price": current_price,
+            "entry_price_range": None,
+            "target_price": None,
+            "stop_loss": None,
+            "reason_codes": [reason_code],
+            "weighted_reasoning": reason,
+            "summary": reason,
+        },
+        "metadata": metadata,
+        "risk_governor": {
+            "ticker": ticker,
+            "status": "reject",
+            "sizing_allowed": False,
+            "reason_codes": [reason_code],
+            "message": reason,
+        },
+        "decision_source": "risk_guard",
+        "execution_status": "NO_TRADE",
+        "reason_codes": [reason_code],
+        "debate_rounds": 0,
+        "debate_history": [],
+        "error": None,
+        "status": "success",
+    }
+
+
+def _apply_pre_cio_filters(
+    candidates: list[dict],
+    regime: str,
+    rejected_results: list[dict[str, Any]] | None = None,
+) -> list[dict]:
     """
     Hard filter sebelum masuk CIO â€" buang kandidat yang tidak layak
     tanpa membuang LLM token untuk mereka.
@@ -2928,12 +3247,35 @@ def _apply_pre_cio_filters(candidates: list[dict], regime: str) -> list[dict]:
         exdate_days = _candidate_exdate_days(c)
         if exdate_days is not None and exdate_days <= 7:
             logger.info(f"[PreCIO] {ticker} SKIP – ExDate {exdate_days}d")
+            if rejected_results is not None:
+                rejected_results.append(
+                    _pre_cio_terminal_result(
+                        c,
+                        reason_code="exdate_imminent",
+                        reason=(
+                            f"Ex-date dalam {exdate_days} hari; setup tidak "
+                            "boleh masuk full debate."
+                        ),
+                    )
+                )
             continue
 
-        # Counter-trend di HIGH regime â†' skip langsung
-        # Di NORMAL/LOW regime â†' biarkan masuk tapi CIO beri penalty
-        if regime == "HIGH" and _candidate_ma200_context(c) == "BELOW":
-            logger.info(f"[PreCIO] {ticker} SKIP – counter-trend di HIGH regime")
+        # Counter-trend under canonical DEFENSIVE execution is not debateable.
+        if regime == "DEFENSIVE" and _candidate_ma200_context(c) == "BELOW":
+            logger.info(
+                f"[PreCIO] {ticker} SKIP – counter-trend di DEFENSIVE execution regime"
+            )
+            if rejected_results is not None:
+                rejected_results.append(
+                    _pre_cio_terminal_result(
+                        c,
+                        reason_code="counter_trend_defensive",
+                        reason=(
+                            "Harga berada di bawah MA200 saat execution regime "
+                            "DEFENSIVE; setup ditahan sebelum full debate."
+                        ),
+                    )
+                )
             continue
 
         filtered.append(c)
@@ -2961,7 +3303,10 @@ def parse_report(
     # [FIX-9] `for row in data` â€" syntax error di versi sebelumnya diperbaiki.
     for row in data:
         raw = row.get("Ticker") or row.get("ticker") or ""
-        ticker = raw.strip().upper() if raw else ""
+        try:
+            ticker = normalize_idx_ticker(raw)
+        except InvalidIDXTicker:
+            ticker = ""
 
         if not validate_ticker(ticker):
             logger.warning(f"[Parser] Format ticker tidak valid: '{raw}' – dilewati")
@@ -3006,7 +3351,10 @@ def parse_sector_map(
     data = candidates if candidates is not None else _load_quant_candidates(json_path)
     for row in data:
         raw = row.get("Ticker") or row.get("ticker") or ""
-        ticker = raw.strip().upper() if raw else ""
+        try:
+            ticker = normalize_idx_ticker(raw)
+        except InvalidIDXTicker:
+            ticker = ""
         if validate_ticker(ticker):
             sector_map[ticker] = str(row.get("Sektor Key", "unknown") or "unknown")
 
@@ -3057,7 +3405,14 @@ def _empty_result(
     [FIX-10] Status default "failed". Pass status="timeout" agar telemetry
     dapat membedakan timeout dari genuine failure.
     """
-    metadata: dict[str, Any] = {}
+    regime_context = dict(ORCHESTRATOR_CONFIG.get("regime_context") or {})
+    hmm_regime = dict(ORCHESTRATOR_CONFIG.get("hmm_regime") or {})
+    metadata: dict[str, Any] = {
+        "execution_regime": regime_context.get("execution_regime"),
+        "execution_regime_reason": regime_context.get(
+            "execution_regime_reason"
+        ),
+    }
     if failure_stage:
         metadata["failure_stage"] = failure_stage
     if failure_type:
@@ -3075,6 +3430,15 @@ def _empty_result(
         "debate_history": [],
         "raw_data_summary": "",
         "metadata": metadata,
+        "regime_context": regime_context,
+        "hmm_regime": hmm_regime,
+        "trend_regime": regime_context.get("trend_regime"),
+        "volatility_regime": regime_context.get("volatility_regime"),
+        "execution_regime": regime_context.get("execution_regime"),
+        "execution_regime_reason": regime_context.get(
+            "execution_regime_reason"
+        ),
+        "trading_params": regime_context.get("execution_params", {}),
         "error": error,
         "status": status,
         "conviction_score": 0.0,
@@ -3117,12 +3481,92 @@ def _dict_or_empty(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def _is_batch_only_result(result: dict[str, Any]) -> bool:
+    return _dict_or_empty(result.get("metadata")).get("artifact_scope") == "batch_only"
+
+
+def _canonicalize_result_for_artifact(
+    result: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Return a persistence-safe result without exposing rejected raw identity.
+
+    Returns None when the result's ticker identity cannot be canonicalized
+    (missing or conflicting nested tickers); the caller drops it instead of
+    aborting the whole artifact for every other, valid result in the batch.
+    """
+
+    if not _is_batch_only_result(result):
+        try:
+            return canonicalize_result_identity(result)
+        except (InvalidIDXTicker, TypeError) as exc:
+            logger.warning(
+                "[Persist] reason_code=invalid_result_identity ticker={} detail={}",
+                result.get("ticker") if isinstance(result, dict) else None,
+                exc,
+            )
+            return None
+
+    sanitized = dict(result)
+    sanitized["ticker"] = None
+    for key in ("verdict", "risk_governor", "execution_decision"):
+        nested = result.get(key)
+        if isinstance(nested, dict):
+            sanitized[key] = {**nested, "ticker": None}
+    return sanitized
+
+
+def _canonicalize_results_for_artifact(
+    results: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    canonicalized = (_canonicalize_result_for_artifact(result) for result in results)
+    return [result for result in canonicalized if result is not None]
+
+
 def _result_metadata(entry: dict[str, Any]) -> dict[str, Any]:
     metadata = entry.get("metadata")
     if not isinstance(metadata, dict):
         metadata = {}
         entry["metadata"] = metadata
     return metadata
+
+
+def _stamp_execution_regime_contract(result: dict[str, Any]) -> None:
+    """Apply the batch execution authority to every result before scoring."""
+    batch_context = dict(ORCHESTRATOR_CONFIG.get("regime_context") or {})
+    result_context = result.get("regime_context")
+    if not isinstance(result_context, dict) or not result_context.get(
+        "execution_regime"
+    ):
+        result_context = batch_context
+    else:
+        result_context = dict(result_context)
+
+    hmm_regime = result.get("hmm_regime")
+    if not isinstance(hmm_regime, dict) or not hmm_regime:
+        hmm_regime = dict(ORCHESTRATOR_CONFIG.get("hmm_regime") or {})
+
+    result["regime_context"] = result_context
+    result["hmm_regime"] = hmm_regime
+    if not result.get("trend_regime"):
+        result["trend_regime"] = result_context.get("trend_regime")
+    if not result.get("volatility_regime"):
+        result["volatility_regime"] = result_context.get("volatility_regime")
+    if not result.get("execution_regime"):
+        result["execution_regime"] = result_context.get("execution_regime")
+    if not result.get("execution_regime_reason"):
+        result["execution_regime_reason"] = result_context.get(
+            "execution_regime_reason"
+        )
+    if not result.get("trading_params"):
+        result["trading_params"] = result_context.get("execution_params", {})
+
+    metadata = _result_metadata(result)
+    if not metadata.get("execution_regime"):
+        metadata["execution_regime"] = result.get("execution_regime")
+    if not metadata.get("execution_regime_reason"):
+        metadata["execution_regime_reason"] = result.get(
+            "execution_regime_reason"
+        )
 
 
 def _parse_price_value(value: Any) -> float | None:
@@ -3233,6 +3677,7 @@ def validate_setup_coherence(
     target: float,
     stop: float,
     yf_info: dict[str, Any] | None = None,
+    execution_regime: str | None = None,
 ) -> None:
     """Raise SetupCoherenceError when a trade setup is not actionable."""
     if target <= entry_high:
@@ -3254,17 +3699,29 @@ def validate_setup_coherence(
         raise SetupCoherenceError(
             f"stop ({stop}) is not below bottom of entry range ({entry_low})"
         ) from exc
-    rr_resolution = get_rr_resolution(ticker, yf_info=yf_info)
-    rr_minimum = rr_resolution.rr_minimum
+    rr_resolution = get_required_rr_resolution(
+        ticker,
+        regime=execution_regime,
+        yf_info=yf_info,
+    )
+    rr_minimum = rr_resolution.required_rr
     if rr < rr_minimum:
         raise SetupCoherenceError(
-            f"R/R ({rr:.2f}x) below minimum threshold of {rr_minimum:.1f}x "
-            f"{format_rr_resolution_context(rr_resolution)}"
+            f"R/R ({rr:.2f}x) below canonical threshold of {rr_minimum:.3f}x "
+            f"({rr_resolution.tier_name} tier; execution regime "
+            f"{rr_resolution.execution_regime} x"
+            f"{rr_resolution.regime_multiplier:.2f}; user floor "
+            f"{rr_resolution.user_execution_floor:.1f}x)"
         )
 
 
 def extract_model_confidence(verdict: dict[str, Any]) -> float | None:
     """Return CIO model certainty on a 0.0-1.0 scale before R/R weighting."""
+    if (
+        str(verdict.get("decision_source") or "").lower() == "preflight"
+        and verdict.get("model_confidence") is None
+    ):
+        return None
     return _coerce_confidence(
         verdict.get("model_confidence")
         if verdict.get("model_confidence") is not None
@@ -3347,31 +3804,55 @@ def _extract_rr_yf_info(result: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
-def _rr_tier_note(ticker: str, yf_info: dict[str, Any] | None = None) -> str | None:
-    """Return a visible R/R tier note for non-default ticker thresholds."""
-    resolution = get_rr_resolution(ticker, yf_info=yf_info)
-    if resolution.tier_name == DEFAULT_RR_TIER_NAME:
-        return None
-    return f"R/R threshold: {resolution.rr_minimum:.1f}x ({resolution.tier_label} tier)"
+def _rr_tier_note(
+    ticker: str,
+    yf_info: dict[str, Any] | None = None,
+    execution_regime: str | None = None,
+) -> str:
+    """Return the visible canonical R/R requirement and its inputs."""
+    resolution = get_required_rr_resolution(
+        ticker,
+        regime=execution_regime,
+        yf_info=yf_info,
+    )
+    return (
+        f"Required R/R: {resolution.required_rr:.3f}x "
+        f"(base {resolution.base_rr_minimum:.2f}x, {resolution.tier_label}, "
+        f"{resolution.execution_regime} x{resolution.regime_multiplier:.2f}, "
+        f"user floor {resolution.user_execution_floor:.1f}x)"
+    )
 
 
 def _annotate_rr_tier(
     result: dict[str, Any],
     ticker: str,
     yf_info: dict[str, Any] | None = None,
+    execution_regime: str | None = None,
 ) -> None:
-    """Attach R/R tier metadata to result and verdict without changing schemas."""
+    """Attach canonical R/R requirement metadata to result and verdict."""
     yf_info = yf_info if yf_info is not None else _extract_rr_yf_info(result)
-    resolution = get_rr_resolution(ticker, yf_info=yf_info)
+    execution_regime = execution_regime or execution_regime_from_payload(result) or None
+    resolution = get_required_rr_resolution(
+        ticker,
+        regime=execution_regime,
+        yf_info=yf_info,
+    )
     verdict = result.get("verdict") if isinstance(result.get("verdict"), dict) else {}
     metadata = (
         result.get("metadata") if isinstance(result.get("metadata"), dict) else {}
     )
     tier_payload = {
         "rr_tier": resolution.tier_name,
-        "rr_minimum": resolution.rr_minimum,
+        "rr_minimum": resolution.required_rr,
+        "required_rr": resolution.required_rr,
+        "rr_base_minimum": resolution.base_rr_minimum,
+        "rr_regime_minimum": resolution.regime_rr_minimum,
+        "rr_user_floor": resolution.user_execution_floor,
+        "rr_regime": resolution.execution_regime,
+        "rr_regime_multiplier": resolution.regime_multiplier,
         "rr_tier_label": resolution.tier_label,
-        "rr_tier_source": resolution.source,
+        "rr_tier_source": resolution.tier_source,
+        "rr_requirement_source": "max_user_floor_tier_x_regime",
     }
     if resolution.market_cap_idr is not None:
         tier_payload["rr_market_cap_idr"] = resolution.market_cap_idr
@@ -3380,11 +3861,14 @@ def _annotate_rr_tier(
         verdict.update(tier_payload)
     metadata.update(tier_payload)
     result["metadata"] = metadata
-    note = _rr_tier_note(ticker, yf_info=yf_info)
-    if note:
-        result["rr_tier_note"] = note
-        if verdict:
-            verdict["rr_tier_note"] = note
+    note = _rr_tier_note(
+        ticker,
+        yf_info=yf_info,
+        execution_regime=execution_regime,
+    )
+    result["rr_tier_note"] = note
+    if verdict:
+        verdict["rr_tier_note"] = note
 
 
 def _confidence_gate_should_skip(confidence: float | int) -> bool:
@@ -3445,7 +3929,13 @@ def apply_setup_coherence_gate(ticker: str, result: dict[str, Any]) -> bool:
             f"{ticker}: setup coherence cannot be validated because price fields are missing"
         )
     yf_info = _extract_rr_yf_info(result)
-    _annotate_rr_tier(result, ticker, yf_info=yf_info)
+    execution_regime = execution_regime_from_payload(result) or None
+    _annotate_rr_tier(
+        result,
+        ticker,
+        yf_info=yf_info,
+        execution_regime=execution_regime,
+    )
     try:
         validate_setup_coherence(
             ticker,
@@ -3455,6 +3945,7 @@ def apply_setup_coherence_gate(ticker: str, result: dict[str, Any]) -> bool:
             float(target),
             float(stop),
             yf_info=yf_info,
+            execution_regime=execution_regime,
         )
         return False
     except SetupCoherenceError as exc:
@@ -3655,7 +4146,11 @@ def _attach_risk_governor_to_result(
             "ticker": ticker,
             "verdict": verdict,
             "current_price": verdict.get("current_price"),
-            "market_regime": ORCHESTRATOR_CONFIG.get("market_regime"),
+            "rule_regime_snapshot": ORCHESTRATOR_CONFIG.get("market_regime"),
+            "regime_context": result.get("regime_context")
+            or ORCHESTRATOR_CONFIG.get("regime_context"),
+            "execution_regime": result.get("execution_regime"),
+            "execution_regime_reason": result.get("execution_regime_reason"),
             "raw_data": raw_data,
             "raw_data_summary": result.get("raw_data_summary"),
             "metadata": metadata,
@@ -3709,7 +4204,7 @@ def _record_ticker_telemetry(
             run_id=run_id,
             status=status,
             verdict_rating=verdict.get("rating"),
-            confidence=_coerce_confidence(verdict.get("confidence")),
+            confidence=extract_model_confidence(verdict),
             debate_rounds=int(result.get("debate_rounds") or 0),
             duration_seconds=elapsed,
             flash_calls=_metadata_int(metadata, "flash_calls"),
@@ -3738,18 +4233,38 @@ async def _inject_forecast_reports(results: list[dict]) -> None:
     """
     import asyncio
 
+    pending: list[tuple[dict, Any]] = []
+    for result in results:
+        if isinstance(result, dict):
+            pending.append((result, result.pop("_execution_snapshot", None)))
+
     try:
         from core.forecasting import ForecastingService
+        from schemas.debate import CIOVerdict
 
         service = ForecastingService()
-    except ImportError:
+    except Exception as exc:
+        logger.warning("[Forecast] Service unavailable for batch: {}", exc)
         return
 
-    from schemas.debate import CIOVerdict
-
-    for result in results:
-        ticker = str(result.get("ticker") or "").upper()
-        if not ticker or _result_status(result) != "success":
+    for result, execution_snapshot in pending:
+        raw_ticker = str(result.get("ticker") or "")
+        if not raw_ticker or _result_status(result) != "success":
+            continue
+        try:
+            ticker = normalize_idx_ticker(raw_ticker)
+        except InvalidIDXTicker as exc:
+            result["forecast_ev_ignored_reason"] = "invalid_idx_ticker"
+            logger.warning("[Forecast] Invalid ticker skipped: {}", exc)
+            continue
+        metadata = (
+            result.get("metadata")
+            if isinstance(result.get("metadata"), dict)
+            else {}
+        )
+        setup = metadata.get("trade_setup_snapshot")
+        if isinstance(setup, dict) and setup.get("debate_eligible") is False:
+            result["forecast_ev_ignored_reason"] = "preflight_terminal"
             continue
         verdict_dict = (
             result.get("verdict") if isinstance(result.get("verdict"), dict) else {}
@@ -3762,9 +4277,29 @@ async def _inject_forecast_reports(results: list[dict]) -> None:
             cio = None
         try:
             report = await asyncio.to_thread(
-                service.predict, ticker, None, (10,), "ensemble", cio
+                service.predict,
+                ticker,
+                None,
+                (10,),
+                "ensemble",
+                cio,
+                execution_snapshot,
             )
             report_payload = report.model_dump(mode="json")
+            metadata = (
+                result.get("metadata")
+                if isinstance(result.get("metadata"), dict)
+                else {}
+            )
+            snapshot_provenance = metadata.get("market_snapshot")
+            if isinstance(snapshot_provenance, dict):
+                report_payload["market_snapshot"] = dict(snapshot_provenance)
+                report_payload["execution_snapshot_id"] = (
+                    snapshot_provenance.get("snapshot_id")
+                )
+                report_payload["execution_snapshot_hash"] = (
+                    snapshot_provenance.get("data_hash")
+                )
             result["forecast_report"] = report_payload
             result.pop("forecast_ev_pct", None)
             result.pop("forecast_ev_downweight", None)
@@ -3790,29 +4325,93 @@ def _enhance_completed_results(
 ) -> None:
     for result in results:
         try:
+            _stamp_execution_regime_contract(result)
             ticker = str(result.get("ticker") or "UNKNOWN").upper()
             status = _result_status(result)
             result["status"] = status
-            if fetch_news:
+            metadata = (
+                result.get("metadata")
+                if isinstance(result.get("metadata"), dict)
+                else {}
+            )
+            setup = metadata.get("trade_setup_snapshot")
+            setup = setup if isinstance(setup, dict) else {}
+            terminal_preflight = bool(
+                str(metadata.get("decision_source") or "").lower() == "preflight"
+                or (setup and setup.get("debate_eligible") is False)
+            )
+            if fetch_news and not terminal_preflight:
                 _attach_news_signal(ticker, result)
             if status == "success" and result.get("verdict"):
                 _merge_metadata_reasons(result)
-                risk_locked = apply_minimum_confidence_gate(ticker, result)
-                if not risk_locked:
-                    risk_locked = apply_setup_coherence_gate(ticker, result)
-                apply_extreme_overvaluation_flag(ticker, result)
-                sync_metric_aliases(result)
-                if not risk_locked:
-                    _attach_risk_governor_to_result(
-                        ticker=ticker,
-                        run_id=run_id,
-                        result=result,
+                if terminal_preflight:
+                    verdict = result["verdict"]
+                    setup_status = str(
+                        setup.get("status")
+                        or metadata.get("execution_status")
+                        or "INSUFFICIENT_DATA"
+                    ).upper()
+                    reason_code = str(
+                        setup.get("reason_code") or "trade_setup_rejected"
                     )
+                    reason = str(
+                        setup.get("reason") or "Trade setup is not executable."
+                    )
+                    execution_status = (
+                        "WAITLIST"
+                        if setup_status == "WAIT_FOR_PULLBACK"
+                        else "INSUFFICIENT_DATA"
+                        if setup_status == "INSUFFICIENT_DATA"
+                        else "NO_TRADE"
+                    )
+                    result["decision_source"] = "preflight"
+                    result["execution_status"] = execution_status
+                    result["model_rating"] = None
+                    result["model_confidence"] = None
+                    result["policy_confidence"] = 1.0
+                    verdict["decision_source"] = "preflight"
+                    verdict["execution_status"] = execution_status
+                    verdict["model_rating"] = None
+                    verdict["model_confidence"] = None
+                    verdict["policy_confidence"] = 1.0
+                    verdict["reason_codes"] = list(
+                        dict.fromkeys(
+                            [*(verdict.get("reason_codes") or []), reason_code]
+                        )
+                    )
+                    if execution_status == "WAITLIST":
+                        result["risk_gov"] = "wait_for_pullback"
+                        result["risk_governor"] = {
+                            "ticker": ticker,
+                            "status": "wait_for_pullback",
+                            "sizing_allowed": False,
+                            "reason_codes": [reason_code],
+                            "message": reason,
+                        }
+                    else:
+                        _set_reject_risk_payload(
+                            result,
+                            ticker=ticker,
+                            reason=reason_code,
+                            message=reason,
+                        )
                 else:
-                    logger.info(
-                        f"[RiskGovernor] {ticker}: reject "
-                        f"({', '.join(result.get('reasons') or [])})"
-                    )
+                    risk_locked = apply_minimum_confidence_gate(ticker, result)
+                    if not risk_locked:
+                        risk_locked = apply_setup_coherence_gate(ticker, result)
+                    apply_extreme_overvaluation_flag(ticker, result)
+                    sync_metric_aliases(result)
+                    if not risk_locked:
+                        _attach_risk_governor_to_result(
+                            ticker=ticker,
+                            run_id=run_id,
+                            result=result,
+                        )
+                    else:
+                        logger.info(
+                            f"[RiskGovernor] {ticker}: reject "
+                            f"({', '.join(result.get('reasons') or [])})"
+                        )
             else:
                 sync_metric_aliases(result)
             _record_ticker_telemetry(
@@ -3860,7 +4459,7 @@ def _write_explainability_audit(
     try:
         packet = DEFAULT_AUDITOR.build_audit_packet(result)
         DEFAULT_AUDITOR.log_packet(packet)
-        audit_path = output_dir / "debates" / ticker / "latest_audit.txt"
+        audit_path = _ticker_artifact_path(output_dir, ticker, "latest_audit.txt")
         audit_path.parent.mkdir(parents=True, exist_ok=True)
         audit_path.write_text(
             DEFAULT_AUDITOR.format_report(packet),
@@ -4059,18 +4658,27 @@ def _write_batch_telemetry_report(
         )
         DEFAULT_TELEMETRY.log_report(report)
         report_text = DEFAULT_TELEMETRY.format_report(report)
-        telemetry_dir = output_dir / "telemetry"
+        telemetry_dir = resolve_within_root(output_dir, "telemetry")
         telemetry_dir.mkdir(parents=True, exist_ok=True)
-        with (telemetry_dir / "telemetry_log.jsonl").open(
+        telemetry_log_path = resolve_within_root(
+            telemetry_dir, "telemetry_log.jsonl"
+        )
+        latest_report_path = resolve_within_root(
+            telemetry_dir, "latest_batch_report.txt"
+        )
+        run_report_path = resolve_within_root(
+            telemetry_dir, f"{run_id}_report.txt"
+        )
+        with telemetry_log_path.open(
             "a", encoding="utf-8"
         ) as file:
             file.write(report.model_dump_json())
             file.write("\n")
-        (telemetry_dir / "latest_batch_report.txt").write_text(
+        latest_report_path.write_text(
             report_text,
             encoding="utf-8",
         )
-        (telemetry_dir / f"{run_id}_report.txt").write_text(
+        run_report_path.write_text(
             report_text,
             encoding="utf-8",
         )
@@ -4086,9 +4694,14 @@ def _write_formatter_reports(
     output_dir: Path,
     formatter: MarkdownFormatter = DEFAULT_MD,
 ) -> None:
-    for result in results:
-        verdict = _dict_or_empty(result.get("verdict"))
-        ticker = str(result.get("ticker") or verdict.get("ticker") or "UNKNOWN").upper()
+    artifact_results = _canonicalize_results_for_artifact(results)
+    validated_results: list[tuple[dict[str, Any], str]] = []
+    for result in artifact_results:
+        if _is_batch_only_result(result):
+            continue
+        ticker = result["ticker"]
+        validated_results.append((result, ticker))
+    for result, ticker in validated_results:
         try:
             payload = dict(result)
             metadata = _dict_or_empty(payload.get("metadata"))
@@ -4096,16 +4709,19 @@ def _write_formatter_reports(
                 metadata = {**metadata, "run_id": run_id}
                 payload["metadata"] = metadata
             md_content = formatter.generate_ticker_report(payload)
-            md_path = output_dir / "debates" / ticker / "latest_report.md"
+            md_path = _ticker_artifact_path(output_dir, ticker, "latest_report.md")
             md_path.parent.mkdir(parents=True, exist_ok=True)
             md_path.write_text(md_content, encoding="utf-8")
             logger.info(f"[Formatter] Markdown report saved: {md_path}")
         except Exception as e:
             logger.warning(f"[Formatter] Markdown failed for {ticker}: {e}")
 
+    batch_md_path = resolve_within_root(output_dir, "latest_batch_report.md")
     try:
-        batch_md = formatter.generate_batch_summary(results=results, run_id=run_id)
-        batch_md_path = output_dir / "latest_batch_report.md"
+        batch_md = formatter.generate_batch_summary(
+            results=artifact_results,
+            run_id=run_id,
+        )
         batch_md_path.write_text(batch_md, encoding="utf-8")
         logger.info(f"[Formatter] Batch summary saved: {batch_md_path}")
     except Exception as e:
@@ -4131,7 +4747,12 @@ def _check_report_consistency(
         logger.warning(f"[ReportConsistency] failed: {e}")
 
 
-async def _run_single_debate(ticker: str, chamber: Any, sector: str = "") -> dict:
+async def _run_single_debate(
+    ticker: str,
+    chamber: Any,
+    sector: str = "",
+    prepared_setup: dict[str, Any] | None = None,
+) -> dict:
     """
     Jalankan debate untuk satu ticker: chamber.run() owns market-data prefetch â†' validasi schema.
 
@@ -4143,7 +4764,14 @@ async def _run_single_debate(ticker: str, chamber: Any, sector: str = "") -> dic
     logger.info(f"[Debate] Mulai: {ticker}")
 
     try:
-        result = await chamber.run(ticker, sector=sector)
+        if prepared_setup is None:
+            result = await chamber.run(ticker, sector=sector)
+        else:
+            result = await chamber.run(
+                ticker,
+                sector=sector,
+                prepared_setup=prepared_setup,
+            )
         if result.get("error") is not None:
             error = str(result["error"])
             _guard_status = (result.get("metadata") or {}).get("guard_status", "")
@@ -4195,6 +4823,17 @@ async def _run_single_debate(ticker: str, chamber: Any, sector: str = "") -> dic
             _as_debate_message(m) for m in result.get("debate_history", [])
         ]
         metadata = dict(result.get("metadata") or {})
+        market_data = (
+            result.get("market_data")
+            if isinstance(result.get("market_data"), dict)
+            else {}
+        )
+        market_snapshot = market_data.get("market_snapshot")
+        execution_snapshot = market_data.get("_market_snapshot_object")
+        if isinstance(market_snapshot, dict):
+            metadata["market_snapshot"] = dict(market_snapshot)
+            metadata["snapshot_id"] = market_snapshot.get("snapshot_id")
+            metadata["data_hash"] = market_snapshot.get("data_hash")
         yf_info = _extract_rr_yf_info(result)
         market_cap = (yf_info or {}).get("marketCap")
         if (
@@ -4225,12 +4864,18 @@ async def _run_single_debate(ticker: str, chamber: Any, sector: str = "") -> dic
             ],
             "raw_data_summary": result.get("raw_data", ""),
             "metadata": metadata,
-            "regime": result.get(
-                "regime"
-            ),  # HMM regime dict; read by apply_defensive_guard
+            "regime_context": result.get("regime_context"),
+            "hmm_regime": result.get("hmm_regime"),
+            "trend_regime": result.get("trend_regime"),
+            "volatility_regime": result.get("volatility_regime"),
+            "execution_regime": result.get("execution_regime"),
+            "execution_regime_reason": result.get(
+                "execution_regime_reason"
+            ),
             "trading_params": result.get(
                 "trading_params"
-            ),  # REGIME_RULES entry for current label
+            ),
+            "_execution_snapshot": execution_snapshot,
             "error": None,
             "status": "success",
             "conviction_score": 0.0,  # Diisi oleh select_top3
@@ -4254,6 +4899,7 @@ async def run_batch_debates(
     run_id: str | None = None,
     chamber_factory: Callable[[], Any] | None = None,
     candidates_by_ticker: dict[str, dict] | None = None,
+    max_executable_debates: int | None = None,
 ) -> list[dict]:
     # abort_event di-inject dari main() agar signal handler bisa mengaksesnya.
     """
@@ -4278,6 +4924,7 @@ async def run_batch_debates(
         period_seconds=60.0,
     )
     sem = asyncio.Semaphore(max_concurrent)
+    preflight_sem = asyncio.Semaphore(max_concurrent)
 
     # [FIX-3] Gunakan abort_event yang di-inject, atau buat baru jika tidak ada.
     if abort_event is None:
@@ -4290,9 +4937,21 @@ async def run_batch_debates(
     # Batas budget per-run diambil dari core.budget; fallback ke jumlah ticker.
     try:
         usage = get_usage()
-        max_budget = usage.get("pro_budget", len(tickers))
+        max_budget = (
+            max(0, int(max_executable_debates))
+            if max_executable_debates is not None
+            else max(
+                0,
+                int(usage.get("pro_budget", len(tickers)))
+                - int(usage.get("pro_calls", 0)),
+            )
+        )
     except Exception:
-        max_budget = len(tickers)
+        max_budget = (
+            max(0, int(max_executable_debates))
+            if max_executable_debates is not None
+            else len(tickers)
+        )
 
     total_tickers = len(tickers)
     progress_state = {"completed": 0}
@@ -4362,8 +5021,57 @@ async def run_batch_debates(
         def _finish_result(result: dict) -> dict:
             try:
                 metadata = _result_metadata(result)
+                regime_context = dict(
+                    result.get("regime_context")
+                    or ORCHESTRATOR_CONFIG.get("regime_context")
+                    or {}
+                )
+                hmm_regime = dict(
+                    result.get("hmm_regime")
+                    or ORCHESTRATOR_CONFIG.get("hmm_regime")
+                    or {}
+                )
+                result["regime_context"] = regime_context
+                result["hmm_regime"] = hmm_regime
+                if not result.get("trend_regime"):
+                    result["trend_regime"] = regime_context.get("trend_regime")
+                if not result.get("volatility_regime"):
+                    result["volatility_regime"] = regime_context.get(
+                        "volatility_regime"
+                    )
+                if not result.get("execution_regime"):
+                    result["execution_regime"] = regime_context.get(
+                        "execution_regime"
+                    )
+                if not result.get("execution_regime_reason"):
+                    result["execution_regime_reason"] = regime_context.get(
+                        "execution_regime_reason"
+                    )
+                if not result.get("trading_params"):
+                    result["trading_params"] = regime_context.get(
+                        "execution_params", {}
+                    )
+                metadata.setdefault(
+                    "execution_regime", result.get("execution_regime")
+                )
+                metadata.setdefault(
+                    "execution_regime_reason",
+                    result.get("execution_regime_reason"),
+                )
                 if run_id:
                     metadata.setdefault("run_id", run_id)
+                candidate = (candidates_by_ticker or {}).get(ticker, {})
+                candidate_snapshot = (
+                    candidate.get("market_snapshot")
+                    if isinstance(candidate.get("market_snapshot"), dict)
+                    else {}
+                )
+                if candidate_snapshot:
+                    metadata["market_snapshot"] = dict(candidate_snapshot)
+                    metadata["snapshot_id"] = candidate_snapshot.get(
+                        "snapshot_id"
+                    )
+                    metadata["data_hash"] = candidate_snapshot.get("data_hash")
                 metadata["duration_seconds"] = (
                     asyncio.get_event_loop().time() - started_at
                 )
@@ -4382,11 +5090,42 @@ async def run_batch_debates(
                     )
                 )
 
-            # 2. Tunggu slot rate limit
+            # 2. Build the deterministic setup before rate limiting or budget
+            # reservation. Non-executable candidates terminate here with zero
+            # LLM calls and still remain present in the batch result.
+            prepared_setup: dict[str, Any] | None = None
             _set_status(ticker, "QUEUED", step="fetching data")
+            prepare = getattr(chamber, "prepare_trade_setup", None)
+            if callable(prepare):
+                async with preflight_sem:
+                    prepared_setup = await prepare(
+                        ticker,
+                        current_price=0.0,
+                        sector=sector_key,
+                    )
+                setup_snapshot = prepared_setup.get("trade_setup_snapshot")
+                setup_snapshot = (
+                    setup_snapshot if isinstance(setup_snapshot, dict) else {}
+                )
+                if not bool(setup_snapshot.get("debate_eligible")):
+                    _set_status(ticker, "PREFLIGHT", step="running analysis")
+                    result = await _run_single_debate(
+                        ticker,
+                        chamber,
+                        sector=sector_key,
+                        prepared_setup=prepared_setup,
+                    )
+                    result["sector_key"] = sector_key
+                    final_rating = result.get("verdict", {}).get("rating") or (
+                        "ERROR" if result.get("error") else "NO_TRADE"
+                    )
+                    _set_status(ticker, final_rating, result)
+                    return _finish_result(result)
+
+            # 3. Only executable candidates consume an LLM rate-limit slot.
             await rate_limiter.acquire()
 
-            # 3. Tunggu slot konkurensi
+            # 4. Tunggu slot konkurensi
             async with sem:
                 _set_status(ticker, "DEBATING", step="running analysis")
                 await asyncio.sleep(ORCHESTRATOR_CONFIG["batch_delay"])
@@ -4407,15 +5146,35 @@ async def run_batch_debates(
                 # 5. Charge budget tepat sebelum eksekusi (atomik)
                 async with budget_lock:
                     if budget_state["spent"] >= max_budget:
-                        abort_event.set()
                         logger.warning(
-                            f"[{ticker}] Budget habis saat charge -- abort ditetapkan"
+                            f"[{ticker}] Kapasitas executable debate habis; "
+                            "ticker dipertahankan sebagai explicit terminal result"
                         )
-                        _set_status(ticker, "ABORTED", step="stopped")
+                        reason_code = "llm_budget_capacity_exhausted"
+                        reason = (
+                            "Tidak ada kapasitas LLM tersisa setelah deterministic "
+                            "preflight; setup belum memperoleh CIO evaluation."
+                        )
+                        capacity_result = _pre_cio_terminal_result(
+                            {"Ticker": ticker},
+                            reason_code=reason_code,
+                            reason=reason,
+                        )
+                        capacity_result["status"] = "skipped"
+                        capacity_result["execution_status"] = "INSUFFICIENT_DATA"
+                        capacity_result["verdict"]["execution_status"] = (
+                            "INSUFFICIENT_DATA"
+                        )
+                        capacity_result["metadata"].pop(
+                            "pre_cio_rejection", None
+                        )
+                        capacity_result["metadata"]["budget_capacity_rejection"] = {
+                            "reason_code": reason_code,
+                            "estimated_pro_calls_per_ticker": 8,
+                        }
+                        _set_status(ticker, "SKIPPED", capacity_result)
                         return _finish_result(
-                            _empty_result(
-                                ticker, "Budget exhausted at charge point", sector_key
-                            )
+                            capacity_result
                         )
 
                     budget_state["spent"] += 1
@@ -4427,7 +5186,10 @@ async def run_batch_debates(
                 # 6. Eksekusi
                 try:
                     result = await _run_single_debate(
-                        ticker, chamber, sector=sector_key
+                        ticker,
+                        chamber,
+                        sector=sector_key,
+                        prepared_setup=prepared_setup,
                     )
 
                     # Valuation disagreement: Graham FV (screener) vs debate engine FV
@@ -4438,6 +5200,22 @@ async def run_batch_debates(
                             )
 
                             cand = candidates_by_ticker.get(ticker, {})
+                            candidate_snapshot = (
+                                cand.get("market_snapshot")
+                                if isinstance(cand.get("market_snapshot"), dict)
+                                else {}
+                            )
+                            if candidate_snapshot:
+                                result.setdefault("metadata", {})
+                                result["metadata"]["market_snapshot"] = dict(
+                                    candidate_snapshot
+                                )
+                                result["metadata"]["snapshot_id"] = (
+                                    candidate_snapshot.get("snapshot_id")
+                                )
+                                result["metadata"]["data_hash"] = (
+                                    candidate_snapshot.get("data_hash")
+                                )
                             graham_fv = cand.get("Est. Fair Value (Graham)")
                             debate_fv = (result.get("verdict") or {}).get("fair_value")
                             if graham_fv or debate_fv:
@@ -4579,6 +5357,12 @@ async def run_batch_debates(
             # FIX: ISSUE 1 — Propagate the batch run_id before RAG evidence IDs are built.
             setattr(chamber, "run_id", run_id)
         setattr(chamber, "market_regime", ORCHESTRATOR_CONFIG.get("market_regime"))
+        setattr(chamber, "hmm_regime", ORCHESTRATOR_CONFIG.get("hmm_regime"))
+        setattr(
+            chamber,
+            "regime_context",
+            ORCHESTRATOR_CONFIG.get("regime_context"),
+        )
         results = await asyncio.gather(
             *[_guarded(t) for t in tickers],
             return_exceptions=True,
@@ -4744,6 +5528,8 @@ def select_top_n(
     results: list[dict],
     debate_records: list[dict] | None = None,
     realized_outcomes: list[TradeOutcome] | None = None,
+    *,
+    require_risk_deployable: bool = False,
 ) -> list[dict]:
     """
     Rank hasil debate dan kembalikan Top N dengan sector diversification.
@@ -4775,6 +5561,15 @@ def select_top_n(
         # occupy a top_n slot — the same report would otherwise show the entry
         # both ranked and actionability="reject".
         risk = entry.get("risk_governor")
+        if require_risk_deployable and not (
+            isinstance(risk, dict)
+            and risk.get("status") == "deployable"
+            and risk.get("sizing_allowed") is True
+        ):
+            logger.info(
+                f"[Rank] Excluded {entry['ticker']} – setup is not risk-deployable"
+            )
+            continue
         if isinstance(risk, dict) and risk.get("status") == "reject":
             logger.info(
                 f"[Rank] Excluded {entry['ticker']} – risk governor reject "
@@ -4831,16 +5626,25 @@ select_top3 = select_top_n
 # ---------------------------------------------------------------------------
 
 
+def _safe_direct_artifact_path(path: Path) -> Path:
+    """Contain one configured artifact within its declared parent directory."""
+
+    return resolve_within_root(path.parent, path.name)
+
+
 def _load_results_list(path: Path) -> list[dict[str, Any]]:
-    if not path.exists():
+    safe_path = _safe_direct_artifact_path(path)
+    if not safe_path.exists():
         return []
     try:
-        content = path.read_text(encoding="utf-8")
+        content = safe_path.read_text(encoding="utf-8")
         if not content.strip():
             return []
         loaded = json.loads(content)
     except Exception as e:
-        logger.warning(f"[Persist] Gagal membaca existing results dari {path}: {e}")
+        logger.warning(
+            f"[Persist] Gagal membaca existing results dari {safe_path}: {e}"
+        )
         return []
     if not isinstance(loaded, list):
         return []
@@ -4849,12 +5653,19 @@ def _load_results_list(path: Path) -> list[dict[str, Any]]:
 
 def save_full_results(results: list[dict], path: Path = FULL_RESULTS_PATH) -> None:
     """Simpan snapshot batch terakhir sebagai JSON tunggal."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    for r in results:
+    artifact_results = _canonicalize_results_for_artifact(results)
+    safe_path = _safe_direct_artifact_path(path)
+    safe_path.parent.mkdir(parents=True, exist_ok=True)
+    for r in artifact_results:
         if isinstance(r, dict) and "ticker" in r:
             sync_metric_aliases(r)
-    path.write_text(json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8")
-    logger.info(f"[Persist] Full batch snapshot ({len(results)} ticker) -> {path}")
+    safe_path.write_text(
+        json.dumps(artifact_results, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    logger.info(
+        f"[Persist] Full batch snapshot ({len(artifact_results)} ticker) -> {safe_path}"
+    )
 
 
 def save_merged_results(
@@ -4863,28 +5674,42 @@ def save_merged_results(
     seed_path: Path = FULL_RESULTS_PATH,
 ) -> None:
     """Simpan latest ticker state gabungan untuk dashboard dan histori lokal."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    existing_data = _load_results_list(path)
-    if not existing_data and seed_path != path:
-        existing_data = _load_results_list(seed_path)
+    incoming = [
+        canonicalize_result_identity(result)
+        for result in results
+        if not _is_batch_only_result(result)
+    ]
+    safe_path = _safe_direct_artifact_path(path)
+    safe_seed_path = _safe_direct_artifact_path(seed_path)
+    safe_path.parent.mkdir(parents=True, exist_ok=True)
+    existing_data = _load_results_list(safe_path)
+    if not existing_data and safe_seed_path != safe_path:
+        existing_data = _load_results_list(safe_seed_path)
 
-    data_dict = {
-        item["ticker"]: item
-        for item in existing_data
-        if isinstance(item, dict) and "ticker" in item
-    }
-    for r in results:
-        if isinstance(r, dict) and "ticker" in r:
-            sync_metric_aliases(r)
-            data_dict[r["ticker"]] = r
+    data_dict: dict[str, dict[str, Any]] = {}
+    for item in existing_data:
+        if _is_batch_only_result(item):
+            continue
+        try:
+            canonical = canonicalize_result_identity(item)
+        except (InvalidIDXTicker, TypeError) as exc:
+            logger.warning(
+                "[Persist] reason_code=invalid_existing_result_identity: {}",
+                exc,
+            )
+            continue
+        data_dict[canonical["ticker"]] = canonical
+    for result in incoming:
+        sync_metric_aliases(result)
+        data_dict[result["ticker"]] = result
 
     merged_results = list(data_dict.values())
-    path.write_text(
+    safe_path.write_text(
         json.dumps(merged_results, indent=2, ensure_ascii=False), encoding="utf-8"
     )
     logger.info(
         f"[Persist] Merged ticker state "
-        f"({len(results)} new/updated into {len(merged_results)} total) -> {path}"
+        f"({len(incoming)} new/updated into {len(merged_results)} total) -> {safe_path}"
     )
 
 
@@ -4893,10 +5718,20 @@ def save_single_agent_results(
     output_dir: Path = OUTPUT_DIR,
 ) -> None:
     """Persist standalone single-agent baseline results per ticker."""
-    single_dir = output_dir / "single_agent"
-    single_dir.mkdir(parents=True, exist_ok=True)
+    validated_results: list[tuple[Any, str]] = []
     for result in results:
-        path = single_dir / f"{result.ticker}.json"
+        try:
+            validated_results.append((result, normalize_idx_ticker(result.ticker)))
+        except InvalidIDXTicker as exc:
+            logger.warning(
+                "[SingleAgent] reason_code=invalid_ticker ticker={} detail={}",
+                result.ticker,
+                exc,
+            )
+    single_dir = resolve_within_root(output_dir, "single_agent")
+    single_dir.mkdir(parents=True, exist_ok=True)
+    for result, ticker in validated_results:
+        path = resolve_within_root(single_dir, f"{ticker}.json")
         path.write_text(result.model_dump_json(indent=2), encoding="utf-8")
         if result.verdict:
             logger.info(
@@ -4913,18 +5748,22 @@ def save_individual_debates(results: list[dict], output_dir: Path = OUTPUT_DIR) 
     Simpan setiap hasil debate yang sukses ke folder output/debates/ per ticker.
     Ini digunakan oleh historical_scorer untuk track record jangka panjang.
     """
-    debates_dir = output_dir / "debates"
+    eligible = [
+        canonicalize_result_identity(entry)
+        for entry in results
+        if entry.get("verdict")
+        and not entry.get("error")
+        and _dict_or_empty(entry.get("metadata")).get("artifact_scope")
+        != "batch_only"
+    ]
+    debates_dir = resolve_within_root(output_dir, "debates")
     debates_dir.mkdir(parents=True, exist_ok=True)
 
     count = 0
-    for entry in results:
-        # Hanya simpan yang punya verdict (berhasil didebat)
-        if not entry.get("verdict") or entry.get("error"):
-            continue
-
+    for entry in eligible:
         ticker = entry["ticker"]
         # Gunakan format nama yang konsisten dengan historical_scorer.py
-        file_path = debates_dir / f"{ticker}_debate.json"
+        file_path = resolve_within_root(debates_dir, f"{ticker}_debate.json")
 
         # Simpan individual file
         file_path.write_text(
@@ -4951,17 +5790,22 @@ def save_individual_debates_versioned(
     Untuk backward compatibility, file flat output/debates/{TICKER}_debate.json
     tetap ditulis agar historical_scorer lama tetap membaca latest record.
     """
-    debates_dir = output_dir / "debates"
+    eligible = [
+        canonicalize_result_identity(entry)
+        for entry in results
+        if entry.get("verdict")
+        and not entry.get("error")
+        and _dict_or_empty(entry.get("metadata")).get("artifact_scope")
+        != "batch_only"
+    ]
+    debates_dir = resolve_within_root(output_dir, "debates")
     debates_dir.mkdir(parents=True, exist_ok=True)
 
     count = 0
-    for entry in results:
-        if not entry.get("verdict") or entry.get("error"):
-            continue
-
+    for entry in eligible:
         ticker = entry["ticker"]
-        ticker_dir = debates_dir / ticker
-        version_dir = ticker_dir / f"v{timestamp}"
+        ticker_dir = resolve_within_root(debates_dir, ticker)
+        version_dir = resolve_within_root(ticker_dir, f"v{timestamp}")
         version_dir.mkdir(parents=True, exist_ok=True)
 
         payload = dict(entry)
@@ -4972,19 +5816,19 @@ def save_individual_debates_versioned(
             "versioned_output": True,
         }
 
-        version_file = version_dir / f"{ticker}_debate.json"
+        version_file = resolve_within_root(version_dir, f"{ticker}_debate.json")
         version_file.write_text(
             json.dumps(payload, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
 
-        latest_file = ticker_dir / "latest_debate.json"
+        latest_file = resolve_within_root(ticker_dir, "latest_debate.json")
         latest_file.write_text(
             json.dumps(payload, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
 
-        legacy_file = debates_dir / f"{ticker}_debate.json"
+        legacy_file = resolve_within_root(debates_dir, f"{ticker}_debate.json")
         legacy_file.write_text(
             json.dumps(payload, indent=2, ensure_ascii=False),
             encoding="utf-8",
@@ -5009,12 +5853,26 @@ def save_individual_debates_versioned(
 
 def _latest_debate_path_for_validation(results: list[dict], output_dir: Path) -> Path:
     for entry in results:
-        if entry.get("verdict") and not entry.get("error") and entry.get("ticker"):
-            return output_dir / "debates" / entry["ticker"] / "latest_debate.json"
+        if (
+            entry.get("verdict")
+            and not entry.get("error")
+            and entry.get("ticker")
+            and _dict_or_empty(entry.get("metadata")).get("artifact_scope")
+            != "batch_only"
+        ):
+            return _ticker_artifact_path(
+                output_dir, entry["ticker"], "latest_debate.json"
+            )
     for entry in results:
-        if entry.get("ticker"):
-            return output_dir / "debates" / entry["ticker"] / "latest_debate.json"
-    return output_dir / "debates" / "UNKNOWN" / "latest_debate.json"
+        if (
+            entry.get("ticker")
+            and _dict_or_empty(entry.get("metadata")).get("artifact_scope")
+            != "batch_only"
+        ):
+            return _ticker_artifact_path(
+                output_dir, entry["ticker"], "latest_debate.json"
+            )
+    return resolve_within_root(output_dir, "debates", "latest_debate.json")
 
 
 def _log_artifact_validation(results: list[dict]):
@@ -5042,12 +5900,28 @@ def _build_sizing_candidates(top_n: list[dict]) -> list[dict]:
     candidates: list[dict] = []
     for entry in top_n:
         risk = entry.get("risk_governor")
-        if isinstance(risk, dict) and risk.get("sizing_allowed") is False:
+        if not isinstance(risk, dict) or risk.get("sizing_allowed") is not True:
             continue
         verdict = entry.get("verdict") or {}
+        if str(verdict.get("rating") or "").upper() not in {
+            "STRONG_BUY",
+            "BUY",
+        }:
+            continue
         candidates.append(
             {
                 "ticker": entry.get("ticker") or verdict.get("ticker"),
+                **(
+                    {
+                        "regime_context": entry.get("regime_context"),
+                        "execution_regime": entry.get("execution_regime"),
+                        "execution_regime_reason": entry.get(
+                            "execution_regime_reason"
+                        ),
+                    }
+                    if entry.get("execution_regime")
+                    else {}
+                ),
                 "current_price": verdict.get("current_price"),
                 "entry_high": (
                     risk.get("entry_high") if isinstance(risk, dict) else None
@@ -5096,9 +5970,25 @@ def _apply_circuit_breaker(top_n: list[dict], portfolio_state: dict) -> bool:
 
 
 def _annotate_risk_governor(top_n: list[dict]) -> None:
-    """Attach deterministic actionability metadata before sizing/reporting."""
+    """Attach deterministic actionability metadata to a standalone entry list.
+
+    Not part of main()'s pipeline (per-result annotation now happens earlier,
+    via _attach_risk_governor_to_result inside _enhance_completed_results).
+    Kept as a simple, direct entry point onto annotate_risk() for callers and
+    tests that only have a bare {ticker, verdict} list and want risk_governor
+    attached without building the full _attach_risk_governor_to_result context.
+    """
     for entry in top_n:
-        entry.setdefault("market_regime", ORCHESTRATOR_CONFIG.get("market_regime"))
+        entry.setdefault(
+            "regime_context", ORCHESTRATOR_CONFIG.get("regime_context")
+        )
+        context = entry.get("regime_context")
+        if isinstance(context, dict):
+            entry.setdefault("execution_regime", context.get("execution_regime"))
+            entry.setdefault(
+                "execution_regime_reason",
+                context.get("execution_regime_reason"),
+            )
         try:
             decision = annotate_risk(entry)
             if not decision.sizing_allowed:
@@ -5170,6 +6060,146 @@ def _attach_sizing_to_results(results: list[dict], sizing_result: dict | None) -
         entry["position_sizing"] = positions[ticker]
         entry["allocation_reasoning"] = allocation_reasoning
         entry["deployment_scenario_comparison"] = scenario_comparison
+
+
+def _finalize_execution_decisions(results: list[dict]) -> None:
+    """Stamp one canonical post-risk, post-sizing decision on every result."""
+    from app.api.result_adapter import build_execution_decision
+
+    for entry in results:
+        if not isinstance(entry, dict):
+            continue
+        try:
+            decision = build_execution_decision(entry)
+        except (InvalidIDXTicker, TypeError) as exc:
+            logger.warning(
+                "[ExecutionDecision] reason_code=invalid_result_identity "
+                "ticker={} detail={}",
+                entry.get("ticker"),
+                exc,
+            )
+            continue
+        entry["execution_decision"] = decision
+        for field in (
+            "decision_contract_version",
+            "decision_source",
+            "execution_status",
+            "model_rating",
+            "model_confidence",
+            "policy_confidence",
+            "actionable",
+            "reason_codes",
+        ):
+            entry[field] = decision.get(field)
+        verdict = entry.get("verdict")
+        if isinstance(verdict, dict):
+            verdict["decision_source"] = decision.get("decision_source")
+            verdict["execution_status"] = decision.get("execution_status")
+            verdict["model_rating"] = decision.get("model_rating")
+            verdict["model_confidence"] = decision.get("model_confidence")
+            verdict["policy_confidence"] = decision.get("policy_confidence")
+
+
+def build_execution_funnel(results: list[dict]) -> dict[str, Any]:
+    """Return auditable counts from candidate intake through lot-sized output."""
+    counts = {
+        "quant_candidates": len(results),
+        "technical_data_complete": 0,
+        "trade_envelope_valid": 0,
+        "debated": 0,
+        "risk_deployable": 0,
+        "position_sized": 0,
+    }
+    status_counts: dict[str, int] = {}
+    ticker_outcomes: list[dict[str, Any]] = []
+    for entry in results:
+        metadata = (
+            entry.get("metadata")
+            if isinstance(entry.get("metadata"), dict)
+            else {}
+        )
+        setup = metadata.get("trade_setup_snapshot")
+        setup = setup if isinstance(setup, dict) else {}
+        setup_status = str(setup.get("status") or "").upper()
+        technical_status = str(
+            setup.get("technical_data_status") or ""
+        ).upper()
+        pre_cio = metadata.get("pre_cio_rejection")
+        pre_cio = pre_cio if isinstance(pre_cio, dict) else {}
+        if technical_status == "COMPLETE" or pre_cio.get(
+            "technical_data_complete"
+        ) is True:
+            counts["technical_data_complete"] += 1
+        if setup_status in {"EXECUTABLE", "WAIT_FOR_PULLBACK"}:
+            counts["trade_envelope_valid"] += 1
+
+        llm_calls = int(metadata.get("llm_calls") or 0)
+        if (
+            llm_calls > 0
+            or int(metadata.get("flash_calls") or 0) > 0
+            or int(metadata.get("pro_calls") or 0) > 0
+            or int(entry.get("debate_rounds") or 0) > 0
+        ):
+            counts["debated"] += 1
+
+        risk = (
+            entry.get("risk_governor")
+            if isinstance(entry.get("risk_governor"), dict)
+            else {}
+        )
+        if risk.get("status") == "deployable" and risk.get("sizing_allowed") is True:
+            counts["risk_deployable"] += 1
+
+        position = (
+            entry.get("position_sizing")
+            if isinstance(entry.get("position_sizing"), dict)
+            else {}
+        )
+        if (
+            int(position.get("lot") or 0) >= 1
+            and int(position.get("shares") or 0)
+            == int(position.get("lot") or 0) * 100
+            and float(position.get("max_loss_rp") or 0.0) > 0
+        ):
+            counts["position_sized"] += 1
+
+        execution_status = str(
+            entry.get("execution_status") or "INSUFFICIENT_DATA"
+        ).upper()
+        status_counts[execution_status] = status_counts.get(execution_status, 0) + 1
+        ticker_outcomes.append(
+            {
+                "ticker": entry.get("ticker"),
+                "trade_setup_status": setup_status or None,
+                "execution_status": execution_status,
+                "reason_codes": list(entry.get("reason_codes") or []),
+                "snapshot_id": metadata.get("snapshot_id"),
+                "data_hash": metadata.get("data_hash"),
+            }
+        )
+
+    return {
+        "contract_version": "execution-funnel-v1",
+        "counts": counts,
+        "execution_status_counts": status_counts,
+        "ticker_outcomes": ticker_outcomes,
+    }
+
+
+def save_execution_funnel(
+    results: list[dict],
+    path: Path,
+) -> dict[str, Any]:
+    artifact_results = _canonicalize_results_for_artifact(results)
+    funnel = build_execution_funnel(artifact_results)
+    safe_path = _safe_direct_artifact_path(path)
+    safe_path.parent.mkdir(parents=True, exist_ok=True)
+    safe_path.write_text(
+        json.dumps(funnel, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    logger.info("[ExecutionFunnel] {}", funnel["counts"])
+    return funnel
 
 
 def _dry_run_profile(sector_key: str) -> dict[str, Any]:
@@ -5348,6 +6378,18 @@ def _generate_mock_debate_results(
                     "dry_run": True,
                     "mock_profile": sector_key,
                     "prompt_version": PROMPT_VERSION,
+                    "flash_calls": 0,
+                    "pro_calls": 0,
+                    "llm_calls": 0,
+                    "trade_setup_snapshot": {
+                        "version": "dry-run-1.0",
+                        "ticker": ticker,
+                        "status": "EXECUTABLE",
+                        "reason_code": "dry_run_synthetic_setup",
+                        "reason": "Synthetic executable setup for dry-run validation.",
+                        "debate_eligible": True,
+                        "technical_data_status": "COMPLETE",
+                    },
                 },
             }
         )
@@ -5413,6 +6455,16 @@ def _batch_metadata_value(results: list[dict], key: str) -> str | None:
     return None
 
 
+def _result_snapshot_provenance(result: dict[str, Any]) -> tuple[str, str]:
+    metadata = result.get("metadata") if isinstance(result, dict) else {}
+    metadata = metadata if isinstance(metadata, dict) else {}
+    snapshot = metadata.get("market_snapshot")
+    snapshot = snapshot if isinstance(snapshot, dict) else {}
+    snapshot_id = snapshot.get("snapshot_id") or metadata.get("snapshot_id") or "-"
+    data_hash = snapshot.get("data_hash") or metadata.get("data_hash") or "-"
+    return str(snapshot_id), str(data_hash)
+
+
 def _conviction_breakdown_row(
     score: float, model_confidence: float, verdict: dict
 ) -> str:
@@ -5471,6 +6523,9 @@ def generate_top3_report(
     select_top3 â€" tidak ada pemanggilan ulang compute_conviction_score.
     Untuk ticker error (tidak masuk select_top3), skor default 0.0.
     """
+    top_n = _canonicalize_results_for_artifact(top_n)
+    all_results = _canonicalize_results_for_artifact(all_results)
+    path = _safe_direct_artifact_path(path)
     timestamp = get_local_timestamp()
     batch_timestamp = _batch_metadata_value(all_results, "batch_timestamp")
     run_id = _batch_metadata_value(all_results, "run_id")
@@ -5482,6 +6537,32 @@ def generate_top3_report(
         if r.get("verdict", {}).get("rating") not in EXCLUDED_RATINGS
         and r.get("verdict")
     )
+    report_regime_context = dict(
+        next(
+            (
+                result.get("regime_context")
+                for result in all_results
+                if isinstance(result.get("regime_context"), dict)
+            ),
+            ORCHESTRATOR_CONFIG.get("regime_context") or {},
+        )
+        or {}
+    )
+    execution_regime = str(
+        report_regime_context.get("execution_regime") or "UNKNOWN"
+    )
+    execution_reason = str(
+        report_regime_context.get("execution_regime_reason") or "unspecified"
+    )
+    trend_payload = report_regime_context.get("trend_regime") or {}
+    trend_regime = (
+        trend_payload.get("label")
+        if isinstance(trend_payload, dict)
+        else trend_payload
+    ) or "UNKNOWN"
+    volatility_regime = str(
+        report_regime_context.get("volatility_regime") or "UNKNOWN"
+    )
 
     lines: list[str] = [
         f"# TOP {selected_count} HIGH-CONVICTION IHSG SWING TRADES",
@@ -5489,8 +6570,30 @@ def generate_top3_report(
         f"> **Generated**: {timestamp}",
         f"> **Batch Timestamp**: {batch_timestamp or '-'}",
         f"> **Run ID**: {run_id or '-'}",
+        f"> **Execution Regime**: {execution_regime}",
+        f"> **Execution Regime Reason**: {execution_reason}",
+        f"> **Trend Regime (diagnostic)**: {trend_regime}",
+        f"> **Volatility Regime (diagnostic)**: {volatility_regime}",
         "> **Pipeline**: Quant Scouting -> Multi-Agent Debate -> CIO Verdict",
         f"> **Stocks Debated**: {total_debated} | **Eligible (BUY/STRONG_BUY)**: {eligible} | **Selected**: {selected_count}",
+        "",
+        "---",
+        "",
+    ]
+    lines += [
+        "## Market Snapshot Provenance",
+        "",
+        "| Ticker | Snapshot ID | Data Hash |",
+        "|---|---|---|",
+        *[
+            (
+                f"| {entry.get('ticker', '-')} | "
+                f"{_result_snapshot_provenance(entry)[0]} | "
+                f"{_result_snapshot_provenance(entry)[1]} |"
+            )
+            for entry in all_results
+            if isinstance(entry, dict)
+        ],
         "",
         "---",
         "",
@@ -5500,8 +6603,9 @@ def generate_top3_report(
         lines += [
             f"**Tidak ada saham yang memenuhi syarat untuk Top {ORCHESTRATOR_CONFIG['top_n_selection']}.**",
             "",
-            "Semua kandidat diberi rating HOLD, AVOID, atau SELL oleh CIO Judge. "
-            "Tidak ada swing trade high-conviction yang teridentifikasi dalam batch ini.",
+            "Tidak ada setup yang mencapai status risk-deployable dan position-sized. "
+            "Lihat canonical execution status serta reason codes pada batch report; "
+            "NO_TRADE adalah hasil kebijakan yang valid, bukan kegagalan pipeline.",
         ]
         report_text = "\n".join(lines)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -5799,7 +6903,14 @@ async def main(
     Step 3:  Score & rank dengan historical records + sector diversification.
     Step 4:  Persist + generate Markdown report.
     """
+    ticker_override = normalize_idx_tickers(
+        list(tickers or CLI_TICKERS_OVERRIDE or []),
+        require_nonempty=False,
+    )
     _reset_orchestrator_runtime_config()
+    from utils.market_data_cache import clear_run_cache
+
+    await clear_run_cache()
     if not _CLI_LOGGING_CONFIGURED:
         configure_cli_logging(verbose=False)
     _cli_renderer.reset_run()
@@ -5842,8 +6953,6 @@ async def main(
     except Exception as e:
         logger.warning(f"[BacktestEval] Auto-eval failed: {e}")
 
-    ticker_override = list(tickers or CLI_TICKERS_OVERRIDE or [])
-
     reset_budget()
     if user_config is None:
         if ticker_override:
@@ -5874,7 +6983,37 @@ async def main(
         await asyncio.to_thread(_maybe_refresh_macro_rates)
         await asyncio.to_thread(_maybe_refresh_sector_benchmarks)
 
-    # Step 0a: Dependency Validation
+    # Step 0a: Resolve one canonical execution regime before filter/intake.
+    _cli_renderer.phase("Market Regime")
+    regime_snapshot = await detect_market_regime()
+    regime_snapshot_payload = regime_snapshot.model_dump()
+    hmm_regime = await detect_hmm_regime()
+    regime_context = resolve_execution_regime(
+        rule_snapshot=regime_snapshot_payload,
+        hmm_state=hmm_regime,
+    )
+    ORCHESTRATOR_CONFIG["market_regime"] = regime_snapshot_payload
+    ORCHESTRATOR_CONFIG["hmm_regime"] = hmm_regime
+    ORCHESTRATOR_CONFIG["regime_context"] = regime_context
+    vol = regime_snapshot.volatility
+    regime: str = regime_context["execution_regime"]
+    regime_params = dict(regime_context["operational_params"])
+    logger.info(
+        "[Regime] execution={} reason={} -- applying overrides: {}",
+        regime,
+        regime_context["execution_regime_reason"],
+        regime_params,
+    )
+    _apply_regime_params(regime_params)
+    _cli_renderer.render_market_regime(
+        volatility=vol,
+        execution_regime=regime,
+        regime_context=regime_context,
+        regime_params=regime_params,
+        snapshot=regime_snapshot_payload,
+    )
+
+    # Step 0b: Dependency Validation
     _cli_renderer.phase("Candidate Validation")
     if ticker_override:
         logger.info(
@@ -5882,24 +7021,48 @@ async def main(
             "skip quant filter dan top10_candidates.json."
         )
     else:
-        # Force a fresh screen when the cached candidates were produced under a
-        # different screener mode; a fresh same-mode cache is reused as before.
+        # Reuse candidates only when screener strategy and execution authority
+        # match the context that produced the cache.
         cached_mode = read_candidates_screener_mode(JSON_PATH)
-        force_rerun = cached_mode != run_screener_mode
+        cached_execution_regime = read_candidates_execution_regime(JSON_PATH)
+        cached_snapshot_contract_ok = _candidate_file_has_snapshot_contract(
+            JSON_PATH
+        )
+        force_rerun = _candidate_cache_context_mismatch(
+            cached_mode=cached_mode,
+            requested_mode=run_screener_mode,
+            cached_execution_regime=cached_execution_regime,
+            execution_regime=regime_context["execution_regime"],
+        ) or not cached_snapshot_contract_ok
         validation = check_candidates_file(JSON_PATH, settings.CANDIDATES_MAX_AGE_HOURS)
         if force_rerun or not validation.is_valid:
             if force_rerun or settings.CANDIDATES_AUTO_RERUN:
                 if force_rerun:
                     logger.info(
-                        f"[Validator] cached screener_mode={cached_mode} != "
-                        f"requested {run_screener_mode}: rerun quant filter."
+                        "[Validator] candidate cache context mismatch: "
+                        f"screener={cached_mode!r}->{run_screener_mode!r}, "
+                        f"execution_regime={cached_execution_regime!r}->"
+                        f"{regime_context['execution_regime']!r}; "
+                        f"snapshot_contract={cached_snapshot_contract_ok}; "
+                        "rerun quant filter."
                     )
                 else:
                     logger.info(
                         f"[Validator] {validation.message} Auto-rerun quant filter."
                     )
                 if not maybe_rerun_quant_filter(
-                    output_dir=OUTPUT_DIR, mode=run_screener_mode
+                    output_dir=OUTPUT_DIR,
+                    mode=run_screener_mode,
+                    execution_regime=regime_context["execution_regime"],
+                    execution_regime_reason=regime_context[
+                        "execution_regime_reason"
+                    ],
+                    trend_regime=(
+                        regime_context.get("trend_regime") or {}
+                    ).get("label"),
+                    volatility_regime=regime_context.get(
+                        "volatility_regime"
+                    ),
                 ):
                     revalidation = check_candidates_file(
                         JSON_PATH, settings.CANDIDATES_MAX_AGE_HOURS
@@ -5936,28 +7099,9 @@ async def main(
         else:
             logger.info(f"[Validator] {validation.message}")
 
-    # Step 0b: Market Regime Detection
-    _cli_renderer.phase("Market Regime")
-    regime_snapshot = await detect_market_regime()
-    regime_snapshot_payload = regime_snapshot.model_dump()
-    ORCHESTRATOR_CONFIG["market_regime"] = regime_snapshot_payload
-    vol = regime_snapshot.volatility
-    regime: RegimeType = regime_snapshot.regime
-    regime_params = get_regime_params(regime)
-    if regime_params:
-        logger.info(f"[Regime] {regime} -- applying overrides: {regime_params}")
-        _apply_regime_params(regime_params)
-    else:
-        logger.info(f"[Regime] {regime} -- no overrides applied.")
-    _cli_renderer.render_market_regime(
-        volatility=vol,
-        regime=regime,
-        regime_params=regime_params,
-        snapshot=regime_snapshot_payload,
-    )
-
     # Step 1: Parse
     _cli_renderer.phase("Candidate Intake")
+    pre_cio_rejections: list[dict[str, Any]] = []
     try:
         if ticker_override:
             tickers = ticker_override
@@ -5966,13 +7110,30 @@ async def main(
             logger.info(f"[CLI] {len(tickers)} ticker dari --tickers: {tickers}")
         else:
             candidates = _load_quant_candidates(JSON_PATH)
-            candidates = _apply_candidate_intake(candidates)
-            candidates = _apply_pre_cio_filters(candidates, regime)
-            tickers = parse_report(candidates=candidates)
+            candidates = _apply_candidate_intake(
+                candidates,
+                rejected_results=pre_cio_rejections,
+            )
+            candidates = _apply_pre_cio_filters(
+                candidates,
+                regime,
+                rejected_results=pre_cio_rejections,
+            )
+            candidates = _apply_critical_risk_filter(
+                candidates,
+                rejected_results=pre_cio_rejections,
+            )
+            tickers = parse_report(candidates=candidates) if candidates else []
             sector_map = parse_sector_map(candidates=candidates)
             candidates_by_ticker = {
-                c["Ticker"]: c for c in candidates if c.get("Ticker")
+                _candidate_ticker(c): c
+                for c in candidates
+                if validate_ticker(_candidate_ticker(c))
             }
+            await _seed_candidate_market_snapshots(
+                candidates,
+                output_dir=OUTPUT_DIR,
+            )
     except (FileNotFoundError, ValueError) as e:
         logger.error(f"[Orchestrator] {e}")
         _cli_renderer.flush_buffered_alerts()
@@ -6005,7 +7166,7 @@ async def main(
             _cli_renderer.flush_buffered_alerts()
             return
 
-    if not dry_run:
+    if not dry_run and tickers:
         _cli_renderer.phase("Provider Health")
         provider_health = await check_all_providers(tickers)
         _cli_renderer.render_provider_health(provider_health)
@@ -6053,29 +7214,27 @@ async def main(
     abort_event = asyncio.Event()
     _setup_abort_signal(asyncio.get_running_loop(), abort_event)
 
-    # Budget reservation: ensure enough pro calls remain for all tickers
+    # Deterministic preflight must inspect every candidate before any LLM budget
+    # reservation. The per-task charge inside run_batch_debates applies only to
+    # setups that are actually debate-eligible.
     _PRO_CALLS_PER_TICKER_ESTIMATE = 8  # conservative; tune from telemetry
     _budget_usage = get_usage()
     _remaining_pro = _budget_usage["pro_budget"] - _budget_usage["pro_calls"]
     _max_feasible = _remaining_pro // _PRO_CALLS_PER_TICKER_ESTIMATE
     if _max_feasible <= 0:
-        logger.error(
-            "[Orchestrator] Pro budget exhausted before debate batch (%d/%d calls used).",
+        logger.warning(
+            "[Orchestrator] Pro budget exhausted ({}/{} calls used); "
+            "deterministic preflight will still run and eligible debates will abort.",
             _budget_usage["pro_calls"],
             _budget_usage["pro_budget"],
         )
-        raise BudgetExhaustedError(
-            "Pro budget exhausted before debate batch could start."
-        )
-    if _max_feasible < len(tickers):
-        _skipped = tickers[_max_feasible:]
-        tickers = tickers[:_max_feasible]
+    elif _max_feasible < len(tickers):
         logger.warning(
-            "[Orchestrator] Budget allows %d/%d tickers (%d remaining pro calls). Skipping: %s",
+            "[Orchestrator] Estimated Pro budget covers {}/{} tickers "
+            "({} remaining calls); all candidates still enter deterministic preflight.",
             _max_feasible,
-            _max_feasible + len(_skipped),
+            len(tickers),
             _remaining_pro,
-            _skipped,
         )
 
     _cli_renderer.start_batch_progress(tickers)
@@ -6102,8 +7261,16 @@ async def main(
                     run_id=ledger_run_id,
                     chamber_factory=chamber_factory,
                     candidates_by_ticker=candidates_by_ticker,
+                    max_executable_debates=max(0, _max_feasible),
                 )
             _enhance_completed_results(results, ledger_run_id, fetch_news=not dry_run)
+            if pre_cio_rejections:
+                for terminal_result in pre_cio_rejections:
+                    _stamp_execution_regime_contract(terminal_result)
+                    terminal_metadata = _result_metadata(terminal_result)
+                    terminal_metadata["run_id"] = ledger_run_id
+                    terminal_metadata["duration_seconds"] = 0.0
+                results.extend(pre_cio_rejections)
             await _inject_forecast_reports(results)
             _log_risk_warn_distribution(results)
             for result in results:
@@ -6132,30 +7299,41 @@ async def main(
     _cli_renderer.phase("Scoring and Sizing")
     debate_records = load_debate_history(OUTPUT_DIR)
     realized_outcomes = load_realized_outcomes()
-    top_n = select_top_n(
-        results,
-        debate_records=debate_records,
-        realized_outcomes=realized_outcomes,
-    )
     _portfolio_state = portfolio_state or (user_config or {}).get("portfolio_state", {})
-    if not _apply_circuit_breaker(top_n, _portfolio_state):
-        _annotate_risk_governor(top_n)
+    buy_universe = [
+        entry
+        for entry in results
+        if str((entry.get("verdict") or {}).get("rating") or "").upper()
+        in {"BUY", "STRONG_BUY"}
+    ]
+    if _apply_circuit_breaker(buy_universe, _portfolio_state):
+        top_n = []
+    else:
+        top_n = select_top_n(
+            results,
+            debate_records=debate_records,
+            realized_outcomes=realized_outcomes,
+            require_risk_deployable=True,
+        )
     sizing_candidates = _build_sizing_candidates(top_n)
+    batch_regime_context = dict(
+        ORCHESTRATOR_CONFIG.get("regime_context") or {}
+    )
     _regime_tp = next(
         (
             e.get("trading_params")
             for e in top_n
             if isinstance(e.get("trading_params"), dict)
         ),
-        None,
+        batch_regime_context.get("execution_params"),
     )
     _regime_lbl = next(
         (
-            str((e.get("regime") or {}).get("label", "")).upper()
+            str(e.get("execution_regime") or "").upper()
             for e in top_n
-            if e.get("regime")
+            if e.get("execution_regime")
         ),
-        "",
+        str(batch_regime_context.get("execution_regime") or ""),
     )
     if _regime_tp:
         user_config = {
@@ -6180,6 +7358,9 @@ async def main(
         f"({sizing_result['summary']['deployed_pct'] * 100:.1f}%)"
     )
     _attach_sizing_to_results(results, sizing_result)
+    _finalize_execution_decisions(results)
+    execution_funnel_path = OUTPUT_DIR / "execution_funnel.json"
+    save_execution_funnel(results, execution_funnel_path)
     _cli_renderer.render_scoring_summary(
         results=results,
         top_n=top_n,
@@ -6209,6 +7390,12 @@ async def main(
         run_id=ledger_run_id,
         artifact="full_batch_results.json",
         path=FULL_RESULTS_PATH,
+        ticker_count=len(results),
+    )
+    _ledger_artifact_write(
+        run_id=ledger_run_id,
+        artifact="execution_funnel.json",
+        path=execution_funnel_path,
         ticker_count=len(results),
     )
     save_individual_debates_versioned(
@@ -6252,6 +7439,7 @@ async def main(
     persistence_outputs = [
         FULL_RESULTS_PATH,
         MERGED_RESULTS_PATH,
+        execution_funnel_path,
         TOP3_REPORT_PATH,
         OUTPUT_DIR / "latest_batch_report.md",
         OUTPUT_DIR / "debates",

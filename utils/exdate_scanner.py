@@ -17,6 +17,8 @@ from typing import TypedDict
 
 import pandas as pd
 
+from utils.ticker import InvalidIDXTicker, normalize_idx_ticker, to_yfinance_symbol
+
 
 # ── Constants ────────────────────────────────────────────────────────────────
 
@@ -73,7 +75,14 @@ def scan_exdate(ticker: str, current_price: float = 0.0) -> ExDateInfo:
     }
 
     try:
-        t = _get_yfinance().Ticker(f"{ticker}.JK")
+        ticker = normalize_idx_ticker(ticker)
+        symbol = to_yfinance_symbol(ticker)
+    except InvalidIDXTicker as exc:
+        logger.warning(f"[ExDate] invalid ticker rejected before fetch: {exc}")
+        return _CLEAR
+
+    try:
+        t = _get_yfinance().Ticker(symbol)
 
         # ── 1. Get upcoming dividends from yfinance calendar ─────────────────
         # yfinance returns a dict with "Ex-Dividend Date" as a Timestamp or None

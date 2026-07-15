@@ -1,7 +1,10 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from core.backtest_memory import BacktestMemory, TradeOutcome
+from utils.ticker import InvalidIDXTicker
 
 
 def _outcome(
@@ -42,6 +45,29 @@ def test_record_and_query_by_ticker_returns_correct_records(tmp_path: Path) -> N
     assert len(results) == 1
     assert results[0].ticker == "BBCA"
     assert results[0].pnl_pct == 10
+
+
+def test_ticker_alias_is_canonicalized_for_storage_and_query(tmp_path: Path) -> None:
+    memory = BacktestMemory(tmp_path / "backtest_memory.jsonl")
+    memory.record(_outcome(ticker="bbca.jk"))
+
+    results = memory.query(ticker="BBCA.JK")
+
+    assert [record.ticker for record in results] == ["BBCA"]
+
+
+def test_invalid_query_ticker_is_rejected_before_store_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    memory = BacktestMemory(tmp_path / "backtest_memory.jsonl")
+
+    def unexpected_read() -> list[TradeOutcome]:
+        pytest.fail("invalid ticker reached backtest-memory read")
+
+    monkeypatch.setattr(memory, "_read_all", unexpected_read)
+    with pytest.raises(InvalidIDXTicker):
+        memory.query(ticker="../escape")
 
 
 def test_query_by_verdict_rating_filters_correctly(tmp_path: Path) -> None:
@@ -123,6 +149,26 @@ def test_old_jsonl_records_without_evaluation_metadata_still_load(
 
     assert len(records) == 1
     assert records[0].evaluation_method is None
+
+
+def test_corrupt_and_invalid_ticker_lines_are_skipped_per_record(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "backtest_memory.jsonl"
+    valid = _outcome(ticker="BBCA").model_dump(mode="json")
+    invalid_ticker = {**valid, "ticker": "../escape"}
+    path.write_text(
+        "not-json\n"
+        + json.dumps(invalid_ticker)
+        + "\n"
+        + json.dumps(valid)
+        + "\n",
+        encoding="utf-8",
+    )
+
+    records = BacktestMemory(path).all_records()
+
+    assert [record.ticker for record in records] == ["BBCA"]
 
 
 def test_replace_all_creates_backup_and_preserves_records(tmp_path: Path) -> None:

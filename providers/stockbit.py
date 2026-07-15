@@ -30,6 +30,7 @@ from utils.helpers import (
     parse_key_statistic_results_item_value,
 )
 from utils.logger_config import logger
+from utils.ticker import normalize_idx_ticker
 
 load_dotenv()
 
@@ -45,6 +46,8 @@ class StockBit:
         """
         logger.info("StockBit provider initialised")
         self.stocks = stocks
+        for stock in self.stocks:
+            stock.ticker = self._ticker(stock)
         self.base_url = "https://exodus.stockbit.com"
         self.key_statistic = None
         from services.stockbit_api_client import StockbitApiClient
@@ -71,7 +74,8 @@ class StockBit:
             - Logs an error message if the request fails due to an exception.
             - Logs an informational message if the request fails after all retries.
         """
-        url = f"{self.base_url}/keystats/ratio/v1/{stock.ticker}?year_limit=10"
+        ticker = self._ticker(stock)
+        url = f"{self.base_url}/keystats/ratio/v1/{ticker}?year_limit=10"
 
         return self.stockbit_api_client.get(url)
 
@@ -447,9 +451,8 @@ class StockBit:
         Returns:
         - Stock: The stock price data extracted from the response.
         """
-        url = (
-            f"{self.base_url}/company-price-feed/v2/orderbook/companies/{stock.ticker}"
-        )
+        ticker = self._ticker(stock)
+        url = f"{self.base_url}/company-price-feed/v2/orderbook/companies/{ticker}"
 
         return self.stockbit_api_client.get(url)
 
@@ -553,7 +556,8 @@ class StockBit:
         Returns:
         - dict: A dictionary containing the response data from the HTTP GET request.
         """
-        url = f"{self.base_url}/stream/v3/symbol/{stock.ticker}/pinned"
+        ticker = self._ticker(stock)
+        url = f"{self.base_url}/stream/v3/symbol/{ticker}/pinned"
 
         return self.stockbit_api_client.get(url)
 
@@ -563,7 +567,8 @@ class StockBit:
         # di-enrich (price/fundamental) memicu repr pydantic siklik ->
         # RecursionError untuk SEMUA ticker. Evaluasi fallback secara lazy.
         ticker = getattr(stock, "ticker", None)
-        return ticker if ticker is not None else str(stock)
+        raw_ticker = ticker if ticker is not None else str(stock)
+        return normalize_idx_ticker(raw_ticker)
 
     @staticmethod
     def _extract_stream_posts(raw: dict | list | None) -> list[dict]:

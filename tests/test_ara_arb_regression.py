@@ -9,7 +9,9 @@ for stocks that had touched ARA/ARB territory intraday.
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
+from core.idx_market_params import ara_upper_limit
 from core.risk_governor import _ara_sessions_needed
 from core.quant_filter.pipeline import compute_ara_arb_risk
 
@@ -103,12 +105,21 @@ def test_output_fields_unchanged():
     assert set(result.keys()) == {"arb_lock_risk", "ara_entry_risk", "ara_arb_note"}
 
 
-def test_ara_sessions_needed_uses_current_idx_price_boundaries():
-    """Rp100/Rp250 must use 25%/20% ARA, not the older broad 35%/<200 rule."""
+def test_ara_sessions_needed_preserves_unaffected_idx_price_bands():
+    """Keep coverage for price bands unaffected by the Rp50-Rp200 defect."""
     assert _ara_sessions_needed(50.0, 67.0) == 1       # <=50: 35% ARA
-    assert _ara_sessions_needed(100.0, 126.0) == 2    # 50-200: 25% ARA
     assert _ara_sessions_needed(250.0, 310.0) == 1    # 200-5000: 25% ARA (250*1.25=312.5 > 310)
     assert _ara_sessions_needed(6000.0, 7300.0) == 2  # >5000: 20% ARA (6000*1.20=7200 < 7300)
+
+
+def test_ara_50_to_200_band_uses_current_35pct_rule():
+    assert ara_upper_limit(50.0) == pytest.approx(0.35)
+    assert ara_upper_limit(100.0) == pytest.approx(0.35)
+    assert ara_upper_limit(200.0) == pytest.approx(0.35)
+    assert ara_upper_limit(201.0) == pytest.approx(0.25)
+    assert ara_upper_limit(5000.0) == pytest.approx(0.25)
+    assert ara_upper_limit(5001.0) == pytest.approx(0.20)
+    assert _ara_sessions_needed(100.0, 126.0) == 1
 
 
 # ── Task 2 regression test ─────────────────────────────────────────────────────

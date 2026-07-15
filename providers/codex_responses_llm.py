@@ -7,6 +7,7 @@ instead of the standard Developer API (chat/completions).
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any, AsyncIterator, Dict, Iterator, List, Optional
 
@@ -28,6 +29,7 @@ from openai import AsyncOpenAI, OpenAI
 from pydantic import SecretStr, PrivateAttr, field_validator
 
 from utils.logger_config import logger
+from utils.secret_redaction import redact_secrets
 
 REASONING_EFFORTS = {"none", "minimal", "low", "medium", "high", "xhigh"}
 
@@ -43,6 +45,7 @@ class ChatCodexResponses(BaseChatModel):
     max_tokens: Optional[int] = None
     reasoning_effort: Optional[str] = None
     base_url: Optional[str] = None
+    credential_type: str = "oauth"
 
     _client: Any = PrivateAttr()
     _sync_client: Any = PrivateAttr()
@@ -65,7 +68,15 @@ class ChatCodexResponses(BaseChatModel):
 
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
-        base_url = self.base_url or "https://chatgpt.com/backend-api/codex"
+        self._rebuild_clients()
+
+    def _rebuild_clients(self) -> None:
+        default_base_url = (
+            "https://api.openai.com/v1"
+            if self.credential_type == "managed_api_key"
+            else "https://chatgpt.com/backend-api/codex"
+        )
+        base_url = self.base_url or default_base_url
         self._client = AsyncOpenAI(
             api_key=self.api_key.get_secret_value(),
             base_url=base_url,
@@ -76,6 +87,40 @@ class ChatCodexResponses(BaseChatModel):
             base_url=base_url,
             timeout=self.request_timeout,
         )
+
+    def _recover_auth_sync(self, exc: Exception) -> None:
+        from providers.oauth_manager import (
+            CodexAuthRecoveryExhausted,
+            codex_token_fingerprint,
+            get_codex_credential_type,
+            is_codex_auth_expiry_error,
+            recover_codex_token_after_auth_failure,
+        )
+
+        if not is_codex_auth_expiry_error(exc):
+            raise exc
+        if self.credential_type == "managed_api_key":
+            raise CodexAuthRecoveryExhausted(
+                "Managed Codex API key was rejected; automatic OAuth recovery "
+                "is unavailable."
+            ) from exc
+        rejected_fingerprint = codex_token_fingerprint(
+            self.api_key.get_secret_value()
+        )
+        try:
+            recovered_token = recover_codex_token_after_auth_failure(
+                rejected_token_fingerprint=rejected_fingerprint
+            )
+        except Exception as recovery_exc:
+            raise CodexAuthRecoveryExhausted(
+                "Codex request failed after one credential recovery attempt."
+            ) from recovery_exc
+        self.api_key = SecretStr(recovered_token)
+        self.credential_type = get_codex_credential_type(recovered_token)
+        self._rebuild_clients()
+
+    async def _recover_auth_async(self, exc: Exception) -> None:
+        await asyncio.to_thread(self._recover_auth_sync, exc)
 
     @property
     def _llm_type(self) -> str:
@@ -205,8 +250,31 @@ class ChatCodexResponses(BaseChatModel):
         try:
             stream = await self._client.responses.create(**api_kwargs)
         except Exception as exc:
-            logger.error(f"[Codex Responses] Connection failed: {exc}")
-            raise
+            from providers.oauth_manager import (
+                CodexAuthRecoveryExhausted,
+                is_codex_auth_expiry_error,
+            )
+
+            if not is_codex_auth_expiry_error(exc):
+                logger.error(
+                    "[Codex Responses] Connection failed: {}",
+                    redact_secrets(exc),
+                )
+                raise
+            await self._recover_auth_async(exc)
+            try:
+                stream = await self._client.responses.create(**api_kwargs)
+            except Exception as retry_exc:
+                if is_codex_auth_expiry_error(retry_exc):
+                    raise CodexAuthRecoveryExhausted(
+                        "Codex request still unauthorized after one credential "
+                        "recovery and replay."
+                    ) from retry_exc
+                logger.error(
+                    "[Codex Responses] Replay failed: {}",
+                    redact_secrets(retry_exc),
+                )
+                raise
 
         async for event in stream:
             event_type = getattr(event, "type", "")
@@ -310,8 +378,31 @@ class ChatCodexResponses(BaseChatModel):
         try:
             stream = self._sync_client.responses.create(**api_kwargs)
         except Exception as exc:
-            logger.error(f"[Codex Responses] Connection failed: {exc}")
-            raise
+            from providers.oauth_manager import (
+                CodexAuthRecoveryExhausted,
+                is_codex_auth_expiry_error,
+            )
+
+            if not is_codex_auth_expiry_error(exc):
+                logger.error(
+                    "[Codex Responses] Connection failed: {}",
+                    redact_secrets(exc),
+                )
+                raise
+            self._recover_auth_sync(exc)
+            try:
+                stream = self._sync_client.responses.create(**api_kwargs)
+            except Exception as retry_exc:
+                if is_codex_auth_expiry_error(retry_exc):
+                    raise CodexAuthRecoveryExhausted(
+                        "Codex request still unauthorized after one credential "
+                        "recovery and replay."
+                    ) from retry_exc
+                logger.error(
+                    "[Codex Responses] Replay failed: {}",
+                    redact_secrets(retry_exc),
+                )
+                raise
 
         for event in stream:
             event_type = getattr(event, "type", "")

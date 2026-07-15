@@ -90,6 +90,31 @@ def test_chunk_context_pack_returns_chunks_for_non_empty_categories(
     assert "Risk Overvalued: False" in fair_value_chunk.content
 
 
+def test_fair_value_chunk_renders_missing_anchor_without_negative_100_pct(
+    tmp_path: Path,
+) -> None:
+    store = EvidenceRanker(tmp_path / "evidence.jsonl")
+    pack = _pack().model_copy(
+        update={
+            "fair_value": None,
+            "fair_value_base": None,
+            "fair_value_low": None,
+            "fair_value_high": None,
+            "missing_fields": ["fair_value"],
+        }
+    )
+
+    chunks = store.chunk_context_pack(pack, run_id="run-1")
+    fair_value_chunk = next(
+        chunk for chunk in chunks if chunk.category == "fair_value"
+    )
+
+    assert "Fair Value Base: INSUFFICIENT_DATA" in fair_value_chunk.content
+    assert "Fair Value Range: INSUFFICIENT_DATA" in fair_value_chunk.content
+    assert "Upside: INSUFFICIENT_DATA" in fair_value_chunk.content
+    assert "-100%" not in fair_value_chunk.content
+
+
 def test_chunk_context_pack_uses_source_timestamp_for_staleness(
     tmp_path: Path,
 ) -> None:

@@ -1,5 +1,7 @@
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from utils.ticker import normalize_idx_tickers
+
 
 class DebateStreamRequest(BaseModel):
     tickers: list[str] = Field(..., min_length=1, max_length=10)
@@ -10,10 +12,7 @@ class DebateStreamRequest(BaseModel):
     @field_validator("tickers")
     @classmethod
     def tickers_uppercase(cls, value: list[str]) -> list[str]:
-        cleaned = [ticker.strip().upper() for ticker in value if ticker.strip()]
-        if not cleaned:
-            raise ValueError("Pilih minimal satu ticker untuk menjalankan debate.")
-        return cleaned
+        return normalize_idx_tickers(value)
 
 
 class StockSchema(BaseModel):  # QW-FIX-5

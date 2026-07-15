@@ -7,9 +7,11 @@ import json
 import sys
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from core.settings import settings
+from utils.logger_config import logger
+from utils.ticker import normalize_idx_ticker
 
 
 DEFAULT_PATH = settings.observations_path
@@ -31,6 +33,12 @@ class AgentObservation(BaseModel):
     timestamp: str
     evidence: list[str]
 
+    @field_validator("ticker", mode="before")
+    @classmethod
+    def normalize_ticker(cls, value: object) -> str:
+        """Keep observation identities canonical before persistence."""
+        return normalize_idx_ticker(value)  # type: ignore[arg-type]
+
 
 class ObservationStore:
     """Append-only JSONL observation store."""
@@ -40,9 +48,10 @@ class ObservationStore:
 
     def append(self, obs: AgentObservation) -> None:
         """Append one observation as a JSON line."""
+        validated = AgentObservation.model_validate(obs.model_dump())
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a", encoding="utf-8") as handle:
-            handle.write(obs.model_dump_json())
+            handle.write(validated.model_dump_json())
             handle.write("\n")
 
     def query(
@@ -52,11 +61,12 @@ class ObservationStore:
         agent: str | None = None,
     ) -> list[AgentObservation]:
         """Read observations matching all provided filters."""
+        ticker_filter = normalize_idx_ticker(ticker) if ticker is not None else None
         observations = self._read_all()
         return [
             obs
             for obs in observations
-            if (ticker is None or obs.ticker == ticker)
+            if (ticker_filter is None or obs.ticker == ticker_filter)
             and (run_id is None or obs.run_id == run_id)
             and (agent is None or obs.agent == agent)
         ]
@@ -66,9 +76,20 @@ class ObservationStore:
         if not self.path.exists():
             return None
         lines = self.path.read_text(encoding="utf-8").splitlines()
-        for line in reversed(lines):
-            if line.strip():
+        for line_number in range(len(lines), 0, -1):
+            line = lines[line_number - 1]
+            if not line.strip():
+                continue
+            try:
                 return AgentObservation.model_validate_json(line).run_id
+            except Exception as exc:
+                logger.warning(
+                    "[ObservationStore] reason_code=invalid_observation_record "
+                    "line={} exception_type={} detail={}",
+                    line_number,
+                    type(exc).__name__,
+                    exc,
+                )
         return None
 
     def clear(self) -> None:
@@ -80,9 +101,22 @@ class ObservationStore:
         if not self.path.exists():
             return []
         observations: list[AgentObservation] = []
-        for line in self.path.read_text(encoding="utf-8").splitlines():
-            if line.strip():
+        for line_number, line in enumerate(
+            self.path.read_text(encoding="utf-8").splitlines(),
+            start=1,
+        ):
+            if not line.strip():
+                continue
+            try:
                 observations.append(AgentObservation.model_validate_json(line))
+            except Exception as exc:
+                logger.warning(
+                    "[ObservationStore] reason_code=invalid_observation_record "
+                    "line={} exception_type={} detail={}",
+                    line_number,
+                    type(exc).__name__,
+                    exc,
+                )
         return observations
 
 

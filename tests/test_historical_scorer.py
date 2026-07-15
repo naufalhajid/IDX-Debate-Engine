@@ -72,6 +72,44 @@ def test_load_debate_files(tmp_path: Path) -> None:
     assert records[0]["ticker"] == "BBCA"
 
 
+def test_load_debate_history_canonicalizes_payload_alias(tmp_path: Path) -> None:
+    debates_dir = tmp_path / "debates"
+    debates_dir.mkdir()
+    (debates_dir / "BBCA_debate.json").write_text(
+        json.dumps(
+            {
+                "ticker": "bbca.jk",
+                "verdict": {"ticker": "BBCA.JK", "rating": "BUY"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    records = load_debate_history(tmp_path)
+
+    assert records[0]["ticker"] == "BBCA"
+    assert records[0]["verdict"]["ticker"] == "BBCA"
+
+
+def test_load_debate_history_skips_filename_payload_ticker_mismatch(
+    tmp_path: Path,
+) -> None:
+    debates_dir = tmp_path / "debates"
+    debates_dir.mkdir()
+    (debates_dir / "BBCA_debate.json").write_text(
+        json.dumps({"ticker": "BMRI", "verdict": {"rating": "BUY"}}),
+        encoding="utf-8",
+    )
+    (debates_dir / "BMRI_debate.json").write_text(
+        json.dumps({"ticker": "BMRI", "verdict": {"rating": "HOLD"}}),
+        encoding="utf-8",
+    )
+
+    records = load_debate_history(tmp_path)
+
+    assert [record["ticker"] for record in records] == ["BMRI"]
+
+
 def test_load_skips_corrupt_files(tmp_path: Path) -> None:
     """File JSON rusak diabaikan, tidak raise exception."""
     debates_dir = tmp_path / "debates"
@@ -100,6 +138,14 @@ def test_win_rate_all_wins() -> None:
     """10 records BUY confidence > 0.5 = win rate 1.0."""
     records = [_make_record("BBCA", "BUY", 0.8)] * 10
     result = compute_historical_win_rate("BBCA", records)
+    assert result == pytest.approx(1.0)
+
+
+def test_win_rate_query_and_records_use_canonical_ticker() -> None:
+    records = [_make_record("BBCA.JK", "BUY", 0.8)] * 10
+
+    result = compute_historical_win_rate("bbca", records)
+
     assert result == pytest.approx(1.0)
 
 

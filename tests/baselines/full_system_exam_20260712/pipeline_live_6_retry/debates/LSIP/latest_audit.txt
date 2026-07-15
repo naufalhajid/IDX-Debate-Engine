@@ -1,0 +1,49 @@
+╔══════════════════════════════════════════╗
+║  AUDIT REPORT: LSIP — HOLD       ║
+╚══════════════════════════════════════════╝
+
+Summary : LSIP→HOLD: unknown won by unknown (0.40) after 3 round(s). 3 agent(s) dissented.
+Run ID  : 20260712_173441
+Generated: 2026-07-12T10:39:08.209033+00:00
+
+VERDICT
+───────
+Rating     : HOLD (confidence: 40%)
+Method     : unknown
+Winner    : unknown
+Consensus  : no
+Rounds     : 3
+Dissent    : 60% (3 of 5 agents)
+
+AGENT VOTES
+───────────
+  fundamental_scout      HOLD     conf= 0.82 eff= 0.82  ✅
+  chartist               BUY      conf= 0.78 eff= 0.78  ❌
+  sentiment_specialist   HOLD     conf= 0.72 eff= 0.72  ✅
+  bull                   BUY      conf= 0.62 eff= 0.62  ❌
+  bear                   AVOID    conf= 0.66 eff= 0.56  ❌
+  devils_advocate        AVOID    conf= 0.40 eff= 0.40  ❌
+
+KEY ARGUMENTS
+─────────────
+Bull  : Position: BULLISH
+Debate Confidence: MEDIUM
+
+Bear’s execution-risk point is fair, but its stop logic is too binary. The cited breakdown concern around Rp 1,238 is not the only reference: the technical sheet gives a secondary support at Rp 1,205, which is still above the 52-week low context and align
+Bear  : Position: BEARISH
+Debate Confidence: MEDIUM
+
+The Bull’s cited support stack around Rp 1,238 and Rp 1,205 is not a durable safety net; if price is already stretched above the upper band, a pullback into those levels can happen without changing the larger trend, but that does not make them reliable de
+Devil : Position: STRESS_TEST  
+Agent Confidence: 0.83
+
+**Challenge 1 — MACRO / COMPANY RISK**  
+If the recent dividend/corporate-action flow fades and sellers hit the tape, could **Rp 1,238** fail quickly and drag LSIP through the stop cluster despite the current bullish structure?  
+
+**Challenge 2 — TRANS
+
+DATA QUALITY
+────────────
+Freshness OK : False
+Stale sources: sentiment
+Missing      : none

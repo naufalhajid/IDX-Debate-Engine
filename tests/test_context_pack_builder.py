@@ -61,6 +61,27 @@ def test_build_context_pack_partial_data_lists_missing_fields() -> None:
     ]
 
 
+def test_build_context_pack_normalizes_nonpositive_fair_value_to_missing() -> None:
+    pack = build_context_pack(
+        "BBCA",
+        {
+            "current_price": 6175,
+            "fair_value_estimate": 0,
+            "fair_value_base": 0,
+            "fair_value_low": -10,
+            "fair_value_high": 0,
+        },
+    )
+
+    assert pack.fair_value is None
+    assert pack.fair_value_base is None
+    assert pack.fair_value_low is None
+    assert pack.fair_value_high is None
+    assert pack.priority_fields["fair_value"] is None
+    assert pack.priority_fields["fair_value_base"] is None
+    assert "fair_value" in pack.missing_fields
+
+
 def test_pack_to_prompt_string_truncates_oversized_fundamentals(
     caplog,
 ) -> None:

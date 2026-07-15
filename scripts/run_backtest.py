@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.backtester.metrics_calculator import calculate_deflated_sharpe_ratio
 from scripts.historical_backtest import replay_ticker
+from utils.ticker import InvalidIDXTicker, normalize_idx_tickers
 
 _BENCHMARK_SR = 0.5  # swing trading threshold
 
@@ -187,7 +188,10 @@ def main() -> None:
     parser.add_argument("--oos", type=int, default=63, help="OOS window in trading days (default: 63)")
     args = parser.parse_args()
 
-    tickers = [t.strip().upper() for t in args.tickers.split(",") if t.strip()]
+    try:
+        tickers = normalize_idx_tickers(args.tickers.split(","))
+    except InvalidIDXTicker as exc:
+        parser.error(str(exc))
     generated_at = date.today().isoformat()
     min_days_needed = args.insample + 4 * args.oos
 

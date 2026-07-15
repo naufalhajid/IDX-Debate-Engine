@@ -3,29 +3,27 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Annotated, Optional
+from typing import Annotated, Any, Optional
 
 import typer
 
 from app.cli.ui.console import console
+from core.settings import settings
 from providers.oauth_manager import (
     _lock_path,
     _read_auth_store,
     _write_auth_store,
     file_lock,
+    normalise_codex_credential,
 )
+from utils.secret_redaction import redact_secrets
 
 app = typer.Typer(help="Manage authentication tokens for LLM providers.")
 
-CODEX_OAUTH_CLIENT_ID = (
-    "app_EMoamEEZ73f0CkXaXp7hrann"  # Identik dengan Hermes Codex Client ID
-)
-
-
-def _codex_device_code_login() -> Optional[str]:
+def _codex_device_code_login() -> Optional[dict[str, Any]]:
     """Menjalankan Device Code flow untuk OpenAI Codex."""
     issuer = "https://auth.openai.com"
-    client_id = CODEX_OAUTH_CLIENT_ID
+    client_id = settings.CODEX_OAUTH_CLIENT_ID
 
     headers = {
         "Content-Type": "application/json",
@@ -45,7 +43,7 @@ def _codex_device_code_login() -> Optional[str]:
         with urllib.request.urlopen(req, timeout=15) as resp:
             device_data = json.loads(resp.read().decode())
     except urllib.error.URLError as e:
-        console.print(f"[idx.error]❌ Gagal request device code: {e}[/idx.error]")
+        console.print("[idx.error]Gagal request device code: " + f"{redact_secrets(e)}[/idx.error]")
         return None
 
     user_code = device_data.get("user_code", "")
@@ -130,18 +128,48 @@ def _codex_device_code_login() -> Optional[str]:
     try:
         with urllib.request.urlopen(token_req, timeout=15) as resp:
             tokens = json.loads(resp.read().decode())
-            return tokens.get("access_token")
+            credential = normalise_codex_credential(
+                tokens,
+                source="device_code",
+                auth_mode="chatgpt",
+            )
+            return credential if credential["access_token"] else None
     except Exception as e:
-        console.print(f"[idx.error]❌ Gagal menukar token: {e}[/idx.error]")
+        console.print("[idx.error]Gagal menukar token: " + f"{redact_secrets(e)}[/idx.error]")
         return None
 
 
-def _add_token(provider: str, token: str) -> None:
+def _add_token(
+    provider: str,
+    token: str | dict[str, Any],
+    *,
+    source: str = "manual",
+) -> None:
     if not token:
-        console.print("[idx.error]❌ Error: Token tidak boleh kosong.[/idx.error]")
+        console.print("[idx.error]Error: Token tidak boleh kosong.[/idx.error]")
         return
 
-    token_data = {"access_token": token, "refresh_token": "", "expires_at_ms": 0}
+    if provider == "codex":
+        payload = token if isinstance(token, dict) else {"access_token": token}
+        token_data = normalise_codex_credential(
+            payload,
+            source=source,
+            auth_mode=str(payload.get("auth_mode") or ""),
+        )
+        if not token_data["access_token"]:
+            console.print(
+                "[idx.error]Error: Access token tidak boleh kosong.[/idx.error]"
+            )
+            return
+    else:
+        token_data = {
+            "access_token": str(token),
+            "refresh_token": "",
+            "expires_in": 0,
+            "expires_at_ms": 0,
+            "credential_type": "managed_api_key",
+            "source": source,
+        }
 
     try:
         with file_lock(_lock_path()):
@@ -150,13 +178,16 @@ def _add_token(provider: str, token: str) -> None:
             _write_auth_store(store)
 
         console.print(
-            f"\n[idx.ok]✅ Token untuk provider '{provider}' berhasil ditambahkan ke auth store![/idx.ok]"
+            f"\n[idx.ok]Token provider '{provider}' berhasil disimpan.[/idx.ok]"
         )
         console.print(
-            f"   [idx.muted]Anda sekarang bisa menjalankan sistem menggunakan {provider}.[/idx.muted]"
+            f"   [idx.muted]Sistem siap menggunakan {provider}.[/idx.muted]"
         )
-    except Exception as e:
-        console.print(f"[idx.error]❌ Gagal menyimpan token: {e}[/idx.error]")
+    except Exception as exc:
+        console.print(
+            "[idx.error]Gagal menyimpan token: "
+            f"{redact_secrets(exc)}[/idx.error]"
+        )
 
 
 @app.command(name="add")
@@ -164,38 +195,65 @@ def auth_add_command(
     provider: Annotated[
         str, typer.Argument(help="Nama provider (openai-codex, anthropic, gemini)")
     ],
-    token: Annotated[
-        Optional[str], typer.Argument(help="Access Token (opsional untuk codex)")
-    ] = None,
+    managed_key: Annotated[
+        bool,
+        typer.Option(
+            "--managed-key",
+            help="Prompt aman untuk managed Codex API key (tidak masuk argv).",
+        ),
+    ] = False,
 ) -> None:
-    """Tambahkan token auth baru."""
+    """Tambahkan token tanpa mengekspos secret melalui command-line arguments."""
     provider_raw = provider.lower()
+    credential: str | dict[str, Any] | None = None
+    source = "manual"
 
     if provider_raw in ["openai-codex", "codex"]:
         provider_key = "codex"
-        if not token:
+        if managed_key:
+            import getpass
+
+            managed_secret = getpass.getpass(
+                "Masukkan managed Codex API key: "
+            ).strip()
+            if not managed_secret:
+                raise typer.Exit(code=1)
+            credential = {
+                "access_token": managed_secret,
+                "credential_type": "managed_api_key",
+                "auth_mode": "managed_api_key",
+            }
+            source = "managed_key_prompt"
+        else:
             console.print(
                 "[idx.header]Memulai Device Code Login untuk OpenAI Codex...[/idx.header]"
             )
-            token = _codex_device_code_login()
-            if not token:
+            credential = _codex_device_code_login()
+            source = "device_code"
+            if not credential:
                 raise typer.Exit(code=1)
     elif provider_raw == "anthropic":
+        if managed_key:
+            raise typer.BadParameter("--managed-key hanya untuk provider codex")
         provider_key = "anthropic"
     elif provider_raw == "gemini":
+        if managed_key:
+            raise typer.BadParameter("--managed-key hanya untuk provider codex")
         provider_key = "gemini"
     else:
         console.print(
-            f"[idx.error]❌ Provider '{provider_raw}' tidak didukung.[/idx.error]"
+            f"[idx.error]Provider '{provider_raw}' tidak didukung.[/idx.error]"
         )
         raise typer.Exit(code=1)
 
-    if not token:
+    if not credential:
         import getpass
 
-        token = getpass.getpass(f"Masukkan access token untuk {provider_key}: ").strip()
+        credential = getpass.getpass(
+            f"Masukkan access token untuk {provider_key}: "
+        ).strip()
 
-    _add_token(provider_key, token)
+    _add_token(provider_key, credential, source=source)
 
 
 __all__ = ["app"]

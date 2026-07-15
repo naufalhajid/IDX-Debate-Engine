@@ -46,6 +46,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from utils.ticker import InvalidIDXTicker, normalize_idx_tickers  # noqa: E402
+
 # Pool default: kandidat screener terakhir + blue chip likuid lintas sektor.
 DEFAULT_POOL = [
     "BBCA",
@@ -74,12 +76,12 @@ def _screener_candidate_tickers() -> list[str]:
 
 def _build_pool(explicit: list[str] | None) -> list[str]:
     if explicit:
-        return [t.upper() for t in explicit]
+        return normalize_idx_tickers(explicit)
     pool: list[str] = []
     for ticker in _screener_candidate_tickers() + DEFAULT_POOL:
         if ticker not in pool:
             pool.append(ticker)
-    return pool[:12]
+    return normalize_idx_tickers(pool[:12])
 
 
 # ── Phase A — sweep envelope deterministik (tanpa LLM) ───────────────────────
@@ -385,7 +387,10 @@ def main() -> int:
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     diag_dir = Path("output/diagnostics") / f"gate_reopen_{stamp}"
 
-    pool = _build_pool(args.tickers)
+    try:
+        pool = _build_pool(args.tickers)
+    except InvalidIDXTicker as exc:
+        parser.error(str(exc))
     print(f"[Phase A] Envelope sweep {len(pool)} ticker: {', '.join(pool)}")
     phase_a_rows = phase_a_envelope_sweep(pool)
     phase_a_table = render_phase_a(phase_a_rows)
@@ -409,7 +414,7 @@ def main() -> int:
         ]
         candidates.sort(key=lambda r: r["normal"].get("rr") or 0.0, reverse=True)
         chosen = (
-            [t.upper() for t in args.tickers]
+            normalize_idx_tickers(args.tickers)
             if args.tickers
             else [r["ticker"] for r in candidates[: args.top]]
         )

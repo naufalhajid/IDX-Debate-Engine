@@ -18,6 +18,13 @@ from app.api.schemas import DebateStreamRequest, StockSchema
 from core.settings import settings
 from db.models.stock import Stock
 from utils.logger_config import logger
+from utils.ticker import (
+    InvalidIDXTicker,
+    PathContainmentError,
+    canonicalize_result_identity,
+    normalize_idx_ticker,
+    resolve_within_root,
+)
 
 
 router = APIRouter(prefix="/api", tags=["stocks"])
@@ -38,22 +45,99 @@ def _error(code: str, message: str, status_code: int) -> HTTPException:
     )
 
 
+def _safe_root_file(path: Path) -> Path:
+    return resolve_within_root(RESULTS_PATH.parent, path.name)
+
+
+def _safe_root_file_exists(path: Path) -> bool:
+    try:
+        return _safe_root_file(path).is_file()
+    except (OSError, PathContainmentError):
+        return False
+
+
+def _validate_stock_ticker_path(ticker: str) -> None:
+    """Route-level guard that runs before normal endpoint dependencies."""
+
+    try:
+        normalize_idx_ticker(ticker)
+    except InvalidIDXTicker as exc:
+        raise _error(
+            "INVALID_IDX_TICKER",
+            str(exc),
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+        ) from exc
+
+
+def _safe_debate_files() -> list[Path]:
+    try:
+        debates_dir = resolve_within_root(RESULTS_PATH.parent, "debates")
+    except PathContainmentError as exc:
+        logger.warning(
+            "[results_artifacts] reason_code=unsafe_debates_directory: {}", exc
+        )
+        return []
+    if not debates_dir.is_dir():
+        return []
+
+    files: list[Path] = []
+    for candidate in debates_dir.glob("*.json"):
+        try:
+            safe_path = resolve_within_root(debates_dir, candidate.name)
+        except PathContainmentError as exc:
+            logger.warning(
+                "[results_artifacts] reason_code=unsafe_debate_artifact file={}: {}",
+                candidate.name,
+                exc,
+            )
+            continue
+        if safe_path.is_file():
+            files.append(safe_path)
+    return files
+
+
+def _expected_ticker_from_debate_path(path: Path) -> str | None:
+    suffix = "_debate.json"
+    if not path.name.endswith(suffix):
+        return None
+    raw = path.name[: -len(suffix)]
+    try:
+        return normalize_idx_ticker(raw)
+    except InvalidIDXTicker:
+        return None
+
+
+def _canonical_result_item(
+    item: Any,
+    *,
+    expected_ticker: str | None = None,
+) -> dict[str, Any] | None:
+    if not isinstance(item, dict):
+        return None
+    try:
+        return canonicalize_result_identity(item, expected_ticker=expected_ticker)
+    except InvalidIDXTicker as exc:
+        logger.warning(
+            "[results_artifacts] reason_code=invalid_artifact_ticker: {}", exc
+        )
+        return None
+
+
 def _results_signature() -> float:
     signature = 0.0
-    for path in (RESULTS_PATH, _merged_results_path()):
+    for configured_path in (RESULTS_PATH, _merged_results_path()):
         try:
+            path = _safe_root_file(configured_path)
             if path.exists():
                 signature = max(signature, path.stat().st_mtime)
-        except OSError:
+        except (OSError, PathContainmentError):
             pass
 
-    debates_dir = RESULTS_PATH.parent / "debates"
-    if debates_dir.exists():
-        for path in debates_dir.glob("*.json"):
-            try:
-                signature = max(signature, path.stat().st_mtime)
-            except OSError:
-                continue
+    for path in _safe_debate_files():
+        try:
+            signature = max(signature, path.stat().st_mtime)
+        except OSError:
+            continue
     return signature
 
 
@@ -64,8 +148,9 @@ def _merged_results_path() -> Path:
 
 
 def _primary_results_path() -> Path:
-    merged_path = _merged_results_path()
-    return merged_path if merged_path.exists() else RESULTS_PATH
+    merged_path = _safe_root_file(_merged_results_path())
+    results_path = _safe_root_file(RESULTS_PATH)
+    return merged_path if merged_path.exists() else results_path
 
 
 async def _load_results() -> dict[str, dict[str, Any]]:  # QW-FIX-PF1
@@ -99,8 +184,9 @@ async def _load_results() -> dict[str, dict[str, Any]]:  # QW-FIX-PF1
             return _cache
 
         raw_data = []
-        results_path = _primary_results_path()
+        results_path: Path | None = None
         try:
+            results_path = _primary_results_path()
             async with aiofiles.open(results_path, mode="r", encoding="utf-8") as f:
                 content = await f.read()
             if content.strip():
@@ -109,34 +195,36 @@ async def _load_results() -> dict[str, dict[str, Any]]:  # QW-FIX-PF1
                     raw_data = loaded
         except Exception as exc:
             logger.warning(
-                f"[_load_results] Failed to read {_primary_results_path()}: {exc}."
+                f"[_load_results] Failed to read results artifact: {exc}."
             )
 
         # Merge results: key by ticker. Start with full_batch_results.json items
-        compiled_results = {
-            item["ticker"]: item
-            for item in raw_data
-            if isinstance(item, dict) and "ticker" in item
-        }
+        compiled_results: dict[str, dict[str, Any]] = {}
+        for item in raw_data:
+            normalized_item = _canonical_result_item(item)
+            if normalized_item is not None:
+                compiled_results[normalized_item["ticker"]] = normalized_item
 
         # Scan output/debates/*.json for any additional or missing individual debates
-        debates_dir = RESULTS_PATH.parent / "debates"
-        if debates_dir.exists():
-            for f in debates_dir.glob("*.json"):
-                try:
-                    async with aiofiles.open(f, mode="r", encoding="utf-8") as file:
-                        file_content = await file.read()
-                    if file_content.strip():
-                        data = json.loads(file_content)
-                        if isinstance(data, dict) and "ticker" in data:
-                            ticker_key = data["ticker"]
-                            if (
-                                results_path == RESULTS_PATH
-                                or ticker_key not in compiled_results
-                            ):
-                                compiled_results[ticker_key] = data
-                except Exception as e:
-                    logger.warning(f"[_load_results] Failed to read fallback {f}: {e}")
+        for f in _safe_debate_files():
+            try:
+                async with aiofiles.open(f, mode="r", encoding="utf-8") as file:
+                    file_content = await file.read()
+                if file_content.strip():
+                    normalized_item = _canonical_result_item(
+                        json.loads(file_content),
+                        expected_ticker=_expected_ticker_from_debate_path(f),
+                    )
+                    if normalized_item is not None:
+                        ticker_key = normalized_item["ticker"]
+                        if (
+                            results_path is None
+                            or results_path.name == RESULTS_PATH.name
+                            or ticker_key not in compiled_results
+                        ):
+                            compiled_results[ticker_key] = normalized_item
+            except Exception as e:
+                logger.warning(f"[_load_results] Failed to read fallback {f}: {e}")
 
         if not compiled_results:
             raise _error(
@@ -173,57 +261,59 @@ def invalidate_results_cache() -> None:
 async def health_check() -> dict[str, Any]:
     from datetime import datetime, timedelta
 
-    debates_dir = RESULTS_PATH.parent / "debates"
     latest_time = None
     results = []
 
-    if debates_dir.exists():
-        for f in debates_dir.glob("*.json"):
-            try:
-                mtime = f.stat().st_mtime
-                if latest_time is None or mtime > latest_time:
-                    latest_time = mtime
+    for f in _safe_debate_files():
+        try:
+            mtime = f.stat().st_mtime
+            content = f.read_text(encoding="utf-8")
+            if not content.strip():
+                continue
+            data = _canonical_result_item(
+                json.loads(content),
+                expected_ticker=_expected_ticker_from_debate_path(f),
+            )
+            if data is None:
+                continue
+            if latest_time is None or mtime > latest_time:
+                latest_time = mtime
 
-                content = f.read_text(encoding="utf-8")
-                if not content.strip():
-                    continue
-                data = json.loads(content)
+            verdict = data.get("verdict") or {}
+            rating = verdict.get("rating", "UNKNOWN")
+            confidence = verdict.get("confidence", 0.0)
+            conviction_score = data.get("conviction_score", 0.0)
+            rounds = data.get("debate_rounds", 0)
+            consensus = data.get("consensus_reached", False)
 
-                verdict = data.get("verdict") or {}
-                rating = verdict.get("rating", "UNKNOWN")
-                confidence = verdict.get("confidence", 0.0)
-                conviction_score = data.get("conviction_score", 0.0)
-                rounds = data.get("debate_rounds", 0)
-                consensus = data.get("consensus_reached", False)
-
-                metadata = data.get("metadata") or {}
-                batch_ts = metadata.get("batch_timestamp") or metadata.get(
-                    "run_timestamp"
-                )
-                debate_date = datetime.fromtimestamp(mtime)
-                if batch_ts:
+            metadata = data.get("metadata") or {}
+            batch_ts = metadata.get("batch_timestamp") or metadata.get(
+                "run_timestamp"
+            )
+            debate_date = datetime.fromtimestamp(mtime)
+            if batch_ts:
+                try:
+                    debate_date = datetime.strptime(batch_ts, "%Y%m%d_%H%M%S")
+                except ValueError:
                     try:
-                        debate_date = datetime.strptime(batch_ts, "%Y%m%d_%H%M%S")
-                    except ValueError:
-                        try:
-                            debate_date = datetime.strptime(
-                                batch_ts.split("_")[0], "%Y%m%d"
-                            )
-                        except Exception:
-                            pass
+                        debate_date = datetime.strptime(
+                            batch_ts.split("_")[0], "%Y%m%d"
+                        )
+                    except Exception:
+                        pass
 
-                results.append(
-                    {
-                        "rating": rating,
-                        "confidence": confidence,
-                        "conviction_score": conviction_score,
-                        "rounds": rounds,
-                        "consensus": consensus,
-                        "date": debate_date,
-                    }
-                )
-            except Exception:
-                pass
+            results.append(
+                {
+                    "rating": rating,
+                    "confidence": confidence,
+                    "conviction_score": conviction_score,
+                    "rounds": rounds,
+                    "consensus": consensus,
+                    "date": debate_date,
+                }
+            )
+        except Exception as exc:
+            logger.warning(f"[health] Failed to read debate artifact {f}: {exc}")
 
     total_debates = len(results)
 
@@ -278,8 +368,8 @@ async def health_check() -> dict[str, Any]:
 
     return {
         "status": "ok",
-        "results_exist": RESULTS_PATH.exists()
-        or _merged_results_path().exists()
+        "results_exist": _safe_root_file_exists(RESULTS_PATH)
+        or _safe_root_file_exists(_merged_results_path())
         or bool(results),
         "latest_debate_date": latest_date_str,
         "debate_stats": debate_stats,
@@ -321,12 +411,22 @@ async def get_stocks(db: AsyncSession = Depends(get_db)) -> list[StockSchema]:
     return stocks
 
 
-@router.get("/stocks/{ticker}")
+@router.get(
+    "/stocks/{ticker}",
+    dependencies=[Depends(_validate_stock_ticker_path)],
+)
 async def get_stock_detail(
     ticker: str,
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    normalized_ticker = ticker.upper()
+    try:
+        normalized_ticker = normalize_idx_ticker(ticker)
+    except InvalidIDXTicker as exc:
+        raise _error(
+            "INVALID_IDX_TICKER",
+            str(exc),
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+        ) from exc
     stmt = select(Stock).where(Stock.ticker == normalized_ticker)
     stock = (await db.scalars(stmt)).first()
     results = {}

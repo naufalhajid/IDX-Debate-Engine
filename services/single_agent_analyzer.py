@@ -33,6 +33,7 @@ from services.context_pack_builder import (
 )
 from services.fair_value_calculator import build_fair_value_payload
 from utils.logger_config import logger
+from utils.ticker import InvalidIDXTicker, normalize_idx_ticker
 from utils.market_data_cache import derive_current_price, prefetch_market_data
 from utils.technicals import compute_atr, compute_rsi
 
@@ -58,7 +59,7 @@ class SingleAgentVerdict(BaseModel):
     ticker: str
     rating: Literal["BUY", "HOLD", "AVOID"]
     confidence: float = Field(ge=0.0, le=1.0)
-    fair_value: float
+    fair_value: float | None
     current_price: float
     entry_price_range: str
     target_price: float
@@ -114,7 +115,7 @@ class SingleAgentAnalyzer:
 
     def _fetch_market_data(self, ticker: str) -> ContextPack:
         """Fetch provider data and normalize it into the shared ContextPack model."""
-        normalized = ticker.strip().upper()
+        normalized = normalize_idx_ticker(ticker)
         market_data = asyncio.run(prefetch_market_data(normalized))
         current_price = derive_current_price(market_data)
         technicals = self._build_technical_indicators(market_data)
@@ -176,7 +177,7 @@ class SingleAgentAnalyzer:
         return f"""
 You are a senior investment analyst at a top-tier Indonesian investment bank.
 Analyze the following stock data and provide a swing trade recommendation for
-{ticker.strip().upper()} listed on Bursa Efek Indonesia.
+{normalize_idx_ticker(ticker)} listed on Bursa Efek Indonesia.
 
 {context_pack_string}
 {fair_value_line}
@@ -227,14 +228,14 @@ Rules:
     ) -> SingleAgentResult:
         """Parse the model response into a typed single-agent result."""
         generated_at = datetime.now(timezone.utc).isoformat()
-        normalized = ticker.strip().upper()
+        normalized = normalize_idx_ticker(ticker)
         try:
             parsed = json.loads(self._strip_json_fence(raw))
             verdict = SingleAgentVerdict(
                 ticker=normalized,
                 rating=str(parsed["rating"]).upper(),
                 confidence=parsed["confidence"],
-                fair_value=float(fair_value if fair_value is not None else 0.0),
+                fair_value=(float(fair_value) if fair_value is not None else None),
                 current_price=float(context.price),
                 entry_price_range=str(parsed["entry_price_range"]),
                 target_price=parsed["target_price"],
@@ -277,7 +278,7 @@ Rules:
     async def analyze(self, ticker: str, run_id: str) -> SingleAgentResult:
         """Run the full one-call single-agent baseline pipeline."""
         start = time.monotonic()
-        normalized = ticker.strip().upper()
+        normalized = normalize_idx_ticker(ticker)
         context_tokens = 0
         try:
             context = await asyncio.to_thread(self._fetch_market_data, normalized)
@@ -323,8 +324,21 @@ Rules:
     ) -> list[SingleAgentResult]:
         """Analyze tickers sequentially, preserving per-ticker failures."""
         results: list[SingleAgentResult] = []
-        for ticker in tickers:
-            normalized = ticker.strip().upper()
+        for raw_ticker in tickers:
+            try:
+                normalized = normalize_idx_ticker(raw_ticker)
+            except InvalidIDXTicker as exc:
+                results.append(
+                    self._failure_result(
+                        ticker=str(raw_ticker or ""),
+                        run_id=run_id,
+                        status="failed",
+                        error=str(exc),
+                        duration=0.0,
+                        context_tokens=0,
+                    )
+                )
+                continue
             logger.info(f"[SingleAgent] Starting {normalized}")
             try:
                 result = await self.analyze(normalized, run_id)

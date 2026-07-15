@@ -24,23 +24,31 @@ from core.adaptive_planner import (
     PlanAction,
 )
 from core.backtest_memory import DEFAULT_MEMORY, TradeOutcome
+from core.execution_regime import resolve_execution_regime
 from core.execution_ledger import DEFAULT_LEDGER, EventSeverity, EventType, LedgerEvent
 from core.ops_telemetry import DEFAULT_TELEMETRY, TickerMetric
 from core.prompt_pack_linter import lint_prompt_pack
 from core.regime import detect_market_regime
+from core.regime_gate import detect_hmm_regime
 from core.report_consistency import InconsistencyType, check_consistency
 from core.risk_governor import annotate_risk
 from core.settings import settings
 from services.explainability_auditor import DEFAULT_AUDITOR
 from services.report_formatter import DEFAULT_MD, RichFormatter
 from utils.logger_config import logger
+from utils.ticker import (
+    InvalidIDXTicker,
+    normalize_idx_ticker,
+    normalize_idx_tickers,
+    resolve_within_root,
+)
 
 PROMPT_MANIFEST_PATH = (
     Path(__file__).resolve().parent / "services" / "debate_prompts" / "manifest.json"
 )
 _batch_failed_count: int = 0
 _DEBATE_LOGGING_CONFIGURED = False
-_MARKET_REGIME_SNAPSHOT: dict[str, Any] | None = None
+_RULE_REGIME_SNAPSHOT: dict[str, Any] | None = None
 
 
 def _ensure_utf8_console() -> None:
@@ -265,6 +273,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         args.tickers = (args.tickers or []) + args.ticker_alias
     if not args.tickers:
         parser.error("one of --tickers or --ticker is required")
+    try:
+        args.tickers = normalize_idx_tickers(args.tickers)
+    except InvalidIDXTicker as exc:
+        parser.error(str(exc))
     return args
 
 
@@ -351,13 +363,18 @@ def _artifact_root(output_dir: Path) -> Path:
     return output_dir.parent if output_dir.name.lower() == "debates" else output_dir
 
 
+def _ticker_output_path(output_dir: Path, ticker: str, *parts: str) -> Path:
+    canonical_ticker = normalize_idx_ticker(ticker)
+    return resolve_within_root(output_dir, canonical_ticker, *parts)
+
+
 def _check_report_consistency_if_available(output_dir: Path) -> None:
     _check_report_consistency_with_planner(output_dir, ticker=None, run_id="unknown")
 
 
 def _latest_debate_has_risk_governor(output_dir: Path, ticker: str) -> bool:
     try:
-        latest_file = output_dir / ticker / "latest_debate.json"
+        latest_file = _ticker_output_path(output_dir, ticker, "latest_debate.json")
         if not latest_file.exists():
             return False
         payload = json.loads(latest_file.read_text(encoding="utf-8"))
@@ -450,9 +467,9 @@ def _write_audit_report(
     run_timestamp: str,
 ) -> None:
     try:
-        ticker_dir = output_dir / ticker
-        version_dir = ticker_dir / f"v{run_timestamp}"
-        latest_file = ticker_dir / "latest_debate.json"
+        ticker_dir = _ticker_output_path(output_dir, ticker)
+        version_dir = _ticker_output_path(output_dir, ticker, f"v{run_timestamp}")
+        latest_file = _ticker_output_path(output_dir, ticker, "latest_debate.json")
         debate_json = json.loads(latest_file.read_text(encoding="utf-8"))
         packet = DEFAULT_AUDITOR.build_audit_packet(debate_json)
         DEFAULT_AUDITOR.log_packet(packet)
@@ -489,7 +506,7 @@ def _write_formatter_report(
 
     try:
         md = DEFAULT_MD.generate_ticker_report(payload)
-        md_path = output_dir / ticker / "latest_report.md"
+        md_path = _ticker_output_path(output_dir, ticker, "latest_report.md")
         md_path.parent.mkdir(parents=True, exist_ok=True)
         md_path.write_text(md, encoding="utf-8")
         logger.info(f"[Formatter] Report: {md_path}")
@@ -610,8 +627,10 @@ def _load_batch_debate_rows(
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for ticker in tickers:
-        latest_path = output_dir / ticker / "latest_debate.json"
         try:
+            latest_path = _ticker_output_path(
+                output_dir, ticker, "latest_debate.json"
+            )
             if latest_path.exists():
                 rows.append(json.loads(latest_path.read_text(encoding="utf-8")))
             else:
@@ -673,13 +692,15 @@ def _save_timestamped_report(
         "versioned_output": True,
     }
 
-    ticker_dir = output_dir / ticker
-    version_dir = ticker_dir / f"v{run_timestamp}"
+    ticker = normalize_idx_ticker(ticker)
+    version_dir = _ticker_output_path(output_dir, ticker, f"v{run_timestamp}")
     version_dir.mkdir(parents=True, exist_ok=True)
 
-    version_file = version_dir / f"{ticker}_debate.json"
-    latest_file = ticker_dir / "latest_debate.json"
-    legacy_file = output_dir / f"{ticker}_debate.json"
+    version_file = _ticker_output_path(
+        output_dir, ticker, f"v{run_timestamp}", f"{ticker}_debate.json"
+    )
+    latest_file = _ticker_output_path(output_dir, ticker, "latest_debate.json")
+    legacy_file = resolve_within_root(output_dir, f"{ticker}_debate.json")
 
     serialized = json.dumps(payload, indent=2, ensure_ascii=False)
     for path in (version_file, latest_file, legacy_file):
@@ -920,7 +941,57 @@ def _dict_or_empty(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
-def _market_regime_summary(snapshot: dict[str, Any] | None) -> str:
+def _standalone_regime_payload(
+    result: dict[str, Any], chamber: Any | None = None
+) -> dict[str, Any]:
+    """Build the explicit regime contract for standalone debate artifacts."""
+    metadata = _dict_or_empty(result.get("metadata"))
+    rule_snapshot = result.get("rule_regime_snapshot")
+    if not isinstance(rule_snapshot, dict):
+        rule_snapshot = metadata.get("rule_regime_snapshot")
+    if not isinstance(rule_snapshot, dict) and chamber is not None:
+        rule_snapshot = getattr(chamber, "market_regime", None)
+    if not isinstance(rule_snapshot, dict):
+        rule_snapshot = None
+
+    hmm_regime = result.get("hmm_regime")
+    if not isinstance(hmm_regime, dict) and chamber is not None:
+        hmm_regime = getattr(chamber, "hmm_regime", None)
+    if not isinstance(hmm_regime, dict):
+        hmm_regime = {}
+
+    regime_context = result.get("regime_context")
+    if not isinstance(regime_context, dict) and chamber is not None:
+        regime_context = getattr(chamber, "regime_context", None)
+    if not isinstance(regime_context, dict) or not regime_context:
+        regime_context = resolve_execution_regime(
+            rule_snapshot=rule_snapshot,
+            hmm_state=hmm_regime,
+        )
+    else:
+        regime_context = dict(regime_context)
+
+    trend_regime = regime_context.get("trend_regime")
+    if not isinstance(trend_regime, dict):
+        trend_regime = _dict_or_empty(result.get("trend_regime"))
+
+    trading_params = regime_context.get("execution_params")
+    if not isinstance(trading_params, dict):
+        trading_params = _dict_or_empty(result.get("trading_params"))
+
+    return {
+        "rule_regime_snapshot": rule_snapshot,
+        "regime_context": regime_context,
+        "hmm_regime": dict(hmm_regime),
+        "trend_regime": dict(trend_regime),
+        "volatility_regime": regime_context.get("volatility_regime"),
+        "execution_regime": regime_context.get("execution_regime"),
+        "execution_regime_reason": regime_context.get("execution_regime_reason"),
+        "trading_params": dict(trading_params),
+    }
+
+
+def _rule_regime_summary(snapshot: dict[str, Any] | None) -> str:
     if not isinstance(snapshot, dict):
         return "unavailable"
     regime = str(snapshot.get("regime") or "unknown")
@@ -961,17 +1032,22 @@ def _attach_risk_governor(
             or metadata.get("avg_volume_20d")
             or technicals.get("avg_volume_20d")
         )
+        regime_payload = _standalone_regime_payload(report)
 
         risk_entry = {
             "ticker": ticker,
             "verdict": verdict,
             "current_price": verdict.get("current_price"),
-            "market_regime": _MARKET_REGIME_SNAPSHOT,
+            **regime_payload,
             "risk_context": {
                 "atr14": atr14,
                 "avg_volume": avg_volume,
                 "exdate_days": None,
-                "market_regime": _MARKET_REGIME_SNAPSHOT,
+                "regime_context": regime_payload["regime_context"],
+                "execution_regime": regime_payload["execution_regime"],
+                "execution_regime_reason": regime_payload[
+                    "execution_regime_reason"
+                ],
                 "sector": None,
                 "run_id": run_id,
             },
@@ -1070,6 +1146,9 @@ async def _debate_one(
             )
             return False
 
+        regime_payload = _standalone_regime_payload(result, chamber)
+        result.update(regime_payload)
+
         # Build report dict
         report = {
             "ticker": result["ticker"],
@@ -1093,6 +1172,7 @@ async def _debate_one(
             ],
             "raw_data_summary": result["raw_data"],
             "metadata": result.get("metadata", {}),
+            **regime_payload,
         }
         _attach_risk_governor(
             ticker=ticker,
@@ -1138,7 +1218,7 @@ async def _debate_one(
             )
             return False
         logger.info(f"Timestamped report saved to {report_path}")
-        latest_path = output_dir / ticker / "latest_debate.json"
+        latest_path = _ticker_output_path(output_dir, ticker, "latest_debate.json")
         logger.info(f"Latest report updated at {latest_path}")
         _ledger_artifact_write(
             run_id=run_timestamp,
@@ -1229,9 +1309,9 @@ async def _debate_one(
 
 
 async def main(argv: list[str] | None = None) -> None:
-    global _MARKET_REGIME_SNAPSHOT, _batch_failed_count
+    global _RULE_REGIME_SNAPSHOT, _batch_failed_count
     _batch_failed_count = 0
-    _MARKET_REGIME_SNAPSHOT = None
+    _RULE_REGIME_SNAPSHOT = None
 
     args = parse_args(argv)
     configure_debate_logging(verbose=bool(args.verbose))
@@ -1267,20 +1347,37 @@ async def main(argv: list[str] | None = None) -> None:
 
     try:
         regime_snapshot = await detect_market_regime()
-        _MARKET_REGIME_SNAPSHOT = regime_snapshot.model_dump()
+        _RULE_REGIME_SNAPSHOT = regime_snapshot.model_dump()
         cli_console.print(
-            "[idx.section]Market regime[/idx.section] "
-            f"{_market_regime_summary(_MARKET_REGIME_SNAPSHOT)}"
+            "[idx.section]Rule-based regime diagnostic[/idx.section] "
+            f"{_rule_regime_summary(_RULE_REGIME_SNAPSHOT)}"
         )
     except Exception as exc:
-        _MARKET_REGIME_SNAPSHOT = None
+        _RULE_REGIME_SNAPSHOT = None
         logger.warning(f"[run_debate] Market regime unavailable: {exc}")
-        cli_console.print("[idx.section]Market regime[/idx.section] unavailable")
+        cli_console.print(
+            "[idx.section]Rule-based regime diagnostic[/idx.section] unavailable"
+        )
+
+    hmm_regime = await detect_hmm_regime()
+    regime_context = resolve_execution_regime(
+        rule_snapshot=_RULE_REGIME_SNAPSHOT,
+        hmm_state=hmm_regime,
+    )
+    cli_console.print(
+        "[idx.section]Execution regime[/idx.section] "
+        f"{regime_context['execution_regime']} "
+        f"({regime_context['execution_regime_reason']})"
+    )
 
     # LLM instances created once and reused for all tickers
     from services.debate_chamber import DebateChamber
 
     chamber = DebateChamber()
+    # Compatibility attribute consumed by DebateChamber as a diagnostic snapshot.
+    chamber.market_regime = _RULE_REGIME_SNAPSHOT
+    chamber.hmm_regime = hmm_regime
+    chamber.regime_context = regime_context
 
     succeeded, failed = 0, 0
     for ticker in args.tickers:

@@ -132,9 +132,186 @@ def test_extract_keystats_distinguishes_missing_dps_from_explicit_zero():
     )
 
     assert missing_dps.dps is None
+    assert missing_dps.dps_source is None
     assert zero_dps.dps == 0.0
+    assert zero_dps.dps_source == "stockbit_direct"
     assert FairValueCalculator(missing_dps).fair_value_ddm() is None
     assert FairValueCalculator(zero_dps).fair_value_ddm() is None
+
+
+def test_build_payload_derives_missing_dps_from_market_price_not_pb_ratio(
+    monkeypatch,
+):
+    """Freeze the BMRI-shaped defect reproduced by the 2026-07-12 live run."""
+    captured: dict[str, KeyStats] = {}
+    original_init = FairValueCalculator.__init__
+
+    def capturing_init(self, stats, *args, **kwargs):
+        captured["stats"] = stats
+        original_init(self, stats, *args, **kwargs)
+
+    monkeypatch.setattr(FairValueCalculator, "__init__", capturing_init)
+
+    api_response = _stockbit_response(
+        [
+            ("Current EPS (TTM)", "10"),
+            ("Book Value Per Share", "100"),
+            ("Dividend Yield (TTM)", "11.69"),
+            ("Current Price to Book Value", "1.25"),
+        ]
+    )
+
+    report, result = build_fair_value_payload(api_response, "BMRI", 4_080.0)
+
+    stats = captured["stats"]
+    assert stats.current_price == 4_080.0
+    assert stats.raw_pb_current == pytest.approx(1.25)
+    assert stats.dps == pytest.approx(476.95)
+    assert stats.dps_source == "yield_x_market_price"
+    assert stats.dps_yield_pct == pytest.approx(11.69)
+    assert stats.dps_price_used == pytest.approx(4_080.0)
+    assert result["dps_source"] == "yield_x_market_price"
+    assert "DPS Source" in report
+    assert "11.69% x Rp 4,080" in report
+
+
+def test_fractional_dividend_yield_is_still_percentage_point_data():
+    stats = extract_keystats(
+        _stockbit_response(
+            [
+                ("Dividend Yield (TTM)", "0.50"),
+                ("Current Price to Book Value", "2.00"),
+            ]
+        ),
+        ticker="TEST",
+        current_price=10_000.0,
+    )
+
+    assert stats.current_price == 10_000.0
+    assert stats.dps == pytest.approx(50.0)
+    assert stats.dps_source == "yield_x_market_price"
+
+
+def test_missing_market_price_does_not_fall_back_to_pb_ratio_for_dps():
+    stats = extract_keystats(
+        _stockbit_response(
+            [
+                ("Current EPS (TTM)", "10"),
+                ("Dividend Yield (TTM)", "11.69"),
+                ("Current Price to Book Value", "1.25"),
+            ]
+        ),
+        ticker="TEST",
+    )
+
+    assert stats.raw_pb_current == pytest.approx(1.25)
+    assert stats.current_price == 0.0
+    assert stats.dps is None
+    assert stats.dps_source is None
+
+
+def test_explicit_invalid_market_price_does_not_use_api_price_fallback():
+    stats = extract_keystats(
+        _stockbit_response(
+            [
+                ("Dividend Yield (TTM)", "11.69"),
+                ("Last Price", "4080"),
+            ]
+        ),
+        ticker="TEST",
+        current_price=0.0,
+    )
+
+    assert stats.current_price == 0.0
+    assert stats.dps is None
+    assert stats.dps_source is None
+
+
+def test_exact_case_insensitive_api_price_is_used_only_when_price_omitted():
+    stats = extract_keystats(
+        _stockbit_response(
+            [
+                ("Dividend Yield (TTM)", "11.69"),
+                ("current price", "4080"),
+            ]
+        ),
+        ticker="TEST",
+    )
+
+    assert stats.current_price == 0.0
+    assert stats.dps == pytest.approx(476.95)
+    assert stats.dps_source == "yield_x_market_price"
+    assert stats.dps_price_used == pytest.approx(4_080.0)
+
+
+@pytest.mark.parametrize(
+    ("ticker", "yield_pct", "price", "expected_dps"),
+    [
+        ("BBCA", "4.87", 6_175.0, 300.72),
+        ("BMRI", "11.69", 4_080.0, 476.95),
+        ("LSIP", "6.41", 1_295.0, 83.01),
+    ],
+)
+def test_idx_live_regression_dps_values(
+    ticker,
+    yield_pct,
+    price,
+    expected_dps,
+):
+    stats = extract_keystats(
+        _stockbit_response(
+            [
+                ("Current EPS (TTM)", "10"),
+                ("Dividend Yield (TTM)", yield_pct),
+                ("Current Price to Book Value", "1.25"),
+            ]
+        ),
+        ticker=ticker,
+        current_price=price,
+    )
+
+    assert stats.dps == pytest.approx(expected_dps, abs=0.01)
+    assert stats.dps_source == "yield_x_market_price"
+    assert stats.dps_price_used == pytest.approx(price)
+
+
+def test_direct_dps_takes_precedence_over_dividend_yield():
+    stats = extract_keystats(
+        _stockbit_response(
+            [
+                ("Current EPS (TTM)", "10"),
+                ("Dividend Per Share (TTM)", "325"),
+                ("Dividend Yield (TTM)", "11.69"),
+                ("Current Price to Book Value", "1.25"),
+            ]
+        ),
+        ticker="BBCA",
+        current_price=6_175.0,
+    )
+
+    assert stats.dps == pytest.approx(325.0)
+    assert stats.dps_source == "stockbit_direct"
+    assert stats.dps_yield_pct is None
+    assert stats.dps_price_used is None
+
+
+def test_dps_growth_field_does_not_masquerade_as_direct_dps():
+    stats = extract_keystats(
+        _stockbit_response(
+            [
+                ("Current EPS (TTM)", "10"),
+                ("DPS Growth", "10"),
+                ("Dividend Yield (TTM)", "5"),
+            ]
+        ),
+        ticker="TEST",
+        current_price=1_000.0,
+    )
+
+    assert stats.dps == pytest.approx(50.0)
+    assert stats.dps_source == "yield_x_market_price"
+    assert stats.dps_yield_pct == pytest.approx(5.0)
+    assert stats.dps_price_used == pytest.approx(1_000.0)
 
 
 def test_sector_weight_assertion(monkeypatch):
@@ -160,10 +337,11 @@ def _calculator_with_methods(
     pe: float | None = None,
     pb: float | None = None,
     ddm: float | None = None,
+    sector: str = "default",
 ) -> FairValueCalculator:
     calc = FairValueCalculator(
         KeyStats(ticker="TEST", current_price=current_price),
-        sector="default",
+        sector=sector,
     )
     monkeypatch.setattr(calc, "fair_value_pe", lambda: pe)
     monkeypatch.setattr(calc, "fair_value_pb", lambda: pb)
@@ -178,6 +356,7 @@ def test_fair_value_range_uses_10pct_for_three_valid_methods(monkeypatch):
         pe=100,
         pb=100,
         ddm=100,
+        sector="bank",
     ).fair_value_weighted()
 
     assert result["fair_value"] == 100
@@ -1214,8 +1393,43 @@ def test_zero_weight_ddm_outlier_does_not_trip_dispersion(monkeypatch):
     ).fair_value_weighted()
 
     assert result["fv_method_dispersion_ratio"] == pytest.approx(1.1)
-    assert result["confidence"] == "HIGH"
-    assert result["range_pct"] == pytest.approx(0.10)
+
+
+def test_zero_weight_ddm_does_not_inflate_confidence_or_tighten_range(
+    monkeypatch,
+):
+    result = _calculator_with_methods(
+        monkeypatch,
+        current_price=100,
+        pe=100.0,
+        pb=110.0,
+        ddm=3000.0,
+    ).fair_value_weighted()
+
+    assert result["breakdown"]["ddm"] == 3000
+    assert result["fv_method_dispersion_ratio"] == pytest.approx(1.1)
+    assert result["confidence"] == "MEDIUM"
+    assert result["range_pct"] == pytest.approx(0.15)
+    assert result["active_method_count"] == 2
+    assert result["valid_method_count"] == 2
+    assert result["available_method_count"] == 3
+
+
+def test_only_zero_weight_method_returns_insufficient_data(monkeypatch):
+    result = _calculator_with_methods(
+        monkeypatch,
+        current_price=100,
+        pe=None,
+        pb=None,
+        ddm=3000.0,
+    ).fair_value_weighted()
+
+    assert result["breakdown"] == {"ddm": 3000}
+    assert result["fair_value"] is None
+    assert result["confidence"] == "INSUFFICIENT_DATA"
+    assert result["active_method_count"] == 0
+    assert result["valid_method_count"] == 0
+    assert result["available_method_count"] == 1
 
 
 def test_quality_gate_rejects_extreme_dispersion(monkeypatch):

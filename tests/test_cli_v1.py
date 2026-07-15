@@ -209,6 +209,67 @@ def test_filter_rejects_conflicting_positional_and_option_modes(monkeypatch):
     assert "positional mode conflicts with --mode" in result.output
 
 
+def test_filter_displays_canonical_execution_and_scoring_regimes(monkeypatch):
+    import pandas as pd
+
+    def fake_run_filter(*, top, input_file, output_dir, mode="momentum"):
+        return pd.DataFrame(
+            [
+                {
+                    "Ticker": "BBCA",
+                    "execution_regime": "DEFENSIVE",
+                    "scoring_regime_profile": "DEFENSIVE",
+                }
+            ]
+        )
+
+    monkeypatch.setattr("app.cli.commands.filter.run_filter", fake_run_filter)
+
+    result = runner.invoke(app, ["filter"])
+
+    assert result.exit_code == 0, result.output
+    assert "Execution regime: DEFENSIVE" in result.output
+    assert "scoring profile: DEFENSIVE" in result.output
+
+
+def test_filter_watchlist_displays_canonical_regime_fields(
+    tmp_path: Path,
+    monkeypatch,
+):
+    import json
+
+    import pandas as pd
+
+    def fake_run_filter(*, top, input_file, output_dir, mode="momentum"):
+        return pd.DataFrame()
+
+    output_dir = tmp_path / "filter"
+    output_dir.mkdir()
+    (output_dir / "watchlist_candidates.json").write_text(
+        json.dumps(
+            [
+                {
+                    "Ticker": "BBCA",
+                    "Composite Score": 42.0,
+                    "Weekly Trend": "UPTREND",
+                    "execution_regime": "SIDEWAYS",
+                    "scoring_regime_profile": "HIGH",
+                    "score_floor": 45,
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("app.cli.commands.filter.run_filter", fake_run_filter)
+
+    result = runner.invoke(app, ["filter", "--output-dir", str(output_dir)])
+
+    assert result.exit_code == 0, result.output
+    normalized_output = " ".join(result.output.split())
+    assert "execution regime=SIDEWAYS" in normalized_output
+    assert "scoring profile=HIGH" in normalized_output
+
+
 def test_debate_normalizes_tickers_and_output_dir(monkeypatch):
     calls = []
 
@@ -223,6 +284,24 @@ def test_debate_normalizes_tickers_and_output_dir(monkeypatch):
 
     assert result.exit_code == 0, result.output
     assert calls == [(["BBRI", "BBCA"], Path("tmp/debates"), False, True)]
+
+
+def test_debate_rejects_path_like_ticker_before_dispatch(monkeypatch):
+    calls = []
+
+    def fake_run_debate_cli(*, tickers, output_dir, verbose=False, details=True):
+        calls.append((tickers, output_dir, verbose, details))
+
+    monkeypatch.setattr("app.cli.commands.debate.run_debate_cli", fake_run_debate_cli)
+
+    result = runner.invoke(
+        app,
+        ["debate", "../escape", "--output-dir", "tmp/debates"],
+    )
+
+    assert result.exit_code != 0
+    assert calls == []
+    assert "valid IDX ticker" in _strip_ansi(result.output)
 
 
 def test_debate_accepts_tickers_option_for_readme_compatibility(monkeypatch):

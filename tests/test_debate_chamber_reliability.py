@@ -738,7 +738,7 @@ def test_fair_value_rejected_without_current_run_rag_evidence():
         metadata={"rag_citations": []},
     )
 
-    assert fair_value == 0.0
+    assert fair_value is None
     assert metadata["fair_value_rejected"] is True
     assert metadata["valuation_gap"] == "unverified"
     assert "fair_value_unverified" in metadata["reasons"]
@@ -761,6 +761,21 @@ def test_fair_value_accepted_with_current_run_rag_evidence():
 
     assert fair_value == 10474
     assert metadata["fair_value_rag_verified"] is True
+
+
+def test_public_scout_metrics_preserves_missing_fair_value_as_none():
+    chamber = _chamber()
+
+    metrics = chamber._public_scout_metrics(
+        {
+            "metadata": {},
+            "technical_indicators": {},
+            "fundamental_data": "",
+            "sentiment_data": "",
+        }
+    )
+
+    assert metrics["fundamental"]["fair_value"] is None
 
 
 @pytest.mark.asyncio
@@ -932,6 +947,37 @@ async def test_cio_envelope_rejection_carries_hypothetical_envelope():
     assert verdict_dict["hypothetical_envelope"] == hypo
 
 
+@pytest.mark.asyncio
+async def test_cio_envelope_rejection_preserves_unverified_fair_value_semantics():
+    chamber = _chamber()
+
+    result = await chamber._cio_judge_node(
+        {
+            "ticker": "TOTL",
+            "current_price": 1000.0,
+            "technical_indicators": {"rsi14": 50.0, "return_5d_pct": -2.0},
+            "fair_value_estimate": None,
+            "fair_value_base": None,
+            "fair_value_low": None,
+            "fair_value_high": None,
+            "metadata": {
+                "fair_value_rejected": True,
+                "valuation_gap": "unverified",
+            },
+            "debate_history": [],
+            "raw_data": "",
+            "devils_advocate_question": "",
+        }
+    )
+    verdict = json.loads(result["final_verdict"])
+
+    assert verdict["fair_value"] is None
+    assert verdict["fair_value_base"] is None
+    assert verdict["fair_value_low"] is None
+    assert verdict["fair_value_high"] is None
+    assert verdict["valuation_gap"] == "unverified"
+
+
 def test_trade_envelope_proceeds_when_price_above_fair_value():
     # Task A: FV ceiling removed. A stock trading above its intrinsic-value
     # anchor is exactly the momentum-breakout scenario swing trading targets.
@@ -941,7 +987,12 @@ def test_trade_envelope_proceeds_when_price_above_fair_value():
     envelope = chamber._compute_trade_envelope(
         current_price=1000.0,
         fair_value=800.0,
-        tech={"ma50": 980.0, "sma20": 1000.0, "atr14": 10.0},
+        tech={
+            "ma50": 980.0,
+            "sma20": 1000.0,
+            "atr14": 16.0,
+            "high_20d": 1200.0,
+        },
     )
 
     assert not envelope.get("rejected")
@@ -967,7 +1018,11 @@ async def test_cio_parse_fallback_preserves_envelope_prices_on_llm_failure(monke
         {
             "ticker": "BRPT",
             "current_price": 1000.0,
-            "technical_indicators": {"ma50": 980.0, "sma20": 1000.0, "atr14": 10.0},
+            "technical_indicators": {
+                "ma50": 980.0,
+                "sma20": 1000.0,
+                "atr14": 16.0,
+            },
             "fair_value_estimate": 800.0,
             "debate_history": [],
             "raw_data": "",
@@ -1022,8 +1077,24 @@ async def test_market_data_cache_prefetches_one_yfinance_bundle(monkeypatch):
         def dividends(self):
             return pd.Series(dtype=float)
 
+    def fake_download(symbol: str, **_kwargs):
+        assert symbol == "BBRI.JK"
+        index = pd.bdate_range(end="2026-07-10", periods=2)
+        return pd.DataFrame(
+            {
+                "Open": [99.0, 104.0],
+                "High": [101.0, 106.0],
+                "Low": [98.0, 103.0],
+                "Close": [100.0, 105.0],
+                "Volume": [1_000, 1_100],
+            },
+            index=index,
+        )
+
     monkeypatch.setattr(
-        mdc, "_get_yfinance", lambda: SimpleNamespace(Ticker=FakeTicker)
+        mdc,
+        "_get_yfinance",
+        lambda: SimpleNamespace(Ticker=FakeTicker, download=fake_download),
     )
     cache = mdc.TickerDataCache()
 
@@ -1111,7 +1182,11 @@ async def test_cio_uses_decision_brief_and_redacts_debate_prices(monkeypatch):
         {
             "ticker": "BBRI",
             "current_price": 1000.0,
-            "technical_indicators": {"ma50": 980, "atr14": 30},
+            "technical_indicators": {
+                "ma50": 980,
+                "atr14": 30,
+                "sector": "mining",
+            },
             "fair_value_estimate": 1200.0,
             "debate_history": [
                 DebateMessage(
@@ -1178,7 +1253,11 @@ async def test_cio_records_rag_citation_guard_when_evidence_id_missing(monkeypat
         {
             "ticker": "BBRI",
             "current_price": 1000.0,
-            "technical_indicators": {"ma50": 980, "atr14": 30},
+            "technical_indicators": {
+                "ma50": 980,
+                "atr14": 30,
+                "sector": "mining",
+            },
             "fair_value_estimate": 1200.0,
             "debate_history": [
                 DebateMessage(role="bull", content="BUY with momentum", round_num=1)
@@ -1253,7 +1332,11 @@ async def test_cio_records_malformed_rag_citation_metadata(monkeypatch):
         {
             "ticker": "BBRI",
             "current_price": 1000.0,
-            "technical_indicators": {"ma50": 980, "atr14": 30},
+            "technical_indicators": {
+                "ma50": 980,
+                "atr14": 30,
+                "sector": "mining",
+            },
             "fair_value_estimate": 1200.0,
             "debate_history": [
                 DebateMessage(role="bull", content="BUY with momentum", round_num=1)
@@ -1448,7 +1531,12 @@ async def test_cio_parses_list_content_response_and_keeps_consensus_override(
         {
             "ticker": "ADRO",
             "current_price": 1000.0,
-            "technical_indicators": {"ma50": 990.0, "sma20": 1000.0, "atr14": 30.0},
+            "technical_indicators": {
+                "ma50": 990.0,
+                "sma20": 1000.0,
+                "atr14": 30.0,
+                "sector": "energy",
+            },
             "fair_value_estimate": 1300.0,
             "debate_history": [
                 DebateMessage(
@@ -1502,12 +1590,18 @@ def test_trade_envelope_guarantees_sufficient_rr_from_entry_high():
     envelope = chamber._compute_trade_envelope(
         current_price=127.0,
         fair_value=423.0,
-        tech={"ma50": 140.0, "sma20": 133.0, "atr14": 5.0},
+        tech={
+            "ma50": 140.0,
+            "sma20": 133.0,
+            "atr14": 5.0,
+            "sector": "mining",
+        },
     )
 
     # R/R must be calculated conservatively from entry_high (not entry_mid).
     # With the 10% swing cap (P1.10), this geometry produces R/R ~1.44.
-    assert envelope["risk_reward_ratio"] >= 1.3
+    assert envelope["risk_reward_ratio"] >= envelope["required_rr"]
+    assert envelope["required_rr"] == 2.0
 
 
 def test_trade_envelope_swing_cap_limits_target_regardless_of_fair_value():
@@ -1518,7 +1612,13 @@ def test_trade_envelope_swing_cap_limits_target_regardless_of_fair_value():
     envelope = chamber._compute_trade_envelope(
         current_price=165.0,
         fair_value=253.0,
-        tech={"ma50": 162.0, "sma20": 150.0, "atr14": 6.0, "52w_high": 519.0},
+        tech={
+            "ma50": 162.0,
+            "sma20": 150.0,
+            "atr14": 6.0,
+            "52w_high": 519.0,
+            "sector": "mining",
+        },
     )
 
     assert envelope["target_price"] <= 253.0
@@ -1529,7 +1629,13 @@ def test_trade_envelope_swing_cap_limits_target_regardless_of_fair_value():
     envelope2 = chamber._compute_trade_envelope(
         current_price=165.0,
         fair_value=253.0,
-        tech={"ma50": 162.0, "sma20": 150.0, "atr14": 6.0, "52w_high": 210.0},
+        tech={
+            "ma50": 162.0,
+            "sma20": 150.0,
+            "atr14": 6.0,
+            "52w_high": 210.0,
+            "sector": "mining",
+        },
     )
     assert "(Swing Cap)" in envelope2["target_basis"]
     assert envelope2["target_price"] <= 253.0
@@ -1539,12 +1645,12 @@ def test_trade_envelope_swing_cap_limits_target_regardless_of_fair_value():
 def test_trade_envelope_swing_cap_applies_even_with_fair_value_above_resistance():
     chamber = _chamber()
 
-    # NZIA 2026-06-11: FV Rp 417 sits above the 52w-high target Rp 316, so the
-    # FV ceiling never fired and the envelope shipped +78% / R/R 11.75x.
+    # FV sits above a valid nearby 52-week resistance, so the sector swing cap
+    # must remain the operative ceiling rather than intrinsic value.
     envelope = chamber._compute_trade_envelope(
         current_price=177.0,
         fair_value=417.0,
-        tech={"ma50": 173.0, "sma20": 160.0, "atr14": 7.0, "52w_high": 316.0},
+        tech={"ma50": 173.0, "sma20": 160.0, "atr14": 4.0, "52w_high": 220.0},
     )
 
     assert envelope["target_price"] <= envelope["entry_high"] * 1.16
@@ -1562,7 +1668,12 @@ def test_trade_envelope_swing_cap_is_operative_ceiling_when_fv_below_entry():
     envelope = chamber._compute_trade_envelope(
         current_price=1000.0,
         fair_value=800.0,
-        tech={"ma50": 980.0, "sma20": 1000.0, "atr14": 10.0},
+        tech={
+            "ma50": 980.0,
+            "sma20": 1000.0,
+            "atr14": 16.0,
+            "high_20d": 1200.0,
+        },
     )
 
     assert not envelope.get("rejected")
@@ -1580,9 +1691,12 @@ def test_trade_envelope_uses_resistance_when_below_rr_seed():
         fair_value=423.0,
         tech={"ma50": 140.0, "sma20": 133.0, "atr14": 3.0, "high_20d": 139.0},
     )
-    assert not envelope.get("rejected")
-    assert envelope["target_price"] == 139  # resistance, not seed (143) or swing cap
-    assert "20-Day" in envelope["target_basis"]
+    assert envelope.get("rejected") is True
+    assert envelope["reason_code"] == "rr_too_low"
+    hypothetical = envelope["hypothetical_envelope"]
+    assert hypothetical["target_price"] == 139
+    assert hypothetical["risk_reward_ratio"] < hypothetical["required_rr"]
+    assert "20-Day" in hypothetical["target_basis"]
 
 
 def test_trade_envelope_falls_back_to_rr_seed_when_no_resistance():
@@ -1591,7 +1705,12 @@ def test_trade_envelope_falls_back_to_rr_seed_when_no_resistance():
     envelope = chamber._compute_trade_envelope(
         current_price=127.0,
         fair_value=423.0,
-        tech={"ma50": 140.0, "sma20": 133.0, "atr14": 5.0},
+        tech={
+            "ma50": 140.0,
+            "sma20": 133.0,
+            "atr14": 5.0,
+            "sector": "mining",
+        },
     )
     assert not envelope.get("rejected")
     assert "Minimum R/R" in envelope["target_basis"]
@@ -1604,7 +1723,13 @@ def test_trade_envelope_ignores_52w_high_above_130pct_after_inversion():
     envelope = chamber._compute_trade_envelope(
         current_price=165.0,
         fair_value=253.0,
-        tech={"ma50": 162.0, "sma20": 150.0, "atr14": 6.0, "52w_high": 300.0},
+        tech={
+            "ma50": 162.0,
+            "sma20": 150.0,
+            "atr14": 6.0,
+            "52w_high": 300.0,
+            "sector": "mining",
+        },
     )
     assert not envelope.get("rejected")
     assert "52-Week" not in envelope["target_basis"]
@@ -1634,9 +1759,12 @@ def test_sector_aware_cap_mining_allows_wider_target():
     env_default = chamber._compute_trade_envelope(10000.0, 0.0, {**tech})
     env_mining = chamber._compute_trade_envelope(10000.0, 0.0, {**tech, "sector": "mining"})
 
-    assert env_mining["target_price"] > env_default["target_price"]
+    assert env_default.get("rejected") is True
+    default_hypothetical = env_default["hypothetical_envelope"]
+    assert env_mining["target_price"] > default_hypothetical["target_price"]
+    assert env_mining["risk_reward_ratio"] >= env_mining["required_rr"]
     assert env_mining["target_price"] <= env_mining["entry_high"] * 1.21
-    assert "(Swing Cap)" in env_default["target_basis"]
+    assert "(Swing Cap)" in default_hypothetical["target_basis"]
 
 
 def test_sector_aware_cap_bank_keeps_tight_target():
@@ -1646,8 +1774,12 @@ def test_sector_aware_cap_bank_keeps_tight_target():
 
     env_bank = chamber._compute_trade_envelope(10000.0, 0.0, {**tech, "sector": "bank"})
 
-    assert env_bank["target_price"] <= env_bank["entry_high"] * 1.11
-    assert "(Swing Cap)" in env_bank["target_basis"]
+    assert env_bank.get("rejected") is True
+    bank_hypothetical = env_bank["hypothetical_envelope"]
+    assert bank_hypothetical["target_price"] <= (
+        bank_hypothetical["entry_high"] * 1.11
+    )
+    assert "(Swing Cap)" in bank_hypothetical["target_basis"]
 
 
 @pytest.mark.asyncio
@@ -1674,6 +1806,10 @@ async def test_fundamental_node_propagates_quality_rejection_to_metadata(monkeyp
                 "fair_value_low": None,
                 "fair_value_high": None,
                 "range_pct": None,
+                "dps": 83.01,
+                "dps_source": "yield_x_market_price",
+                "dps_yield_pct": 6.41,
+                "dps_price_used": 1295.0,
                 "risk_overvalued": False,
                 "fv_quality_rejected": True,
                 "fv_quality_reasons": ["fv_methods_lt_2"],
@@ -1686,6 +1822,10 @@ async def test_fundamental_node_propagates_quality_rejection_to_metadata(monkeyp
     )
 
     assert partial["fair_value_estimate"] is None
+    assert partial["dps"] == pytest.approx(83.01)
+    assert partial["dps_source"] == "yield_x_market_price"
+    assert partial["dps_yield_pct"] == pytest.approx(6.41)
+    assert partial["dps_price_used"] == pytest.approx(1295.0)
     # Quality rejection must surface through the same metadata fields the
     # RAG-evidence rejection uses, so report consumers treat both alike.
     meta = partial["metadata"]
@@ -1796,6 +1936,73 @@ def test_defensive_clamp_not_applied_in_normal():
     )
 
 
+def test_defensive_clamp_prefers_canonical_execution_regime_in_conflict():
+    chamber = _chamber()
+    state = _defensive_state("BUY", 0.75)
+    state.update(
+        {
+            "execution_regime": "DEFENSIVE",
+            "regime_context": {"execution_regime": "DEFENSIVE"},
+            "trend_regime": {"label": "SIDEWAYS", "confidence": 0.9467},
+            "hmm_regime": {"label": "SIDEWAYS", "confidence": 0.9467},
+            "metadata": {"regime": "NORMAL"},
+        }
+    )
+
+    result = chamber._apply_defensive_clamp(
+        {"rating": "BUY", "confidence": 0.75},
+        state,
+    )
+
+    assert result["rating"] == "HOLD"
+    assert result["confidence"] <= 0.55
+
+
+def test_initial_state_resolves_context_before_any_terminal_preflight() -> None:
+    chamber = _chamber()
+    chamber.market_regime = {
+        "regime": "DEFENSIVE",
+        "volatility_regime": "HIGH",
+    }
+    chamber.hmm_regime = {"label": "SIDEWAYS", "confidence": 0.9467}
+    chamber.regime_context = {}
+
+    state = chamber._new_initial_state(
+        ticker="BACH",
+        current_price=100.0,
+        market_data={"source": "test"},
+        run_id="regime-test",
+    )
+
+    assert state["execution_regime"] == "DEFENSIVE"
+    assert state["execution_regime_reason"] == "rule_based_defensive_override"
+    assert state["trend_regime"]["label"] == "SIDEWAYS"
+    assert state["trading_params"]["consensus_threshold"] == 0.80
+    assert "regime" not in state
+    assert "regime" not in state["metadata"]
+
+
+def test_legacy_defensive_does_not_override_canonical_sideways():
+    chamber = _chamber()
+    state = _defensive_state("BUY", 0.75)
+    state.update(
+        {
+            "execution_regime": "SIDEWAYS",
+            "regime_context": {"execution_regime": "SIDEWAYS"},
+            "hmm_regime": {"label": "BEAR_STRESS", "confidence": 0.99},
+            "metadata": {"regime": "DEFENSIVE"},
+        }
+    )
+
+    result = chamber._apply_defensive_clamp(
+        {"rating": "BUY", "confidence": 0.75},
+        state,
+    )
+
+    assert result["rating"] == "BUY"
+    assert result["confidence"] == 0.75
+
+
 # ---------------------------------------------------------------------------
 # P0.2 — ATR regime multiplier and noise rejection gate
 # ---------------------------------------------------------------------------
@@ -1810,8 +2017,18 @@ def test_atr_multiplier_defensive_wider_stop_than_normal():
     # current_price=1000, atr14=20, sma20=960:
     #   NORMAL   stop = max(940, 950)=950; distance=50 > noise_floor=30 -> OK
     #   DEFENSIVE stop = max(940, 940)=940; distance=60 > 30 -> OK
-    tech_neutral = {"regime": "NORMAL", "atr14": 20.0, "sma20": 960.0}
-    tech_defensive = {"regime": "DEFENSIVE", "atr14": 20.0, "sma20": 960.0}
+    tech_neutral = {
+        "regime": "NORMAL",
+        "atr14": 20.0,
+        "sma20": 960.0,
+        "sector": "mining",
+    }
+    tech_defensive = {
+        "regime": "DEFENSIVE",
+        "atr14": 20.0,
+        "sma20": 960.0,
+        "sector": "mining",
+    }
 
     env_neutral = chamber._compute_trade_envelope(1000.0, 1100.0, tech_neutral)
     env_defensive = chamber._compute_trade_envelope(1000.0, 1100.0, tech_defensive)
@@ -1822,6 +2039,37 @@ def test_atr_multiplier_defensive_wider_stop_than_normal():
         f"DEFENSIVE stop {env_defensive['stop_loss']} should be lower than "
         f"NORMAL stop {env_neutral['stop_loss']} (wider buffer)"
     )
+
+
+def test_trade_envelope_receives_canonical_execution_regime(monkeypatch):
+    chamber = _chamber()
+    captured: dict[str, str] = {}
+    original = chamber._compute_trade_envelope
+
+    def capture_regime(current_price, fair_value, tech):
+        captured["regime"] = tech.get("regime")
+        return original(current_price, fair_value, tech)
+
+    monkeypatch.setattr(chamber, "_compute_trade_envelope", capture_regime)
+    chamber._format_devils_advocate_trade_envelope(
+        {
+            "current_price": 1000.0,
+            "fair_value_estimate": 1200.0,
+            "technical_indicators": {
+                "regime": "SIDEWAYS",
+                "atr14": 20.0,
+                "sma20": 960.0,
+                "rsi14": 55.0,
+                "return_5d_pct": 1.5,
+            },
+            "execution_regime": "DEFENSIVE",
+            "regime_context": {"execution_regime": "DEFENSIVE"},
+            "hmm_regime": {"label": "SIDEWAYS", "confidence": 0.9467},
+            "metadata": {"regime": "NORMAL"},
+        }
+    )
+
+    assert captured["regime"] == "DEFENSIVE"
 
 
 def test_atr_noise_gate_rejects_stop_inside_noise():
@@ -1904,7 +2152,7 @@ def test_envelope_momentum_rejection_still_computes_hypothetical_levels():
     assert envelope["reason_code"] == "no_momentum_confirmation"
     hypo = envelope["hypothetical_envelope"]
     assert hypo["stop_loss"] < hypo["entry_low"] < hypo["entry_high"]
-    assert hypo["risk_reward_ratio"] >= 1.4
+    assert hypo["risk_reward_ratio"] >= hypo["required_rr"]
 
 
 def test_envelope_noise_rejection_keeps_first_reason_code():
@@ -1920,7 +2168,7 @@ def test_envelope_noise_rejection_keeps_first_reason_code():
     hypo = envelope["hypothetical_envelope"]
     assert hypo["stop_loss"] < hypo["entry_high"]
     assert hypo["target_price"] > 0
-    assert hypo["risk_reward_ratio"] < 1.4  # later gate fired too, but did not win
+    assert hypo["risk_reward_ratio"] < hypo["required_rr"]
 
 
 def test_envelope_accepted_setup_has_no_hypothetical_envelope():
@@ -2223,3 +2471,269 @@ def test_momentum_play_false_does_not_cap_confidence():
     assert verdict.confidence == 0.82, (
         f"momentum_play=False must not cap confidence, got {verdict.confidence}"
     )
+
+
+@pytest.mark.asyncio
+async def test_short_history_is_terminal_before_langgraph_with_zero_llm_calls(
+    monkeypatch,
+):
+    chamber = _chamber()
+    chamber._llm_call_counts = {}
+    index = pd.date_range("2026-07-08", periods=3, freq="B")
+    history = pd.DataFrame(
+        {
+            "Open": [450.0, 500.0, 500.0],
+            "High": [500.0, 550.0, 510.0],
+            "Low": [440.0, 490.0, 472.0],
+            "Close": [500.0, 550.0, 500.0],
+            "Volume": [1_000_000.0, 2_000_000.0, 1_500_000.0],
+        },
+        index=index,
+    )
+
+    async def fake_fetch_market_data(ticker):
+        return {
+            "history": history,
+            "source": "test",
+            "info": {"listingDate": "2026-07-08"},
+        }
+
+    class FailingApp:
+        calls = 0
+
+        async def ainvoke(self, state):
+            self.calls += 1
+            raise AssertionError("LangGraph must not run for short history")
+
+    app = FailingApp()
+    chamber.app = app
+    monkeypatch.setattr(chamber, "_fetch_market_data", fake_fetch_market_data)
+
+    result = await chamber.run("BACH", current_price=500.0)
+    verdict = CIOVerdict(**json.loads(result["final_verdict"]))
+    snapshot = result["metadata"]["trade_setup_snapshot"]
+
+    assert app.calls == 0
+    assert snapshot["status"] == "INSUFFICIENT_DATA"
+    assert snapshot["reason_code"] == "recent_listing_short_history"
+    assert result["metadata"]["execution_status"] == "INSUFFICIENT_DATA"
+    assert result["metadata"]["decision_source"] == "preflight"
+    assert result["metadata"]["flash_calls"] == 0
+    assert result["metadata"]["pro_calls"] == 0
+    assert result["metadata"]["llm_calls"] == 0
+    assert result["round_count"] == 0
+    assert result["debate_history"] == []
+    assert verdict.rating == "HOLD"
+    assert verdict.confidence == 0.0
+    assert verdict.entry_price_range is None
+
+
+@pytest.mark.asyncio
+async def test_prepared_executable_setup_avoids_double_fetch_and_recompute(
+    monkeypatch,
+):
+    chamber = _chamber()
+    chamber._llm_call_counts = {}
+    counters = {"fetch": 0, "technicals": 0, "preflight": 0, "envelope": 0}
+    index = pd.date_range("2025-01-01", periods=250, freq="B")
+    close = pd.Series([100.0 + i * 0.1 for i in range(250)], index=index)
+    history = pd.DataFrame(
+        {
+            "Open": close - 0.5,
+            "High": close + 1.0,
+            "Low": close - 1.0,
+            "Close": close,
+            "Volume": 1_000_000.0,
+        },
+        index=index,
+    )
+
+    async def fake_fetch_market_data(ticker):
+        counters["fetch"] += 1
+        return {"history": history, "source": "test", "info": {}}
+
+    def fake_technicals(frame):
+        counters["technicals"] += 1
+        return {
+            "current_price": 125.0,
+            "sma20": 124.0,
+            "ma50": 123.0,
+            "ma200": 115.0,
+            "ma200_context": "ABOVE",
+            "rsi14": 55.0,
+            "atr14": 2.0,
+            "low_20d": 118.0,
+            "return_5d_pct": 1.0,
+        }
+
+    def fake_preflight(tech, current_price):
+        counters["preflight"] += 1
+        return {"status": "clean", "atr14": 2.0, "surrogate_gap": 7.0}
+
+    def fake_envelope(current_price, fair_value, tech):
+        counters["envelope"] += 1
+        return {
+            "entry_low": 120.0,
+            "entry_high": 125.0,
+            "entry_mid": 122.5,
+            "target_price": 145.0,
+            "target_basis": "test",
+            "stop_loss": 115.0,
+            "risk_reward_ratio": 2.0,
+            "atr14": 2.0,
+            "stop_near_noise": False,
+        }
+
+    monkeypatch.setattr(chamber, "_fetch_market_data", fake_fetch_market_data)
+    monkeypatch.setattr(chamber, "_compute_technical_indicators", fake_technicals)
+    monkeypatch.setattr(chamber, "_run_tradeability_preflight", fake_preflight)
+    monkeypatch.setattr(chamber, "_compute_trade_envelope", fake_envelope)
+    prepared = await chamber.prepare_trade_setup(
+        "TEST",
+        current_price=125.0,
+        sector="bank",
+    )
+
+    class EchoApp:
+        calls = 0
+
+        async def ainvoke(self, state):
+            self.calls += 1
+            return state
+
+    app = EchoApp()
+    chamber.app = app
+
+    async def fail_fetch(ticker):
+        raise AssertionError("prepared run must not refetch market data")
+
+    def fail_recompute(*args, **kwargs):
+        raise AssertionError("prepared run must not recompute trade setup")
+
+    monkeypatch.setattr(chamber, "_fetch_market_data", fail_fetch)
+    monkeypatch.setattr(chamber, "_compute_technical_indicators", fail_recompute)
+    monkeypatch.setattr(chamber, "_run_tradeability_preflight", fail_recompute)
+    monkeypatch.setattr(chamber, "_compute_trade_envelope", fail_recompute)
+
+    result = await chamber.run("TEST", prepared_setup=prepared)
+
+    assert prepared["trade_setup_snapshot"]["status"] == "EXECUTABLE"
+    assert app.calls == 1
+    assert counters == {"fetch": 1, "technicals": 1, "preflight": 1, "envelope": 1}
+    assert result["metadata"]["execution_status"] == "EXECUTABLE"
+
+
+@pytest.mark.asyncio
+async def test_prepared_rr_rejection_is_terminal_with_zero_llm_calls():
+    chamber = _chamber()
+    chamber._llm_call_counts = {}
+
+    class FailingApp:
+        calls = 0
+
+        async def ainvoke(self, state):
+            self.calls += 1
+            raise AssertionError("LangGraph must not run for RR_TOO_LOW")
+
+    app = FailingApp()
+    chamber.app = app
+    hypothetical = {
+        "entry_low": 1255.0,
+        "entry_high": 1295.0,
+        "target_price": 1325.0,
+        "target_basis": "Resistance 20-Day",
+        "stop_loss": 1165.0,
+        "risk_reward_ratio": 0.23,
+    }
+    prepared = {
+        "ticker": "LSIP",
+        "current_price": 1295.0,
+        "sector": "consumer_staples",
+        "market_data": {"source": "test"},
+        "regime_context": {
+            "execution_regime": "SIDEWAYS",
+            "execution_params": {},
+        },
+        "hmm_regime": {},
+        "rule_regime_snapshot": None,
+        "trade_setup_snapshot": {
+            "status": "RR_TOO_LOW",
+            "reason_code": "rr_too_low",
+            "reason": "R/R 0.23 below minimum",
+            "debate_eligible": False,
+            "technical_indicators": {"rsi14": 59.8},
+            "preflight": {"status": "clean"},
+            "envelope": None,
+            "hypothetical_envelope": hypothetical,
+        },
+    }
+
+    result = await chamber.run("LSIP", prepared_setup=prepared)
+    verdict = CIOVerdict(**json.loads(result["final_verdict"]))
+
+    assert app.calls == 0
+    assert result["metadata"]["execution_status"] == "RR_TOO_LOW"
+    assert result["metadata"]["flash_calls"] == 0
+    assert result["metadata"]["pro_calls"] == 0
+    assert result["metadata"]["llm_calls"] == 0
+    assert verdict.reason_codes == ["rr_too_low"]
+    assert verdict.hypothetical_envelope == hypothetical
+    assert verdict.confidence == 0.0
+    assert verdict.model_confidence is None
+    assert verdict.policy_confidence == 1.0
+    assert verdict.entry_price_range is None
+
+
+@pytest.mark.asyncio
+async def test_stream_run_routes_terminal_snapshot_before_scouts(monkeypatch):
+    chamber = _chamber()
+    prepared = {
+        "ticker": "BACH",
+        "trade_setup_snapshot": {
+            "status": "INSUFFICIENT_DATA",
+            "reason_code": "recent_listing_short_history",
+            "debate_eligible": False,
+        },
+    }
+    terminal_state = {
+        "ticker": "BACH",
+        "current_price": 500.0,
+        "final_verdict": CIOVerdict(
+            ticker="BACH",
+            rating="HOLD",
+            confidence=0.0,
+            current_price=500.0,
+            summary="INSUFFICIENT_DATA",
+            reason_codes=["recent_listing_short_history"],
+        ).model_dump_json(),
+        "metadata": {
+            "execution_status": "INSUFFICIENT_DATA",
+            "flash_calls": 0,
+            "pro_calls": 0,
+            "llm_calls": 0,
+        },
+    }
+    calls = {"prepare": 0, "run": 0, "scouts": 0}
+
+    async def fake_prepare(ticker, current_price=0.0, sector=""):
+        calls["prepare"] += 1
+        return prepared
+
+    async def fake_run(ticker, current_price=0.0, sector="", prepared_setup=None):
+        calls["run"] += 1
+        assert prepared_setup is prepared
+        return terminal_state
+
+    async def fail_scouts(ticker, prepared_setup=None):
+        calls["scouts"] += 1
+        raise AssertionError("terminal stream must not start scouts")
+
+    monkeypatch.setattr(chamber, "prepare_trade_setup", fake_prepare)
+    monkeypatch.setattr(chamber, "run", fake_run)
+    monkeypatch.setattr(chamber, "_run_scouts", fail_scouts)
+
+    events = [event async for event in chamber.stream_run("BACH")]
+
+    assert [event["type"] for event in events] == ["progress", "verdict", "done"]
+    assert calls == {"prepare": 1, "run": 1, "scouts": 0}
+    assert events[1]["raw_state"]["metadata"]["llm_calls"] == 0

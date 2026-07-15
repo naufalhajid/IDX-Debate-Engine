@@ -1,0 +1,49 @@
+╔══════════════════════════════════════════╗
+║  AUDIT REPORT: BACH — INSUFFICIENT_DATA ║
+╚══════════════════════════════════════════╝
+
+Summary : BACH→INSUFFICIENT_DATA: unknown won by unknown (0.15) after 3 round(s). 1 agent(s) dissented. No reliable fair value in the Python Trade Envelope due to insufficient data
+Run ID  : 20260712_173441
+Generated: 2026-07-12T10:39:08.266092+00:00
+
+VERDICT
+───────
+Rating     : INSUFFICIENT_DATA (confidence: 15%)
+Method     : unknown
+Winner    : unknown
+Consensus  : no
+Rounds     : 3
+Dissent    : 20% (1 of 5 agents)
+
+AGENT VOTES
+───────────
+  fundamental_scout      HOLD     conf= 0.62 eff= 0.62  ❌
+  chartist               HOLD     conf= 0.28 eff= 0.28  ❌
+  sentiment_specialist   HOLD     conf= 0.68 eff= 0.68  ❌
+  bull                   HOLD     conf= 0.31 eff= 0.31  ❌
+  bear                   AVOID    conf= 0.24 eff= 0.20  ❌
+  devils_advocate        AVOID    conf= 0.40 eff= 0.40  ❌
+
+KEY ARGUMENTS
+─────────────
+Bull  : Position: NEUTRAL
+Debate Confidence: LOW
+
+Bear’s stop-loss thesis leans on the breakdown area around Rp 500, but the tape also shows a lower bid shelf in the Rp 490–472 zone, so the downside is not a clean air-pocket collapse. That gives BACH a secondary support reference below the cited breakdown l
+Bear  : Position: BEARISH
+Debate Confidence: LOW
+
+The Bull’s setup is fragile because it leans on the Rp 500 area as a support/entry anchor, yet the tape already showed a weak close near Rp 472 after trading down from Rp 550. That means the cited Rp 500 line is not a validated floor; it is already being tes
+Devil : Position: STRESS_TEST  
+Agent Confidence: 0.27
+
+Challenge 1 — MACRO / COMPANY RISK  
+If the stock is already near Rp 500 support and foreign funds keep selling, could the Rp 500 floor fail within 5–20 trading days and flush toward Rp 472? Net foreign flow data: null.
+
+Challenge 2 — TRANSACTION COST 
+
+DATA QUALITY
+────────────
+Freshness OK : False
+Stale sources: sentiment
+Missing      : none

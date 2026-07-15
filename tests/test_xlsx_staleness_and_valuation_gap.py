@@ -15,6 +15,8 @@ from core.quant_filter.config import (
     assess_xlsx_staleness,
 )
 from services.fair_value_calculator import check_valuation_disagreement
+from services.fair_value_calculator import FairValueCalculator, KeyStats
+from utils.xlsx_adapter import XlsxDataAdapter
 
 
 # ── Task 5 — assess_xlsx_staleness ────────────────────────────────────────────
@@ -134,3 +136,64 @@ def test_custom_threshold():
         graham_fv=1000.0, debate_fv=1400.0, disagreement_threshold=0.50
     )
     assert result["valuation_disagreement"] == "ALIGNED"
+
+
+def test_xlsx_weighted_average_counts_only_positive_weight_methods():
+    adapter = object.__new__(XlsxDataAdapter)
+    calc = FairValueCalculator(
+        KeyStats(ticker="TEST", current_price=100.0),
+        sector="default",
+    )
+
+    result = adapter._weighted_average_with_ev(
+        calc,
+        pe_fv=100.0,
+        pb_fv=110.0,
+        ddm_fv=3000.0,
+        ev_fv=120.0,
+        sektor="default",
+    )
+
+    assert result["breakdown"]["ddm"] == 3000
+    assert result["active_method_count"] == 3
+    assert result["valid_method_count"] == 3
+    assert result["available_method_count"] == 4
+    assert result["configured_active_method_count"] == 3
+
+
+def test_xlsx_report_preserves_missing_fair_value_as_none(monkeypatch):
+    adapter = object.__new__(XlsxDataAdapter)
+    monkeypatch.setattr(
+        adapter,
+        "extract_keystats",
+        lambda ticker, current_price: KeyStats(
+            ticker=ticker,
+            current_price=current_price,
+        ),
+    )
+    monkeypatch.setattr(adapter, "fair_value_ev_ebitda", lambda *args: None)
+    monkeypatch.setattr(
+        adapter,
+        "_weighted_average_with_ev",
+        lambda *args: {
+            "fair_value": None,
+            "breakdown": {},
+            "confidence": "INSUFFICIENT_DATA",
+            "margin_of_safety_pct": None,
+            "valuation_verdict": "DATA_UNAVAILABLE",
+        },
+    )
+    monkeypatch.setattr(adapter, "get_quality_flags", lambda ticker: {})
+    monkeypatch.setattr(
+        adapter,
+        "_build_extended_report",
+        lambda **kwargs: "report",
+    )
+
+    report, fair_value = adapter.build_fair_value_report(
+        "TEST",
+        current_price=100.0,
+    )
+
+    assert report == "report"
+    assert fair_value is None

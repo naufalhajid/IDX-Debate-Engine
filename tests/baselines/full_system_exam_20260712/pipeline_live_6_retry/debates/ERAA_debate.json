@@ -1,0 +1,436 @@
+{
+  "ticker": "ERAA",
+  "verdict": {
+    "ticker": "ERAA",
+    "rating": "HOLD",
+    "confidence": 0.4,
+    "fair_value": 1292.0,
+    "fair_value_base": 1292.0,
+    "fair_value_low": 1098.0,
+    "fair_value_high": 1486.0,
+    "valuation_gap": null,
+    "entry_price_range": null,
+    "target_price": null,
+    "stop_loss": null,
+    "current_price": 340.0,
+    "timeframe": "5-20 Trading Days",
+    "execution_horizon_days": 10,
+    "weighted_reasoning": "",
+    "critical_risk_factor": "",
+    "key_catalysts": [],
+    "key_risks": [],
+    "summary": "Setup ditolak: no_momentum_confirmation: return_5d -0.3% < 0 at RSI 49.6.",
+    "target_basis": null,
+    "expected_return": null,
+    "risk_reward_ratio": null,
+    "is_overvalued": false,
+    "risk_overvalued": false,
+    "wait_and_see": true,
+    "consensus_reached": true,
+    "consensus_method": "voting",
+    "dissenting_agents": [
+      "bear"
+    ],
+    "reason_codes": [
+      "no_momentum_confirmation"
+    ],
+    "hypothetical_envelope": {
+      "entry_low": 330.0,
+      "entry_high": 340.0,
+      "target_price": 358.0,
+      "target_basis": "Resistance 20-Day",
+      "stop_loss": 308.0,
+      "risk_reward_ratio": 0.56
+    },
+    "trailing_stop_pct": null,
+    "trailing_stop_trigger_pct": null,
+    "partial_exit_t1_pct": 0.5,
+    "partial_exit_trail_remainder": true,
+    "momentum_play": false,
+    "model_confidence": 0.4
+  },
+  "debate_rounds": 1,
+  "consensus_reached": true,
+  "consensus_method": "voting",
+  "dissenting_agents": [
+    "bear"
+  ],
+  "agent_votes": [
+    {
+      "agent": "fundamental_scout",
+      "position": "HOLD",
+      "confidence": 0.78,
+      "calibration_weight": 1.0,
+      "effective_confidence": 0.78,
+      "round": 0
+    },
+    {
+      "agent": "chartist",
+      "position": "HOLD",
+      "confidence": 0.72,
+      "calibration_weight": 1.0,
+      "effective_confidence": 0.72,
+      "round": 0
+    },
+    {
+      "agent": "sentiment_specialist",
+      "position": "HOLD",
+      "confidence": 0.61,
+      "calibration_weight": 1.0,
+      "effective_confidence": 0.61,
+      "round": 0
+    },
+    {
+      "agent": "bull",
+      "position": "HOLD",
+      "confidence": 0.44,
+      "calibration_weight": 1.0,
+      "effective_confidence": 0.44,
+      "round": 1
+    },
+    {
+      "agent": "bear",
+      "position": "AVOID",
+      "confidence": 0.42,
+      "calibration_weight": 0.85,
+      "effective_confidence": 0.357,
+      "round": 1
+    },
+    {
+      "agent": "devils_advocate",
+      "position": "AVOID",
+      "confidence": 0.4,
+      "calibration_weight": 1.0,
+      "effective_confidence": 0.4,
+      "round": 2
+    }
+  ],
+  "consensus_winner": {
+    "agent": "fundamental_scout",
+    "position": "HOLD",
+    "confidence": 0.78,
+    "calibration_weight": 1.0,
+    "effective_confidence": 0.78,
+    "round": 0
+  },
+  "disagreement_type": null,
+  "debate_history": [
+    {
+      "role": "bull",
+      "content": "Position: NEUTRAL  \nDebate Confidence: LOW\n\nData audit first: the brief does include one fundamental citation with an actual number, P/E implied via fair value data is available only indirectly as Current Price 340 vs Fair Value Base 1292, one technical citation with actual numbers is available (price Rp 340, EMA20 Rp 339, MA50 Rp 348, MA200 Rp 376, RSI 49.6, AVWAP Rp 335), and one company-specific catalyst with dates is available (ERAA dividend cum date on 2026-07-07). However, that catalyst date is in the past relative to Current Date 2026-07-12, so it is PAST_EVENT_NOT_CATALYST and cannot justify a 5-20 trading-day BUY. Because the near-term catalyst requirement is not satisfied, I must stop at NEUTRAL.\n\nFundamental floor: the valuation gap is large on paper, with Current Price Rp 340 versus Fair Value Base Rp 1,292, which suggests deep discounting. But for a 5-20 trading-day swing, the fair value gap alone is not enough, especially when the trade is counter-trend: price is below MA50 Rp 348 and below MA200 Rp 376, so the chart is not yet confirming a structural long. The evidence also says upside is capped conservatively and the setup is a counter-trend bounce, not a high-conviction trend reversal.\n\nTechnical entry: the reported entry zone is Rp 339-348, anchored by EMA20 Rp 339 and MA50 Rp 348, with price at Rp 340 and just above AVWAP Rp 335. That is a reasonable support band, but the brief also notes RSI 49.6, volume_surge_ratio 1.06, and “volume is not confirming strongly,” so the support has not yet shown decisive participation. BB squeeze is active, which can precede a move, but without a valid near-term catalyst this remains a watchlist setup rather than a BUY.\n\nCatalyst and risk/reward: the only company-specific catalyst provided is the 2026-07-07 dividend event, which is already past and therefore not usable as a future trigger. No other dated 5-20 trading-day catalyst is present, so I cannot responsibly name one. The brief does provide a working trade plan: Entry Rp 339-348 -> Target Rp 350 -> Stop Rp 311, implying a modest R/R around 1:1 from the midpoint and not an attractive asymmetric swing. Given the missing valid catalyst and counter-trend structure, the correct stance is NEUTRAL.\n\nPosition: HOLD  \nAgent Confidence: 0.44",
+      "round": 1,
+      "position": "HOLD",
+      "confidence": 0.374
+    },
+    {
+      "role": "bear",
+      "content": "Position: BEARISH\nDebate Confidence: LOW\n\nThe data audit is incomplete for a 5–20 trading-day swing. I do have one fundamental risk metric with an actual number: current price Rp 340 versus fair value base Rp 1,292, implying a very large discount or, more precisely, a valuation gap of about 280%. I also have technical risk numbers: price Rp 340 is below MA50 Rp 348 and below MA200 Rp 376, with RSI(14) at 49.6 and volume_surge_ratio only 1.06. The company-specific event in the brief is the dividend cum date on 2026-07-07, but that is a PAST_EVENT_NOT_CATALYST relative to 2026-07-12, so it cannot justify a 5–20 day entry. Because the near-term catalyst is invalid, this is not a BUY case; at best it remains NEUTRAL, and I will still challenge the setup below.\n\nOvervaluation is not the main issue here: the price is not above fair value, it is far below it, so there is no premium to quantify. That means the bullish thesis depends entirely on execution and timing, not valuation. But the chart says this is a counter-trend bounce, not a structural long: the brief explicitly places price below MA50 Rp 348 and below MA200 Rp 376, while also saying MA200 context is BELOW. The support band at Rp 339–348 is therefore fragile, because any loss of Rp 339 would push price back under the nearest trend reference, and the next cited downside anchor is the stop at Rp 311.\n\nTechnical breakdown risk is real because the “support” is sitting on weak confirmation. Price at Rp 340 is only 0.1% above VWAP Rp 340 and just above AVWAP Rp 335, while BB squeeze is active and MACD histogram is POSITIVE_SHRINKING; that combination can fail without volume. The brief already admits volume is not confirming strongly, with volume_surge_ratio 1.06, and the setup is capped conservatively because MA200 context is below. In other words, the cited entry zone Rp 339–348 is not backed by decisive participation, so a lower-high / failed bounce scenario remains plausible if price cannot reclaim Rp 348 with stronger volume.\n\nCatalyst risk is the decisive weakness. The only company-specific dated trigger provided is the 2026-07-07 dividend cum date, which is already past and therefore unusable as a forward catalyst inside a 5–20 trading-day window. No other company-specific negative or positive catalyst with a valid future date is given, so the bull case lacks a time-bound trigger. The trade plan in the brief implies Entry Rp 339–348, Target Rp 350, Stop Rp 311; using the midpoint entry around Rp 343.5, upside is about Rp 6.5 while downside to stop is about Rp 32.5, or roughly 0.2:1 reward/risk. That is an unfavorable R/R and makes the setup unattractive even before accounting for the invalid catalyst.\n\nPosition: AVOID\nAgent Confidence: 0.42",
+      "round": 1,
+      "position": "AVOID",
+      "confidence": 0.42
+    },
+    {
+      "role": "devils_advocate",
+      "content": "Position: STRESS_TEST  \nAgent Confidence: 0.48\n\n1) If foreign funds keep selling into a counter-trend bounce and price loses the cited support at Rp 339, won’t the below-MA200 setup snap back toward the Rp 311 stop within days?\n\n2) Entry price used: Rp 343.5 midpoint\n\nCost components:\n- Buy commission: 0.15%\n- Sell commission: 0.25%\n- Final income tax: 0.10%\n- Slippage: 0.15%  \n- Total round-trip cost: 0.65%\n\nProjected target return% from Entry Midpoint to Target Price:\n- Target Price: Rp 350\n- Expected Return From Entry Midpoint: 1.89%\n\nNet return after costs:\n- 1.89% - 0.65% = 1.24%\n\nINSUFFICIENT NET RETURN -- transaction costs consume too much of the projected gain.\n\nPOSITION: AVOID CONFIDENCE: 0.40",
+      "round": 2,
+      "position": "AVOID",
+      "confidence": 0.4
+    }
+  ],
+  "raw_data_summary": "=== EVIDENCE BRIEF: ERAA ===\nQuery: swing trade analysis\n\n[FAIR_VALUE]\nEvidence ID: ERAA_20260712_173441_fair_value_0\nCurrent Price: 340 | Fair Value Base: 1292 | Fair Value Range: 1098 - 1486 | Upside: 280.0% | Risk Overvalued: False\nSource: stockbit | Score: 0.85\n\n[TECHNICAL]\nEvidence ID: ERAA_20260712_173441_technical_0\n{\"52w_high\":517.0,\"52w_low\":300.0,\"atr14\":11.0,\"avg_volume_20d\":31929785.0,\"avwap\":335.0,\"avwap_anchor_bars_ago\":23,\"avwap_position\":\"ABOVE_AVWAP\",\"bb_position\":\"LOWER_HALF\",\"bb_squeeze\":true,\"bb_width\":7.31,\"brief\":\"Position: NEUTRAL ma200_context is BELOW, so this is a counter-trend bounce, not a structural long. Stock-specific context: current price Rp 340 sits below MA50 Rp 348 and below\nSource: yfinance | Score: 0.95\n\n[TECHNICAL]\nEvidence ID: ERAA_20260712_173441_technical_1\nMA200 Rp 376, while EMA20 Rp 339 is the nearest trend reference. Weekly trend is INSUFFICIENT_DATA, so no higher-timeframe confirmation is available. MACD histogram is POSITIVE_SHRINKING, so momentum is still positive but decelerating; BB squeeze is active, which means a breakout is likely but needs volume confirmation before entry. ENTRY ZONE: Rp 339 - Rp 348. Counter-trend trade -- reduce\nSource: yfinance | Score: 0.95\n\n[TECHNICAL]\nEvidence ID: ERAA_20260712_173441_technical_2\nposition size to 50%. TARGET: Rp 350 (approx. 2.4% from entry midpoint), with upside capped conservatively because MA200 context is BELOW. STOP-LOSS: Rp 311 (2.5 x ATR below EMA20). RSI(14) is 49.6, so momentum is neutral. Volume is not confirming strongly: volume_surge_ratio 1.06 is only slightly above average, so price advance lacks decisive participation. VWAP: Rp 340 | Price is 0.1% at VWAP.\nSource: yfinance | Score: 0.95\n\n[TECHNICAL]\nEvidence ID: ERAA_20260712_173441_technical_3\nPrice is below POC (Rp 381) b...\",\"compression_type\":\"NONE\",\"current_price\":340.0,\"divergence_strength\":null,\"ema20\":339.0,\"entry_rationale\":\"Market closed (weekend). Plan entries for Monday\nSource: yfinance | Score: 0.95\n\n[EXDATE]\nEvidence ID: ERAA_20260712_173441_exdate_0\nDividend Ex-Date: === DIVIDEND EX-DATE SCAN: ERAA ===\nStatus: CLEAR — Tidak ada ex-dividend date dalam 30 hari ke depan.\nSource: stockbit | Score: 0.70\n\n---\nTotal evidence: 6/14 chunks selected\nToken estimate: ~568\n\n=== NEWS BRIEF: ERAA ===\nPeriod: last 60 days\nSentiment: POSITIVE (score: +1.00)\nCORPORATE ACTION DETECTED\nConfidence adjustment: +0.05\nReason: Positive news sentiment supports trade\nLanguage: ID/EN\n\nTOP NEWS:\n1. [POSITIVE] 9 Saham Cum Date Hari Ini (7/7): ERAA, RUIS, hingga DEWA Siap Tebar Dividen! - Ajaib\n   Source: Ajaib | 2026-07-07\n   Events: CORPORATE_ACTION\n2. [POSITIVE] Catat, Jadwal Cum Dividen Saham ERAA Hari Ini Selasa (7/7) - Bisnis.com - Market\n   Source: Bisnis.com - Market | 2026-07-07\n   Events: CORPORATE_ACTION\n3. [POSITIVE] Besok Cum Dividen, Saham ERAA Masih Dibuang Asing - KabarBursa.com\n   Source: KabarBursa.com | 2026-07-06\n   Events: CORPORATE_ACTION\n4. [POSITIVE] Grup Erajaya ERAA dan ERAL Kompak Tebar Dividen, Begini Penilaian Analis - RCTI+\n   Source: RCTI+ | 2026-07-04\n   Events: CORPORATE_ACTION\n5. [POSITIVE] Grup Erajaya (ERAA) Bertabur Dividen - investor.id\n   Source: investor.id | 2026-07-03\n   Events: CORPORATE_ACTION",
+  "metadata": {
+    "prompt_version": "2026-06-30-cio-regime-labels-v27",
+    "run_id": "20260712_173441",
+    "regime": "DEFENSIVE",
+    "sector": "unknown",
+    "market_data_source": "yfinance",
+    "market_data_fetched_at": "2026-07-09T17:00:00+00:00",
+    "market_data_cached": true,
+    "flash_calls": 6,
+    "pro_calls": 0,
+    "tradeability_preflight": {
+      "status": "clean",
+      "atr14": 11.0,
+      "surrogate_gap": 18.0
+    },
+    "preflight_skipped": false,
+    "has_breaking_news": false,
+    "has_insider_selling": false,
+    "has_post_earnings": false,
+    "breaking_news_headlines": [],
+    "news_confidence_adjustment": 0.0,
+    "news_overall_sentiment": "NEUTRAL",
+    "news_brief": "=== NEWS BRIEF: ERAA ===\nPeriod: last 60 days\nSentiment: POSITIVE (score: +1.00)\nCORPORATE ACTION DETECTED\nConfidence adjustment: +0.05\nReason: Positive news sentiment supports trade\nLanguage: ID/EN\n\nTOP NEWS:\n1. [POSITIVE] 9 Saham Cum Date Hari Ini (7/7): ERAA, RUIS, hingga DEWA Siap Tebar Dividen! - Ajaib\n   Source: Ajaib | 2026-07-07\n   Events: CORPORATE_ACTION\n2. [POSITIVE] Catat, Jadwal Cum Dividen Saham ERAA Hari Ini Selasa (7/7) - Bisnis.com - Market\n   Source: Bisnis.com - Market | 2026-07-07\n   Events: CORPORATE_ACTION\n3. [POSITIVE] Besok Cum Dividen, Saham ERAA Masih Dibuang Asing - KabarBursa.com\n   Source: KabarBursa.com | 2026-07-06\n   Events: CORPORATE_ACTION\n4. [POSITIVE] Grup Erajaya ERAA dan ERAL Kompak Tebar Dividen, Begini Penilaian Analis - RCTI+\n   Source: RCTI+ | 2026-07-04\n   Events: CORPORATE_ACTION\n5. [POSITIVE] Grup Erajaya (ERAA) Bertabur Dividen - investor.id\n   Source: investor.id | 2026-07-03\n   Events: CORPORATE_ACTION",
+    "exdate_tier": "CLEAR",
+    "rag_chunks_selected": 6,
+    "rag_chunks_considered": 14,
+    "rag_token_estimate": 568,
+    "rag_rendered_char_count": 2272,
+    "evidence_age_h": 0,
+    "evidence_age_hours": 0.0,
+    "rag_citation_ids": [
+      "ERAA_20260712_173441_fair_value_0",
+      "ERAA_20260712_173441_technical_0",
+      "ERAA_20260712_173441_technical_1",
+      "ERAA_20260712_173441_technical_2",
+      "ERAA_20260712_173441_technical_3",
+      "ERAA_20260712_173441_exdate_0"
+    ],
+    "rag_citations": [
+      {
+        "chunk_id": "ERAA_20260712_173441_fair_value_0",
+        "category": "fair_value",
+        "source": "stockbit",
+        "relevance_score": 0.85,
+        "is_stale": false
+      },
+      {
+        "chunk_id": "ERAA_20260712_173441_technical_0",
+        "category": "technical",
+        "source": "yfinance",
+        "relevance_score": 0.95,
+        "is_stale": false
+      },
+      {
+        "chunk_id": "ERAA_20260712_173441_technical_1",
+        "category": "technical",
+        "source": "yfinance",
+        "relevance_score": 0.95,
+        "is_stale": false
+      },
+      {
+        "chunk_id": "ERAA_20260712_173441_technical_2",
+        "category": "technical",
+        "source": "yfinance",
+        "relevance_score": 0.95,
+        "is_stale": false
+      },
+      {
+        "chunk_id": "ERAA_20260712_173441_technical_3",
+        "category": "technical",
+        "source": "yfinance",
+        "relevance_score": 0.95,
+        "is_stale": false
+      },
+      {
+        "chunk_id": "ERAA_20260712_173441_exdate_0",
+        "category": "exdate",
+        "source": "stockbit",
+        "relevance_score": 0.7,
+        "is_stale": false
+      }
+    ],
+    "rag_stale_citation_ids": [],
+    "fair_value_rag_verified": true,
+    "market_cap_idr": 5318381142016,
+    "duration_seconds": 143.79699999999139,
+    "batch_timestamp": "20260712_173908",
+    "versioned_output": true
+  },
+  "regime": {
+    "label": "SIDEWAYS",
+    "confidence": 0.9467375021528672,
+    "probabilities": {
+      "SIDEWAYS": 0.9467375021528672,
+      "BULL": 0.019237603759281907,
+      "BEAR_STRESS": 0.034024894087631256
+    },
+    "msci_override": false,
+    "training_days": 756,
+    "detected_at": "2026-07-12T17:36:51.047523",
+    "notes": "MSCI review active: True"
+  },
+  "trading_params": {
+    "description": "IHSG flat, moderate volatility",
+    "max_position_pct": 0.01,
+    "min_risk_reward": 2.0,
+    "consensus_threshold": 0.7,
+    "max_concurrent_positions": 2,
+    "devil_advocate_weight": 0.3,
+    "regime_multiplier": 0.85,
+    "trading_allowed": true
+  },
+  "error": null,
+  "status": "success",
+  "conviction_score": 0.0,
+  "sector_key": "unknown",
+  "news_sentiment": "NEUTRAL",
+  "news_confidence_adjustment": 0.0,
+  "has_breaking_news": false,
+  "breaking_news_headlines": [],
+  "evidence_age_h": 0,
+  "model_confidence": 0.4,
+  "trade_conviction": 0.0,
+  "risk_governor": {
+    "ticker": "ERAA",
+    "status": "reject",
+    "sizing_allowed": false,
+    "reason_codes": [
+      "no_momentum_confirmation",
+      "invalid_entry_range",
+      "missing_target_price",
+      "missing_stop_loss"
+    ],
+    "message": "Setup ditolak karena data harga kunci belum valid.",
+    "current_price": 340.0,
+    "entry_low": null,
+    "entry_high": null,
+    "target_price": null,
+    "stop_loss": null
+  },
+  "forecast_report": {
+    "ticker": "ERAA",
+    "as_of": "2026-07-12",
+    "horizon_days": 10,
+    "expected_return_net": null,
+    "p_target": null,
+    "p_stop": null,
+    "volatility_forecast": 0.29437590914803563,
+    "expected_value": null,
+    "decision": "AVOID",
+    "confidence": null,
+    "model_votes": [
+      {
+        "model_name": "naive",
+        "status": "validation_failed",
+        "reason": "validation_status:failed",
+        "r_hat_net": -0.006658149426735643,
+        "p_target": 0.3980493157407272,
+        "p_stop": 0.40004693161347055,
+        "volatility_forecast": 0.29437590914803563,
+        "weight": 0.0,
+        "validation_passed": false,
+        "ic": null,
+        "brier_target": 0.25,
+        "rmse": 0.058316900571691886,
+        "mae": 0.046967573188950715,
+        "mape": 1.0336774199480516,
+        "directional_accuracy": 0.6599999999999999
+      },
+      {
+        "model_name": "xgboost",
+        "status": "active",
+        "reason": null,
+        "r_hat_net": 0.013300804421305656,
+        "p_target": 0.4032695641837305,
+        "p_stop": 0.3948377983201915,
+        "volatility_forecast": 0.29437590914803563,
+        "weight": 0.0,
+        "validation_passed": true,
+        "ic": 0.24044883537891515,
+        "brier_target": 0.27890610944695937,
+        "rmse": 0.06624985227916708,
+        "mae": 0.054108522456808375,
+        "mape": 2.623269317840307,
+        "directional_accuracy": 0.5733333333333334
+      },
+      {
+        "model_name": "lstm",
+        "status": "experimental_unused",
+        "reason": "conservative_policy",
+        "r_hat_net": null,
+        "p_target": null,
+        "p_stop": null,
+        "volatility_forecast": null,
+        "weight": 0.0,
+        "validation_passed": false,
+        "ic": null,
+        "brier_target": null,
+        "rmse": null,
+        "mae": null,
+        "mape": null,
+        "directional_accuracy": null
+      },
+      {
+        "model_name": "prophet",
+        "status": "experimental_unused",
+        "reason": "conservative_policy_not_primary_return_model",
+        "r_hat_net": null,
+        "p_target": null,
+        "p_stop": null,
+        "volatility_forecast": null,
+        "weight": 0.0,
+        "validation_passed": false,
+        "ic": null,
+        "brier_target": null,
+        "rmse": null,
+        "mae": null,
+        "mape": null,
+        "directional_accuracy": null
+      },
+      {
+        "model_name": "tgarch",
+        "status": "active",
+        "reason": null,
+        "r_hat_net": null,
+        "p_target": null,
+        "p_stop": null,
+        "volatility_forecast": 0.29437590914803563,
+        "weight": 0.0,
+        "validation_passed": true,
+        "ic": null,
+        "brier_target": null,
+        "rmse": null,
+        "mae": null,
+        "mape": null,
+        "directional_accuracy": null
+      }
+    ],
+    "validation_summary": {
+      "horizon_days": 10,
+      "n_observations": 150,
+      "ic_mean": 0.24044883537891515,
+      "ic_t_stat": 1.3622574778762533,
+      "brier": 0.2644530547234797,
+      "rmse": 0.062283376425429485,
+      "mae": 0.050538047822879545,
+      "mape": 1.8284733688941794,
+      "directional_accuracy": 0.6166666666666667,
+      "dsr": 0.00018,
+      "bh_q_value_passed": false,
+      "status": "failed"
+    },
+    "validation_by_model": {
+      "naive": {
+        "horizon_days": 10,
+        "n_observations": 150,
+        "ic_mean": null,
+        "ic_t_stat": null,
+        "brier": 0.25,
+        "rmse": 0.058316900571691886,
+        "mae": 0.046967573188950715,
+        "mape": 1.0336774199480516,
+        "directional_accuracy": 0.6599999999999999,
+        "dsr": 0.00018,
+        "bh_q_value_passed": false,
+        "status": "failed"
+      },
+      "xgboost": {
+        "horizon_days": 10,
+        "n_observations": 150,
+        "ic_mean": 0.24044883537891515,
+        "ic_t_stat": 1.3622574778762533,
+        "brier": 0.27890610944695937,
+        "rmse": 0.06624985227916708,
+        "mae": 0.054108522456808375,
+        "mape": 2.623269317840307,
+        "directional_accuracy": 0.5733333333333334,
+        "dsr": 0.00018,
+        "bh_q_value_passed": false,
+        "status": "research_only"
+      }
+    },
+    "model_dispersion": 0.00997947692402065,
+    "model_disagreement_penalty": 0.12,
+    "risk_adjusted_expected_value": null,
+    "data_quality_flags": [
+      "no_validated_return_model",
+      "experimental_unused:lstm",
+      "experimental_unused:prophet",
+      "model_disagreement_penalty:0.120",
+      "validation_status:failed"
+    ],
+    "volatility_fallback": false
+  },
+  "forecast_ev_ignored_reason": "validation_failed"
+}

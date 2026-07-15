@@ -16,6 +16,8 @@ from app.cli.mode_utils import (
 )
 from app.cli.ui.console import console
 from app.cli.ui.tables import build_verdict_summary_table
+from utils.logger_config import logger
+from utils.ticker import InvalidIDXTicker, normalize_idx_tickers
 
 
 def _select_from_menu(
@@ -175,7 +177,7 @@ def run_pipeline_cli(
         argv.append("--verbose")
     if tickers:
         argv.append("--tickers")
-        argv.extend(ticker.strip().upper() for ticker in tickers if ticker.strip())
+        argv.extend(normalize_idx_tickers(tickers))
     if portfolio_loss_pct is not None:
         argv.extend(["--portfolio-loss-pct", str(portfolio_loss_pct)])
     orchestrator._run_cli(argv)
@@ -260,11 +262,15 @@ def pipeline_command(
 
     root_ctx = ctx.find_root()
     global_verbose = bool(((root_ctx.obj or {}) if root_ctx else {}).get("verbose"))
-    selected_tickers = tuple(
-        ticker.strip().upper()
-        for ticker in tuple(tickers or ()) + positional_tickers
-        if ticker.strip()
-    )
+    try:
+        selected_tickers = tuple(
+            normalize_idx_tickers(
+                tuple(tickers or ()) + positional_tickers,
+                require_nonempty=False,
+            )
+        )
+    except InvalidIDXTicker as exc:
+        raise typer.BadParameter(str(exc)) from exc
 
     # Build active flags label for pre-flight panel
     flags: list[str] = []
@@ -329,18 +335,30 @@ def pipeline_command(
 
     # Post-pipeline: show verdict summary from batch results
     batch_file = output_dir / "full_batch_results.json"
+    artifact_read_failed = False
     if batch_file.exists():
         try:
             results = json.loads(batch_file.read_text(encoding="utf-8"))
             if isinstance(results, list) and results:
                 console.print(build_verdict_summary_table(results))
-        except Exception:
-            pass
+        except Exception as exc:
+            artifact_read_failed = True
+            logger.warning(
+                "[Pipeline] stage=verdict_summary_display "
+                f"exception_type={type(exc).__name__} path={batch_file}: {exc}"
+            )
 
     report = output_dir / "TOP_3_SWING_TRADES.md"
-    console.print(
-        f"\n[idx.ok]Pipeline complete.[/idx.ok]  [idx.path]{report}[/idx.path]"
-    )
+    if artifact_read_failed:
+        console.print(
+            "\n[idx.warn]Pipeline completed with artifact errors.[/idx.warn] "
+            f"Verdict summary could not be read from [idx.path]{batch_file}[/idx.path]. "
+            f"[idx.path]{report}[/idx.path]"
+        )
+    else:
+        console.print(
+            f"\n[idx.ok]Pipeline complete.[/idx.ok]  [idx.path]{report}[/idx.path]"
+        )
 
 
 app = typer.Typer(help="End-to-end orchestration commands.")

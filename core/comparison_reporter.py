@@ -11,6 +11,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 from services.single_agent_analyzer import SingleAgentResult
+from utils.ticker import normalize_idx_ticker
 
 
 class ComparisonRow(BaseModel):
@@ -61,7 +62,7 @@ class ComparisonReporter:
         rows: list[ComparisonRow] = []
 
         for single in single_results:
-            ticker = single.ticker.strip().upper()
+            ticker = normalize_idx_ticker(single.ticker)
             multi = multi_results.get(ticker, {})
             single_verdict = single.verdict
 

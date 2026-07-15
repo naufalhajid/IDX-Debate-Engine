@@ -25,9 +25,11 @@ from core.forecasting.validation import (
     validate_model,
     walk_forward_splits,
 )
+from utils.ticker import normalize_idx_ticker
 
 if TYPE_CHECKING:
     from schemas.debate import CIOVerdict
+    from utils.market_snapshot import MarketSnapshot
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +90,7 @@ class ForecastingService:
         horizons: tuple[int, ...] = _DEFAULT_HORIZONS,
         mode: ForecastMode = "ensemble",
         cio_verdict: "CIOVerdict | None" = None,
+        execution_snapshot: "MarketSnapshot | None" = None,
     ) -> ForecastReport:
         """Produce a ForecastReport for ticker.
 
@@ -97,6 +100,15 @@ class ForecastingService:
         - tgarch uses TGARCH volatility with zero-drift return baseline.
         LSTM and Prophet are intentionally visible as experimental-unused in ensemble.
         """
+        ticker = normalize_idx_ticker(ticker)
+        if execution_snapshot is not None:
+            snapshot_ticker = normalize_idx_ticker(execution_snapshot.ticker)
+            if snapshot_ticker != ticker:
+                raise ValueError(
+                    "Execution snapshot ticker does not match forecast ticker."
+                )
+        if as_of is None and execution_snapshot is not None:
+            as_of = execution_snapshot.last_date or execution_snapshot.requested_end
         as_of = as_of or date.today()
         flags: list[str] = []
         mode = _normalize_mode(mode, flags)
@@ -110,7 +122,21 @@ class ForecastingService:
             return _error_report(ticker, as_of, horizon, flags)
 
         try:
-            dataset = self._dataset_builder.build([ticker], start, end, horizons=(horizon,))
+            if execution_snapshot is None:
+                dataset = self._dataset_builder.build(
+                    [ticker],
+                    start,
+                    end,
+                    horizons=(horizon,),
+                )
+            else:
+                dataset = self._dataset_builder.build(
+                    [ticker],
+                    start,
+                    end,
+                    horizons=(horizon,),
+                    snapshots={ticker: execution_snapshot},
+                )
         except Exception as e:
             return _error_report(ticker, as_of, horizon, [f"dataset_error:{type(e).__name__}"])
 

@@ -30,6 +30,7 @@ import yfinance as yf
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from utils.technicals import compute_atr, compute_rsi, snap_to_tick
+from utils.ticker import InvalidIDXTicker, normalize_idx_tickers
 
 # ── Envelope parameters (mirror production debate_chamber.py — keep in sync) ─
 MAX_TARGET_RETURN_NO_FV = 0.10   # 10% cap without fair-value anchor
@@ -278,7 +279,10 @@ def main() -> None:
     parser.add_argument("--output", default="output/historical_backtest/summary.json")
     args = parser.parse_args()
 
-    tickers = [t.strip().upper() for t in args.tickers.split(",") if t.strip()]
+    try:
+        tickers = normalize_idx_tickers(args.tickers.split(","))
+    except InvalidIDXTicker as exc:
+        parser.error(str(exc))
     all_trades: list[dict] = []
     per_ticker: dict[str, dict] = {}
 

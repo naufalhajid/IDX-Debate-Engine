@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from datetime import datetime, timezone
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from utils.ticker import normalize_idx_ticker
 
 
 CONTEXT_CHAR_LIMIT = 3_200
@@ -86,7 +89,7 @@ class ContextPack(BaseModel):
 
 def build_context_pack(ticker: str, raw_data: dict) -> ContextPack:
     """Map raw provider output into a normalized, compact context pack."""
-    normalized_ticker = str(ticker or raw_data.get("ticker") or "").strip().upper()
+    normalized_ticker = normalize_idx_ticker(ticker or raw_data.get("ticker") or "")
     price = _first_number(
         raw_data,
         "price",
@@ -102,46 +105,54 @@ def build_context_pack(ticker: str, raw_data: dict) -> ContextPack:
             ("verdict", "current_price"),
         ),
     )
-    fair_value = _first_number(
-        raw_data,
-        "fair_value",
-        "fair_value_base",
-        "fair_value_estimate",
-        nested_paths=(
-            ("fundamentals", "fair_value"),
-            ("fundamentals", "fair_value_base"),
-            ("fundamental_data", "fair_value"),
-            ("fundamental_data", "fair_value_base"),
-            ("verdict", "fair_value"),
-            ("verdict", "fair_value_base"),
-        ),
+    fair_value = _positive_number_or_none(
+        _first_number(
+            raw_data,
+            "fair_value",
+            "fair_value_base",
+            "fair_value_estimate",
+            nested_paths=(
+                ("fundamentals", "fair_value"),
+                ("fundamentals", "fair_value_base"),
+                ("fundamental_data", "fair_value"),
+                ("fundamental_data", "fair_value_base"),
+                ("verdict", "fair_value"),
+                ("verdict", "fair_value_base"),
+            ),
+        )
     )
-    fair_value_base = _first_number(
-        raw_data,
-        "fair_value_base",
-        nested_paths=(
-            ("fundamentals", "fair_value_base"),
-            ("fundamental_data", "fair_value_base"),
-            ("verdict", "fair_value_base"),
-        ),
+    fair_value_base = _positive_number_or_none(
+        _first_number(
+            raw_data,
+            "fair_value_base",
+            nested_paths=(
+                ("fundamentals", "fair_value_base"),
+                ("fundamental_data", "fair_value_base"),
+                ("verdict", "fair_value_base"),
+            ),
+        )
     )
-    fair_value_low = _first_number(
-        raw_data,
-        "fair_value_low",
-        nested_paths=(
-            ("fundamentals", "fair_value_low"),
-            ("fundamental_data", "fair_value_low"),
-            ("verdict", "fair_value_low"),
-        ),
+    fair_value_low = _positive_number_or_none(
+        _first_number(
+            raw_data,
+            "fair_value_low",
+            nested_paths=(
+                ("fundamentals", "fair_value_low"),
+                ("fundamental_data", "fair_value_low"),
+                ("verdict", "fair_value_low"),
+            ),
+        )
     )
-    fair_value_high = _first_number(
-        raw_data,
-        "fair_value_high",
-        nested_paths=(
-            ("fundamentals", "fair_value_high"),
-            ("fundamental_data", "fair_value_high"),
-            ("verdict", "fair_value_high"),
-        ),
+    fair_value_high = _positive_number_or_none(
+        _first_number(
+            raw_data,
+            "fair_value_high",
+            nested_paths=(
+                ("fundamentals", "fair_value_high"),
+                ("fundamental_data", "fair_value_high"),
+                ("verdict", "fair_value_high"),
+            ),
+        )
     )
     risk_overvalued = _first_present(raw_data, "risk_overvalued")
     if risk_overvalued is None:
@@ -185,12 +196,15 @@ def build_context_pack(ticker: str, raw_data: dict) -> ContextPack:
     if not data_sources:
         missing_fields.append("data_sources")
 
+    resolved_fair_value_base = (
+        fair_value_base if fair_value_base is not None else fair_value
+    )
     pack = ContextPack(
         ticker=normalized_ticker,
         as_of=_resolve_as_of(raw_data),
         price=price or 0.0,
         fair_value=fair_value,
-        fair_value_base=fair_value_base or fair_value,
+        fair_value_base=resolved_fair_value_base,
         fair_value_low=fair_value_low,
         fair_value_high=fair_value_high,
         risk_overvalued=_optional_bool(risk_overvalued),
@@ -206,7 +220,7 @@ def build_context_pack(ticker: str, raw_data: dict) -> ContextPack:
             raw_data,
             current_price=price,
             fair_value=fair_value,
-            fair_value_base=fair_value_base or fair_value,
+            fair_value_base=resolved_fair_value_base,
             fair_value_low=fair_value_low,
             fair_value_high=fair_value_high,
             risk_overvalued=_optional_bool(risk_overvalued),
@@ -311,7 +325,9 @@ def _collect_priority_fields(
         "rating": _first_present(verdict, raw_data, "rating"),
         "current_price": current_price,
         "fair_value": fair_value,
-        "fair_value_base": fair_value_base or fair_value,
+        "fair_value_base": (
+            fair_value_base if fair_value_base is not None else fair_value
+        ),
         "fair_value_low": fair_value_low,
         "fair_value_high": fair_value_high,
         "risk_overvalued": risk_overvalued,
@@ -545,6 +561,13 @@ def _optional_number(value: Any) -> float | None:
         return float(str(value).replace(",", ""))
     except (TypeError, ValueError):
         return None
+
+
+def _positive_number_or_none(value: float | None) -> float | None:
+    """Normalize invalid valuation sentinels to missing-data semantics."""
+    if value is None or not math.isfinite(value) or value <= 0:
+        return None
+    return value
 
 
 def _nested_get(raw_data: dict, path: tuple[str, ...]) -> Any:

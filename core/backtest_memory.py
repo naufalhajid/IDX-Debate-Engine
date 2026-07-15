@@ -8,9 +8,11 @@ import sys
 from pathlib import Path
 from typing import Literal, Sequence
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from core.settings import settings
+from utils.logger_config import logger
+from utils.ticker import normalize_idx_ticker
 
 
 DEFAULT_PATH = settings.backtest_memory_path
@@ -42,6 +44,12 @@ class TradeOutcome(BaseModel):
     holding_period_days: int | None = None
     position_size_pct: float | None = None
 
+    @field_validator("ticker", mode="before")
+    @classmethod
+    def normalize_ticker(cls, value: object) -> str:
+        """Keep every persisted outcome on the canonical IDX identity."""
+        return normalize_idx_ticker(value)  # type: ignore[arg-type]
+
     @model_validator(mode="after")
     def calculate_pnl_pct(self) -> TradeOutcome:
         """Fill pnl_pct when exit and entry prices are available."""
@@ -62,9 +70,10 @@ class BacktestMemory:
 
     def record(self, outcome: TradeOutcome) -> None:
         """Append one trade outcome as a JSON line."""
+        validated = TradeOutcome.model_validate(outcome.model_dump())
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a", encoding="utf-8") as handle:
-            handle.write(outcome.model_dump_json())
+            handle.write(validated.model_dump_json())
             handle.write("\n")
 
     def all_records(self) -> list[TradeOutcome]:
@@ -78,6 +87,9 @@ class BacktestMemory:
         backup: bool = True,
     ) -> Path | None:
         """Atomically replace the memory file, optionally keeping a .bak copy."""
+        validated_records = [
+            TradeOutcome.model_validate(record.model_dump()) for record in records
+        ]
         self.path.parent.mkdir(parents=True, exist_ok=True)
         backup_path: Path | None = None
 
@@ -89,7 +101,9 @@ class BacktestMemory:
             )
 
         tmp_path = self.path.with_name(f"{self.path.name}.tmp")
-        payload = "".join(record.model_dump_json() + "\n" for record in records)
+        payload = "".join(
+            record.model_dump_json() + "\n" for record in validated_records
+        )
         tmp_path.write_text(payload, encoding="utf-8")
         tmp_path.replace(self.path)
         return backup_path
@@ -101,12 +115,13 @@ class BacktestMemory:
         outcome: str | None = None,
     ) -> list[TradeOutcome]:
         """Read outcomes matching all provided filters."""
+        ticker_filter = normalize_idx_ticker(ticker) if ticker is not None else None
         verdict_filter = verdict_rating.upper() if verdict_rating else None
         outcome_filter = outcome.lower() if outcome else None
         return [
             record
             for record in self._read_all()
-            if (ticker is None or record.ticker == ticker)
+            if (ticker_filter is None or record.ticker == ticker_filter)
             and (
                 verdict_filter is None
                 or record.verdict_rating.upper() == verdict_filter
@@ -160,9 +175,22 @@ class BacktestMemory:
         if not self.path.exists():
             return []
         records: list[TradeOutcome] = []
-        for line in self.path.read_text(encoding="utf-8").splitlines():
-            if line.strip():
+        for line_number, line in enumerate(
+            self.path.read_text(encoding="utf-8").splitlines(),
+            start=1,
+        ):
+            if not line.strip():
+                continue
+            try:
                 records.append(TradeOutcome.model_validate_json(line))
+            except Exception as exc:
+                logger.warning(
+                    "[BacktestMemory] reason_code=invalid_backtest_memory_record "
+                    "line={} exception_type={} detail={}",
+                    line_number,
+                    type(exc).__name__,
+                    exc,
+                )
         return records
 
 
