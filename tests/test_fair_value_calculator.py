@@ -110,6 +110,37 @@ def test_extract_keystats_partial_match_prefers_shortest_key():
     assert stats.roe == pytest.approx(0.15)
 
 
+def test_current_price_lookup_does_not_partial_match_price_to_book_ratio():
+    """FIX 2: 'Current Price' must never partial-match 'Current Price to Book
+    Value'. The DPS-from-yield fallback (extract_keystats, ~line 781) looks
+    up ["Last Price", "Current Price", "Close Price"] with allow_partial=False
+    specifically to prevent this — a flat dict that has the PB ratio field
+    but no exact price field must leave the price unresolved (DPS stays
+    None), not silently substitute the PB ratio as if it were a price.
+    """
+    api_response = _stockbit_response(
+        [
+            # EPS/BVPS present so Strategy A is treated as authoritative and
+            # the legacy key-value fallback (which would independently
+            # re-resolve raw_pb_current via different field names) never
+            # fires — see extract_keystats' "found nothing useful" check.
+            ("Current EPS (TTM)", "10"),
+            ("Book Value Per Share", "100"),
+            ("Current Price to Book Value", "2.5"),
+            ("Dividend Yield (TTM)", "5.0"),
+        ]
+    )
+
+    # current_price intentionally omitted (None) so the vulnerable fallback
+    # path — which only runs when the caller didn't already supply a price —
+    # actually executes instead of being short-circuited.
+    stats = extract_keystats(api_response, "TEST", current_price=None)
+
+    assert stats.raw_pb_current == 2.5
+    assert stats.dps is None
+    assert stats.dps_price_used is None
+
+
 def test_extract_keystats_distinguishes_missing_dps_from_explicit_zero():
     missing_dps = extract_keystats(
         _stockbit_response(

@@ -10,11 +10,13 @@ import pytest
 from utils.market_snapshot import (
     IDX_TIMEZONE,
     build_market_snapshot,
+    build_market_snapshots,
     candidate_snapshot_provenance,
     download_market_snapshot,
     load_market_snapshot,
     persist_market_snapshots,
     resample_daily_to_weekly,
+    snapshots_to_multiindex,
 )
 
 
@@ -62,6 +64,47 @@ def test_flat_and_both_batch_layouts_produce_identical_snapshot() -> None:
     }
     pd.testing.assert_frame_equal(snapshots[0].history, snapshots[1].history)
     pd.testing.assert_frame_equal(snapshots[0].history, snapshots[2].history)
+
+
+def test_screener_price_and_seeded_snapshot_price_are_identical() -> None:
+    """FIX 2 (price-basis consistency): the screener and the debate chamber
+    must read the same "current price" for the same ticker + as-of date.
+
+    core/quant_filter/pipeline.py's ticker analyzer does ONE bulk
+    yfinance.download() for all candidates, then:
+      1. build_market_snapshots(raw, tickers, ...) turns that bulk frame into
+         one MarketSnapshot per ticker — these are the artifacts later
+         persisted (persist_market_snapshots) and seeded into the debate
+         chamber's session cache (_seed_candidate_market_snapshots).
+      2. snapshots_to_multiindex(snapshots) reconstructs the working
+         DataFrame FROM those same snapshots (not from the raw pre-snapshot
+         frame) — and it is THIS reconstructed frame's Close.iloc[-1] that
+         becomes the screener's "Current Price" (pipeline.py:769).
+    So step 1's snapshot.history and step 2's per-ticker slice are built from
+    the same MarketSnapshot object by construction, not by convention. This
+    test proves that construction holds instead of assuming it.
+    """
+    raw = pd.concat({"BBCA.JK": _frame(), "BBRI.JK": _frame()}, axis=1)
+    tickers = ["BBCA", "BBRI"]
+
+    snapshots = build_market_snapshots(
+        raw,
+        tickers,
+        requested_start=START,
+        requested_end=AS_OF,
+        min_complete_bars=400,
+        now=AFTER_CLOSE,
+    )
+    # What the screener sees: pipeline.py:769 current_px = close.iloc[-1] on
+    # the reconstructed per-ticker frame.
+    reconstructed = snapshots_to_multiindex(snapshots, ready_only=False)
+
+    for ticker in tickers:
+        screener_price = float(reconstructed[f"{ticker}.JK"]["Close"].iloc[-1])
+        # What gets seeded into the debate chamber's cache and later read via
+        # derive_current_price(market_data) -- utils/market_data_cache.py:190.
+        seeded_snapshot_price = float(snapshots[ticker].history["Close"].iloc[-1])
+        assert screener_price == seeded_snapshot_price
 
 
 def test_cleaning_keeps_last_duplicate_and_drops_incomplete_row() -> None:
