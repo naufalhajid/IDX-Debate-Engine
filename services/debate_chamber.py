@@ -5473,6 +5473,15 @@ Start your response with '{' and end with '}'. Nothing else."""
         effective_price = float(current_price or 0.0)
         if effective_price <= 0:
             effective_price = derive_current_price(market_data)
+            current_price_source = "market_data"
+        else:
+            current_price_source = "explicit"
+        # FIX 2 (price-basis consistency): market_data["history_as_of"] is the
+        # timestamp of the last OHLCV bar the price was derived from — either
+        # the screener's seeded snapshot (utils/market_data_cache.py:190) or a
+        # fresh fetch. Recording it lets downstream provenance/audit trace
+        # exactly which bar this trade envelope is anchored to.
+        current_price_as_of = (market_data or {}).get("history_as_of")
         regime_context, hmm_regime, rule_regime_snapshot = (
             self._canonical_regime_inputs()
         )
@@ -5515,6 +5524,8 @@ Start your response with '{' and end with '}'. Nothing else."""
         return {
             "ticker": ticker,
             "current_price": effective_price,
+            "current_price_source": current_price_source,
+            "current_price_as_of": current_price_as_of,
             "sector": sector,
             "market_data": market_data,
             "regime_context": regime_context,

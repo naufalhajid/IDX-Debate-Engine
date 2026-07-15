@@ -2624,6 +2624,129 @@ async def test_prepared_executable_setup_avoids_double_fetch_and_recompute(
 
 
 @pytest.mark.asyncio
+async def test_prepare_trade_setup_derives_price_from_market_data(monkeypatch):
+    """FIX 2 (price-basis consistency) regression guard.
+
+    core/orchestrator/legacy.py always calls
+    prepare_trade_setup(ticker, current_price=0.0, sector=...) in the main
+    pipeline — it deliberately does NOT pass the screener's price, because
+    the design is for the debate chamber to derive price from `market_data`
+    (utils.market_data_cache.derive_current_price), and market_data itself
+    comes from a session-scoped cache that _seed_candidate_market_snapshots
+    pins to the SAME verified OHLCV artifact the screener/filter used
+    (utils/market_data_cache.py:190 — `seeded_snapshot or download_market_snapshot(...)`,
+    never both). So price consistency is structural: as long as
+    prepare_trade_setup derives its price from whatever `_fetch_market_data`
+    returns (rather than some independent source), the screener and the
+    debate chamber are reading the same number. This test pins that
+    derivation with current_price=0.0, the exact argument the orchestrator
+    passes in production, so a future change can't silently reintroduce a
+    second, divergent price source.
+    """
+    chamber = _chamber()
+    index = pd.date_range("2025-01-01", periods=30, freq="B")
+    close = pd.Series([100.0] * 29 + [137.5], index=index)  # distinctive last close
+    history = pd.DataFrame(
+        {
+            "Open": close,
+            "High": close,
+            "Low": close,
+            "Close": close,
+            "Volume": 1_000_000.0,
+        },
+        index=index,
+    )
+
+    async def fake_fetch_market_data(ticker):
+        return {
+            "history": history,
+            "info": {},
+            "fast_info": {},
+            "history_as_of": history.index[-1].isoformat(),
+        }
+
+    monkeypatch.setattr(chamber, "_fetch_market_data", fake_fetch_market_data)
+    monkeypatch.setattr(
+        chamber,
+        "_compute_technical_indicators",
+        lambda frame: {
+            "current_price": 137.5,
+            "sma20": 130.0,
+            "ma50": 128.0,
+            "ma200": 120.0,
+            "ma200_context": "ABOVE",
+            "rsi14": 55.0,
+            "atr14": 2.0,
+            "low_20d": 118.0,
+            "return_5d_pct": 1.0,
+        },
+    )
+    monkeypatch.setattr(
+        chamber,
+        "_run_tradeability_preflight",
+        lambda tech, current_price: {"status": "clean", "atr14": 2.0, "surrogate_gap": 7.0},
+    )
+    monkeypatch.setattr(
+        chamber,
+        "_compute_trade_envelope",
+        lambda current_price, fair_value, tech: {
+            "entry_low": 130.0,
+            "entry_high": 137.5,
+            "entry_mid": 133.75,
+            "target_price": 150.0,
+            "target_basis": "test",
+            "stop_loss": 125.0,
+            "risk_reward_ratio": 2.0,
+            "atr14": 2.0,
+            "stop_near_noise": False,
+        },
+    )
+
+    prepared = await chamber.prepare_trade_setup("TEST", current_price=0.0, sector="default")
+
+    assert prepared["current_price"] == 137.5
+    assert prepared["current_price_source"] == "market_data"
+    assert prepared["current_price_as_of"] == history.index[-1].isoformat()
+
+
+@pytest.mark.asyncio
+async def test_prepare_trade_setup_records_explicit_price_source(monkeypatch):
+    """FIX 2: when a caller supplies a non-zero current_price explicitly
+    (e.g. an ad-hoc `uv run idx debate` CLI run with no screener candidate to
+    reconcile against), provenance must say so rather than implying it came
+    from market_data — the two cases have different audit trails.
+    """
+    chamber = _chamber()
+    index = pd.date_range("2025-01-01", periods=5, freq="B")
+    close = pd.Series([100.0, 101.0, 102.0, 103.0, 104.0], index=index)
+    history = pd.DataFrame(
+        {"Open": close, "High": close, "Low": close, "Close": close, "Volume": 1.0},
+        index=index,
+    )
+
+    async def fake_fetch_market_data(ticker):
+        return {"history": history, "info": {}, "fast_info": {}}
+
+    monkeypatch.setattr(chamber, "_fetch_market_data", fake_fetch_market_data)
+    monkeypatch.setattr(chamber, "_compute_technical_indicators", lambda frame: {})
+    monkeypatch.setattr(
+        chamber,
+        "_run_tradeability_preflight",
+        lambda tech, current_price: {"status": "clean"},
+    )
+    monkeypatch.setattr(
+        chamber,
+        "_compute_trade_envelope",
+        lambda current_price, fair_value, tech: {"entry_low": current_price},
+    )
+
+    prepared = await chamber.prepare_trade_setup("TEST", current_price=250.0, sector="default")
+
+    assert prepared["current_price"] == 250.0
+    assert prepared["current_price_source"] == "explicit"
+
+
+@pytest.mark.asyncio
 async def test_prepared_rr_rejection_is_terminal_with_zero_llm_calls():
     chamber = _chamber()
     chamber._llm_call_counts = {}
