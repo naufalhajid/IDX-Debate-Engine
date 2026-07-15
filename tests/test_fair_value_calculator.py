@@ -1806,3 +1806,65 @@ def test_extract_keystats_parses_live_api_ebitda_net_debt_capex_ocf():
     assert stats.net_debt == 2_658_000_000_000.0
     assert stats.capex_ttm == 517_000_000_000.0
     assert stats.operating_cash_flow_ttm == 2_450_000_000_000.0
+
+
+def test_build_fair_value_payload_shares_outstanding_fallback_activates_ev_ebitda():
+    """TASK J: the live `/keystats/ratio/v1/{ticker}` endpoint never exposes
+    shares_outstanding under any field name extract_keystats() searches for
+    (confirmed live-probed against AKRA/ELSA/TAPG/GGRM/ERAA 2026-07-16) --
+    so on the API path stats.shares_outstanding is always 0.0, and
+    fair_value_ev_ebitda()/fair_value_dcf() can never activate even once
+    FIX 7 fixed ebitda_ttm/net_debt/capex_ttm parsing, regardless of whether
+    the underlying company data supports them. build_fair_value_payload()'s
+    new shares_outstanding kwarg lets debate_chamber.py supply the figure
+    from market_data["info"]["sharesOutstanding"] (yfinance -- already
+    fetched once in prepare_trade_setup(), before the parallel scout
+    fan-out, and cross-validated <2% against xlsx Stockbit share counts for
+    all 5 probed tickers). Uses ELSA's exact real live-probed EBITDA/Net
+    Debt strings (see test above) plus its real yfinance share count.
+    """
+    api_response = _stockbit_response(
+        [
+            ("Current EPS (TTM)", "98.83"),
+            ("Book Value Per Share", "753.87"),
+            ("EBITDA (TTM)", "1,614 B"),
+            ("Net Debt (Quarter)", "(2,658 B)"),
+        ]
+    )
+    _report, result = build_fair_value_payload(
+        api_response, "ELSA", 650.0, shares_outstanding=7_298_500_000.0
+    )
+
+    assert "ev_ebitda" in result["active_methods"]
+    assert result["fv_provenance"]["shares_outstanding_source"] == "yfinance_market_data"
+
+
+def test_build_fair_value_payload_shares_outstanding_fallback_is_not_used_when_stockbit_has_it():
+    """Precedence check: the yfinance fallback must only fill a genuine gap,
+    never silently override a real Stockbit-reported share count (were
+    Stockbit to ever start exposing this field) -- consistent with this
+    codebase's "prefer the primary source, fall back only when actually
+    missing" convention used for e.g. net_debt's total-debt-minus-cash
+    fallback (FIX 3A)."""
+    api_response = _stockbit_response(
+        [
+            ("Current EPS (TTM)", "98.83"),
+            ("Book Value Per Share", "753.87"),
+            ("Current Share Outstanding", "7,300,000,000"),
+        ]
+    )
+    _report, result = build_fair_value_payload(
+        api_response, "ELSA", 650.0, shares_outstanding=999_000_000.0
+    )
+
+    assert result["fv_provenance"]["shares_outstanding_source"] == "stockbit_api"
+
+
+def test_build_fair_value_payload_shares_outstanding_source_none_when_unavailable():
+    """No Stockbit field, no yfinance fallback supplied (unsupplied kwarg,
+    matching every pre-TASK-J call site) -- source must be None, not a
+    fabricated label, per this session's "missing -> None" discipline."""
+    api_response = _stockbit_response([("Current EPS (TTM)", "98.83")])
+    _report, result = build_fair_value_payload(api_response, "TEST", 1000.0)
+
+    assert result["fv_provenance"]["shares_outstanding_source"] is None

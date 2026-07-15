@@ -2189,12 +2189,37 @@ Current Date (Asia/Jakarta): {current_date}
             # (prepare_trade_setup() -> run()'s initial_state["metadata"])
             # rather than letting it silently stop here.
             _incoming_metadata = state.get("metadata") or {}
+            # TASK J: shares_outstanding is never exposed by the live keystats
+            # endpoint (confirmed live-probed 2026-07-16), which silently
+            # blocks fair_value_ev_ebitda()/fair_value_dcf() from ever
+            # activating even after FIX 7's parsing fix. prepare_trade_setup()
+            # already fetches yfinance's raw Ticker.info dict once, before the
+            # parallel scout fan-out, and seeds it into state["market_data"]
+            # ["info"] -- the same dict _rr_yf_info already relies on
+            # elsewhere in this file. Same defensive-typing guard as
+            # utils/trade_math.py::_get_market_cap_idr() (bool is an int
+            # subclass in Python -- must not sneak through as a share count).
+            _yf_info = (state.get("market_data") or {}).get("info")
+            _shares_outstanding = (
+                _yf_info.get("sharesOutstanding")
+                if isinstance(_yf_info, dict)
+                else None
+            )
+            if (
+                not isinstance(_shares_outstanding, (int, float))
+                or isinstance(_shares_outstanding, bool)
+                or _shares_outstanding <= 0
+            ):
+                _shares_outstanding = None
+            else:
+                _shares_outstanding = float(_shares_outstanding)
             report_str, fv_result = build_fair_value_payload(
                 raw,
                 ticker,
                 current_price,
                 current_price_source=_incoming_metadata.get("current_price_source"),
                 current_price_as_of=_incoming_metadata.get("current_price_as_of"),
+                shares_outstanding=_shares_outstanding,
             )
             fv_price = fv_result.get("fair_value")
             logger.info(f"[Fundamental] Fair value for {ticker}: {fv_price}")

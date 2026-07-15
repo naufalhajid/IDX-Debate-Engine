@@ -2191,6 +2191,7 @@ def _build_fair_value_core(
     financials_source: str = "unknown",
     current_price_source: str | None = None,
     current_price_as_of: str | None = None,
+    shares_outstanding_source: str | None = None,
 ) -> tuple[str, dict]:
     """THE canonical FV engine — every source (API, XLSX, future) converges here.
 
@@ -2263,6 +2264,7 @@ def _build_fair_value_core(
         "current_price_as_of": current_price_as_of,
         "sector_comp_source": calc.sector_medians_source,
         "sector_comp_as_of": calc.sector_medians_as_of,
+        "shares_outstanding_source": shares_outstanding_source,
     }
 
     # ── C3: Historical valuation band (API-only enrichment) ────────────────
@@ -2298,6 +2300,7 @@ def build_fair_value_payload(
     *,
     current_price_source: str | None = None,
     current_price_as_of: str | None = None,
+    shares_outstanding: float | None = None,
 ) -> tuple[str, dict]:
     multiples = extract_historical_multiples(api_response, ticker)
     stats = extract_keystats(
@@ -2315,6 +2318,23 @@ def build_fair_value_payload(
     if multiples.get("growth_rate") is not None:
         stats.growth_rate = multiples["growth_rate"]
 
+    # TASK J: the live keystats endpoint never exposes shares_outstanding
+    # under any field name extract_keystats() searches for, so stats.
+    # shares_outstanding is always 0.0 here -- blocking fair_value_ev_ebitda()
+    # and fair_value_dcf() regardless of whether ebitda_ttm/net_debt/capex_ttm
+    # parsed correctly (FIX 7). Fall back to a caller-supplied figure (e.g.
+    # debate_chamber.py's market_data["info"]["sharesOutstanding"], yfinance)
+    # ONLY when Stockbit genuinely has nothing -- never override a real
+    # Stockbit-reported value, same "primary source wins" convention as
+    # net_debt's total-debt-minus-cash fallback (FIX 3A).
+    if stats.shares_outstanding > 0:
+        shares_outstanding_source = "stockbit_api"
+    elif shares_outstanding is not None and shares_outstanding > 0:
+        stats.shares_outstanding = shares_outstanding
+        shares_outstanding_source = "yfinance_market_data"
+    else:
+        shares_outstanding_source = None
+
     return _build_fair_value_core(
         stats,
         ticker,
@@ -2324,6 +2344,7 @@ def build_fair_value_payload(
         financials_source="stockbit_api",
         current_price_source=current_price_source,
         current_price_as_of=current_price_as_of,
+        shares_outstanding_source=shares_outstanding_source,
     )
 
 

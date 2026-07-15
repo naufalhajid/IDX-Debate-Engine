@@ -1915,6 +1915,149 @@ async def test_fundamental_node_threads_price_source_and_surfaces_fv_provenance(
     assert meta["run_id"] == "t1"
 
 
+async def test_fundamental_node_threads_shares_outstanding_from_market_data(
+    monkeypatch,
+):
+    """TASK J: shares_outstanding is never exposed by the live keystats
+    endpoint (confirmed live-probed 2026-07-16), which blocks fair_value_
+    ev_ebitda()/fair_value_dcf() from ever activating regardless of FIX 7's
+    parsing fix. prepare_trade_setup() already fetches yfinance's raw
+    Ticker.info dict once, before the parallel scout fan-out (scout_
+    dispatcher is a zero-op pass-through -- fundamental/chartist/sentiment
+    all read the SAME pre-populated state, they don't wait on each other),
+    and seeds it into state["market_data"]["info"] -- the same dict already
+    relied on elsewhere in this file for _rr_yf_info. _fundamental_node()
+    must read market_data["info"]["sharesOutstanding"] from state and
+    forward it to build_fair_value_payload() as the new shares_outstanding
+    kwarg -- no new fetch, no new latency, no new rate-limit exposure.
+    """
+    chamber = _chamber()
+    chamber.flash_llm = None
+
+    async def fake_fetch(url):
+        return {"data": "raw"}
+
+    async def fake_invoke(state, llm, messages):
+        return SimpleNamespace(content="analysis text")
+
+    monkeypatch.setattr(chamber, "_fetch_url", fake_fetch)
+    monkeypatch.setattr(chamber, "_invoke_llm_for_state", fake_invoke)
+
+    captured_call: dict = {}
+
+    def fake_build_fair_value_payload(raw, ticker, price, **kwargs):
+        captured_call.update(kwargs)
+        return (
+            "report",
+            {
+                "fair_value": 1000.0,
+                "fair_value_base": 1000.0,
+                "fair_value_low": 900.0,
+                "fair_value_high": 1100.0,
+                "range_pct": 0.1,
+                "dps": None,
+                "dps_source": None,
+                "dps_yield_pct": None,
+                "dps_price_used": None,
+                "risk_overvalued": False,
+                "active_methods": ["pe", "pb", "ev_ebitda"],
+                "diagnostic_methods": ["ddm", "sector_comp"],
+                "fv_provenance": {
+                    "financials_source": "stockbit_api",
+                    "financials_as_of_age_days": 2,
+                    "current_price_source": None,
+                    "current_price_as_of": None,
+                    "sector_comp_source": "static_default",
+                    "sector_comp_as_of": None,
+                    "shares_outstanding_source": kwargs.get(
+                        "shares_outstanding"
+                    )
+                    and "yfinance_market_data",
+                },
+            },
+        )
+
+    monkeypatch.setattr(dc, "build_fair_value_payload", fake_build_fair_value_payload)
+
+    partial = await chamber._fundamental_node(
+        {
+            "ticker": "ELSA",
+            "current_price": 650.0,
+            "metadata": {"run_id": "t1"},
+            "market_data": {
+                "info": {"sharesOutstanding": 7_298_500_000.0, "marketCap": 4.7e12},
+            },
+        }
+    )
+
+    assert captured_call["shares_outstanding"] == 7_298_500_000.0
+    assert partial["metadata"]["fv_active_methods"] == ["pe", "pb", "ev_ebitda"]
+
+
+async def test_fundamental_node_shares_outstanding_none_when_market_data_missing(
+    monkeypatch,
+):
+    """No market_data in state (e.g. a call site that never ran prepare_
+    trade_setup()) must not crash -- shares_outstanding forwarded as None,
+    same "missing -> None, never a wrong fallback" discipline as every
+    other optional field in this pipeline."""
+    chamber = _chamber()
+    chamber.flash_llm = None
+
+    async def fake_fetch(url):
+        return {"data": "raw"}
+
+    async def fake_invoke(state, llm, messages):
+        return SimpleNamespace(content="analysis text")
+
+    monkeypatch.setattr(chamber, "_fetch_url", fake_fetch)
+    monkeypatch.setattr(chamber, "_invoke_llm_for_state", fake_invoke)
+
+    captured_call: dict = {}
+
+    def fake_build_fair_value_payload(raw, ticker, price, **kwargs):
+        captured_call.update(kwargs)
+        return (
+            "report",
+            {
+                "fair_value": 1000.0,
+                "fair_value_base": 1000.0,
+                "fair_value_low": 900.0,
+                "fair_value_high": 1100.0,
+                "range_pct": 0.1,
+                "dps": None,
+                "dps_source": None,
+                "dps_yield_pct": None,
+                "dps_price_used": None,
+                "risk_overvalued": False,
+                "active_methods": ["pe", "pb"],
+                "diagnostic_methods": ["ddm", "sector_comp"],
+                "fv_provenance": {
+                    "financials_source": "stockbit_api",
+                    "financials_as_of_age_days": 2,
+                    "current_price_source": None,
+                    "current_price_as_of": None,
+                    "sector_comp_source": "static_default",
+                    "sector_comp_as_of": None,
+                    "shares_outstanding_source": None,
+                },
+            },
+        )
+
+    monkeypatch.setattr(dc, "build_fair_value_payload", fake_build_fair_value_payload)
+
+    partial = await chamber._fundamental_node(
+        {
+            "ticker": "NZIA",
+            "current_price": 1000.0,
+            "metadata": {"run_id": "t1"},
+        }
+    )
+
+    assert captured_call["shares_outstanding"] is None
+    assert partial["metadata"]["fv_provenance"]["shares_outstanding_source"] is None
+
+
 def test_sentiment_payload_from_response_sanitizes_markdown_json():
     raw_markdown = """```json
 {

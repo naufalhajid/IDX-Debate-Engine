@@ -692,6 +692,9 @@ XLSX-sourced fixture already pinned in
 
 ### Task J — `shares_outstanding` is absent from the live keystats endpoint, blocking EV/EBITDA and DCF on the live/debate path
 
+**Status: RESOLVED 2026-07-16** (same day, follow-up session). See "Resolution" below the
+original finding — kept intact as the historical record of the investigation.
+
 **Priority Group:** REFINEMENT (no incorrect output; the methods correctly return `None`
 rather than compute on a missing denominator — but they never activate at all on live data)
 
@@ -731,7 +734,7 @@ issue and was not separately investigated). EV/EBITDA and FCFE-DCF — this sess
 work — are code-complete, unit-tested, and verified correct against real xlsx-sourced data,
 but structurally cannot fire on live/debate-chamber data until this gap closes.
 
-**Proposed Change (not started — needs its own investigation):**
+**Proposed Change (as originally written, before resolution — kept for the record):**
 1. Check whether another already-called Stockbit endpoint in this codebase exposes share
    count or market cap — `providers/idx_broker_summary.py`, `providers/idx.py`, and
    `providers/stockbit.py` all reference market-cap/shares-outstanding-shaped data for other
@@ -745,19 +748,62 @@ but structurally cannot fire on live/debate-chamber data until this gap closes.
    endpoint call is warranted (extra latency/budget cost per FIX ticker — see
    `core/budget.py`).
 
-**Test Coverage:** None yet — investigation/proposal only. A future fix should add a live-
-shaped integration test analogous to
-`test_extract_keystats_parses_live_api_ebitda_net_debt_capex_ocf` (FIX 7) once a
-`shares_outstanding` source is chosen.
+**Resolution (2026-07-16, same-day follow-up):**
+Step 1's three Stockbit-adjacent files were a dead end — `idx_broker_summary.py` is unrelated
+(broker buy/sell flow), and `idx.py`'s `market_cap` comes from a Selenium scrape of the whole
+IDX site (legacy batch pipeline, unusable per-ticker in a live debate call). The real source
+was `utils/trade_math.py::_get_market_cap_idr()`, which already reads `marketCap` from a
+**yfinance** `Ticker.info` dict — a completely different provider than Stockbit. A live check
+confirmed `Ticker.info["sharesOutstanding"]` is populated and accurate for all 5 probed
+tickers, agreeing with the xlsx-sourced Stockbit share counts to within 0.01%–1.9%.
 
-**Risk:** LOW to document (methods fail closed — `None`, never a wrong number); MEDIUM
-priority to fix (two of the six FV methods, including this session's two newest, are
-effectively dormant on the path real trading decisions run through).
+Better still: this yfinance `info` dict is **already fetched once per ticker**, in
+`prepare_trade_setup()` (`services/debate_chamber.py:5490`, via `_fetch_market_data()` →
+`utils/market_data_cache.py::prefetch_market_data()`, which stores the raw
+`yf_ticker.info` at `market_data["info"]` with graceful empty-dict fallback on fetch failure)
+— **before** the graph's parallel scout fan-out even starts (`scout_dispatcher` is a zero-op
+pass-through node; `fundamental`/`chartist`/`sentiment` all read the same pre-populated
+`state`, they do not depend on each other's execution). So no new fetch, no new latency, no
+new rate-limit exposure was needed — `_fundamental_node()` simply never read
+`state["market_data"]["info"]` (the exact same dict `_rr_yf_info` already relies on for R/R
+tiering, elsewhere in the same file). Option 3 (derived proxy / new endpoint) was not needed.
 
-**Effort:** S (investigation) + S–M (threading, depending on where step 1 lands).
+**Files changed:**
+- `services/fair_value_calculator.py` — `build_fair_value_payload()` gained a
+  `shares_outstanding: float | None = None` kwarg; only used as a fallback when Stockbit's own
+  `stats.shares_outstanding` is `<= 0` (never overrides a real Stockbit-reported value).
+  `_build_fair_value_core()` gained `shares_outstanding_source: str | None = None`, recorded
+  in `fv_provenance` (`"stockbit_api"` / `"yfinance_market_data"` / `None`).
+- `services/debate_chamber.py` — `_fundamental_node()` now reads
+  `state["market_data"]["info"]["sharesOutstanding"]` (same defensive int/bool/float guard as
+  `_get_market_cap_idr()`, since `bool` is an `int` subclass in Python) and forwards it.
+
+**Verified against real data (2026-07-16):** real Stockbit keystats + real yfinance
+`sharesOutstanding`/price through the exact production `build_fair_value_payload()` call:
+TAPG `active_methods` now includes `'dcf'` (FV 2032); ELSA and AKRA now include `'ev_ebitda'`
+(AKRA FV 1364; ELSA's overall FV still nulls out on the unrelated, pre-existing
+`fv_implied_pe_extreme` quality-gate condition — not something this task touches or
+introduces, not investigated further here). GGRM/ERAA still don't activate `dcf` — consistent
+with the pre-existing `_ocf_data_is_stable()` gate, not a new gap.
+
+**Test Coverage:** `test_build_fair_value_payload_shares_outstanding_fallback_activates_ev_ebitda`,
+`test_build_fair_value_payload_shares_outstanding_fallback_is_not_used_when_stockbit_has_it`,
+`test_build_fair_value_payload_shares_outstanding_source_none_when_unavailable`
+(`tests/test_fair_value_calculator.py`);
+`test_fundamental_node_threads_shares_outstanding_from_market_data`,
+`test_fundamental_node_shares_outstanding_none_when_market_data_missing`
+(`tests/test_debate_chamber_reliability.py`).
+
+**Risk:** realized as LOW — zero new external calls, fails closed (`None`) exactly as before
+when yfinance data is unavailable, does not touch the quality gate or any existing method's
+math.
+
+**Effort:** realized as S — no new endpoint or proxy needed, just reading data already in
+`state`.
 
 ---
 
 *Addendum written 2026-07-16 during the Fair Value End-to-End Unification & Remediation
 effort, Fix 7, via a live-API probe against TAPG/ELSA/AKRA/GGRM/ERAA using the authenticated
-`StockbitApiClient` (read-only GET requests, no writes/orders/state mutation).*
+`StockbitApiClient` (read-only GET requests, no writes/orders/state mutation). Resolution
+appended same day, follow-up session.*
