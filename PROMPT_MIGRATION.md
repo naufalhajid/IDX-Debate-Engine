@@ -1,5 +1,47 @@
 # Prompt Migration Log
 
+## 2026-07-16 — `taskI-valuation-cross-check-v28`
+
+**Files changed:**
+- `services/debate_prompts/cio_judge.txt` (VALUATION CROSS-CHECK section added between STEP 1 and STEP 2)
+- `services/debate_prompts/manifest.json` (version → `2026-07-16-taskI-valuation-cross-check-v28`)
+- `tests/test_debate_chamber_reliability.py` (version assertion updated; 5 new cross-check tests)
+- `services/debate_chamber.py` (`run()` gains `graham_fv` kwarg; `_cio_judge_node` renders the section)
+- `schemas/debate.py` (`DebateChamberState.graham_fv`)
+- `core/orchestrator/legacy.py` (`run_batch_debates` forwards `Est. Fair Value (Graham)` per ticker)
+
+### Changes
+
+**`cio_judge.txt`** — VALUATION CROSS-CHECK section restored between STEP 1 and STEP 2
+(Task I, REMEDIATION_BACKLOG.md). This re-lands the intent of `s12-valuation-disagreement-v15`
+(reverted in `s12-cio-dead-code-revert-v16` because it referenced a `valuation_disagreement`
+"output metadata" field that was only computed *after* `chamber.run()` returned — dead data
+at reasoning time). The v28 version fixes that root cause instead of re-landing the bug:
+
+- Python now computes `check_valuation_disagreement(graham_fv, sanitized_engine_fv)` inside
+  `_cio_judge_node` itself — *before* prompt assembly — using the same sanitized FV the CIO
+  is given (post `fair_value_rejected` gate), so the numbers are identical to the post-debate
+  audit annotation in `legacy.py` (which stays untouched).
+- The section is rendered into the user message only when Status = SIGNIFICANT (>25% gap).
+  ALIGNED/NOT_COMPARABLE render nothing (original s12 rule: no action required) but are still
+  recorded in `metadata["cio_valuation_cross_check"]` for audit.
+- Sector guidance retained from v15: mining/energy at EPS-cycle peak → prefer engine FV;
+  banks → state which valuation basis was used.
+- New guard sentence: the section NEVER changes entry/target/stop/R-R — the Python Trade
+  Envelope stays authoritative (keeps FIX 4's informational-only policy: no deterministic
+  confidence/range change; the influence is qualitative reasoning only).
+
+**Why:** Disagreement between the Graham screener and the debate engine was computed but
+invisible to the CIO in real time; the CIO could anchor on one figure without knowing the
+other diverged >25% (fires on ~66% of tickers per FIX 4's empirical check).
+
+**Behavioral change:** Only when a screener candidate provides `Est. Fair Value (Graham)`
+AND the gap vs the engine FV exceeds 25%: the CIO must now cite both figures and justify its
+anchor in `weighted_reasoning`. Direct CLI (`idx debate`) and SSE paths pass no `graham_fv`
+→ prompt byte-identical to v27.
+
+---
+
 ## 2026-06-30 — `cio-regime-labels-v27`
 
 **Files changed:**

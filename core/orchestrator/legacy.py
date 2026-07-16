@@ -4785,6 +4785,7 @@ async def _run_single_debate(
     chamber: Any,
     sector: str = "",
     prepared_setup: dict[str, Any] | None = None,
+    graham_fv: float | None = None,
 ) -> dict:
     """
     Jalankan debate untuk satu ticker: chamber.run() owns market-data prefetch â†' validasi schema.
@@ -4796,14 +4797,21 @@ async def _run_single_debate(
 
     logger.info(f"[Debate] Mulai: {ticker}")
 
+    # Task I: graham_fv hanya diteruskan saat tersedia, sehingga chamber/test
+    # double lama tanpa kwarg ini tetap kompatibel di jalur tanpa kandidat.
+    run_kwargs: dict[str, Any] = {}
+    if graham_fv is not None:
+        run_kwargs["graham_fv"] = graham_fv
+
     try:
         if prepared_setup is None:
-            result = await chamber.run(ticker, sector=sector)
+            result = await chamber.run(ticker, sector=sector, **run_kwargs)
         else:
             result = await chamber.run(
                 ticker,
                 sector=sector,
                 prepared_setup=prepared_setup,
+                **run_kwargs,
             )
         if result.get("error") is not None:
             error = str(result["error"])
@@ -5123,6 +5131,20 @@ async def run_batch_debates(
                     )
                 )
 
+            # Task I: Graham FV dari kandidat screener, diteruskan ke chamber
+            # agar _cio_judge_node dapat merender VALUATION CROSS-CHECK secara
+            # real-time (bukan hanya anotasi post-debate di bawah). None di
+            # jalur tanpa kandidat; chamber.run() yang mensanitasi NaN/<=0.
+            graham_fv: float | None = None
+            if candidates_by_ticker:
+                _graham_raw = candidates_by_ticker.get(ticker, {}).get(
+                    "Est. Fair Value (Graham)"
+                )
+                try:
+                    graham_fv = float(_graham_raw) if _graham_raw else None
+                except (TypeError, ValueError):
+                    graham_fv = None
+
             # 2. Build the deterministic setup before rate limiting or budget
             # reservation. Non-executable candidates terminate here with zero
             # LLM calls and still remain present in the batch result.
@@ -5147,6 +5169,7 @@ async def run_batch_debates(
                         chamber,
                         sector=sector_key,
                         prepared_setup=prepared_setup,
+                        graham_fv=graham_fv,
                     )
                     result["sector_key"] = sector_key
                     final_rating = result.get("verdict", {}).get("rating") or (
@@ -5223,6 +5246,7 @@ async def run_batch_debates(
                         chamber,
                         sector=sector_key,
                         prepared_setup=prepared_setup,
+                        graham_fv=graham_fv,
                     )
 
                     # Valuation disagreement: Graham FV (screener) vs debate engine FV.

@@ -840,6 +840,10 @@ class DebateChamberState(TypedDict):
     risk_overvalued: bool
     valuation_band_context: str | None  # C3: self-relative PE/PBV percentile vs own history
     range_52w_signal: str | None  # C4: price position in 52-week high/low range
+    # Task I: Graham Number FV from the quant screener (candidates_by_ticker),
+    # threaded in via run(graham_fv=...). None on paths without screener
+    # context (direct CLI debate, SSE) — the CIO cross-check then no-ops.
+    graham_fv: float | None
 
     # Debate engine
     debate_history: Annotated[list[DebateMessage], history_updater]

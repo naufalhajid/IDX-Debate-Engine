@@ -81,7 +81,11 @@ from services.evidence_ranker import (
     citations_for_bundle,
     guard_evidence_citation_ids,
 )
-from services.fair_value_calculator import build_fair_value_payload, compute_52w_range_signal
+from services.fair_value_calculator import (
+    build_fair_value_payload,
+    check_valuation_disagreement,
+    compute_52w_range_signal,
+)
 from services.indobert_sentiment import sentiment_prior as indobert_sentiment_prior
 from services.debate_prompt_registry import PROMPT_REGISTRY, PROMPT_VERSION
 from services.debate_run_guard import run_with_guard
@@ -1868,6 +1872,7 @@ class DebateChamber:
             "risk_overvalued": False,
             "valuation_band_context": None,
             "range_52w_signal": None,
+            "graham_fv": None,
             "debate_history": [],
             "round_count": 0,
             "consensus_reached": False,
@@ -4722,6 +4727,38 @@ Current Date (Asia/Jakarta): {current_date}
                 "the applicable confidence band."
             )
 
+        # ── Valuation Cross-Check (Task I; deterministic, Python-only) ───────
+        # Graham (screener) vs the *sanitized* engine FV above — the same pair
+        # the post-debate audit in core/orchestrator/legacy.py stores, computed
+        # here so the CIO can reason about the gap in real time (the original
+        # s12 prompt section referenced a field that only existed post-debate;
+        # see PROMPT_MIGRATION.md v15/v16). Informational only per FIX 4:
+        # rendered only when SIGNIFICANT, never fed into envelope/confidence.
+        valuation_cross_check_block = ""
+        graham_fv = state.get("graham_fv")
+        if (
+            isinstance(graham_fv, (int, float))
+            and not isinstance(graham_fv, bool)
+            and math.isfinite(graham_fv)
+            and graham_fv > 0
+        ):
+            cross_check = check_valuation_disagreement(float(graham_fv), fair_value)
+            shown_to_cio = cross_check["valuation_disagreement"] == "SIGNIFICANT"
+            if shown_to_cio:
+                valuation_cross_check_block = (
+                    "=== VALUATION CROSS-CHECK (Python-Computed, informational only) ===\n"
+                    f"Status: SIGNIFICANT — selisih {cross_check['disagreement_pct']}%\n"
+                    f"{cross_check['valuation_note']}\n\n"
+                )
+            cross_check_metadata = dict(_state_metadata(state))
+            cross_check_metadata["cio_valuation_cross_check"] = {
+                **cross_check,
+                "graham_fv": float(graham_fv),
+                "engine_fv": fair_value,
+                "shown_to_cio": shown_to_cio,
+            }
+            state["metadata"] = cross_check_metadata
+
         # ── Build CIO prompt ─────────────────────────────────────────────────
         consensus_directive = self._format_consensus_directive(state)
         debate_history = [_as_debate_message(m) for m in state["debate_history"]]
@@ -4753,6 +4790,7 @@ Current Date (Asia/Jakarta): {current_date}
             f"{envelope_text}\n\n"
             f"=== CONFLICT RESOLUTION ===\n"
             f"{conflict_signal}\n\n"
+            f"{valuation_cross_check_block}"
             f"=== CONSENSUS DIRECTIVE ===\n"
             f"{consensus_directive}\n\n"
             f"Decision Brief (compressed, no raw source dump):\n"
@@ -5677,6 +5715,7 @@ Start your response with '{' and end with '}'. Nothing else."""
         current_price: float = 0.0,
         sector: str = "",
         prepared_setup: dict[str, Any] | None = None,
+        graham_fv: float | None = None,
     ) -> dict:
         """
         Execute the full swing-trade debate pipeline for a given IHSG ticker.
@@ -5690,6 +5729,11 @@ Start your response with '{' and end with '}'. Nothing else."""
             sector        : Raw IDX sector key (e.g. "energy", "bank"). Injected
                             into metadata so _compute_trade_envelope can apply the
                             sector-aware swing cap via _max_target_return().
+            graham_fv     : Graham Number FV from the quant screener (Task I).
+                            Read only by _cio_judge_node for the real-time
+                            VALUATION CROSS-CHECK section; informational only,
+                            never alters the envelope or confidence. Non-finite
+                            or <= 0 values sanitize to None.
 
         Returns:
             The final LangGraph state dict.
@@ -5697,6 +5741,12 @@ Start your response with '{' and end with '}'. Nothing else."""
             For the Svelte trade card: CIOVerdict(**json.loads(...)).to_trade_card()
         """
         ticker = normalize_idx_ticker(ticker)
+        try:
+            graham_fv = float(graham_fv) if graham_fv is not None else None
+        except (TypeError, ValueError):
+            graham_fv = None
+        if graham_fv is not None and (not math.isfinite(graham_fv) or graham_fv <= 0):
+            graham_fv = None
         prepared = prepared_setup or await self.prepare_trade_setup(
             ticker,
             current_price=current_price,
@@ -5765,6 +5815,7 @@ Start your response with '{' and end with '}'. Nothing else."""
             "dps_yield_pct": None,
             "dps_price_used": None,
             "risk_overvalued": False,
+            "graham_fv": graham_fv,
             "debate_history": [],
             "round_count": 0,
             "consensus_reached": False,

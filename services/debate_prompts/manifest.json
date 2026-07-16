@@ -1,5 +1,5 @@
 {
-  "prompt_version": "2026-06-30-cio-regime-labels-v27",
+  "prompt_version": "2026-07-16-taskI-valuation-cross-check-v28",
   "prompts": {
     "FUNDAMENTAL_SCOUT_PROMPT": "fundamental_scout.txt",
     "CHARTIST_PROMPT": "chartist.txt",

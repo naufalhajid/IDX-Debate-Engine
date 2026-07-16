@@ -582,6 +582,9 @@ Unrelated to the 2026-06-21 STRATEGIC_ALIGNMENT_AUDIT and to the 2026-07-15 Task
 
 ### Task I — Restore (or formally retire) real-time CIO visibility into Graham/MultiMoS disagreement
 
+**Status: RESOLVED 2026-07-16** (restored, with the v16 root cause actually fixed this time).
+See "Resolution" below the original finding — kept intact as the historical record.
+
 **Priority Group:** REFINEMENT (previously attempted, reverted; not a regression from Fix 4 --
 Fix 4 deliberately did not touch this)
 
@@ -636,11 +639,53 @@ the one FIX 4 just declined on the deterministic side.
 **Effort:** M -- state threading (schemas/debate.py, debate_chamber.py, legacy.py call
 site) + prompt edit + compliance test.
 
+**Resolution (2026-07-16, same day — restored with the v16 root cause fixed):**
+The "restore" option was chosen (explicit user sign-off), with one deliberate design change
+vs the backlog's original step 1: the disagreement is computed inside **`_cio_judge_node`**,
+not `_fundamental_node`. Reason: the judge derives the *sanitized* engine FV (post
+`fair_value_rejected` verification gate) at lines ~4540; computing there guarantees (a) the
+CIO never reads a disagreement note referencing an FV that a later node already rejected —
+the exact stale-reference bug class that caused the v16 revert — and (b) the figures are
+identical to the post-debate audit annotation in `legacy.py` (which compares Graham vs
+`verdict.fair_value`, and `verdict.fair_value` is Python-overridden from that same sanitized
+FV). The noisy Graham signal is also NOT exposed to bull/bear/synthesizer — CIO-only, the
+original s12 scope.
+
+Mechanics: `run_batch_debates()` extracts `cand["Est. Fair Value (Graham)"]` per ticker and
+forwards it via `_run_single_debate` → `chamber.run(graham_fv=...)` (forwarded only when
+non-None, so existing chamber test-doubles stay compatible) → `DebateChamberState.graham_fv`
+→ `_cio_judge_node` calls `check_valuation_disagreement(graham_fv, sanitized_fv)`. The
+`=== VALUATION CROSS-CHECK ===` section is rendered into the CIO user message **only when
+SIGNIFICANT** (>25% gap); ALIGNED/NOT_COMPARABLE render nothing (original s12 rule) but the
+full result is always recorded in `metadata["cio_valuation_cross_check"]` (incl.
+`shown_to_cio`) for audit. FIX 4's policy is preserved verbatim: informational only — no
+deterministic confidence/range/envelope change; the prompt section explicitly reasserts the
+Trade Envelope as authoritative. Direct CLI (`idx debate`) and SSE paths pass no graham_fv →
+prompt byte-identical to v27 there. The post-debate annotation in `legacy.py` stays untouched.
+
+Prompt: `cio_judge.txt` section restored between STEP 1 and STEP 2 (adapted from the v15
+text recovered from git `1b3950d`; sector guidance retained); manifest bumped to
+`2026-07-16-taskI-valuation-cross-check-v28`; `PROMPT_MIGRATION.md` entry added.
+
+**Test Coverage (realized):** `test_cio_valuation_cross_check_rendered_when_graham_diverges`,
+`test_cio_valuation_cross_check_absent_without_graham_fv`,
+`test_cio_valuation_cross_check_aligned_recorded_but_not_rendered`,
+`test_cio_valuation_cross_check_respects_fair_value_rejected`,
+`test_run_threads_graham_fv_into_initial_state` (`tests/test_debate_chamber_reliability.py`);
+`test_batch_debates_forward_graham_fv_from_candidates`
+(`tests/test_orchestrator_quality_gates.py`). All written TEST FIRST (red confirmed for the
+right reasons before implementation).
+
+**Risk (realized):** LLM-compliance drift remains the inherent residual (prompt-only
+influence); everything deterministic is test-locked, including the guarantee that the section
+never appears when the FV was verification-rejected.
+
 ---
 
 *Addendum written 2026-07-16 during the Fair Value End-to-End Unification & Remediation
 effort, Fix 4, after tracing `check_valuation_disagreement()`'s full history via
-`PROMPT_MIGRATION.md`.*
+`PROMPT_MIGRATION.md`. Resolution appended same day after explicit sign-off (Task I selected
+over Task H options; compute-location decision: `_cio_judge_node`).*
 
 ---
 

@@ -360,6 +360,46 @@ async def test_batch_debate_records_unexpected_ticker_failure(
 
 
 @pytest.mark.asyncio
+async def test_batch_debates_forward_graham_fv_from_candidates() -> None:
+    """Task I: run_batch_debates must extract 'Est. Fair Value (Graham)' from
+    candidates_by_ticker and forward it to chamber.run() so the CIO judge can
+    render the real-time valuation cross-check. Tickers without the field keep
+    the backward-compatible call (graham_fv stays None); test doubles without
+    the kwarg must keep working because None is never forwarded explicitly."""
+    calls: dict[str, float | None] = {}
+
+    class FakeChamber:
+        async def run(
+            self,
+            ticker: str,
+            current_price: float = 0.0,
+            sector: str = "",
+            graham_fv: float | None = None,
+        ) -> dict:
+            calls[ticker] = graham_fv
+            return {
+                "ticker": ticker,
+                "final_verdict": json.dumps(
+                    {"ticker": ticker, "rating": "HOLD", "confidence": 0.4}
+                ),
+                "metadata": {},
+            }
+
+    results = await run_batch_debates(
+        ["BBCA", "TLKM"],
+        chamber_factory=FakeChamber,
+        candidates_by_ticker={
+            "BBCA": {"Est. Fair Value (Graham)": 2500.0},
+            "TLKM": {},
+        },
+    )
+
+    assert [r["ticker"] for r in results] == ["BBCA", "TLKM"]
+    assert calls["BBCA"] == 2500.0
+    assert calls["TLKM"] is None
+
+
+@pytest.mark.asyncio
 async def test_batch_results_serialize_one_canonical_execution_regime(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

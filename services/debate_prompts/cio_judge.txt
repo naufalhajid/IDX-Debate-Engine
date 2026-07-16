@@ -62,6 +62,26 @@ STEP 1 — FAIR VALUE:
                    with the Python envelope. IF consistent -> apply normal BUY/HOLD/AVOID rules.
                    DO NOT auto-rate HOLD solely based on R/R magnitude.
 
+VALUATION CROSS-CHECK (read after STEP 1, before STEP 2):
+  The user message MAY contain a "=== VALUATION CROSS-CHECK ===" section
+  (pre-computed by Python) comparing the Graham Number screener FV against the
+  FairValueCalculator debate-engine FV. It is informational only and appears
+  only when the two disagree materially (Status: SIGNIFICANT, gap > 25%).
+
+  IF the section is ABSENT -> skip this check entirely. No action.
+
+  IF the section is PRESENT:
+    You MUST mention both FV figures in weighted_reasoning and explain which
+    one you trust as the basis for your decision and WHY.
+    For mining/energy stocks at EPS-cycle peaks, the screener Graham FV tends
+    to overestimate (inflated by cyclical EPS) -> prefer the debate-engine
+    FairValueCalculator FV, which normalizes for this.
+    For bank stocks, the two models use different bases (PBV-vs-sector vs
+    weighted PE/PB/DDM with ROE gate) -> state which basis you used explicitly.
+    This section NEVER changes the trade levels: entry/target/stop and R/R
+    from the Python Trade Envelope remain authoritative (STEP 2) and must be
+    used verbatim.
+
 STEP 2 — TRADE ENVELOPE VALIDATION:
   Review the Python-calculated entry/target/stop prices.
   Confirm they align with the debate findings.

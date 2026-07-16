@@ -1137,7 +1137,7 @@ async def test_debate_run_derives_current_price_and_adds_prompt_metadata(monkeyp
 def test_prompt_registry_loads_required_prompts_and_version():
     registry = debate_prompt_registry.PROMPT_REGISTRY
 
-    assert registry.prompt_version == "2026-06-30-cio-regime-labels-v27"
+    assert registry.prompt_version == "2026-07-16-taskI-valuation-cross-check-v28"
     assert set(debate_prompt_registry.REQUIRED_PROMPTS).issubset(registry.prompts)
     assert "CONFIDENCE CALIBRATION" in registry.prompts["CIO_SYSTEM_PROMPT"]
 
@@ -1212,6 +1212,241 @@ async def test_cio_uses_decision_brief_and_redacts_debate_prices(monkeypatch):
     assert "SHOULD_NOT_LEAK_RAW_DATA" not in human_prompt
     assert "Rp 999" not in human_prompt
     assert "Rp [REDACTED: use Python Trade Envelope]" in human_prompt
+
+
+def _cio_cross_check_response() -> SimpleNamespace:
+    return SimpleNamespace(
+        content=json.dumps(
+            {
+                "ticker": "BBRI",
+                "rating": "BUY",
+                "confidence": 0.72,
+                "summary": "Valid setup.",
+                "weighted_reasoning": "Envelope-driven decision.",
+                "key_catalysts": ["volume"],
+                "key_risks": ["breakdown"],
+                "timeframe": "5-20 Trading Days",
+                "execution_horizon_days": 10,
+                "entry_price_range": "1 - 2",
+                "target_price": 3,
+                "stop_loss": 1,
+                "current_price": 1000,
+                "fair_value": 1200,
+                "expected_return": "+5.0%",
+                "risk_reward_ratio": 2.0,
+                "consensus_reached": False,
+                "consensus_method": None,
+                "dissenting_agents": [],
+            }
+        )
+    )
+
+
+def _cio_cross_check_state(**extra) -> dict:
+    state = {
+        "ticker": "BBRI",
+        "current_price": 1000.0,
+        "technical_indicators": {"ma50": 980, "atr14": 30, "sector": "mining"},
+        "fair_value_estimate": 1200.0,
+        "debate_history": [],
+        "raw_data": "",
+        "decision_brief": "COMPACT_DECISION_BRIEF",
+        "consensus_reached": False,
+        "consensus_method": None,
+        "dissenting_agents": [],
+        "agent_votes": [],
+        "disagreement_type": None,
+        "devils_advocate_question": "",
+        "metadata": {},
+    }
+    state.update(extra)
+    return state
+
+
+@pytest.mark.asyncio
+async def test_cio_valuation_cross_check_rendered_when_graham_diverges(monkeypatch):
+    """Task I: graham_fv in state + >25% gap vs the sanitized engine FV must
+    render a Python-computed VALUATION CROSS-CHECK section in the CIO user
+    prompt (citing both figures) and record the audit trail in metadata."""
+    chamber = _chamber()
+    captured = {}
+
+    async def fake_invoke(llm, messages, inject_rules=True):
+        captured["human"] = messages[-1].content
+        return _cio_cross_check_response()
+
+    monkeypatch.setattr(chamber, "_invoke_llm", fake_invoke)
+    chamber.pro_llm = FakeLLM(model="gemini-2.5-pro")
+
+    state = _cio_cross_check_state(graham_fv=3000.0)
+    result = await chamber._cio_judge_node(state)
+
+    human_prompt = captured["human"]
+    assert "=== VALUATION CROSS-CHECK" in human_prompt
+    assert "SIGNIFICANT" in human_prompt
+    assert "Rp3,000" in human_prompt
+    assert "Rp1,200" in human_prompt
+    audit = state["metadata"]["cio_valuation_cross_check"]
+    assert audit["valuation_disagreement"] == "SIGNIFICANT"
+    assert audit["shown_to_cio"] is True
+    json.loads(result["final_verdict"])
+
+
+@pytest.mark.asyncio
+async def test_cio_valuation_cross_check_absent_without_graham_fv(monkeypatch):
+    """No graham_fv (direct CLI / SSE paths, tests) -> no cross-check section
+    and no audit metadata; the CIO prompt is byte-identical to today's."""
+    chamber = _chamber()
+    captured = {}
+
+    async def fake_invoke(llm, messages, inject_rules=True):
+        captured["human"] = messages[-1].content
+        return _cio_cross_check_response()
+
+    monkeypatch.setattr(chamber, "_invoke_llm", fake_invoke)
+    chamber.pro_llm = FakeLLM(model="gemini-2.5-pro")
+
+    state = _cio_cross_check_state()
+    await chamber._cio_judge_node(state)
+
+    assert "VALUATION CROSS-CHECK" not in captured["human"]
+    assert "cio_valuation_cross_check" not in (state.get("metadata") or {})
+
+
+@pytest.mark.asyncio
+async def test_cio_valuation_cross_check_aligned_recorded_but_not_rendered(
+    monkeypatch,
+):
+    """ALIGNED (<25% gap): informational-only policy (FIX 4) — audited in
+    metadata but NOT rendered, so a noisy Graham 'agreement' can't be cited
+    as confirmation by the CIO."""
+    chamber = _chamber()
+    captured = {}
+
+    async def fake_invoke(llm, messages, inject_rules=True):
+        captured["human"] = messages[-1].content
+        return _cio_cross_check_response()
+
+    monkeypatch.setattr(chamber, "_invoke_llm", fake_invoke)
+    chamber.pro_llm = FakeLLM(model="gemini-2.5-pro")
+
+    state = _cio_cross_check_state(graham_fv=1250.0)
+    await chamber._cio_judge_node(state)
+
+    assert "VALUATION CROSS-CHECK" not in captured["human"]
+    audit = state["metadata"]["cio_valuation_cross_check"]
+    assert audit["valuation_disagreement"] == "ALIGNED"
+    assert audit["shown_to_cio"] is False
+
+
+@pytest.mark.asyncio
+async def test_cio_valuation_cross_check_respects_fair_value_rejected(monkeypatch):
+    """When the verification gate rejected the engine FV, the cross-check must
+    compare against the *sanitized* FV (None) -> NOT_COMPARABLE -> no section,
+    even though graham_fv is present. Guards against the stale-reference bug
+    class that caused the original s12 revert (v16)."""
+    chamber = _chamber()
+    captured = {}
+
+    async def fake_invoke(llm, messages, inject_rules=True):
+        captured["human"] = messages[-1].content
+        return _cio_cross_check_response()
+
+    monkeypatch.setattr(chamber, "_invoke_llm", fake_invoke)
+    chamber.pro_llm = FakeLLM(model="gemini-2.5-pro")
+
+    state = _cio_cross_check_state(
+        graham_fv=3000.0,
+        metadata={"fair_value_rejected": True},
+    )
+    await chamber._cio_judge_node(state)
+
+    assert "VALUATION CROSS-CHECK" not in captured["human"]
+    audit = state["metadata"]["cio_valuation_cross_check"]
+    assert audit["valuation_disagreement"] == "NOT_COMPARABLE"
+    assert audit["shown_to_cio"] is False
+
+
+@pytest.mark.asyncio
+async def test_run_threads_graham_fv_into_initial_state(monkeypatch):
+    """Task I: run(graham_fv=...) must surface the screener Graham FV in the
+    LangGraph initial state (sanitized: non-finite/<=0 -> None); omitting the
+    kwarg must default to None so CLI/SSE paths are unchanged."""
+    chamber = _chamber()
+    chamber._llm_call_counts = {}
+    index = pd.date_range("2025-01-01", periods=250, freq="B")
+    close = pd.Series([100.0 + i * 0.1 for i in range(250)], index=index)
+    history = pd.DataFrame(
+        {
+            "Open": close - 0.5,
+            "High": close + 1.0,
+            "Low": close - 1.0,
+            "Close": close,
+            "Volume": 1_000_000.0,
+        },
+        index=index,
+    )
+
+    async def fake_fetch_market_data(ticker):
+        return {"history": history, "source": "test", "info": {}}
+
+    def fake_technicals(frame):
+        return {
+            "current_price": 125.0,
+            "sma20": 124.0,
+            "ma50": 123.0,
+            "ma200": 115.0,
+            "ma200_context": "ABOVE",
+            "rsi14": 55.0,
+            "atr14": 2.0,
+            "low_20d": 118.0,
+            "return_5d_pct": 1.0,
+        }
+
+    def fake_preflight(tech, current_price):
+        return {"status": "clean", "atr14": 2.0, "surrogate_gap": 7.0}
+
+    def fake_envelope(current_price, fair_value, tech):
+        return {
+            "entry_low": 120.0,
+            "entry_high": 125.0,
+            "entry_mid": 122.5,
+            "target_price": 145.0,
+            "target_basis": "test",
+            "stop_loss": 115.0,
+            "risk_reward_ratio": 2.0,
+            "atr14": 2.0,
+            "stop_near_noise": False,
+        }
+
+    monkeypatch.setattr(chamber, "_fetch_market_data", fake_fetch_market_data)
+    monkeypatch.setattr(chamber, "_compute_technical_indicators", fake_technicals)
+    monkeypatch.setattr(chamber, "_run_tradeability_preflight", fake_preflight)
+    monkeypatch.setattr(chamber, "_compute_trade_envelope", fake_envelope)
+    prepared = await chamber.prepare_trade_setup(
+        "TEST",
+        current_price=125.0,
+        sector="bank",
+    )
+    assert prepared["trade_setup_snapshot"]["status"] == "EXECUTABLE"
+
+    captured_states: list[dict] = []
+
+    class CaptureApp:
+        async def ainvoke(self, state):
+            captured_states.append(state)
+            return state
+
+    chamber.app = CaptureApp()
+
+    await chamber.run("TEST", prepared_setup=prepared, graham_fv=2500.0)
+    await chamber.run("TEST", prepared_setup=prepared, graham_fv=float("nan"))
+    await chamber.run("TEST", prepared_setup=prepared)
+
+    with_graham, with_nan, without_graham = captured_states
+    assert with_graham["graham_fv"] == 2500.0
+    assert with_nan["graham_fv"] is None
+    assert without_graham["graham_fv"] is None
 
 
 @pytest.mark.asyncio
