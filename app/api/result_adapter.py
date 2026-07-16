@@ -154,21 +154,23 @@ def _build_scout_metrics(
     )
     raw = str(entry.get("raw_data_summary") or "")
     metadata = entry.get("metadata") if isinstance(entry.get("metadata"), dict) else {}
+    entry_text = verdict.get("entry_price_range") or "-"
+    risk_entry_low = _as_optional_float(risk.get("entry_low"))
+    risk_entry_high = _as_optional_float(risk.get("entry_high"))
+    if risk_entry_low is not None and risk_entry_high is not None:
+        entry_text = f"{risk_entry_low:,.0f} - {risk_entry_high:,.0f}"
     return {
         "technical": {
             "current_price": risk.get("current_price")
             or verdict.get("current_price")
             or 0,
-            "entry": (
-                f"{risk.get('entry_low', 0):,.0f} - {risk.get('entry_high', 0):,.0f}"
-                if risk
-                else verdict.get("entry_price_range", "-")
-            ),
+            "entry": entry_text,
             "ma200": _metric_value(raw, r"MA200[^\d]*(\d+(?:[.,]\d+)?)"),
             "rsi14": _metric_value(raw, r"RSI\(14\)[^\d]*(\d+(?:[.,]\d+)?)"),
         },
         "fundamental": {
             "fair_value": verdict.get("fair_value"),
+            "fair_value_status": verdict.get("fair_value_status"),
             "expected_return": verdict.get("expected_return") or "-",
             "confidence": model_confidence,
             "sector": entry.get("sector_key") or "unknown",
@@ -741,6 +743,7 @@ def normalize_result(entry: dict[str, Any]) -> dict[str, Any]:
         "entry_low": entry_low,
         "entry_high": entry_high,
         "risk_reward": decision["risk_reward"],
+        "fair_value_status": verdict.get("fair_value_status"),
         "required_rr": decision["required_rr"],
         "execution_horizon_days": decision["execution_horizon_days"],
         "lot_count": decision["lot_count"],

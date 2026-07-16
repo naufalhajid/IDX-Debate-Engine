@@ -169,7 +169,7 @@ async def test_consensus_round_two_soft_hold_can_conclude(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_consensus_round_one_two_of_five_is_not_enough(monkeypatch):
+async def test_consensus_round_one_two_participants_are_below_minimum(monkeypatch):
     chamber = _chamber()
 
     async def fake_invoke(llm, messages, inject_rules=True):
@@ -195,7 +195,7 @@ async def test_consensus_round_one_two_of_five_is_not_enough(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_consensus_round_one_three_of_five_waits_for_more_debate(monkeypatch):
+async def test_consensus_round_one_two_of_four_waits_for_more_debate(monkeypatch):
     chamber = _chamber()
 
     async def fake_invoke(llm, messages, inject_rules=True):
@@ -230,7 +230,7 @@ async def test_consensus_round_one_three_of_five_waits_for_more_debate(monkeypat
 
 
 @pytest.mark.asyncio
-async def test_consensus_round_one_requires_four_of_five_votes(monkeypatch):
+async def test_consensus_round_one_allows_three_of_four_votes(monkeypatch):
     chamber = _chamber()
 
     async def fake_invoke(llm, messages, inject_rules=True):
@@ -265,7 +265,7 @@ async def test_consensus_round_one_requires_four_of_five_votes(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_consensus_round_two_allows_three_of_five_votes(monkeypatch):
+async def test_consensus_round_two_requires_three_of_four_votes(monkeypatch):
     chamber = _chamber()
 
     async def fake_invoke(llm, messages, inject_rules=True):
@@ -278,7 +278,7 @@ async def test_consensus_round_two_allows_three_of_five_votes(monkeypatch):
             "round_count": 2,
             "fundamental_data": "Position: BUY\nAgent Confidence: 0.70",
             "technical_data": "Position: BUY\nAgent Confidence: 0.66",
-            "sentiment_data": "Position: HOLD\nAgent Confidence: 0.52",
+            "sentiment_data": "Position: BUY\nAgent Confidence: 0.52",
             "debate_history": [
                 DebateMessage(
                     role="bull",
@@ -296,7 +296,7 @@ async def test_consensus_round_two_allows_three_of_five_votes(monkeypatch):
 
     assert result["consensus_reached"] is True
     assert result["consensus_method"] == "voting"
-    assert result["dissenting_agents"] == ["sentiment_specialist", "bear"]
+    assert result["dissenting_agents"] == ["bear"]
 
 
 @pytest.mark.asyncio
@@ -313,7 +313,7 @@ async def test_consensus_round_two_majority_beats_soft_hold(monkeypatch):
             "round_count": 2,
             "fundamental_data": "Position: BUY\nAgent Confidence: 0.75",
             "technical_data": "Position: BUY\nAgent Confidence: 0.85",
-            "sentiment_data": "Position: HOLD\nAgent Confidence: 0.00",
+            "sentiment_data": "Position: BUY\nAgent Confidence: 0.70",
             "debate_history": [
                 DebateMessage(
                     role="bull",
@@ -332,7 +332,7 @@ async def test_consensus_round_two_majority_beats_soft_hold(monkeypatch):
     assert result["consensus_reached"] is True
     assert result["consensus_method"] == "voting"
     assert result["consensus_winner"]["position"] == "BUY"
-    assert result["dissenting_agents"] == ["sentiment_specialist", "bear"]
+    assert result["dissenting_agents"] == ["bear"]
 
 
 @pytest.mark.asyncio
@@ -356,7 +356,7 @@ async def test_consensus_round_three_uses_confidence_winner(monkeypatch):
                     content="Position: BUY\nAgent Confidence: 0.64",
                     round_num=3,
                 ),
-                # 0.93 keeps |bull-bear| = 0.29 > SOFT_HOLD_CONFIDENCE_DELTA (0.27)
+                # 0.93 keeps |bull-bear| = 0.29 > SOFT_HOLD_CONFIDENCE_DELTA (0.15)
                 # so soft_hold does not claim this case — confidence_winner fires
                 DebateMessage(
                     role="bear",
@@ -378,6 +378,12 @@ def test_cio_verdict_accepts_deadlock_hold_consensus_method():
     verdict = CIOVerdict(ticker="TEST", consensus_method="deadlock_hold")
 
     assert verdict.consensus_method == "deadlock_hold"
+
+
+def test_cio_verdict_accepts_quality_veto_consensus_method():
+    verdict = CIOVerdict(ticker="TEST", consensus_method="quality_veto")
+
+    assert verdict.consensus_method == "quality_veto"
 
 
 def test_cio_verdict_defaults_to_tactical_swing_horizon():
@@ -888,7 +894,11 @@ async def test_cio_envelope_rejection_carries_structured_reason_code():
         {
             "ticker": "TOTL",
             "current_price": 1000.0,
-            "technical_indicators": {"rsi14": 50.0, "return_5d_pct": -2.0},
+            "technical_indicators": {
+                "rsi14": 50.0,
+                "return_5d_pct": -3.0,
+                "ema20": 1010.0,
+            },
             "fair_value_estimate": 1000.0,
             "debate_history": [],
             "raw_data": "",
@@ -898,7 +908,7 @@ async def test_cio_envelope_rejection_carries_structured_reason_code():
     verdict = json.loads(result["final_verdict"])
 
     assert verdict["rating"] == "HOLD"
-    assert verdict["reason_codes"] == ["no_momentum_confirmation"]
+    assert verdict["reason_codes"] == ["momentum_breakdown"]
 
     # Cross the full integration boundary: reparse through CIOVerdict exactly
     # as core/orchestrator/legacy.py does (final_verdict JSON -> CIOVerdict ->
@@ -908,7 +918,7 @@ async def test_cio_envelope_rejection_carries_structured_reason_code():
     decision = evaluate_risk({"ticker": "TOTL", "verdict": verdict_dict})
 
     assert decision.status == "reject"
-    assert "no_momentum_confirmation" in decision.reason_codes
+    assert "momentum_breakdown" in decision.reason_codes
 
 
 @pytest.mark.asyncio
@@ -975,6 +985,7 @@ async def test_cio_envelope_rejection_preserves_unverified_fair_value_semantics(
     assert verdict["fair_value_base"] is None
     assert verdict["fair_value_low"] is None
     assert verdict["fair_value_high"] is None
+    assert verdict["fair_value_status"] is None
     assert verdict["valuation_gap"] == "unverified"
 
 
@@ -2543,27 +2554,29 @@ def test_atr_noise_gate_rejects_stop_inside_noise():
     )
 
 
-def test_trade_envelope_rejects_momentum_mode_with_negative_5d_return():
-    """Momentum mode (RSI > 40) + negative 5d return must be rejected (F12 fix)."""
+def test_trade_envelope_rejects_hard_momentum_breakdown_below_ema20():
+    """A 3% momentum breakdown below EMA20 remains a hard rejection."""
     chamber = _chamber()
     tech = {
         "ma50": 1000.0, "sma20": 980.0, "atr14": 20.0,
-        "rsi14": 55.0, "return_5d_pct": -3.0,
+        "rsi14": 55.0, "return_5d_pct": -3.0, "ema20": 1010.0,
     }
     result = chamber._compute_trade_envelope(1000.0, 1100.0, tech)
     assert result.get("rejected") is True, f"Expected rejected=True, got: {result}"
-    assert "no_momentum_confirmation" in result.get("reason", "")
+    assert "momentum_breakdown" in result.get("reason", "")
 
 
-def test_trade_envelope_allows_mean_reversion_with_negative_5d_return():
-    """Mean-reversion mode (RSI <= 40) must not be blocked by the 5d-return gate."""
+def test_trade_envelope_low_rsi_does_not_bypass_hard_momentum_breakdown():
+    """The two-condition hard breakdown applies independently of RSI."""
     chamber = _chamber()
     tech = {
         "ma50": 1100.0, "sma20": 1050.0, "atr14": 20.0,
-        "rsi14": 35.0, "return_5d_pct": -5.0,
+        "rsi14": 35.0, "return_5d_pct": -5.0, "ema20": 1010.0,
+        "return_1d_pct": 1.0, "volume_surge_ratio": 1.5,
     }
     result = chamber._compute_trade_envelope(1000.0, 1100.0, tech)
-    assert not result.get("rejected"), f"Mean-reversion envelope wrongly rejected: {result}"
+    assert result.get("rejected") is True
+    assert result["reason_code"] == "momentum_breakdown"
 
 
 def test_trade_envelope_allows_positive_5d_return_in_momentum_mode():
@@ -2603,12 +2616,12 @@ def test_envelope_momentum_rejection_still_computes_hypothetical_levels():
     chamber = _chamber()
     tech = {
         "ma50": 1000.0, "sma20": 980.0, "atr14": 20.0,
-        "rsi14": 55.0, "return_5d_pct": -3.0,
+        "rsi14": 55.0, "return_5d_pct": -3.0, "ema20": 1010.0,
     }
     envelope = chamber._compute_trade_envelope(1000.0, 1100.0, tech)
 
     assert envelope.get("rejected") is True
-    assert envelope["reason_code"] == "no_momentum_confirmation"
+    assert envelope["reason_code"] == "momentum_breakdown"
     hypo = envelope["hypothetical_envelope"]
     assert hypo["stop_loss"] < hypo["entry_low"] < hypo["entry_high"]
     assert hypo["risk_reward_ratio"] >= hypo["required_rr"]
@@ -2645,8 +2658,8 @@ def test_envelope_accepted_setup_has_no_hypothetical_envelope():
 
 
 @pytest.mark.asyncio
-async def test_devils_advocate_appends_vote_to_agent_votes(monkeypatch):
-    """_devils_advocate_node must append its AVOID/HOLD vote to agent_votes (6th entry)."""
+async def test_devils_advocate_stays_advisory_without_appending_vote(monkeypatch):
+    """Devil's Advocate keeps its challenge text but never joins agent_votes."""
     chamber = _chamber()
 
     async def fake_invoke_for_state(state, llm, messages, inject_rules=True):
@@ -2677,15 +2690,12 @@ async def test_devils_advocate_appends_vote_to_agent_votes(monkeypatch):
         }
     )
 
-    votes = result["agent_votes"]
-    assert len(votes) == 6, f"Expected 6 agent_votes, got {len(votes)}"
-    da_vote = next((v for v in votes if v["agent"] == "devils_advocate"), None)
-    assert da_vote is not None, "devils_advocate vote missing from agent_votes"
-    assert da_vote["position"] in ("AVOID", "HOLD"), f"Unexpected DA position: {da_vote['position']}"
-    assert 0.0 <= da_vote["confidence"] <= 1.0
-    # Original 5 votes must be preserved unchanged
-    original_agents = {v["agent"] for v in votes[:5]}
-    assert original_agents == {"bull", "bear", "fundamental_scout", "chartist", "sentiment_specialist"}
+    assert "agent_votes" not in result
+    assert len(prior_votes) == 5
+    assert all(vote["agent"] != "devils_advocate" for vote in prior_votes)
+    message = result["debate_history"][0]
+    assert message.position == "UNKNOWN"
+    assert "Worst-case macro challenge" in result["devils_advocate_question"]
 
 
 # ---------------------------------------------------------------------------
@@ -3264,6 +3274,10 @@ async def test_prepared_rr_rejection_is_terminal_with_zero_llm_calls():
     assert verdict.model_confidence is None
     assert verdict.policy_confidence == 1.0
     assert verdict.entry_price_range is None
+    assert verdict.fair_value_status == "NOT_EVALUATED_PREFLIGHT"
+    assert any(
+        "NOT_EVALUATED_PREFLIGHT" in risk for risk in verdict.key_risks
+    )
 
 
 @pytest.mark.asyncio

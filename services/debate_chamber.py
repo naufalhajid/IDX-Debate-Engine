@@ -92,6 +92,10 @@ from services.debate_run_guard import run_with_guard
 from services.trade_setup import (
     build_trade_setup_snapshot as build_predebate_trade_setup,
 )
+from services.signal_packet import (
+    build_raw_signal_packet,
+    refresh_snapshot_signal_packet,
+)
 from utils.logger_config import logger
 from utils.ticker import normalize_idx_ticker
 from utils.market_data_cache import (
@@ -193,11 +197,13 @@ def _is_transient_error(exc: BaseException) -> bool:
 
     if isinstance(exc, BudgetExhaustedError):
         return False
-    combined = " ".join([
-        str(exc).lower(),
-        type(exc).__name__.lower(),
-        repr(exc.args).lower(),
-    ])
+    combined = " ".join(
+        [
+            str(exc).lower(),
+            type(exc).__name__.lower(),
+            repr(exc.args).lower(),
+        ]
+    )
     if any(p in combined for p in _PERMANENT_ERROR_PATTERNS):
         return False
     return any(t in combined for t in _TRANSIENT_ERROR_PATTERNS)
@@ -802,11 +808,20 @@ def post_evaluator_router(
 # ---------------------------------------------------------------------------
 
 BASE_URL = "https://exodus.stockbit.com"
+# Baseline used by the separate regime-confidence guard below.  Do not reuse it
+# as the directional vote-share threshold: SIDEWAYS/BEAR regimes may raise this
+# floor independently of consensus arithmetic.
 CONSENSUS_THRESHOLD = 0.60
-ROUND1_CONSENSUS_THRESHOLD = 0.80
-CONSENSUS_AGENT_COUNT = 5
+DIRECTIONAL_VOTER_AGENTS = frozenset(
+    {"chartist", "sentiment_specialist", "bull", "bear"}
+)
+DIRECTIONAL_VOTE_THRESHOLD = 0.75
+DIRECTIONAL_MIN_SUPPORT = 3
+# Backward-compatible names retained for diagnostics and external tests.
+ROUND1_CONSENSUS_THRESHOLD = DIRECTIONAL_VOTE_THRESHOLD
+CONSENSUS_AGENT_COUNT = len(DIRECTIONAL_VOTER_AGENTS)
 MAX_DEBATE_ROUNDS = 3
-SOFT_HOLD_CONFIDENCE_DELTA = 0.27
+SOFT_HOLD_CONFIDENCE_DELTA = 0.15
 
 #: Bullishness ordering used to clamp the CIO rating to the voting consensus:
 #: the final verdict may be more cautious than the vote, never more bullish.
@@ -1028,8 +1043,12 @@ class DebateChamber:
     )
     _POSITION_RE = re.compile(
         r"(?:position|rating|verdict|swing_signal)\s*[:=]\s*"
-        r"['\"]?(STRONG_BUY|BUY|HOLD|AVOID|SELL|NEUTRAL|BULLISH|BEARISH)",
+        r"['\"]?(STRONG_BUY|BUY|HOLD|AVOID|SELL|NEUTRAL|BULLISH|BEARISH|"
+        r"UNKNOWN|ABSTAIN|INSUFFICIENT_DATA|STRESS_TEST)",
         re.IGNORECASE,
+    )
+    _FUNDAMENTAL_QUALITY_RE = re.compile(
+        r"(?im)^\s*Quality\s+Flag\s*:\s*(PASS|CONDITIONAL|FAIL)\b"
     )
 
     @staticmethod
@@ -1043,8 +1062,8 @@ class DebateChamber:
             return "AVOID"
         if token in {"HOLD", "NEUTRAL", "WAIT", "WAIT_AND_SEE"}:
             return "HOLD"
-        if token in {"INSUFFICIENT_DATA"}:
-            return "HOLD"
+        if token in {"UNKNOWN", "ABSTAIN", "INSUFFICIENT_DATA", "STRESS_TEST"}:
+            return "UNKNOWN"
         return "UNKNOWN"
 
     @staticmethod
@@ -1285,7 +1304,7 @@ class DebateChamber:
     @staticmethod
     def _sentiment_insufficient_payload(reasoning: str) -> dict[str, Any]:
         return {
-            "position": "HOLD",
+            "position": "UNKNOWN",
             "confidence": 0.0,
             "status": "INSUFFICIENT_DATA",
             "reasoning": reasoning,
@@ -1308,7 +1327,7 @@ class DebateChamber:
                 f"[Sentiment] JSON parse failed for {ticker}: {exc}; raw={raw_preview}"
             )
             return {
-                "position": "HOLD",
+                "position": "UNKNOWN",
                 "confidence": 0.0,
                 "status": "PARSE_ERROR",
                 "reasoning": "LLM response could not be parsed as valid JSON.",
@@ -1322,15 +1341,17 @@ class DebateChamber:
     ) -> dict[str, object]:
         status = str(payload.get("status") or "").strip().upper()
         raw_position = (
-            payload.get("sentiment")          # primary: current schema (BULLISH/NEUTRAL/BEARISH/INSUFFICIENT_DATA)
-            or payload.get("position")        # fallback: legacy schema field
-            or payload.get("swing_signal")    # last resort: descriptive text, normalise will likely -> HOLD
+            payload.get(
+                "sentiment"
+            )  # primary: current schema (BULLISH/NEUTRAL/BEARISH/INSUFFICIENT_DATA)
+            or payload.get("position")  # fallback: legacy schema field
+            or payload.get(
+                "swing_signal"
+            )  # last resort: descriptive text, normalise will likely -> HOLD
         )
         position = cls._normalise_position(str(raw_position or ""))
-        if position == "UNKNOWN" and status in {"INSUFFICIENT_DATA", "PARSE_ERROR"}:
-            position = "HOLD"
-        if position == "UNKNOWN":
-            position = "HOLD"
+        if status in {"INSUFFICIENT_DATA", "PARSE_ERROR"}:
+            position = "UNKNOWN"
 
         raw_confidence = payload.get("confidence", 0.0)
         if isinstance(raw_confidence, str):
@@ -1401,7 +1422,7 @@ class DebateChamber:
 
         lowered = text.lower()
         if "insufficient_data" in lowered or "insufficient data" in lowered:
-            return "HOLD"
+            return "UNKNOWN"
 
         scores = {
             "BUY": sum(
@@ -1477,7 +1498,10 @@ class DebateChamber:
             confidence = 0.0
             signal["confidence"] = confidence
         if signal.get("position") == "UNKNOWN":
-            if confidence == 0.0:
+            if confidence == 0.0 and role not in {
+                "sentiment_specialist",
+                "devils_advocate",
+            }:
                 signal["position"] = "HOLD"
             else:
                 logger.info(
@@ -1551,12 +1575,6 @@ class DebateChamber:
         self, state: DebateChamberState
     ) -> list[dict[str, object]]:
         specs = [
-            (
-                "fundamental_scout",
-                state.get("fundamental_data", ""),
-                "fundamental_scout",
-                0,
-            ),
             ("chartist", state.get("technical_data", ""), "chartist", 0),
             (
                 "sentiment_specialist",
@@ -1599,6 +1617,11 @@ class DebateChamber:
             )
         return votes
 
+    @classmethod
+    def _fundamental_quality_flag(cls, content: str) -> str | None:
+        match = cls._FUNDAMENTAL_QUALITY_RE.search(str(content or ""))
+        return match.group(1).upper() if match else None
+
     @staticmethod
     def _dissenters(
         votes: list[dict[str, object]], consensus_position: str
@@ -1606,13 +1629,17 @@ class DebateChamber:
         return [
             str(v["agent"])
             for v in votes
-            if v.get("position") not in {consensus_position, "UNKNOWN"}
+            if v.get("agent") in DIRECTIONAL_VOTER_AGENTS
+            and v.get("position") not in {consensus_position, "UNKNOWN"}
         ]
 
     @staticmethod
     def _infer_disagreement_type(votes: list[dict[str, object]]) -> str:
         positions = {
-            str(v.get("position")) for v in votes if v.get("position") != "UNKNOWN"
+            str(v.get("position"))
+            for v in votes
+            if v.get("agent") in DIRECTIONAL_VOTER_AGENTS
+            and v.get("position") != "UNKNOWN"
         }
         if "BUY" in positions and "AVOID" in positions:
             return "direction"
@@ -1625,22 +1652,35 @@ class DebateChamber:
         votes: list[dict[str, object]],
         round_count: int,
     ) -> dict[str, object]:
-        bull_vote = next((v for v in votes if v["agent"] == "bull"), None)
-        bear_vote = next((v for v in votes if v["agent"] == "bear"), None)
-
-        known_positions = [
-            str(v.get("position"))
-            for v in votes
-            if v.get("position") in {"BUY", "HOLD", "AVOID"}
+        directional_votes = [
+            vote
+            for vote in votes
+            if vote.get("agent") in DIRECTIONAL_VOTER_AGENTS
         ]
+        bull_vote = next(
+            (v for v in directional_votes if v.get("agent") == "bull"), None
+        )
+        bear_vote = next(
+            (v for v in directional_votes if v.get("agent") == "bear"), None
+        )
+
+        participating_votes = [
+            vote
+            for vote in directional_votes
+            if vote.get("position") in {"BUY", "HOLD", "AVOID"}
+        ]
+        known_positions = [str(vote["position"]) for vote in participating_votes]
         counts = Counter(known_positions)
         if counts:
             position, count = counts.most_common(1)[0]
-            threshold = (
-                ROUND1_CONSENSUS_THRESHOLD if round_count <= 1 else CONSENSUS_THRESHOLD
+            required_votes = max(
+                DIRECTIONAL_MIN_SUPPORT,
+                math.ceil(DIRECTIONAL_VOTE_THRESHOLD * len(participating_votes)),
             )
-            if count / CONSENSUS_AGENT_COUNT >= threshold:
-                majority_votes = [v for v in votes if v.get("position") == position]
+            if count >= required_votes:
+                majority_votes = [
+                    v for v in participating_votes if v.get("position") == position
+                ]
                 winner = max(
                     majority_votes, key=lambda v: float(v.get("confidence", 0.0) or 0.0)
                 )
@@ -1691,7 +1731,8 @@ class DebateChamber:
             _bull = next((v for v in votes if v.get("agent") == "bull"), None)
             _bear = next((v for v in votes if v.get("agent") == "bear"), None)
             if (
-                _bull and _bear
+                _bull
+                and _bear
                 and _bull.get("position") in {"BUY", "STRONG_BUY"}
                 and _bear.get("position") == "AVOID"
             ):
@@ -1710,11 +1751,18 @@ class DebateChamber:
                     "consensus_winner": _hold_vote,
                     "agent_votes": votes,
                 }
-            known_votes = [
-                v for v in votes if v.get("position") in {"BUY", "HOLD", "AVOID"}
-            ]
+            known_votes = participating_votes
+            if not known_votes:
+                return {
+                    "consensus_reached": False,
+                    "consensus_method": None,
+                    "disagreement_type": None,
+                    "dissenting_agents": [],
+                    "consensus_winner": None,
+                    "agent_votes": votes,
+                }
             winner = max(
-                known_votes or votes,
+                known_votes,
                 key=lambda v: float(
                     v.get("effective_confidence", v.get("confidence", 0.0)) or 0.0
                 ),
@@ -1888,9 +1936,7 @@ class DebateChamber:
             "trend_regime": regime_context.get("trend_regime"),
             "volatility_regime": regime_context.get("volatility_regime"),
             "execution_regime": regime_context.get("execution_regime"),
-            "execution_regime_reason": regime_context.get(
-                "execution_regime_reason"
-            ),
+            "execution_regime_reason": regime_context.get("execution_regime_reason"),
             "trading_params": regime_context.get("execution_params", {}),
             "should_trade": None,
             "metadata": {
@@ -2345,7 +2391,15 @@ Current Date (Asia/Jakarta): {current_date}
 
         sma20_val = float(close.rolling(20).mean().iloc[-1])
         ema20_val = float(close.ewm(span=20, adjust=False).mean().iloc[-1])
-        ma50_raw = close.rolling(50).mean().iloc[-1] if len(close) >= 50 else None
+        ma50_series = close.rolling(50).mean() if len(close) >= 50 else None
+        ma50_raw = ma50_series.iloc[-1] if ma50_series is not None else None
+        ma50_rising = (
+            bool(ma50_series.iloc[-1] > ma50_series.iloc[-6])
+            if ma50_series is not None
+            and len(close) >= 55
+            and not pd.isna(ma50_series.iloc[-6])
+            else None
+        )
         ma200_series = close.rolling(window=200, min_periods=50).mean()
         ma200_raw = ma200_series.iloc[-1] if len(close) >= 50 else None
         rsi_val = float(compute_rsi(close).iloc[-1])
@@ -2361,10 +2415,17 @@ Current Date (Asia/Jakarta): {current_date}
 
         last_volume = float(volume.iloc[-1]) if len(volume) else 0.0
         avg_volume_20d = float(volume.tail(20).mean()) if len(volume) else 0.0
-        volume_surge_ratio = (last_volume / avg_volume_20d) if avg_volume_20d > 0 else 0.0
+        volume_surge_ratio = (
+            (last_volume / avg_volume_20d) if avg_volume_20d > 0 else 0.0
+        )
         return_5d_pct = (
             (current_price / float(close.iloc[-6]) - 1.0) * 100.0
             if len(close) >= 6 and float(close.iloc[-6]) > 0
+            else 0.0
+        )
+        return_1d_pct = (
+            (current_price / float(close.iloc[-2]) - 1.0) * 100.0
+            if len(close) >= 2 and float(close.iloc[-2]) > 0
             else 0.0
         )
 
@@ -2391,8 +2452,13 @@ Current Date (Asia/Jakarta): {current_date}
             "current_price": round(current_price, 0),
             "sma20": round(sma20_val, 0),
             "ema20": round(ema20_val, 0),
-            "ma50": round(float(ma50_raw), 0) if ma50_raw is not None and not pd.isna(ma50_raw) else None,
-            "ma200": round(float(ma200_raw), 0) if ma200_raw is not None and not pd.isna(ma200_raw) else None,
+            "ma50": round(float(ma50_raw), 0)
+            if ma50_raw is not None and not pd.isna(ma50_raw)
+            else None,
+            "ma50_rising": ma50_rising,
+            "ma200": round(float(ma200_raw), 0)
+            if ma200_raw is not None and not pd.isna(ma200_raw)
+            else None,
             "ma200_context": ma200_context,
             "rsi14": round(rsi_val, 1),
             "atr14": round(atr_val, 0) if not pd.isna(atr_val) else None,
@@ -2405,6 +2471,7 @@ Current Date (Asia/Jakarta): {current_date}
             "low_50d": round(low_50d, 0),
             "volume_surge_ratio": round(volume_surge_ratio, 2),
             "return_5d_pct": round(return_5d_pct, 1),
+            "return_1d_pct": round(return_1d_pct, 1),
         }
 
     @staticmethod
@@ -2489,8 +2556,14 @@ Current Date (Asia/Jakarta): {current_date}
                 # Pre-compute all technicals in Python (ground truth)
                 sma20_val = float(close.rolling(20).mean().iloc[-1])
                 ema20_val = float(close.ewm(span=20, adjust=False).mean().iloc[-1])
-                ma50_raw = (
-                    close.rolling(50).mean().iloc[-1] if len(close) >= 50 else None
+                ma50_series = close.rolling(50).mean() if len(close) >= 50 else None
+                ma50_raw = ma50_series.iloc[-1] if ma50_series is not None else None
+                ma50_rising = (
+                    bool(ma50_series.iloc[-1] > ma50_series.iloc[-6])
+                    if ma50_series is not None
+                    and len(close) >= 55
+                    and not pd.isna(ma50_series.iloc[-6])
+                    else None
                 )
                 ma200_series = close.rolling(window=200, min_periods=50).mean()
                 ma200_raw = ma200_series.iloc[-1] if len(close) >= 50 else None
@@ -2524,6 +2597,11 @@ Current Date (Asia/Jakarta): {current_date}
                     if len(close) >= 6 and float(close.iloc[-6]) > 0
                     else 0.0
                 )
+                return_1d_pct = (
+                    (current_price / float(close.iloc[-2]) - 1.0) * 100.0
+                    if len(close) >= 2 and float(close.iloc[-2]) > 0
+                    else 0.0
+                )
 
                 if ma200_raw is None or pd.isna(ma200_raw):
                     ma200_context = "INSUFFICIENT_DATA"
@@ -2553,6 +2631,7 @@ Current Date (Asia/Jakarta): {current_date}
                     "ma50": round(float(ma50_raw), 0)
                     if ma50_raw is not None and not pd.isna(ma50_raw)
                     else None,
+                    "ma50_rising": ma50_rising,
                     "ma200": round(float(ma200_raw), 0)
                     if ma200_raw is not None and not pd.isna(ma200_raw)
                     else None,
@@ -2568,6 +2647,7 @@ Current Date (Asia/Jakarta): {current_date}
                     "low_50d": round(low_50d, 0),
                     "volume_surge_ratio": round(volume_surge_ratio, 2),
                     "return_5d_pct": round(return_5d_pct, 1),
+                    "return_1d_pct": round(return_1d_pct, 1),
                 }
 
                 # ── Task 9: Weekly Trend (separate yfinance weekly call) ───────
@@ -2577,22 +2657,26 @@ Current Date (Asia/Jakarta): {current_date}
                     tech_indicators.update(weekly_trend)
                 except Exception as _exc:
                     logger.debug(f"[Chartist] Weekly fetch failed: {_exc}")
-                    tech_indicators.update({
-                        "weekly_trend": "INSUFFICIENT_DATA",
-                        "weekly_ma13": None,
-                        "weekly_ma26": None,
-                        "weekly_above_ma13": None,
-                    })
+                    tech_indicators.update(
+                        {
+                            "weekly_trend": "INSUFFICIENT_DATA",
+                            "weekly_ma13": None,
+                            "weekly_ma26": None,
+                            "weekly_above_ma13": None,
+                        }
+                    )
 
                 # ── Task 10: MACD ─────────────────────────────────────────────
                 try:
                     macd = compute_macd(close)
-                    tech_indicators.update({
-                        "macd_histogram": macd["histogram"],
-                        "macd_histogram_state": macd["histogram_state"],
-                        "macd_line": macd["macd_line"],
-                        "macd_signal_line": macd["signal_line"],
-                    })
+                    tech_indicators.update(
+                        {
+                            "macd_histogram": macd["histogram"],
+                            "macd_histogram_state": macd["histogram_state"],
+                            "macd_line": macd["macd_line"],
+                            "macd_signal_line": macd["signal_line"],
+                        }
+                    )
                 except Exception as _exc:
                     logger.debug(f"[Chartist] MACD failed: {_exc}")
 
@@ -2602,15 +2686,17 @@ Current Date (Asia/Jakarta): {current_date}
                     bb = compute_bollinger(close)
                     _rsi_series = compute_rsi(close)
                     rsi_div = detect_rsi_divergence(close, _rsi_series)
-                    tech_indicators.update({
-                        "last_candle_pattern": candle["last_candle_pattern"],
-                        "pattern_type": candle["pattern_type"],
-                        "bb_position": bb["bb_position"],
-                        "bb_squeeze": bb["bb_squeeze"],
-                        "bb_width": bb["bb_width"],
-                        "rsi_divergence": rsi_div["rsi_divergence"],
-                        "divergence_strength": rsi_div["divergence_strength"],
-                    })
+                    tech_indicators.update(
+                        {
+                            "last_candle_pattern": candle["last_candle_pattern"],
+                            "pattern_type": candle["pattern_type"],
+                            "bb_position": bb["bb_position"],
+                            "bb_squeeze": bb["bb_squeeze"],
+                            "bb_width": bb["bb_width"],
+                            "rsi_divergence": rsi_div["rsi_divergence"],
+                            "divergence_strength": rsi_div["divergence_strength"],
+                        }
+                    )
                 except Exception as _exc:
                     logger.debug(f"[Chartist] Pattern/BB/Div failed: {_exc}")
 
@@ -2618,25 +2704,31 @@ Current Date (Asia/Jakarta): {current_date}
                 try:
                     gap = detect_gap(df_yf)
                     compression = detect_volatility_compression(df_yf)
-                    tech_indicators.update({
-                        "gap_type": gap["gap_type"],
-                        "gap_pct": gap["gap_pct"],
-                        "compression_type": compression["compression_type"],
-                        "range_pct": compression["range_pct"],
-                        "is_inside_bar": compression["is_inside_bar"],
-                        "is_nr7": compression["is_nr7"],
-                    })
+                    tech_indicators.update(
+                        {
+                            "gap_type": gap["gap_type"],
+                            "gap_pct": gap["gap_pct"],
+                            "compression_type": compression["compression_type"],
+                            "range_pct": compression["range_pct"],
+                            "is_inside_bar": compression["is_inside_bar"],
+                            "is_nr7": compression["is_nr7"],
+                        }
+                    )
                 except Exception as _exc:
                     logger.debug(f"[Chartist] Gap/Compression failed: {_exc}")
 
                 # ── Task 19: Rolling VWAP ─────────────────────────────────────
                 try:
-                    vwap = compute_vwap(df_yf["High"], df_yf["Low"], close, df_yf["Volume"])
-                    tech_indicators.update({
-                        "vwap": vwap["vwap"],
-                        "vwap_position": vwap["vwap_position"],
-                        "price_to_vwap_pct": vwap["price_to_vwap_pct"],
-                    })
+                    vwap = compute_vwap(
+                        df_yf["High"], df_yf["Low"], close, df_yf["Volume"]
+                    )
+                    tech_indicators.update(
+                        {
+                            "vwap": vwap["vwap"],
+                            "vwap_position": vwap["vwap_position"],
+                            "price_to_vwap_pct": vwap["price_to_vwap_pct"],
+                        }
+                    )
                 except Exception as _exc:
                     logger.debug(f"[Chartist] VWAP failed: {_exc}")
 
@@ -2645,12 +2737,14 @@ Current Date (Asia/Jakarta): {current_date}
                     avwap = compute_anchored_vwap(
                         df_yf["High"], df_yf["Low"], close, df_yf["Volume"]
                     )
-                    tech_indicators.update({
-                        "avwap": avwap["avwap"],
-                        "avwap_position": avwap["avwap_position"],
-                        "price_to_avwap_pct": avwap["price_to_avwap_pct"],
-                        "avwap_anchor_bars_ago": avwap["anchor_bars_ago"],
-                    })
+                    tech_indicators.update(
+                        {
+                            "avwap": avwap["avwap"],
+                            "avwap_position": avwap["avwap_position"],
+                            "price_to_avwap_pct": avwap["price_to_avwap_pct"],
+                            "avwap_anchor_bars_ago": avwap["anchor_bars_ago"],
+                        }
+                    )
                 except Exception as _exc:
                     logger.debug(f"[Chartist] Anchored VWAP failed: {_exc}")
 
@@ -2658,43 +2752,51 @@ Current Date (Asia/Jakarta): {current_date}
                 try:
                     fib = compute_fibonacci_levels(df_yf["High"], df_yf["Low"], close)
                     fib_lvls = fib["fib_levels"] or {}
-                    tech_indicators.update({
-                        "fib_swing_low": fib["fib_swing_low"],
-                        "fib_swing_high": fib["fib_swing_high"],
-                        "fib_23_6": fib_lvls.get("23.6"),
-                        "fib_38_2": fib_lvls.get("38.2"),
-                        "fib_50_0": fib_lvls.get("50.0"),
-                        "fib_61_8": fib_lvls.get("61.8"),
-                        "fib_78_6": fib_lvls.get("78.6"),
-                        "nearest_fib_label": fib["nearest_fib_label"],
-                        "price_to_nearest_fib_pct": fib["price_to_nearest_fib_pct"],
-                        "fib_context": fib["fib_context"],
-                        "fib_trend": fib["fib_trend"],
-                    })
+                    tech_indicators.update(
+                        {
+                            "fib_swing_low": fib["fib_swing_low"],
+                            "fib_swing_high": fib["fib_swing_high"],
+                            "fib_23_6": fib_lvls.get("23.6"),
+                            "fib_38_2": fib_lvls.get("38.2"),
+                            "fib_50_0": fib_lvls.get("50.0"),
+                            "fib_61_8": fib_lvls.get("61.8"),
+                            "fib_78_6": fib_lvls.get("78.6"),
+                            "nearest_fib_label": fib["nearest_fib_label"],
+                            "price_to_nearest_fib_pct": fib["price_to_nearest_fib_pct"],
+                            "fib_context": fib["fib_context"],
+                            "fib_trend": fib["fib_trend"],
+                        }
+                    )
                 except Exception as _exc:
                     logger.debug(f"[Chartist] Fibonacci failed: {_exc}")
 
                 # ── Task 25: Bull / Bear Flag ─────────────────────────────────
                 try:
                     flag = detect_flag_pattern(close, df_yf["Volume"])
-                    tech_indicators.update({
-                        "flag_pattern": flag["flag_pattern"],
-                        "flag_confidence": flag["flag_confidence"],
-                        "pole_pct": flag["pole_pct"],
-                    })
+                    tech_indicators.update(
+                        {
+                            "flag_pattern": flag["flag_pattern"],
+                            "flag_confidence": flag["flag_confidence"],
+                            "pole_pct": flag["pole_pct"],
+                        }
+                    )
                 except Exception as _exc:
                     logger.debug(f"[Chartist] Flag pattern failed: {_exc}")
 
                 # ── Task 20: Volume Profile (POC / HVN / LVN) ────────────────
                 try:
-                    vp = compute_volume_profile(df_yf["High"], df_yf["Low"], close, df_yf["Volume"])
-                    tech_indicators.update({
-                        "poc": vp["poc"],
-                        "poc_distance_pct": vp["poc_distance_pct"],
-                        "price_vs_poc": vp["price_vs_poc"],
-                        "hvn_levels": vp["hvn_levels"],
-                        "lvn_levels": vp["lvn_levels"],
-                    })
+                    vp = compute_volume_profile(
+                        df_yf["High"], df_yf["Low"], close, df_yf["Volume"]
+                    )
+                    tech_indicators.update(
+                        {
+                            "poc": vp["poc"],
+                            "poc_distance_pct": vp["poc_distance_pct"],
+                            "price_vs_poc": vp["price_vs_poc"],
+                            "hvn_levels": vp["hvn_levels"],
+                            "lvn_levels": vp["lvn_levels"],
+                        }
+                    )
                 except Exception as _exc:
                     logger.debug(f"[Chartist] Volume profile failed: {_exc}")
 
@@ -2702,7 +2804,9 @@ Current Date (Asia/Jakarta): {current_date}
                     f"[Chartist] Technicals computed: MA50={tech_indicators.get('ma50')}, RSI={tech_indicators.get('rsi14')}"
                 )
             else:
-                logger.warning(f"[Chartist] OHLCV invalid — {_ohlcv_reason}; skipping technicals")
+                logger.warning(
+                    f"[Chartist] OHLCV invalid — {_ohlcv_reason}; skipping technicals"
+                )
                 technical_partial = True
         except Exception as e:
             logger.warning(f"[Chartist] yfinance download failed for {ticker}: {e}")
@@ -2737,11 +2841,13 @@ Current Date (Asia/Jakarta): {current_date}
         # ── Task 26: IDX time-of-day entry window (clock — runs outside OHLCV block) ──
         try:
             tod = get_time_of_day_signal()
-            tech_indicators.update({
-                "idx_session": tod["idx_session"],
-                "entry_window": tod["entry_window"],
-                "entry_rationale": tod["entry_rationale"],
-            })
+            tech_indicators.update(
+                {
+                    "idx_session": tod["idx_session"],
+                    "entry_window": tod["entry_window"],
+                    "entry_rationale": tod["entry_rationale"],
+                }
+            )
         except Exception as _exc:
             logger.debug(f"[Chartist] Time-of-day signal failed: {_exc}")
 
@@ -3063,18 +3169,12 @@ Current Date (Asia/Jakarta): {current_date}
         fair_value_estimate = state.get("fair_value_estimate")
         try:
             fair_value_estimate = (
-                float(fair_value_estimate)
-                if fair_value_estimate is not None
-                else None
+                float(fair_value_estimate) if fair_value_estimate is not None else None
             )
         except (TypeError, ValueError):
             fair_value_estimate = None
-        if (
-            fair_value_estimate is not None
-            and (
-                not math.isfinite(fair_value_estimate)
-                or fair_value_estimate <= 0
-            )
+        if fair_value_estimate is not None and (
+            not math.isfinite(fair_value_estimate) or fair_value_estimate <= 0
         ):
             fair_value_estimate = None
         fair_value_base = state.get("fair_value_base")
@@ -3139,8 +3239,11 @@ Current Date (Asia/Jakarta): {current_date}
             source_timestamps["market_data"] = market_data_as_of
 
         from providers.idx_foreign_flow import fetch_foreign_flow, _empty as _ff_empty
+
         try:
-            _ff = await asyncio.to_thread(fetch_foreign_flow, ticker, self.stockbit_client)
+            _ff = await asyncio.to_thread(
+                fetch_foreign_flow, ticker, self.stockbit_client
+            )
         except Exception as _exc:
             logger.warning("[Synthesizer] foreign_flow failed for %s: %s", ticker, _exc)
             _ff = _ff_empty(ticker)
@@ -3149,9 +3252,13 @@ Current Date (Asia/Jakarta): {current_date}
             source_timestamps["stockbit_foreign_flow"] = context_generated_at
 
         try:
-            _bs = await asyncio.to_thread(fetch_broker_summary, ticker, self.stockbit_client)
+            _bs = await asyncio.to_thread(
+                fetch_broker_summary, ticker, self.stockbit_client
+            )
         except Exception as _exc:
-            logger.warning("[Synthesizer] broker_summary failed for %s: %s", ticker, _exc)
+            logger.warning(
+                "[Synthesizer] broker_summary failed for %s: %s", ticker, _exc
+            )
             _bs = _bs_empty(ticker)
         if _bs.top_buyer_codes or _bs.top_seller_codes:
             sources.append("stockbit_broker_summary")
@@ -3492,7 +3599,7 @@ Current Date (Asia/Jakarta): {current_date}
         skip Round 2 and proceed directly to Devil's Advocate → CIO.
         Uses Pro — this reasoning step should not be downgraded to Flash.
         """
-        logger.info("[Consensus] Evaluating 5-agent votes")
+        logger.info("[Consensus] Evaluating four directional agent votes")
         votes = self._collect_agent_votes(state)
         result = self._evaluate_consensus_votes(votes, state["round_count"])
 
@@ -3500,12 +3607,14 @@ Current Date (Asia/Jakarta): {current_date}
         # If a voting consensus was reached but winner's effective confidence falls below the
         # regime floor, cancel the consensus so the debate continues.
         _regime_threshold = float(
-            (state.get("trading_params") or {}).get("consensus_threshold", CONSENSUS_THRESHOLD)
+            (state.get("trading_params") or {}).get(
+                "consensus_threshold", CONSENSUS_THRESHOLD
+            )
         )
         if (
-            (result.get("consensus_reached") or result.get("consensus_method") == "confidence_winner")
-            and _regime_threshold > CONSENSUS_THRESHOLD
-        ):
+            result.get("consensus_reached")
+            or result.get("consensus_method") == "confidence_winner"
+        ) and _regime_threshold > CONSENSUS_THRESHOLD:
             winner = result.get("consensus_winner") or {}
             eff_conf = float(
                 winner.get("effective_confidence") or winner.get("confidence") or 0.0
@@ -3523,6 +3632,41 @@ Current Date (Asia/Jakarta): {current_date}
                     eff_conf * 100,
                 )
 
+        quality_flag = self._fundamental_quality_flag(
+            str(state.get("fundamental_data") or "")
+        )
+        metadata = dict(result.get("metadata") or state.get("metadata") or {})
+        if quality_flag:
+            metadata["fundamental_quality_flag"] = quality_flag
+        winner = result.get("consensus_winner") or {}
+        if quality_flag == "FAIL" and self._normalise_position(
+            str(winner.get("position") or "")
+        ) == "BUY":
+            supporters = [
+                str(vote.get("agent"))
+                for vote in result.get("agent_votes", [])
+                if vote.get("agent") in DIRECTIONAL_VOTER_AGENTS
+                and vote.get("position") == "BUY"
+            ]
+            result = {
+                **result,
+                "consensus_reached": True,
+                "consensus_method": "quality_veto",
+                "disagreement_type": "valuation",
+                "dissenting_agents": supporters,
+                "consensus_winner": {
+                    "agent": "fundamental_quality_veto",
+                    "position": "HOLD",
+                    "confidence": 1.0,
+                    "effective_confidence": 1.0,
+                },
+            }
+            logger.info(
+                "[Consensus] Fundamental Quality Flag FAIL vetoed directional BUY"
+            )
+        if quality_flag:
+            result["metadata"] = metadata
+
         if result.get("consensus_method") == "confidence_winner":
             winner = result.get("consensus_winner") or {}
             raw_confidence = float(winner.get("confidence", 0.0) or 0.0)
@@ -3535,7 +3679,7 @@ Current Date (Asia/Jakarta): {current_date}
                 f"raw={raw_confidence:.2f} "
                 f"effective={effective_confidence:.2f}"
             )
-            metadata = dict(state.get("metadata") or {})
+            metadata = dict(result.get("metadata") or state.get("metadata") or {})
             metadata["confidence_winner_audit"] = {
                 "agent": winner.get("agent"),
                 "raw_confidence": raw_confidence,
@@ -3645,30 +3789,23 @@ Current Date (Asia/Jakarta): {current_date}
         ]
         resp = await self._invoke_llm_for_state(state, self.flash_llm, messages)
         content, signal = self._ensure_signal_footer(resp.content, "devils_advocate")
-        if str(signal.get("position", "")).upper() not in ("AVOID", "HOLD"):
-            content += "\n\nPOSITION: AVOID CONFIDENCE: 0.40"
-            signal = {"position": "AVOID", "confidence": 0.40}
+        advisory_signal = {
+            "position": "UNKNOWN",
+            "confidence": float(signal.get("confidence") or 0.0),
+        }
         msg = DebateMessage(
             role="devils_advocate",
             content=content,
             round_num=state["round_count"] + 1,
-            position=str(signal.get("position", "UNKNOWN")),
-            confidence=signal.get("confidence"),
+            position="UNKNOWN",
+            confidence=advisory_signal["confidence"],
         )
-        self._record_observation(state, "devils_advocate", content, signal)
-        existing_votes = list(state.get("agent_votes") or [])
-        existing_votes.append({
-            "agent": "devils_advocate",
-            "position": str(signal.get("position", "UNKNOWN")),
-            "confidence": float(signal.get("confidence") or 0.0),
-            "calibration_weight": 1.0,
-            "effective_confidence": float(signal.get("confidence") or 0.0),
-            "round": state["round_count"] + 1,
-        })
+        self._record_observation(
+            state, "devils_advocate", content, advisory_signal
+        )
         return {
             "debate_history": [msg],
             "devils_advocate_question": content,
-            "agent_votes": existing_votes,
         }
 
     # ── Signal Classifier (pure Python — deterministic) ─────────────────────
@@ -3920,27 +4057,58 @@ Current Date (Asia/Jakarta): {current_date}
         ma50 = tech.get("ma50")
         sector = tech.get("sector")
         atr14 = tech.get("atr14", 0)
-        rsi14 = tech.get("rsi14")
         return_5d = tech.get("return_5d_pct")
+        ema20 = tech.get("ema20")
+        return_1d = tech.get("return_1d_pct")
+        volume_ratio = tech.get("volume_surge_ratio")
 
         # Gate failures do not return early: level computation continues so a
         # rejected setup still carries a full hypothetical envelope for the
         # counterfactual watchlist ledger. The first gate hit owns reason_code.
         rejections: list[tuple[str, str]] = []
 
-        # Momentum confirmation (F12): in momentum mode (RSI > 40) the pullback must
-        # have stabilised — require flat-to-positive 5-day return before entry.
-        # Skipped when RSI <= 40 (mean-reversion setups) where the oversold level
-        # itself is the entry signal and a negative recent return is expected.
-        if rsi14 is not None and return_5d is not None:
-            if rsi14 > 40.0 and return_5d < 0.0:
-                rejections.append((
-                    "no_momentum_confirmation",
+        # Phase 4 shadow-only momentum measurement. Negative momentum is a hard
+        # failure only after a >=3% five-day breakdown below EMA20. Every other
+        # negative-return setup is measured as waiting or confirmed, independent
+        # of RSI. ``services.trade_setup`` deliberately prevents either state
+        # from becoming live-executable without a separate code approval.
+        wait_for_confirmation = False
+        momentum_recalibration_state: str | None = None
+        confirmation_trigger = (
+            "Wait until close >= EMA20, return_1d > 0, and volume_ratio >= 1.0; "
+            "then recompute all execution gates."
+        )
+        if return_5d is not None and return_5d < 0.0:
+            hard_breakdown = (
+                return_5d <= -3.0
+                and ema20 is not None
+                and current_price < ema20
+            )
+            if hard_breakdown:
+                momentum_recalibration_state = "HARD_REJECT"
+                rejections.append(
                     (
-                        f"no_momentum_confirmation: return_5d {return_5d:.1f}%"
-                        f" < 0 at RSI {rsi14:.1f}"
-                    ),
-                ))
+                        "momentum_breakdown",
+                        (
+                            f"momentum_breakdown: return_5d {return_5d:.1f}%"
+                            f" <= -3.0% and close {current_price:.0f}"
+                            f" < EMA20 {ema20:.0f}"
+                        ),
+                    )
+                )
+            else:
+                confirmed = (
+                    ema20 is not None
+                    and current_price >= ema20
+                    and return_1d is not None
+                    and return_1d > 0.0
+                    and volume_ratio is not None
+                    and volume_ratio >= 1.0
+                )
+                momentum_recalibration_state = (
+                    "CONFIRMED" if confirmed else "WAIT_FOR_CONFIRMATION"
+                )
+                wait_for_confirmation = not confirmed
 
         # Entry zone: near MA50 support (pullback entry for swing)
         if ma50 and ma50 > 0 and current_price > 0:
@@ -3994,8 +4162,10 @@ Current Date (Asia/Jakarta): {current_date}
                 tech.get("low_20d", current_price * 0.95),
                 tech.get("low_50d", current_price * 0.95),
             )
-            structural_stop = swing_low - (0.5 * atr14)       # buffer below nearest swing low
-            atr_stop = current_price - (k_atr * atr14)        # regime-scaled ATR floor
+            structural_stop = swing_low - (
+                0.5 * atr14
+            )  # buffer below nearest swing low
+            atr_stop = current_price - (k_atr * atr14)  # regime-scaled ATR floor
             stop = max(structural_stop, atr_stop)
 
             # Hard floor: stop tidak boleh lebih dari MAX_STOP_LOSS_PCT dari current price
@@ -4018,16 +4188,20 @@ Current Date (Asia/Jakarta): {current_date}
         if atr14 > 0:
             _stop_distance = entry_high - stop
             _hard_floor_atr = settings.TRADE_ENVELOPE_HARD_NOISE_ATR_MULTIPLIER * atr14
-            _clean_floor_atr = settings.TRADE_ENVELOPE_CLEAN_NOISE_ATR_MULTIPLIER * atr14
+            _clean_floor_atr = (
+                settings.TRADE_ENVELOPE_CLEAN_NOISE_ATR_MULTIPLIER * atr14
+            )
             if _stop_distance < _hard_floor_atr:
-                rejections.append((
-                    "stop_inside_noise",
+                rejections.append(
                     (
-                        f"stop_inside_noise: gap {_stop_distance:.0f}"
-                        f" < {settings.TRADE_ENVELOPE_HARD_NOISE_ATR_MULTIPLIER:.1f}xATR"
-                        f" {_hard_floor_atr:.0f}"
-                    ),
-                ))
+                        "stop_inside_noise",
+                        (
+                            f"stop_inside_noise: gap {_stop_distance:.0f}"
+                            f" < {settings.TRADE_ENVELOPE_HARD_NOISE_ATR_MULTIPLIER:.1f}xATR"
+                            f" {_hard_floor_atr:.0f}"
+                        ),
+                    )
+                )
             _stop_near_noise = _stop_distance < _clean_floor_atr
 
         # Floor: minimal 4% from entry for worthwhile swing
@@ -4050,12 +4224,14 @@ Current Date (Asia/Jakarta): {current_date}
             resistance_candidates.append((high_52w, "Resistance 52-Week"))
 
         if resistance_candidates:
-            nearest_resistance, target_basis = min(resistance_candidates, key=lambda x: x[0])
-            target_candidate = max(snap_to_tick(nearest_resistance), snap_to_tick(min_target))
-        else:
-            rr_target = entry_high + (
-                risk_from_entry_high * rr_requirement.required_rr
+            nearest_resistance, target_basis = min(
+                resistance_candidates, key=lambda x: x[0]
             )
+            target_candidate = max(
+                snap_to_tick(nearest_resistance), snap_to_tick(min_target)
+            )
+        else:
+            rr_target = entry_high + (risk_from_entry_high * rr_requirement.required_rr)
             target_candidate = max(rr_target, min_target)
             target_basis = "Minimum R/R"
 
@@ -4084,13 +4260,15 @@ Current Date (Asia/Jakarta): {current_date}
                 target = next_target
 
         if target <= entry_high:
-            rejections.append((
-                "target_collapsed",
+            rejections.append(
                 (
-                    f"target_collapsed: target {target} ≤ entry_high {entry_high}"
-                    f" after ceiling(s): {target_basis}"
-                ),
-            ))
+                    "target_collapsed",
+                    (
+                        f"target_collapsed: target {target} ≤ entry_high {entry_high}"
+                        f" after ceiling(s): {target_basis}"
+                    ),
+                )
+            )
 
         # Compute display percentages from entry_mid, but canonical R/R from entry_high.
         gain_pct = ((target - entry_mid) / entry_mid) * 100 if entry_mid > 0 else 0
@@ -4105,17 +4283,34 @@ Current Date (Asia/Jakarta): {current_date}
         # silently. Non-large-cap stocks face a higher threshold (1.5x) in the
         # governor; this catches the worst cases early.
         if rr_ratio < rr_requirement.required_rr:
-            rejections.append((
-                "rr_too_low",
+            rejections.append(
                 (
-                    f"rr_too_low: R/R {rr_ratio:.2f} < "
-                    f"{rr_requirement.required_rr:.3f}"
-                    f" (target {target}, entry_high {entry_high}, stop {stop})"
-                ),
-            ))
+                    "rr_too_low",
+                    (
+                        f"rr_too_low: R/R {rr_ratio:.2f} < "
+                        f"{rr_requirement.required_rr:.3f}"
+                        f" (target {target}, entry_high {entry_high}, stop {stop})"
+                    ),
+                )
+            )
 
         if rejections:
             reason_code, reason = rejections[0]
+            hypothetical_envelope = {
+                "entry_low": entry_low,
+                "entry_high": entry_high,
+                "target_price": target,
+                "target_basis": target_basis,
+                "stop_loss": stop,
+                "risk_reward_ratio": rr_ratio,
+                **rr_contract,
+            }
+            if momentum_recalibration_state is not None:
+                hypothetical_envelope["momentum_recalibration_state"] = (
+                    momentum_recalibration_state
+                )
+            if wait_for_confirmation:
+                hypothetical_envelope["confirmation_trigger"] = confirmation_trigger
             return {
                 "rejected": True,
                 "reason_code": reason_code,
@@ -4123,18 +4318,10 @@ Current Date (Asia/Jakarta): {current_date}
                 # As-computed levels, NOT tradeable: a collapsed target or
                 # sub-floor R/R is recorded exactly as the gates saw it so the
                 # watchlist ledger can later score rejected setups.
-                "hypothetical_envelope": {
-                    "entry_low": entry_low,
-                    "entry_high": entry_high,
-                    "target_price": target,
-                    "target_basis": target_basis,
-                    "stop_loss": stop,
-                    "risk_reward_ratio": rr_ratio,
-                    **rr_contract,
-                },
+                "hypothetical_envelope": hypothetical_envelope,
             }
 
-        return {
+        accepted = {
             "entry_low": entry_low,
             "entry_high": entry_high,
             "entry_mid": round(entry_mid, 0),
@@ -4149,6 +4336,14 @@ Current Date (Asia/Jakarta): {current_date}
             "atr14": atr14,
             "stop_near_noise": _stop_near_noise,
         }
+        if momentum_recalibration_state is not None:
+            accepted["momentum_recalibration_state"] = momentum_recalibration_state
+        if wait_for_confirmation:
+            accepted.update(
+                wait_for_confirmation=True,
+                confirmation_trigger=confirmation_trigger,
+            )
+        return accepted
 
     def _format_trade_envelope(self, envelope: dict) -> str:
         """Format trade envelope as a human-readable string for the CIO prompt."""
@@ -4290,11 +4485,12 @@ Current Date (Asia/Jakarta): {current_date}
             f"dissenting_agents: {json.dumps(dissenters, ensure_ascii=False)}\n"
             f"agent_votes: {json.dumps(votes, ensure_ascii=False)}\n"
             "Rules:\n"
+            "- If consensus_method=quality_veto, final rating must be HOLD.\n"
             "- If consensus_method=soft_hold, final rating must be HOLD.\n"
             "- If consensus_method=confidence_winner, align final rating with the winner position.\n"
             "- If consensus_method=deadlock_hold, Bull and Bear held opposing positions for all debate rounds. "
             "Start from HOLD but evaluate freely — you are the sole tiebreaker. Do not rate STRONG_BUY.\n"
-            "- CIO may validate price levels and risks, but must not override soft_hold or confidence_winner outcomes."
+            "- CIO may validate price levels and risks, but must not override quality_veto, soft_hold, or confidence_winner outcomes."
         )
 
     @staticmethod
@@ -4321,6 +4517,18 @@ Current Date (Asia/Jakarta): {current_date}
         p["consensus_reached"] = bool(state.get("consensus_reached", False))
         p["consensus_method"] = method
         p["dissenting_agents"] = dissenters
+
+        if method == "quality_veto":
+            p["rating"] = "HOLD"
+            p["confidence"] = min(float(p.get("confidence") or 0.52), 0.55)
+            p["weighted_reasoning"] = self._append_reason(
+                p.get("weighted_reasoning"),
+                (
+                    "Consensus override: Fundamental Quality Flag FAIL vetoed "
+                    "the directional BUY setup; the scout remains non-voting."
+                ),
+            )
+            return p
 
         if method == "soft_hold":
             p["rating"] = "HOLD"
@@ -4655,9 +4863,7 @@ Current Date (Asia/Jakarta): {current_date}
                 fair_value_high=fair_value_high,
                 risk_overvalued=risk_overvalued,
                 valuation_gap=(
-                    "unverified"
-                    if state_metadata.get("fair_value_rejected")
-                    else None
+                    "unverified" if state_metadata.get("fair_value_rejected") else None
                 ),
                 entry_price_range=None,
                 target_price=None,
@@ -4676,7 +4882,10 @@ Current Date (Asia/Jakarta): {current_date}
                 state,
                 stage="CIO_VERDICT",
                 started_at=started_at,
-                detail={"rating": noise_verdict.rating, "confidence": noise_verdict.confidence},
+                detail={
+                    "rating": noise_verdict.rating,
+                    "confidence": noise_verdict.confidence,
+                },
             )
             return {"final_verdict": noise_verdict.model_dump_json()}
 
@@ -4830,7 +5039,7 @@ no trailing text. The JSON must have exactly these keys:
   "expected_return": "<string e.g. '+6.2%'>",
   "risk_reward_ratio": <float>,
   "consensus_reached": <true | false>,
-  "consensus_method": "<voting | confidence_winner | soft_hold | deadlock_hold>",
+  "consensus_method": "<voting | confidence_winner | soft_hold | deadlock_hold | quality_veto>",
   "dissenting_agents": ["<agent>", ...]
 }
 
@@ -5113,7 +5322,9 @@ Start your response with '{' and end with '}'. Nothing else."""
                 parsed["confidence"] = round(
                     float(parsed.get("confidence") or 0.0) * _cio_regime_mult, 3
                 )
-            parsed = _apply_noise_cap(parsed)  # must be last — enforces hard ceiling on confidence/rating
+            parsed = _apply_noise_cap(
+                parsed
+            )  # must be last — enforces hard ceiling on confidence/rating
             verdict_json = CIOVerdict(**parsed).model_dump_json()
             logger.info(f"[CIO] JSON parsed successfully for {ticker}")
         except (
@@ -5180,15 +5391,11 @@ Start your response with '{' and end with '}'. Nothing else."""
 
     # ── Regime gate helper nodes ─────────────────────────────────────────────
 
-    async def _scout_dispatcher_node(
-        self, state: DebateChamberState
-    ) -> dict:
+    async def _scout_dispatcher_node(self, state: DebateChamberState) -> dict:
         """Zero-op pass-through enabling parallel fan-out after regime_gate."""
         return {}
 
-    async def _trading_halted_node(
-        self, state: DebateChamberState
-    ) -> dict:
+    async def _trading_halted_node(self, state: DebateChamberState) -> dict:
         """Terminal node when regime gate blocks trading. Emits a HOLD verdict."""
         label = _regime_label_from_state(state) or "UNKNOWN"
         trend = state.get("trend_regime") or {}
@@ -5295,10 +5502,9 @@ Start your response with '{' and end with '}'. Nothing else."""
             )
             metadata = dict(state.get("metadata") or {})
             metadata["trade_setup_snapshot"] = snapshot
+            metadata["signal_packet"] = dict(snapshot.get("signal_packet") or {})
             metadata["execution_status"] = snapshot.get("status")
-            metadata["tradeability_preflight"] = dict(
-                snapshot.get("preflight") or {}
-            )
+            metadata["tradeability_preflight"] = dict(snapshot.get("preflight") or {})
             state["metadata"] = metadata
         self._reset_llm_counters(state)
 
@@ -5541,6 +5747,7 @@ Start your response with '{' and end with '}'. Nothing else."""
         ticker: str,
         current_price: float = 0.0,
         sector: str = "",
+        candidate_context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Fetch once and build the deterministic pre-debate setup contract.
 
@@ -5568,6 +5775,13 @@ Start your response with '{' and end with '}'. Nothing else."""
         )
         history = (market_data or {}).get("history")
         technical_indicators = self._compute_technical_indicators(history)
+        # Phase 1 instrumentation: capture the advisory signal before preflight
+        # or the trade-envelope builder can terminate this ticker. This packet
+        # carries no execution authority and cannot bypass the Risk Governor.
+        raw_signal_packet = build_raw_signal_packet(
+            technical_indicators=technical_indicators,
+            candidate_context=candidate_context,
+        )
         preflight = self._run_tradeability_preflight(
             technical_indicators,
             effective_price,
@@ -5594,13 +5808,12 @@ Start your response with '{' and end with '}'. Nothing else."""
             ticker=ticker,
             market_data=market_data,
             current_price=effective_price,
-            execution_regime=str(
-                regime_context.get("execution_regime") or "UNKNOWN"
-            ),
+            execution_regime=str(regime_context.get("execution_regime") or "UNKNOWN"),
             sector=sector,
             technical_indicators=technical_indicators,
             preflight=preflight,
             envelope_calculator=canonical_envelope,
+            signal_packet=raw_signal_packet,
         )
         return {
             "ticker": ticker,
@@ -5613,6 +5826,7 @@ Start your response with '{' and end with '}'. Nothing else."""
             "hmm_regime": hmm_regime,
             "rule_regime_snapshot": rule_regime_snapshot,
             "trade_setup_snapshot": snapshot,
+            "candidate_context": dict(candidate_context or {}),
             "prepared_at": perf_counter(),
         }
 
@@ -5631,7 +5845,10 @@ Start your response with '{' and end with '}'. Nothing else."""
         hypothetical = snapshot.get("hypothetical_envelope")
         hypothetical = hypothetical if isinstance(hypothetical, dict) else {}
         threshold_envelope = envelope or hypothetical
-        preserve_levels = status == "WAIT_FOR_PULLBACK" and bool(envelope)
+        preserve_levels = status in {
+            "WAIT_FOR_PULLBACK",
+            "WAIT_FOR_CONFIRMATION",
+        } and bool(envelope)
         entry_range = None
         if preserve_levels:
             entry_range = (
@@ -5666,6 +5883,7 @@ Start your response with '{' and end with '}'. Nothing else."""
             rating="HOLD",
             confidence=0.0,
             current_price=float(initial_state.get("current_price") or 0.0),
+            fair_value_status="NOT_EVALUATED_PREFLIGHT",
             summary=f"{status}: {reason}",
             weighted_reasoning=(
                 f"Deterministic pre-debate gate returned {status} "
@@ -5701,9 +5919,7 @@ Start your response with '{' and end with '}'. Nothing else."""
         )
         return {
             **initial_state,
-            "technical_indicators": dict(
-                snapshot.get("technical_indicators") or {}
-            ),
+            "technical_indicators": dict(snapshot.get("technical_indicators") or {}),
             "final_verdict": verdict.model_dump_json(),
             "metadata": metadata,
             "error": None,
@@ -5767,6 +5983,11 @@ Start your response with '{' and end with '}'. Nothing else."""
                     ticker,
                     current_price=current_price,
                     sector=sector,
+                    candidate_context=(
+                        prepared.get("candidate_context")
+                        if isinstance(prepared.get("candidate_context"), dict)
+                        else None
+                    ),
                 )
         prepared_raw_ticker = str(prepared.get("ticker") or "").strip()
         prepared_ticker = (
@@ -5782,6 +6003,14 @@ Start your response with '{' and end with '}'. Nothing else."""
         snapshot = prepared.get("trade_setup_snapshot")
         if not isinstance(snapshot, dict):
             raise ValueError("Prepared trade setup is missing trade_setup_snapshot.")
+        candidate_context = prepared.get("candidate_context")
+        candidate_context = (
+            candidate_context if isinstance(candidate_context, dict) else None
+        )
+        signal_packet = refresh_snapshot_signal_packet(
+            snapshot,
+            candidate_context=candidate_context,
+        )
         current_price = float(prepared.get("current_price") or current_price or 0.0)
         sector = str(prepared.get("sector") or sector or "")
         regime_context = prepared.get("regime_context")
@@ -5802,9 +6031,7 @@ Start your response with '{' and end with '}'. Nothing else."""
             "news_confidence_adjustment": 0.0,
             "raw_data": "",
             "decision_brief": "",
-            "technical_indicators": dict(
-                snapshot.get("technical_indicators") or {}
-            ),
+            "technical_indicators": dict(snapshot.get("technical_indicators") or {}),
             "fair_value_estimate": None,
             "fair_value_base": None,
             "fair_value_low": None,
@@ -5831,9 +6058,7 @@ Start your response with '{' and end with '}'. Nothing else."""
             "trend_regime": regime_context.get("trend_regime"),
             "volatility_regime": regime_context.get("volatility_regime"),
             "execution_regime": regime_context.get("execution_regime"),
-            "execution_regime_reason": regime_context.get(
-                "execution_regime_reason"
-            ),
+            "execution_regime_reason": regime_context.get("execution_regime_reason"),
             "trading_params": regime_context.get("execution_params", {}),
             "should_trade": None,
             "metadata": {
@@ -5851,6 +6076,7 @@ Start your response with '{' and end with '}'. Nothing else."""
                 "flash_calls": 0,
                 "pro_calls": 0,
                 "trade_setup_snapshot": snapshot,
+                "signal_packet": dict(signal_packet),
                 "execution_status": snapshot.get("status"),
                 # FIX 5: forward FIX 2's price provenance from prepare_trade_
                 # setup() so _fundamental_node() can pass it to

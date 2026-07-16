@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 from schemas.debate import CIOVerdict
 
 
@@ -18,6 +21,8 @@ def test_cio_buy_is_waitlist_until_risk_and_sizing_complete() -> None:
     assert verdict.policy_confidence is None
     assert verdict.execution_status == "WAITLIST"
     assert verdict.to_trade_card()["actionable"] is False
+    assert verdict.fair_value_status is None
+    assert verdict.to_trade_card()["fair_value_status"] is None
 
 
 def test_preflight_placeholder_confidence_is_not_model_confidence() -> None:
@@ -33,6 +38,32 @@ def test_preflight_placeholder_confidence_is_not_model_confidence() -> None:
     assert verdict.model_confidence is None
     assert verdict.policy_confidence == 1.0
     assert verdict.execution_status == "NO_TRADE"
+
+
+def test_legacy_verdict_without_fair_value_status_remains_compatible() -> None:
+    legacy_payload = CIOVerdict(
+        ticker="LSIP",
+        rating="HOLD",
+        confidence=0.40,
+        reason_codes=["rr_too_low"],
+    ).model_dump(exclude={"fair_value_status"})
+
+    verdict = CIOVerdict.model_validate(legacy_payload)
+
+    assert "fair_value_status" not in legacy_payload
+    assert verdict.fair_value_status is None
+    assert verdict.to_trade_card()["fair_value_status"] is None
+
+
+def test_handwritten_json_schema_keeps_fair_value_status_optional_nullable() -> None:
+    schema_path = Path(__file__).parents[1] / "schemas" / "cio_verdict_swing.json"
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    status_schema = schema["properties"]["fair_value_status"]
+
+    assert "fair_value_status" not in schema["required"]
+    assert status_schema["type"] == ["string", "null"]
+    assert status_schema["enum"] == ["NOT_EVALUATED_PREFLIGHT", None]
+    assert status_schema["default"] is None
 
 
 def test_preflight_risk_flag_survives_schema_validation() -> None:
@@ -93,4 +124,3 @@ def test_avoid_preserves_model_confidence_but_is_not_actionable() -> None:
     assert verdict.model_confidence == 0.77
     assert verdict.execution_status == "AVOID"
     assert card["actionable"] is False
-

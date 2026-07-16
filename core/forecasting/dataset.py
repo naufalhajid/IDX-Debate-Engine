@@ -5,13 +5,15 @@ import contextlib
 import io
 import logging
 import warnings
-from datetime import date, timedelta
-from typing import TYPE_CHECKING, Mapping
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
+from typing import TYPE_CHECKING, Callable, Mapping
 
 import numpy as np
 import pandas as pd
 
 from utils.ticker import normalize_idx_ticker, normalize_idx_tickers, to_yfinance_symbol
+from utils.market_snapshot import validate_market_snapshot_integrity
 
 if TYPE_CHECKING:
     from utils.market_snapshot import MarketSnapshot
@@ -22,6 +24,40 @@ _REGIME_HIGH_THRESHOLD: float = 0.02
 _REGIME_LOW_THRESHOLD: float = 0.01
 _REGIME_DEFENSIVE_WEEKLY_DROP: float = 0.05
 _REGIME_RECOVERY_WEEKLY_BOUNCE: float = 0.10
+_IHSG_REQUIRED_PREHISTORY_CALENDAR_DAYS: int = 280
+_IHSG_DEFAULT_LOOKBACK_CALENDAR_DAYS: int = 1_100
+_IHSG_MIN_COMPLETE_BARS: int = 400
+
+
+@dataclass(frozen=True)
+class ForecastDatasetSplit:
+    """Point-in-time model inputs with an explicit train/inference boundary."""
+
+    training_features: pd.DataFrame
+    inference_features: pd.DataFrame
+
+
+def split_forecast_dataset(
+    dataset: pd.DataFrame,
+    *,
+    horizon: int,
+) -> ForecastDatasetSplit:
+    """Split a materialized dataset into known-label history and one live row.
+
+    ``training_features`` contains only rows whose selected-horizon future
+    close is already known. ``inference_features`` contains exactly the latest
+    row whose future close is unknown, so it cannot accidentally be fitted.
+    """
+    forward_column = f"close_t{int(horizon)}"
+    if forward_column not in dataset.columns:
+        raise ValueError(f"Missing forward price column: {forward_column}")
+
+    training = dataset.dropna(subset=[forward_column]).copy(deep=True)
+    inference = dataset.loc[dataset[forward_column].isna()].tail(1).copy(deep=True)
+    return ForecastDatasetSplit(
+        training_features=training,
+        inference_features=inference,
+    )
 
 
 def _get_yf():
@@ -92,6 +128,9 @@ class DatasetBuilder:
         end: date,
         horizons: tuple[int, ...] = (5, 10, 20),
         snapshots: Mapping[str, "MarketSnapshot"] | None = None,
+        *,
+        ihsg_snapshot: "MarketSnapshot | None" = None,
+        include_unlabeled_tail: bool = False,
     ) -> pd.DataFrame:
         normalized_tickers = normalize_idx_tickers(tickers)
         normalized_snapshots: dict[str, MarketSnapshot] = {}
@@ -103,10 +142,28 @@ class DatasetBuilder:
                     raise ValueError(
                         "Forecast snapshot mapping key does not match snapshot ticker."
                     )
+                validate_market_snapshot_integrity(
+                    snapshot,
+                    expected_ticker=normalized_key,
+                )
                 normalized_snapshots[normalized_key] = snapshot
 
         # Download IHSG once for the full window — shared across all tickers
-        ihsg_regimes = _compute_ihsg_regimes(start, end)
+        if ihsg_snapshot is not None:
+            _validate_ihsg_snapshot(ihsg_snapshot, start=start, end=end)
+            ihsg_regimes = _compute_ihsg_regimes_from_history(
+                ihsg_snapshot.history_copy(),
+                start,
+                end,
+            )
+            if ihsg_regimes is None or ihsg_regimes.empty:
+                raise ValueError(
+                    "Frozen IHSG snapshot could not produce regime features."
+                )
+        else:
+            # Legacy/provider mode. Frozen pipeline calls always inject a
+            # snapshot and therefore never reach this network path.
+            ihsg_regimes = _compute_ihsg_regimes(start, end)
 
         frames: list[pd.DataFrame] = []
         for ticker in normalized_tickers:
@@ -119,6 +176,7 @@ class DatasetBuilder:
                     horizons,
                     ihsg_regimes,
                     snapshot=snapshot,
+                    include_unlabeled_tail=include_unlabeled_tail,
                 )
                 if df is not None and len(df) >= _MIN_BARS:
                     frames.append(df)
@@ -138,6 +196,8 @@ class DatasetBuilder:
         horizons: tuple[int, ...],
         ihsg_regimes: pd.DataFrame | None = None,
         snapshot: "MarketSnapshot | None" = None,
+        *,
+        include_unlabeled_tail: bool = False,
     ) -> pd.DataFrame | None:
         if snapshot is not None:
             raw = snapshot.history_copy()
@@ -176,12 +236,15 @@ class DatasetBuilder:
         df.index = pd.to_datetime(df.index)
         df = df[(df.index.date >= start) & (df.index.date <= end)]  # type: ignore[operator]
 
-        # Drop rows where any horizon forward price is NaN
+        # Label-complete history is used for model fitting and validation.
+        # The opt-in tail preserves the newest rows whose future outcome is not
+        # known yet so ForecastingService can use the latest one for inference.
         fwd_cols = [f"close_t{h}" for h in horizons]
-        df = df.dropna(subset=fwd_cols)
-
-        if df.empty:
+        label_complete = df.dropna(subset=fwd_cols)
+        if len(label_complete) < _MIN_BARS:
             return None
+        if not include_unlabeled_tail:
+            df = label_complete
 
         df["ticker"] = ticker.upper()
         df["date"] = pd.to_datetime(df.index).date
@@ -238,6 +301,147 @@ def _compute_atr(high: pd.Series, low: pd.Series, close: pd.Series, period: int 
     return tr.ewm(alpha=1 / period, min_periods=period, adjust=False).mean()
 
 
+def _compute_ihsg_regimes_from_history(
+    history: pd.DataFrame,
+    start: date,
+    end: date,
+) -> pd.DataFrame | None:
+    """Compute causal, per-date regime features from frozen IHSG bars."""
+
+    if history is None or history.empty:
+        return None
+    raw = history.copy(deep=True)
+    if hasattr(raw.columns, "nlevels") and raw.columns.nlevels > 1:
+        raw.columns = [
+            col[0] if isinstance(col, tuple) else col
+            for col in raw.columns.to_flat_index()
+        ]
+    raw.columns = [str(column).lower() for column in raw.columns]
+    if "close" not in raw.columns:
+        return None
+    raw.index = pd.to_datetime(raw.index, errors="coerce")
+    raw = raw[~raw.index.isna()].sort_index(kind="stable")
+    raw = raw[~raw.index.duplicated(keep="last")]
+    raw = raw[raw.index.date <= end]
+    close = raw["close"].squeeze().dropna().sort_index()
+    if len(close) < 20:
+        return None
+
+    daily_ret = close.pct_change()
+    rolling_vol = daily_ret.rolling(20).std()
+    ret5d = close.pct_change(5)
+    ma20 = close.rolling(20).mean()
+    ma50 = close.rolling(50).mean()
+    ma200 = close.rolling(200).mean()
+
+    defensive = (ret5d <= -_REGIME_DEFENSIVE_WEEKLY_DROP) | (
+        (close < ma20) & (close < ma50) & (close < ma200)
+    )
+    defensive = defensive.fillna(False)
+    vol_high = rolling_vol >= _REGIME_HIGH_THRESHOLD
+    recovery = (
+        ~defensive
+        & vol_high
+        & (ret5d >= _REGIME_RECOVERY_WEEKLY_BOUNCE)
+    ).fillna(False)
+    high = (~defensive & ~recovery & vol_high).fillna(False)
+    low = (
+        ~defensive
+        & ~recovery
+        & ~high
+        & (rolling_vol < _REGIME_LOW_THRESHOLD)
+    ).fillna(False)
+
+    out = pd.DataFrame(
+        {
+            "regime_defensive": defensive.astype(int),
+            "regime_recovery": recovery.astype(int),
+            "regime_high": high.astype(int),
+            "regime_low": low.astype(int),
+        },
+        index=close.index,
+    )
+    out.index = pd.to_datetime(out.index)
+    out = out[(out.index.date >= start) & (out.index.date <= end)]  # type: ignore[operator]
+    return out if not out.empty else None
+
+
+def _validate_ihsg_snapshot(
+    snapshot: "MarketSnapshot",
+    *,
+    start: date,
+    end: date,
+) -> None:
+    """Fail closed before ticker processing when benchmark data drifts."""
+
+    validate_market_snapshot_integrity(snapshot, expected_ticker="IHSG")
+    if normalize_idx_ticker(snapshot.ticker) != "IHSG":
+        raise ValueError("IHSG snapshot ticker must be IHSG.")
+    if snapshot.requested_end != end or snapshot.last_date != end:
+        raise ValueError("IHSG snapshot as-of does not match forecast as-of.")
+    history = snapshot.history_copy()
+    if history.empty:
+        raise ValueError("IHSG snapshot history is empty.")
+    dates = pd.to_datetime(history.index, errors="coerce")
+    if dates.isna().any() or dates.max().date() > end:
+        raise ValueError("IHSG snapshot contains invalid or future-dated bars.")
+    required_start = start - timedelta(
+        days=_IHSG_REQUIRED_PREHISTORY_CALENDAR_DAYS
+    )
+    if dates.min().date() > required_start:
+        raise ValueError("IHSG snapshot has insufficient prehistory for MA200.")
+    close = pd.to_numeric(history.get("Close"), errors="coerce")
+    complete_pre_start = close[
+        (dates.date < start) & np.isfinite(close.to_numpy(dtype=float))
+    ]
+    if complete_pre_start.index.nunique() < 200:
+        raise ValueError(
+            "IHSG snapshot needs at least 200 complete sessions before start."
+        )
+
+
+def download_ihsg_snapshot(
+    *,
+    as_of: date,
+    lookback_calendar_days: int = _IHSG_DEFAULT_LOOKBACK_CALENDAR_DAYS,
+    downloader: Callable[..., pd.DataFrame] | None = None,
+    now: datetime | None = None,
+) -> "MarketSnapshot":
+    """Download one explicit ``^JKSE`` snapshot for frozen forecast features."""
+
+    from utils.market_snapshot import build_market_snapshot
+
+    if downloader is None:
+        downloader = _get_yf().download
+    requested_start = as_of - timedelta(days=int(lookback_calendar_days))
+    raw = downloader(
+        "^JKSE",
+        start=requested_start.isoformat(),
+        end=(as_of + timedelta(days=1)).isoformat(),
+        interval="1d",
+        auto_adjust=True,
+        progress=False,
+        threads=False,
+        timeout=_YF_TIMEOUT_S,
+    )
+    if raw is None:
+        raw = pd.DataFrame()
+    if isinstance(getattr(raw, "columns", None), pd.MultiIndex):
+        raw = raw.copy()
+        raw.columns = [
+            column[0] if isinstance(column, tuple) else column
+            for column in raw.columns.to_flat_index()
+        ]
+    return build_market_snapshot(
+        "IHSG",
+        raw,
+        requested_start=requested_start,
+        requested_end=as_of,
+        min_complete_bars=_IHSG_MIN_COMPLETE_BARS,
+        now=now,
+    )
+
+
 def _compute_ihsg_regimes(start: date, end: date) -> pd.DataFrame | None:
     """Download ^JKSE and compute a per-date one-hot regime DataFrame.
 
@@ -270,51 +474,7 @@ def _compute_ihsg_regimes(start: date, end: date) -> pd.DataFrame | None:
         if raw is None or getattr(raw, "empty", True):
             return None
 
-        # Flatten MultiIndex columns if present
-        if hasattr(raw.columns, "nlevels") and raw.columns.nlevels > 1:
-            raw.columns = [col[0] if isinstance(col, tuple) else col for col in raw.columns.to_flat_index()]
-        raw.columns = [str(c).lower() for c in raw.columns]
-
-        close = raw["close"].squeeze().dropna().sort_index()
-        if len(close) < 20:
-            return None
-
-        # Rolling 20-day realized volatility (daily std of returns)
-        daily_ret = close.pct_change()
-        rolling_vol = daily_ret.rolling(20).std()
-        ret5d = close.pct_change(5)
-        ma20 = close.rolling(20).mean()
-        ma50 = close.rolling(50).mean()
-        ma200 = close.rolling(200).mean()
-
-        defensive = (ret5d <= -_REGIME_DEFENSIVE_WEEKLY_DROP) | (
-            (close < ma20) & (close < ma50) & (close < ma200)
-        )
-        # Fill NaN from rolling windows as False
-        defensive = defensive.fillna(False)
-        vol_high = rolling_vol >= _REGIME_HIGH_THRESHOLD
-
-        recovery = (
-            ~defensive
-            & vol_high
-            & (ret5d >= _REGIME_RECOVERY_WEEKLY_BOUNCE)
-        ).fillna(False)
-        high = (~defensive & ~recovery & vol_high).fillna(False)
-        low = (
-            ~defensive & ~recovery & ~high & (rolling_vol < _REGIME_LOW_THRESHOLD)
-        ).fillna(False)
-
-        out = pd.DataFrame({
-            "regime_defensive": defensive.astype(int),
-            "regime_recovery": recovery.astype(int),
-            "regime_high": high.astype(int),
-            "regime_low": low.astype(int),
-        }, index=close.index)
-
-        # Restrict to requested window
-        out.index = pd.to_datetime(out.index)
-        out = out[(out.index.date >= start) & (out.index.date <= end)]  # type: ignore[operator]
-        return out if not out.empty else None
+        return _compute_ihsg_regimes_from_history(raw, start, end)
 
     except Exception:
         return None

@@ -17,6 +17,7 @@ Keep these files locally during normal operation. They are ignored by Git:
 | `output/debates/{TICKER}/latest_debate.json` | Latest debate snapshot for explainability, validation, and RAG evidence tools. |
 | `output/debates/{TICKER}_debate.json` | Legacy flat debate file kept for compatibility. |
 | `output/backtest/backtest_memory.jsonl` | Append-only realized trade outcome memory. |
+| `output/shadow_evaluation/{run}/` | Isolated signal observations, fixed-horizon outcomes, coverage/calibration metrics, and an evaluation-only report. |
 | `output/telemetry/*` | Runtime telemetry reports and JSONL logs. |
 | `output/audit/*` | Runtime audit logs. |
 | `output/rag_evidence/*`, `output/ledger/*`, `output/observations/*`, `output/planner/*` | Local operational traces and evidence stores. |

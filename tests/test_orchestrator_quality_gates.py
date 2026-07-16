@@ -844,8 +844,22 @@ def test_pre_cio_filters_preserve_rejections_as_terminal_results() -> None:
     assert rejected[1]["reason_codes"] == ["counter_trend_defensive"]
 
 
+@pytest.mark.parametrize(
+    ("setup_status", "reason_code", "expected_risk_status"),
+    [
+        ("WAIT_FOR_PULLBACK", "price_above_entry_range", "wait_for_pullback"),
+        (
+            "WAIT_FOR_CONFIRMATION",
+            "wait_for_momentum_confirmation",
+            "watchlist_only",
+        ),
+    ],
+)
 def test_terminal_preflight_bypasses_confidence_gate_and_maps_waitlist(
     monkeypatch: pytest.MonkeyPatch,
+    setup_status: str,
+    reason_code: str,
+    expected_risk_status: str,
 ) -> None:
     monkeypatch.setattr(
         orchestrator,
@@ -864,15 +878,15 @@ def test_terminal_preflight_bypasses_confidence_gate_and_maps_waitlist(
             "stop_loss": 480,
             "risk_reward_ratio": 2.5,
             "execution_horizon_days": 10,
-            "reason_codes": ["price_above_entry_range"],
+            "reason_codes": [reason_code],
         },
         "metadata": {
             "decision_source": "preflight",
             "llm_calls": 0,
             "trade_setup_snapshot": {
-                "status": "WAIT_FOR_PULLBACK",
-                "reason_code": "price_above_entry_range",
-                "reason": "Current price is above entry range.",
+                "status": setup_status,
+                "reason_code": reason_code,
+                "reason": "Deterministic setup is waiting.",
                 "debate_eligible": False,
                 "technical_data_status": "COMPLETE",
             },
@@ -887,10 +901,56 @@ def test_terminal_preflight_bypasses_confidence_gate_and_maps_waitlist(
     orchestrator._finalize_execution_decisions([result])
 
     assert result["verdict"]["rating"] == "HOLD"
-    assert result["risk_governor"]["status"] == "wait_for_pullback"
+    assert result["risk_governor"]["status"] == expected_risk_status
     assert result["execution_status"] == "WAITLIST"
     assert result["decision_source"] == "preflight"
     assert result["model_confidence"] is None
+
+
+def test_terminal_shadow_only_setup_stays_no_trade_with_canonical_risk_status(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        orchestrator,
+        "_attach_news_signal",
+        lambda *_args, **_kwargs: pytest.fail("terminal preflight fetched news"),
+    )
+    result = {
+        "ticker": "TAPG",
+        "status": "success",
+        "verdict": {
+            "ticker": "TAPG",
+            "rating": "HOLD",
+            "confidence": 0.0,
+            "entry_price_range": None,
+            "target_price": None,
+            "stop_loss": None,
+            "reason_codes": ["shadow_only_momentum_recalibration"],
+        },
+        "metadata": {
+            "decision_source": "preflight",
+            "llm_calls": 0,
+            "trade_setup_snapshot": {
+                "status": "SHADOW_ONLY",
+                "reason_code": "shadow_only_momentum_recalibration",
+                "reason": "Calibration only; live authorization is disabled.",
+                "debate_eligible": False,
+                "technical_data_status": "COMPLETE",
+            },
+        },
+    }
+
+    orchestrator._enhance_completed_results(
+        [result],
+        "phase4-shadow-test",
+        fetch_news=True,
+    )
+    orchestrator._finalize_execution_decisions([result])
+
+    assert result["risk_governor"]["status"] == "watchlist_only"
+    assert result["risk_governor"]["sizing_allowed"] is False
+    assert result["execution_status"] == "NO_TRADE"
+    assert result["decision_source"] == "preflight"
 
 
 def test_execution_funnel_counts_pre_cio_and_terminal_outcomes() -> None:
@@ -951,6 +1011,40 @@ def test_execution_funnel_counts_pre_cio_and_terminal_outcomes() -> None:
         "INSUFFICIENT_DATA": 1,
         "EXECUTABLE_BUY": 1,
     }
+
+
+def test_execution_funnel_does_not_count_shadow_momentum_states_as_valid() -> None:
+    results = [
+        {
+            "ticker": "TAPG",
+            "execution_status": "WAITLIST",
+            "metadata": {
+                "llm_calls": 0,
+                "trade_setup_snapshot": {
+                    "status": "WAIT_FOR_CONFIRMATION",
+                    "technical_data_status": "COMPLETE",
+                },
+            },
+        },
+        {
+            "ticker": "GGRM",
+            "execution_status": "NO_TRADE",
+            "metadata": {
+                "llm_calls": 0,
+                "trade_setup_snapshot": {
+                    "status": "SHADOW_ONLY",
+                    "technical_data_status": "COMPLETE",
+                },
+            },
+        },
+    ]
+
+    funnel = orchestrator.build_execution_funnel(results)
+
+    assert funnel["counts"]["technical_data_complete"] == 2
+    assert funnel["counts"]["trade_envelope_valid"] == 0
+    assert funnel["counts"]["debated"] == 0
+    assert funnel["counts"]["risk_deployable"] == 0
 
 
 @pytest.mark.asyncio

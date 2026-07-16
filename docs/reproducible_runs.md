@@ -70,3 +70,25 @@ loss, same-day target/stop is treated as a conservative loss, and records that
 reach 20 trading days without either trigger are judged by the horizon close.
 Records without a matching versioned debate artifact are skipped so mock or
 synthetic rows do not become training data.
+
+## Shadow Signal Outcome Evaluation
+
+Use the isolated shadow evaluator for advisory signal packets, including setups
+that were rejected before debate or execution. Both dates are explicit and the
+command only reads persisted JSON plus hash-verified snapshot files; it never
+falls back to a live provider:
+
+```powershell
+uv run idx forecast shadow-backfill `
+  --source-results output/frozen_run/full_batch_results.json `
+  --snapshot-manifest output/market_snapshots/manifest.json `
+  --as-of 2026-07-15 `
+  --evaluation-as-of 2026-08-12 `
+  --horizon 5 --horizon 10 --horizon 20 `
+  --output-dir output/shadow_evaluation/20260715
+```
+
+A horizon remains `PENDING` until exactly that many complete observed sessions
+exist after `--as-of`. Missing snapshots, mismatched reference closes, or broken
+provenance become `INVALID`; they are never repaired by re-fetching data. The
+resulting records are calibration evidence only and have `live_authority=false`.

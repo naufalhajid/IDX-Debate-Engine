@@ -60,7 +60,13 @@ class DebateMessage(BaseDataClass):
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
-ConsensusMethod = Literal["voting", "confidence_winner", "soft_hold", "deadlock_hold"]
+ConsensusMethod = Literal[
+    "voting",
+    "confidence_winner",
+    "soft_hold",
+    "deadlock_hold",
+    "quality_veto",
+]
 ModelRating = Literal["STRONG_BUY", "BUY", "HOLD", "SELL", "AVOID"]
 DecisionSource = Literal["cio", "preflight", "risk_guard"]
 ExecutionStatus = Literal[
@@ -70,6 +76,50 @@ ExecutionStatus = Literal[
     "AVOID",
     "INSUFFICIENT_DATA",
 ]
+FairValueStatus = Literal["NOT_EVALUATED_PREFLIGHT"]
+
+
+class SignalPacket(BaseModel):
+    """Advisory pre-gate signal evidence persisted independently of execution.
+
+    ``execution_eligible`` is deliberately tri-state. ``None`` means the
+    deterministic setup may continue, but the Risk Governor and sizing path
+    have not issued their canonical execution decision yet. The packet never
+    grants execution authority by itself.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    signal_lean: Literal[
+        "BULLISH_SETUP",
+        "NEUTRAL",
+        "BEARISH",
+        "UNKNOWN",
+    ] = "UNKNOWN"
+    chart_strength: Literal[
+        "BULLISH",
+        "NEUTRAL",
+        "BEARISH",
+        "UNKNOWN",
+    ] = "UNKNOWN"
+    relative_strength: float | None = None
+    volume_confirmation: bool | None = None
+    fundamental_quality: Literal[
+        "STRONG",
+        "ADEQUATE",
+        "WEAK",
+        "UNKNOWN",
+    ] = "UNKNOWN"
+    valuation_state: Literal[
+        "UNDERVALUED",
+        "FAIR",
+        "OVERVALUED",
+        "UNKNOWN",
+    ] = "UNKNOWN"
+    forecast_state: str = "NOT_EVALUATED"
+    execution_eligible: bool | None = None
+    execution_rejection_reason: str | None = None
+    required_entry_trigger: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -164,6 +214,13 @@ class CIOVerdict(BaseDataClass):
     fair_value_high: float | None = Field(
         default=None,
         description="Optimistic high end of the fair value range.",
+    )
+    fair_value_status: FairValueStatus | None = Field(
+        default=None,
+        description=(
+            "Explicitly marks fair value as skipped because a deterministic "
+            "pre-debate gate returned before valuation ran. Null otherwise."
+        ),
     )
     # FIX: ISSUE 1 — Carry unverified valuation state into final artifacts.
     valuation_gap: str | None = Field(
@@ -456,7 +513,17 @@ class CIOVerdict(BaseDataClass):
         missing_fv = self.fair_value is None or self.fair_value <= 0
         if self.confidence < 0.60 or bad_rr:
             self.wait_and_see = True
-        if missing_fv and not any(
+        if missing_fv and self.fair_value_status == "NOT_EVALUATED_PREFLIGHT":
+            if not any(
+                "not_evaluated_preflight" in str(risk).lower()
+                for risk in self.key_risks
+            ):
+                self.key_risks = list(self.key_risks) + [
+                    "Fair value status: NOT_EVALUATED_PREFLIGHT — valuation "
+                    "was skipped because the deterministic pre-debate gate "
+                    "stopped the pipeline."
+                ]
+        elif missing_fv and not any(
             "fundamental" in s.lower() for s in self.key_risks
         ):
             self.key_risks = list(self.key_risks) + [
@@ -493,9 +560,7 @@ class CIOVerdict(BaseDataClass):
         # 9. Separate model opinion from deterministic policy output. Legacy
         # preflight paths used HOLD/0.40 placeholders even though no CIO model
         # ran; those values must not become model confidence.
-        normalized_codes = {
-            str(code).strip().lower() for code in self.reason_codes
-        }
+        normalized_codes = {str(code).strip().lower() for code in self.reason_codes}
         preflight_codes = {
             "rr_too_low",
             "stop_inside_noise",
@@ -633,6 +698,7 @@ class CIOVerdict(BaseDataClass):
             "fair_value_base": self.fair_value_base,
             "fair_value_low": self.fair_value_low,
             "fair_value_high": self.fair_value_high,
+            "fair_value_status": self.fair_value_status,
             "expected_return": self.expected_return,
             "risk_reward": self.risk_reward_ratio,
             "is_overvalued": self.is_overvalued,
@@ -838,7 +904,9 @@ class DebateChamberState(TypedDict):
     dps_yield_pct: float | None
     dps_price_used: float | None
     risk_overvalued: bool
-    valuation_band_context: str | None  # C3: self-relative PE/PBV percentile vs own history
+    valuation_band_context: (
+        str | None
+    )  # C3: self-relative PE/PBV percentile vs own history
     range_52w_signal: str | None  # C4: price position in 52-week high/low range
     # Task I: Graham Number FV from the quant screener (candidates_by_ticker),
     # threaded in via run(graham_fv=...). None on paths without screener

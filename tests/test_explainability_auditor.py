@@ -90,7 +90,28 @@ def test_build_audit_packet_returns_packet_with_ticker_and_rating() -> None:
 def test_dissent_rate_calculated_from_two_dissenting_agents() -> None:
     packet = ExplainabilityAuditor().build_audit_packet(debate_fixture())
 
-    assert packet.dissent_rate == 0.4
+    assert packet.dissent_rate == 0.5
+
+
+def test_fundamental_cannot_be_inferred_as_confidence_winner() -> None:
+    debate = debate_fixture()
+    debate["verdict"]["consensus_method"] = "confidence_winner"
+    debate["verdict"]["consensus_winner"] = {
+        "agent": "fundamental_scout",
+        "position": "BUY",
+        "confidence": 0.99,
+    }
+    debate["agent_votes"] = [
+        {"agent": "fundamental_scout", "position": "BUY", "confidence": 0.99},
+        {"agent": "chartist", "position": "BUY", "confidence": 0.60},
+        {"agent": "sentiment_specialist", "position": "HOLD", "confidence": 0.55},
+        {"agent": "bull", "position": "BUY", "confidence": 0.70},
+        {"agent": "bear", "position": "AVOID", "confidence": 0.65},
+    ]
+
+    packet = ExplainabilityAuditor().build_audit_packet(debate)
+
+    assert packet.winner_agent == "bull"
 
 
 def test_one_line_summary_is_non_empty_and_contains_ticker() -> None:

@@ -51,7 +51,9 @@ def build_sector_members_table(
     return table
 
 
-def _safe_float(value: Any, default: float = 0.0) -> float:
+def _safe_float(value: Any, default: float = 0.0) -> float | None:
+    if value is None:
+        return None
     try:
         v = float(value)
         return default if math.isnan(v) else v
@@ -113,15 +115,15 @@ def build_filter_results_table(df: "pd.DataFrame", top_n: int = 10) -> Table:
     table.add_column("F-Score", justify="right", width=7)
 
     for rank, (_, row) in enumerate(df.iterrows(), start=1):
-        score = _safe_float(row.get("Composite Score"))
+        score = _safe_float(row.get("Composite Score")) or 0.0
         price = _safe_float(row.get("Current Price"))
         graham_raw = row.get("Est. Fair Value (Graham)")
         graham_fv = _safe_float(graham_raw) if graham_raw is not None else None
-        upside = _safe_float(row.get("Valuation Gap (%)"))
-        rsi = _safe_float(row.get("RSI (14)"))
+        upside = _safe_float(row.get("Valuation Gap (%)")) or 0.0
+        rsi = _safe_float(row.get("RSI (14)")) or 0.0
         exdate_risk = str(row.get("ExDate Risk") or "CLEAR")
         strategy = str(row.get("Entry Strategy") or "")[:50]
-        piotroski = int(_safe_float(row.get("Piotroski F-Score"), 0))
+        piotroski = int(_safe_float(row.get("Piotroski F-Score"), 0) or 0)
         sector_label = str(row.get("Sektor Key") or row.get("Sektor") or "")
         is_financial = row.get("Sektor Key") in FINANCIAL_SECTORS
 
@@ -221,13 +223,13 @@ def build_verdict_summary_table(results: list[dict]) -> Table:
         verdict = item.get("verdict") or {}
         ticker = str(item.get("ticker") or verdict.get("ticker") or "—")
         rating = str(verdict.get("rating") or "—")
-        confidence = _safe_float(verdict.get("confidence"))
+        confidence = _safe_float(verdict.get("confidence")) or 0.0
         rr = _safe_float(verdict.get("risk_reward_ratio"))
         entry = str(verdict.get("entry_price_range") or "—")
         target_raw = verdict.get("target_price")
         stop_raw = verdict.get("stop_loss")
         expected_return = str(verdict.get("expected_return") or "—")
-        rounds = int(_safe_float(item.get("debate_rounds"), 0))
+        rounds = int(_safe_float(item.get("debate_rounds"), 0) or 0)
 
         # Rating style
         rating_upper = rating.upper()
@@ -248,7 +250,9 @@ def build_verdict_summary_table(results: list[dict]) -> Table:
             conf_text = Text(f"{conf_pct:.0f}%", style="idx.bear")
 
         # R/R
-        if rr >= 2.0:
+        if rr is None:
+            rr_text = Text("N/A", style="idx.muted")
+        elif rr >= 2.0:
             rr_text = Text(f"{rr:.2f}", style="idx.bull")
         elif rr >= 1.5:
             rr_text = Text(f"{rr:.2f}", style="amber")

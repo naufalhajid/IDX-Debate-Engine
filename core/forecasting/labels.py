@@ -24,7 +24,9 @@ def build_labels(df: pd.DataFrame, horizon: int) -> pd.DataFrame:
       y_stop_hit     = 1 if min intraperiod return <= -tau before target hit (terminal fallback)
       sigma_realized = sqrt(252/h * sum(r_t+k^2, k=1..h))  -- None when intraperiod returns unavailable
 
-    Tie rule: tau_target == tau_stop → both labels = 0.
+    Intentional v1 disable: tau_target == tau_stop → both path labels = 0.
+    These columns are retained for schema compatibility but are not classifier
+    targets until differentiated barriers receive separate calibration.
     Removes all close_t+{h} columns after computing labels (no-lookahead guarantee).
     """
     fwd_col = f"close_t{horizon}"
@@ -54,7 +56,9 @@ def _build_path_labels(df: pd.DataFrame, horizon: int, tau: float) -> pd.DataFra
     """Build y_target_hit / y_stop_hit.
 
     Uses path-dependent high/low when available; falls back to terminal return.
-    Tie rule: tau_target == tau_stop → both remain 0.
+    Intentional v1 disable: symmetric barriers leave both labels at zero.
+    ForecastingService uses return/volatility probabilities instead of these
+    uncalibrated path heads.
     """
     df["y_target_hit"] = 0
     df["y_stop_hit"] = 0

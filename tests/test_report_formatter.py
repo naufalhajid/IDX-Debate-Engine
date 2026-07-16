@@ -556,6 +556,33 @@ def test_generate_ticker_report_suppresses_unverified_fair_value() -> None:
     assert "| **Gap** | unverified |" in report
 
 
+def test_preflight_fair_value_status_is_visible_in_markdown_and_rich() -> None:
+    result = _mock_result(rating="HOLD")
+    result["verdict"].update(
+        {
+            "fair_value": None,
+            "fair_value_low": None,
+            "fair_value_high": None,
+            "fair_value_status": "NOT_EVALUATED_PREFLIGHT",
+        }
+    )
+
+    report = MarkdownFormatter().generate_ticker_report(result)
+
+    assert "| **Fair Value** | N/A |" in report
+    assert (
+        "| **Fair Value Status** | NOT_EVALUATED_PREFLIGHT |" in report
+    )
+    assert "| **Gap** | NOT_EVALUATED_PREFLIGHT |" in report
+
+    console = Console(record=True, width=140)
+    RichFormatter(console=console).render_ticker_panel(result)
+    output = console.export_text()
+
+    assert "Fair Value Status" in output
+    assert "NOT_EVALUATED_PREFLIGHT" in output
+
+
 def test_generate_ticker_report_shows_fair_value_range_and_risk_flag() -> None:
     result = _mock_result()
     result["verdict"].update(

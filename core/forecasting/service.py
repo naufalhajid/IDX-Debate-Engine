@@ -1,6 +1,7 @@
 """ForecastingService - public entry point for the IDX forecasting layer."""
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import math
@@ -12,8 +13,12 @@ from typing import TYPE_CHECKING, Literal, cast
 import numpy as np
 import pandas as pd
 
-from core.forecasting.dataset import DatasetBuilder
-from core.forecasting.ensemble import blend_votes, compute_ensemble_weights
+from core.forecasting.dataset import DatasetBuilder, split_forecast_dataset
+from core.forecasting.ensemble import (
+    BRIER_BORDERLINE_EPSILON,
+    blend_votes,
+    compute_ensemble_weights,
+)
 from core.forecasting.labels import TRANSACTION_COST, TAU_H, build_labels
 from core.forecasting.models import ModelBase
 from core.forecasting.models.naive import NaiveModel
@@ -30,6 +35,8 @@ from core.forecasting.validation import (
     validate_model,
     walk_forward_splits,
 )
+from core.settings import settings
+from utils.market_snapshot import validate_market_snapshot_integrity
 from utils.ticker import normalize_idx_ticker
 
 if TYPE_CHECKING:
@@ -48,6 +55,7 @@ _RETURN_LABEL_COLS: frozenset[str] = frozenset(
 _DIRECTIONAL_DISAGREEMENT_PENALTY: float = 0.10
 _MAX_DISAGREEMENT_PENALTY: float = 0.35
 _DISPERSION_REFERENCE_RETURN: float = 0.05
+_LIVE_BUY_EV_FLOOR: float = 0.02
 
 _BLOCKLIST_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "forecast_blocklist.json"
 _blocklist_cache: dict[str, list[int]] | None = None
@@ -81,6 +89,60 @@ class ForecastingService:
         self._dataset_builder = DatasetBuilder()
         self._tgarch = TGARCHForecaster()
         self._naive = NaiveModel()
+        # Run-scoped pinning: repeated computations reuse the fully materialized
+        # ticker + IHSG + point-in-time fundamental feature frame. This avoids
+        # same-date provider revisions without persisting stale data globally.
+        self._feature_snapshot_cache: dict[tuple[object, ...], pd.DataFrame] = {}
+
+    def _materialize_feature_snapshot(
+        self,
+        *,
+        ticker: str,
+        start: date,
+        end: date,
+        horizon: int,
+        execution_snapshot: "MarketSnapshot | None",
+        ihsg_snapshot: "MarketSnapshot | None",
+    ) -> pd.DataFrame:
+        ticker_snapshot_identity = (
+            f"{execution_snapshot.snapshot_id}:{execution_snapshot.data_hash}"
+            if execution_snapshot is not None
+            else "provider_materialized"
+        )
+        ihsg_snapshot_identity = (
+            f"{ihsg_snapshot.snapshot_id}:{ihsg_snapshot.data_hash}"
+            if ihsg_snapshot is not None
+            else "provider_materialized"
+        )
+        cache_key: tuple[object, ...] = (
+            id(self._dataset_builder),
+            ticker,
+            start,
+            end,
+            horizon,
+            ticker_snapshot_identity,
+            ihsg_snapshot_identity,
+        )
+        cached = self._feature_snapshot_cache.get(cache_key)
+        if cached is not None:
+            return cached.copy(deep=True)
+
+        build_kwargs: dict[str, object] = {
+            "horizons": (horizon,),
+            "include_unlabeled_tail": True,
+        }
+        if execution_snapshot is not None:
+            build_kwargs["snapshots"] = {ticker: execution_snapshot}
+        if ihsg_snapshot is not None:
+            build_kwargs["ihsg_snapshot"] = ihsg_snapshot
+        dataset = self._dataset_builder.build(
+            [ticker],
+            start,
+            end,
+            **build_kwargs,
+        )
+        self._feature_snapshot_cache[cache_key] = dataset.copy(deep=True)
+        return dataset.copy(deep=True)
 
     def _return_model_factories(self) -> dict[str, Callable[[], ModelBase]]:
         return {
@@ -96,16 +158,28 @@ class ForecastingService:
         mode: ForecastMode = "ensemble",
         cio_verdict: "CIOVerdict | None" = None,
         execution_snapshot: "MarketSnapshot | None" = None,
+        *,
+        ihsg_snapshot: "MarketSnapshot | None" = None,
+        frozen_inputs_only: bool = False,
     ) -> ForecastReport:
         """Produce a ForecastReport for ticker.
 
         Conservative v1 policy:
-        - ensemble uses Naive/ARIMA/XGBoost return forecasts plus TGARCH volatility.
+        - ensemble uses Naive/XGBoost return forecasts plus TGARCH volatility.
         - naive uses only Naive return forecast plus realized-volatility baseline.
         - tgarch uses TGARCH volatility with zero-drift return baseline.
         LSTM and Prophet are intentionally visible as experimental-unused in ensemble.
         """
+        caller_supplied_as_of = as_of is not None
         ticker = normalize_idx_ticker(ticker)
+        if frozen_inputs_only and execution_snapshot is None:
+            resolved_as_of = as_of or date.today()
+            return _error_report(
+                ticker,
+                resolved_as_of,
+                min(horizons),
+                ["missing_frozen_ticker_snapshot"],
+            )
         if execution_snapshot is not None:
             snapshot_ticker = normalize_idx_ticker(execution_snapshot.ticker)
             if snapshot_ticker != ticker:
@@ -114,7 +188,76 @@ class ForecastingService:
                 )
         if as_of is None and execution_snapshot is not None:
             as_of = execution_snapshot.last_date or execution_snapshot.requested_end
+        strict_feature_as_of = caller_supplied_as_of or execution_snapshot is not None
         as_of = as_of or date.today()
+        if execution_snapshot is not None:
+            try:
+                validate_market_snapshot_integrity(
+                    execution_snapshot,
+                    expected_ticker=ticker,
+                )
+            except Exception:
+                return _error_report(
+                    ticker,
+                    as_of,
+                    min(horizons),
+                    ["ticker_snapshot_integrity_failed"],
+                )
+        if frozen_inputs_only and execution_snapshot is not None:
+            if execution_snapshot.last_date != as_of:
+                return _error_report(
+                    ticker,
+                    as_of,
+                    min(horizons),
+                    ["ticker_snapshot_as_of_mismatch"],
+                )
+        if frozen_inputs_only and ihsg_snapshot is None:
+            return _error_report(
+                ticker,
+                as_of,
+                min(horizons),
+                ["missing_frozen_ihsg_snapshot"],
+            )
+        if ihsg_snapshot is not None:
+            try:
+                validate_market_snapshot_integrity(
+                    ihsg_snapshot,
+                    expected_ticker="IHSG",
+                )
+            except Exception:
+                return _error_report(
+                    ticker,
+                    as_of,
+                    min(horizons),
+                    ["ihsg_snapshot_integrity_failed"],
+                )
+            try:
+                ihsg_ticker = normalize_idx_ticker(ihsg_snapshot.ticker)
+            except Exception:
+                ihsg_ticker = ""
+            ihsg_dates = pd.to_datetime(
+                ihsg_snapshot.history_copy().index,
+                errors="coerce",
+            )
+            ihsg_has_future_or_invalid = bool(
+                ihsg_dates.isna().any()
+                or (
+                    len(ihsg_dates) > 0
+                    and ihsg_dates.max().date() > as_of
+                )
+            )
+            if (
+                ihsg_ticker != "IHSG"
+                or ihsg_snapshot.requested_end != as_of
+                or ihsg_snapshot.last_date != as_of
+                or ihsg_has_future_or_invalid
+            ):
+                return _error_report(
+                    ticker,
+                    as_of,
+                    min(horizons),
+                    ["ihsg_snapshot_as_of_mismatch"],
+                )
         flags: list[str] = []
         mode = _normalize_mode(mode, flags)
 
@@ -127,44 +270,97 @@ class ForecastingService:
             return _error_report(ticker, as_of, horizon, flags)
 
         try:
-            if execution_snapshot is None:
-                dataset = self._dataset_builder.build(
-                    [ticker],
-                    start,
-                    end,
-                    horizons=(horizon,),
-                )
-            else:
-                dataset = self._dataset_builder.build(
-                    [ticker],
-                    start,
-                    end,
-                    horizons=(horizon,),
-                    snapshots={ticker: execution_snapshot},
-                )
+            dataset = self._materialize_feature_snapshot(
+                ticker=ticker,
+                start=start,
+                end=end,
+                horizon=horizon,
+                execution_snapshot=execution_snapshot,
+                ihsg_snapshot=ihsg_snapshot,
+            )
         except Exception as e:
             return _error_report(ticker, as_of, horizon, [f"dataset_error:{type(e).__name__}"])
 
-        if dataset.empty or len(dataset) < 30:
+        if dataset.empty:
             return _error_report(ticker, as_of, horizon, ["insufficient_data"])
 
-        flat_dataset = dataset.reset_index(level="ticker", drop=True)
+        feature_snapshot_hash = _hash_feature_snapshot(dataset)
+        try:
+            dataset_split = split_forecast_dataset(dataset, horizon=horizon)
+        except Exception as e:
+            return _error_report(
+                ticker,
+                as_of,
+                horizon,
+                [f"dataset_split_error:{type(e).__name__}"],
+            )
+        if dataset_split.training_features.empty:
+            return _error_report(ticker, as_of, horizon, ["insufficient_labeled_data"])
+        if dataset_split.inference_features.empty:
+            return _error_report(
+                ticker,
+                as_of,
+                horizon,
+                ["missing_unlabeled_inference_row"],
+            )
+
+        flat_dataset = dataset.reset_index(level="ticker", drop=True).sort_index()
+        flat_dataset = flat_dataset[flat_dataset["close"].notna()]
+        if flat_dataset.empty:
+            return _error_report(ticker, as_of, horizon, ["insufficient_data"])
         if flat_dataset["ocf_price_pct"].isna().all():
             flags.append("ocf_missing")
 
         try:
-            labeled = build_labels(flat_dataset, horizon)
+            prepared = build_labels(flat_dataset, horizon)
         except Exception as e:
             return _error_report(ticker, as_of, horizon, [f"label_error:{type(e).__name__}"])
 
-        labeled = labeled.dropna(subset=["r_net_h"])
-        if labeled.empty:
+        training_index = dataset_split.training_features.reset_index(
+            level="ticker", drop=True
+        ).index
+        inference_index = dataset_split.inference_features.reset_index(
+            level="ticker", drop=True
+        ).index
+        labeled = prepared.loc[prepared.index.intersection(training_index)].dropna(
+            subset=["r_net_h"]
+        )
+        latest = prepared.loc[prepared.index.intersection(inference_index)].tail(1)
+        if latest.empty or latest["r_net_h"].notna().any():
+            return _error_report(
+                ticker,
+                as_of,
+                horizon,
+                ["missing_unlabeled_inference_row"],
+            )
+
+        if len(labeled) < 30:
             return _error_report(ticker, as_of, horizon, ["insufficient_labeled_data"])
 
         feature_frame = _feature_frame(labeled)
-        current_features = feature_frame.tail(1)
+        current_features = _feature_frame(latest).reindex(
+            columns=feature_frame.columns,
+            fill_value=0,
+        )
         if current_features.empty:
             return _error_report(ticker, as_of, horizon, ["insufficient_feature_data"])
+
+        feature_as_of = _frame_end_date(current_features)
+        training_end_date = _frame_end_date(feature_frame)
+        if feature_as_of is None:
+            return _error_report(ticker, as_of, horizon, ["invalid_inference_date"])
+        if training_end_date is None:
+            return _error_report(ticker, as_of, horizon, ["invalid_training_date"])
+        if strict_feature_as_of and feature_as_of != as_of:
+            return _error_report(ticker, as_of, horizon, ["inference_date_mismatch"])
+        if not strict_feature_as_of:
+            # An omitted date means "latest complete market session", not an
+            # artificial calendar-today row on weekends or holidays.
+            as_of = feature_as_of
+        if training_end_date >= feature_as_of:
+            return _error_report(ticker, as_of, horizon, ["training_inference_overlap"])
+        if training_end_date > as_of - timedelta(days=horizon):
+            return _error_report(ticker, as_of, horizon, ["training_label_not_known_as_of"])
 
         close = flat_dataset["close"].dropna()
         close_value = float(close.iloc[-1]) if len(close) else None
@@ -185,6 +381,7 @@ class ForecastingService:
                     model_name="tgarch",
                     status="active" if not vol_fallback else "validation_failed",
                     reason=None if not vol_fallback else "volatility_fallback",
+                    probability_source="return_volatility_parametric",
                     r_hat_net=r_hat_net,
                     p_target=p_target,
                     p_stop=p_stop,
@@ -257,12 +454,60 @@ class ForecastingService:
 
         decision_ev = risk_adjusted_ev if risk_adjusted_ev is not None else ev
         decision = _make_decision(p_target, p_stop, decision_ev, r_hat_net)
+        shadow_decision = None
+        shadow_buy_ev_floor = None
+        shadow_evaluation_only = False
+        if settings.FORECAST_SHADOW_EVALUATION_ENABLED:
+            shadow_buy_ev_floor = float(settings.FORECAST_SHADOW_BUY_EV_FLOOR)
+            shadow_decision = _make_shadow_decision(
+                p_target,
+                p_stop,
+                decision_ev,
+                r_hat_net,
+                ev_floor=shadow_buy_ev_floor,
+            )
+            shadow_evaluation_only = True
+            flags.append(f"shadow_only:buy_ev_floor={shadow_buy_ev_floor:.4f}")
         confidence = _compute_confidence(p_target, p_stop, decision_ev, validation_summary, penalty)
+        probability_source = (
+            "return_volatility_parametric"
+            if p_target is not None and p_stop is not None
+            else "unavailable"
+        )
+        probability_barriers = (
+            _probability_barrier_metadata(horizon, cio_verdict, close_value)
+            if probability_source == "return_volatility_parametric"
+            else None
+        )
 
         return ForecastReport(
             ticker=ticker.upper(),
             as_of=as_of,
+            forecast_as_of=as_of,
             horizon_days=horizon,
+            feature_as_of=feature_as_of,
+            training_end_date=training_end_date,
+            feature_snapshot_hash=feature_snapshot_hash,
+            execution_snapshot_id=(
+                execution_snapshot.snapshot_id
+                if execution_snapshot is not None
+                else None
+            ),
+            execution_snapshot_hash=(
+                execution_snapshot.data_hash
+                if execution_snapshot is not None
+                else None
+            ),
+            ihsg_snapshot_id=(
+                ihsg_snapshot.snapshot_id if ihsg_snapshot is not None else None
+            ),
+            ihsg_snapshot_hash=(
+                ihsg_snapshot.data_hash if ihsg_snapshot is not None else None
+            ),
+            ihsg_feature_as_of=(
+                ihsg_snapshot.last_date if ihsg_snapshot is not None else None
+            ),
+            feature_close=close_value,
             forecast_status=forecast_status,
             failure_reason=failure_reason,
             expected_return_net=r_hat_net,
@@ -271,6 +516,45 @@ class ForecastingService:
             volatility_forecast=sigma_forecast,
             expected_value=ev,
             decision=decision,
+            probability_source=probability_source,
+            probability_event=(
+                probability_barriers["probability_event"]
+                if probability_barriers
+                else None
+            ),
+            probability_barrier_source=(
+                probability_barriers["probability_barrier_source"]
+                if probability_barriers
+                else None
+            ),
+            probability_reference_close=(
+                probability_barriers["probability_reference_close"]
+                if probability_barriers
+                else None
+            ),
+            target_barrier_return=(
+                probability_barriers["target_barrier_return"]
+                if probability_barriers
+                else None
+            ),
+            stop_barrier_return=(
+                probability_barriers["stop_barrier_return"]
+                if probability_barriers
+                else None
+            ),
+            target_barrier_price=(
+                probability_barriers["target_barrier_price"]
+                if probability_barriers
+                else None
+            ),
+            stop_barrier_price=(
+                probability_barriers["stop_barrier_price"]
+                if probability_barriers
+                else None
+            ),
+            shadow_decision=shadow_decision,
+            shadow_buy_ev_floor=shadow_buy_ev_floor,
+            shadow_evaluation_only=shadow_evaluation_only,
             confidence=confidence,
             model_votes=model_votes,
             validation_summary=validation_summary,
@@ -357,7 +641,7 @@ class ForecastingService:
         if validations:
             validations = batch_bh_correction(validations)
 
-        weights = _model_weights(mode, validations, predictions)
+        weights = _model_weights(mode, validations, predictions, flags=flags)
         if mode != "naive" and predictions and sum(weights.values()) <= 1e-12:
             flags.append("no_validated_return_model")
         votes: list[ModelVote] = []
@@ -386,6 +670,11 @@ class ForecastingService:
                     model_name=name,
                     status=status,
                     reason=reason,
+                    probability_source=(
+                        "return_volatility_parametric"
+                        if p_target is not None and p_stop is not None
+                        else "unavailable"
+                    ),
                     r_hat_net=pred,
                     p_target=p_target,
                     p_stop=p_stop,
@@ -408,6 +697,28 @@ class ForecastingService:
 def _feature_frame(labeled: pd.DataFrame) -> pd.DataFrame:
     feature_cols = [c for c in labeled.columns if c not in _RETURN_LABEL_COLS]
     return labeled[feature_cols].select_dtypes(include=[np.number]).fillna(0)
+
+
+def _hash_feature_snapshot(dataset: pd.DataFrame) -> str:
+    """Return a stable hash for the exact materialized feature snapshot."""
+    column_payload = "\x1f".join(str(column) for column in dataset.columns).encode(
+        "utf-8"
+    )
+    row_payload = pd.util.hash_pandas_object(dataset, index=True).to_numpy().tobytes()
+    return hashlib.sha256(column_payload + b"\x00" + row_payload).hexdigest()
+
+
+def _frame_end_date(frame: pd.DataFrame) -> date | None:
+    """Return the final feature index as a date for provenance checks."""
+    if frame.empty:
+        return None
+    try:
+        value = frame.index[-1]
+        if isinstance(value, tuple):
+            value = value[-1]
+        return pd.Timestamp(value).date()
+    except (OverflowError, TypeError, ValueError):
+        return None
 
 
 def _normalize_mode(value: str, flags: list[str]) -> ForecastMode:
@@ -437,6 +748,8 @@ def _model_weights(
     mode: ForecastMode,
     validations: dict[str, ValidationSummary],
     predictions: dict[str, float],
+    *,
+    flags: list[str] | None = None,
 ) -> dict[str, float]:
     if mode == "naive":
         return {"naive": 1.0 if "naive" in predictions else 0.0}
@@ -455,7 +768,32 @@ def _model_weights(
         if name in predictions
         and validation.status in {"production", "research_only"}
     }
-    weights = compute_ensemble_weights(scores) if scores else {}
+    naive_validation = validations.get("naive")
+    naive_brier_benchmark = (
+        naive_validation.brier
+        if naive_validation is not None
+        and naive_validation.brier is not None
+        and math.isfinite(float(naive_validation.brier))
+        else None
+    )
+    if naive_brier_benchmark is not None:
+        for name, validation in validations.items():
+            if name == "naive" or name not in predictions or validation.brier is None:
+                continue
+            brier_delta = float(validation.brier) - float(naive_brier_benchmark)
+            if abs(brier_delta) <= BRIER_BORDERLINE_EPSILON and flags is not None:
+                flags.append(
+                    f"brier_borderline:{name}:delta={brier_delta:+.6f}:"
+                    f"epsilon={BRIER_BORDERLINE_EPSILON:.4f}"
+                )
+    weights = (
+        compute_ensemble_weights(
+            scores,
+            naive_brier_benchmark=naive_brier_benchmark,
+        )
+        if scores
+        else {}
+    )
     if sum(weights.values()) > 1e-12:
         return weights
     return {name: 0.0 for name in predictions}
@@ -657,29 +995,24 @@ def _compute_probs(
     cio_verdict: "CIOVerdict | None",
     close: float | None,
 ) -> tuple[float | None, float | None]:
-    """Log-normal terminal probability approximation for target/stop hit."""
+    """Log-normal terminal probability using an already-H-day return forecast."""
     if sigma is None or sigma <= 0:
         return None, None
 
     h_frac = horizon / 252.0
-    drift_h = (r_hat or 0.0) * h_frac
+    # r_hat is trained against labels.r_net_h and is already an H-day return.
+    # Only the annualized volatility needs sqrt(H/252) conversion.
+    drift_h = r_hat or 0.0
     sigma_h = sigma * math.sqrt(h_frac)
 
     if sigma_h < 1e-10:
         return None, None
 
-    if cio_verdict is not None and close is not None and close > 0:
-        target = cio_verdict.target_price
-        stop = cio_verdict.stop_loss
-        if target and stop and target > 0 and stop > 0 and stop < close < target:
-            G = (target - close) / close
-            L = (close - stop) / close
-        else:
-            tau = TAU_H.get(horizon, 0.015)
-            G, L = tau, tau
-    else:
-        tau = TAU_H.get(horizon, 0.015)
-        G, L = tau, tau
+    barriers = _probability_barrier_metadata(horizon, cio_verdict, close)
+    if barriers is None:
+        return None, None
+    G = float(barriers["target_barrier_return"])
+    L = float(barriers["stop_barrier_return"])
 
     if G <= 0 or L <= 0:
         return None, None
@@ -690,7 +1023,11 @@ def _compute_probs(
         ln_stop = math.log(1 - L) if L < 1 else float("-inf")
 
         p_target = float(1 - _norm.cdf((ln_target - drift_h) / sigma_h))
-        p_stop = float(_norm.cdf((ln_stop - drift_h) / sigma_h)) if math.isfinite(ln_stop) else 0.0
+        p_stop = (
+            float(_norm.cdf((ln_stop - drift_h) / sigma_h))
+            if math.isfinite(ln_stop)
+            else 0.0
+        )
 
         p_target = max(0.0, min(1.0, p_target))
         p_stop = max(0.0, min(1.0, p_stop))
@@ -699,6 +1036,50 @@ def _compute_probs(
         logger.warning("[ForecastSvc] _compute_probs failed: %s", e)
         return None, None
 
+
+def _probability_barrier_metadata(
+    horizon: int,
+    cio_verdict: "CIOVerdict | None",
+    close: float | None,
+) -> dict[str, float | str] | None:
+    """Return the exact terminal-event barriers used by ``_compute_probs``.
+
+    Persisting these values makes later shadow Brier scoring reproducible.  It
+    does not change probability math or any live decision threshold.
+    """
+
+    if close is None or not math.isfinite(float(close)) or float(close) <= 0:
+        return None
+    reference = float(close)
+    source = "default_horizon"
+    target_price: float | None = None
+    stop_price: float | None = None
+    if cio_verdict is not None:
+        target = cio_verdict.target_price
+        stop = cio_verdict.stop_loss
+        if target and stop and target > 0 and stop > 0 and stop < reference < target:
+            target_price = float(target)
+            stop_price = float(stop)
+            source = "cio_trade_levels"
+
+    if target_price is None or stop_price is None:
+        tau = float(TAU_H.get(horizon, 0.015))
+        target_price = reference * (1.0 + tau)
+        stop_price = reference * (1.0 - tau)
+
+    target_return = (target_price - reference) / reference
+    stop_return = (reference - stop_price) / reference
+    if target_return <= 0 or stop_return <= 0:
+        return None
+    return {
+        "probability_event": "terminal",
+        "probability_barrier_source": source,
+        "probability_reference_close": reference,
+        "target_barrier_return": target_return,
+        "stop_barrier_return": stop_return,
+        "target_barrier_price": target_price,
+        "stop_barrier_price": stop_price,
+    }
 
 def _compute_ev(
     p_target: float | None,
@@ -730,13 +1111,49 @@ def _make_decision(
     ev: float | None,
     r_hat_net: float | None,
 ) -> Literal["BUY", "WATCH", "AVOID"]:
+    """Live forecast decision; its 2% EV floor is intentionally unchanged."""
+    return _decision_with_ev_floor(
+        p_target,
+        p_stop,
+        ev,
+        r_hat_net,
+        ev_floor=_LIVE_BUY_EV_FLOOR,
+    )
+
+
+def _make_shadow_decision(
+    p_target: float | None,
+    p_stop: float | None,
+    ev: float | None,
+    r_hat_net: float | None,
+    *,
+    ev_floor: float,
+) -> Literal["BUY", "WATCH", "AVOID"]:
+    """Calibration-only decision that is never consumed by live execution."""
+    return _decision_with_ev_floor(
+        p_target,
+        p_stop,
+        ev,
+        r_hat_net,
+        ev_floor=ev_floor,
+    )
+
+
+def _decision_with_ev_floor(
+    p_target: float | None,
+    p_stop: float | None,
+    ev: float | None,
+    r_hat_net: float | None,
+    *,
+    ev_floor: float,
+) -> Literal["BUY", "WATCH", "AVOID"]:
     if any(v is None for v in [p_target, p_stop, ev, r_hat_net]):
         return "AVOID"
 
     buy = (
         p_target >= 0.55  # type: ignore[operator]
         and (p_target - p_stop) >= 0.15  # type: ignore[operator]
-        and ev >= 0.02  # type: ignore[operator]
+        and ev >= ev_floor  # type: ignore[operator]
         and r_hat_net >= 0.015  # type: ignore[operator]
     )
     if buy:
@@ -774,6 +1191,7 @@ def _error_report(
     return ForecastReport(
         ticker=ticker.upper(),
         as_of=as_of,
+        forecast_as_of=as_of,
         horizon_days=horizon,
         forecast_status="UNAVAILABLE",
         failure_reason=flags[0] if flags else "forecast_unavailable",

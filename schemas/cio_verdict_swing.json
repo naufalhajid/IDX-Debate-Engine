@@ -30,6 +30,12 @@
       "type": "number",
       "description": "Intrinsic value in IDR, calculated via P/E and P/B Band vs 3-5yr historical median."
     },
+    "fair_value_status": {
+      "type": ["string", "null"],
+      "enum": ["NOT_EVALUATED_PREFLIGHT", null],
+      "default": null,
+      "description": "Fair value evaluation was skipped because a deterministic pre-debate gate returned before valuation ran. Null otherwise."
+    },
     "entry_price_range": {
       "type": "string",
       "description": "Safe accumulation zone near confirmed support. Format: 'XXXX - YYYY'."
@@ -104,6 +110,7 @@
       "sell_at":         "target_price      — label: 'Jual di'",
       "cut_loss":        "stop_loss         — label: 'Cut Loss'",
       "fair_value":      "fair_value        — label: 'Harga Wajar'",
+      "fair_value_status": "fair_value_status — label: 'Status Harga Wajar'",
       "expected_return": "expected_return   — label: 'Potensi Profit'",
       "risk_reward":     "risk_reward_ratio — label: 'R/R Ratio'",
       "timeframe":       "timeframe         — label: 'Timeframe'",

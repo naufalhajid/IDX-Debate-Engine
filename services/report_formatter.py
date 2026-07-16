@@ -48,10 +48,18 @@ _AGENT_LABELS = {
     "sentiment_specialist": "Sentiment Specialist",
 }
 
+_DIRECTIONAL_AGENT_ROLES = {
+    "bull",
+    "bear",
+    "chartist",
+    "sentiment_specialist",
+}
+
 _METHOD_LABELS = {
     "voting": "Majority voting",
     "confidence_winner": "Confidence winner",
     "soft_hold": "Soft hold rule",
+    "quality_veto": "Fundamental quality veto",
 }
 
 
@@ -427,6 +435,14 @@ def _valuation_status(
     return "FAIR VALUE"
 
 
+def _fair_value_status(verdict: dict[str, Any]) -> str | None:
+    """Return only the explicit, schema-approved fair-value status."""
+    status = verdict.get("fair_value_status")
+    if status == "NOT_EVALUATED_PREFLIGHT":
+        return status
+    return None
+
+
 def _fair_value_range_text(fair_value_low: Any, fair_value_high: Any) -> str | None:
     low = _safe_float(fair_value_low)
     high = _safe_float(fair_value_high)
@@ -744,7 +760,7 @@ def _vote_distribution_summary(
     votes = [
         vote
         for vote in _agent_votes(result, packet)
-        if not _is_devils_advocate_agent(_vote_value(vote, "agent"))
+        if _canonical(_vote_value(vote, "agent")) in _DIRECTIONAL_AGENT_ROLES
     ]
     if not votes:
         return "voting data unavailable"
@@ -782,7 +798,7 @@ def _agent_choice_reason_lines(
     lines: list[str] = []
     for vote in _agent_votes(result, packet):
         agent = _vote_value(vote, "agent")
-        if _is_devils_advocate_agent(agent):
+        if _canonical(agent) not in _DIRECTIONAL_AGENT_ROLES:
             continue
         position = _canonical_position(_vote_value(vote, "position"))
         label = _agent_label(agent)
@@ -934,7 +950,7 @@ def _voting_winner_agents(
     winners: list[str] = []
     for vote in _agent_votes(result, packet):
         agent = _vote_value(vote, "agent")
-        if _is_devils_advocate_agent(agent):
+        if _canonical(agent) not in _DIRECTIONAL_AGENT_ROLES:
             continue
         if _canonical_position(_vote_value(vote, "position")) != rating:
             continue
@@ -1174,6 +1190,7 @@ class RichFormatter:
             )
             risk_overvalued = _optional_bool(verdict.get("risk_overvalued"))
             valuation_unverified = _valuation_gap_is_unverified(data, verdict)
+            fair_value_status = _fair_value_status(verdict)
             value_gap = _price_diff_pct(fair_value, current_price)
             value_status = _valuation_status(
                 fair_value,
@@ -1222,7 +1239,10 @@ class RichFormatter:
             left_table.add_column(style="bold cyan", no_wrap=True)
             left_table.add_column(style="white")
             left_table.add_row("Current Price", _money(current_price))
-            if not valuation_unverified:
+            if fair_value_status:
+                left_table.add_row("Fair Value", "N/A")
+                left_table.add_row("Fair Value Status", fair_value_status)
+            elif not valuation_unverified:
                 left_table.add_row("Fair Value", _money(fair_value))
                 if fair_value_range:
                     left_table.add_row("FV Range", fair_value_range)
@@ -1232,11 +1252,18 @@ class RichFormatter:
                 "Valuation Gap",
                 Text(
                     (
-                        "unverified"
-                        if valuation_unverified
-                        else f"{_signed_pct(value_gap)} ({value_status})"
+                        fair_value_status
+                        or (
+                            "unverified"
+                            if valuation_unverified
+                            else f"{_signed_pct(value_gap)} ({value_status})"
+                        )
                     ),
-                    style="yellow" if valuation_unverified else value_style,
+                    style=(
+                        "yellow"
+                        if fair_value_status or valuation_unverified
+                        else value_style
+                    ),
                 ),
             )
             left_table.add_row(
@@ -1595,15 +1622,19 @@ class MarkdownFormatter:
             )
             risk_overvalued = _optional_bool(verdict.get("risk_overvalued"))
             valuation_unverified = _valuation_gap_is_unverified(data, verdict)
+            fair_value_status = _fair_value_status(verdict)
             value_gap = _price_diff_pct(fair_value, current_price)
             value_status = (
-                "unverified"
-                if valuation_unverified
-                else _valuation_status(
-                    fair_value,
-                    current_price,
-                    fair_value_low,
-                    fair_value_high,
+                fair_value_status
+                or (
+                    "unverified"
+                    if valuation_unverified
+                    else _valuation_status(
+                        fair_value,
+                        current_price,
+                        fair_value_low,
+                        fair_value_high,
+                    )
                 )
             )
             low, high = _entry_bounds(verdict)
@@ -1652,25 +1683,36 @@ class MarkdownFormatter:
                 ),
                 f"| **Current Price** | {_money(current_price)} |",
                 *(
-                    []
-                    if valuation_unverified
-                    else [f"| **Fair Value** | {_money(fair_value)} |"]
+                    [
+                        "| **Fair Value** | N/A |",
+                        f"| **Fair Value Status** | {fair_value_status} |",
+                    ]
+                    if fair_value_status
+                    else (
+                        []
+                        if valuation_unverified
+                        else [f"| **Fair Value** | {_money(fair_value)} |"]
+                    )
                 ),
                 *(
                     []
-                    if valuation_unverified or not fair_value_range
+                    if fair_value_status
+                    or valuation_unverified
+                    or not fair_value_range
                     else [f"| **Fair Value Range** | {fair_value_range} |"]
                 ),
                 *(
                     []
-                    if valuation_unverified or risk_overvalued is None
+                    if fair_value_status
+                    or valuation_unverified
+                    or risk_overvalued is None
                     else [
                         f"| **Risk Overvalued** | {str(risk_overvalued)} |"
                     ]
                 ),
                 (
                     f"| **Gap** | {value_status} |"
-                    if valuation_unverified
+                    if fair_value_status or valuation_unverified
                     else f"| **Gap** | {_signed_pct(value_gap)} ({value_status}) |"
                 ),
                 "",

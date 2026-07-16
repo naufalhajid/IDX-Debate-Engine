@@ -120,6 +120,11 @@ class Settings(BaseSettings):
     CANDIDATES_MAX_AGE_HOURS: float = 48.0
     CANDIDATES_AUTO_RERUN: bool = True
 
+    # Forecast calibration packet. This is advisory/shadow-only: the live
+    # ForecastReport.decision keeps its independent 2% BUY EV floor.
+    FORECAST_SHADOW_EVALUATION_ENABLED: bool = True
+    FORECAST_SHADOW_BUY_EV_FLOOR: float = 0.005
+
     # ── Market Regime (IHSG ^JKSE realized volatility proxy) ─────────────────
     REGIME_VOLATILITY_HIGH_THRESHOLD: float = 0.02  # daily std >= 2% → HIGH
     REGIME_VOLATILITY_LOW_THRESHOLD: float = 0.01  # daily std < 1%  → LOW
@@ -220,6 +225,14 @@ class Settings(BaseSettings):
                 f"harus sum = 1.0, got {total:.6f}. "
                 "Periksa environment variables."
             )
+        return self
+
+    @model_validator(mode="after")
+    def validate_forecast_shadow_config(self) -> "Settings":
+        """Keep the calibration-only EV floor finite and percentage-like."""
+        floor = float(self.FORECAST_SHADOW_BUY_EV_FLOOR)
+        if not 0 < floor < 1:
+            raise ValueError("FORECAST_SHADOW_BUY_EV_FLOOR must be between 0 and 1")
         return self
 
     @model_validator(mode="after")
