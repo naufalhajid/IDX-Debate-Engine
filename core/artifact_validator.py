@@ -37,6 +37,25 @@ class ReconciliationIssue(BaseModel):
     ticker: str | None = None
 
 
+class RagNotApplicableRecord(BaseModel):
+    """Auditable proof that a batch result never entered the RAG graph path."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ticker: str
+    run_id: str | None = None
+    status: Literal["NOT_APPLICABLE"] = "NOT_APPLICABLE"
+    terminal_kind: Literal[
+        "trade_setup",
+        "pre_cio",
+        "budget_capacity",
+        "candidate_intake",
+    ]
+    terminal_status: str | None = None
+    reason_code: str
+    graph_activity: Literal[False] = False
+
+
 class ReconciliationReport(BaseModel):
     """Combined truth report across batch, markdown, debate, and logs."""
 
@@ -53,6 +72,7 @@ class ReconciliationReport(BaseModel):
     latest_run_id: str | None = None
     surfaces: dict[str, bool] = Field(default_factory=dict)
     corrupt_lines: int = 0
+    rag_not_applicable: list[RagNotApplicableRecord] = Field(default_factory=list)
 
 
 _TOP_PICK_HEADING = re.compile(
@@ -62,6 +82,35 @@ _TOP_PICK_HEADING = re.compile(
 DEFAULT_AUDIT_LOG_PATH = settings.audit_log_path
 DEFAULT_TELEMETRY_LOG_PATH = settings.ops_telemetry_path
 DEFAULT_RAG_EVIDENCE_LOG_PATH = settings.rag_evidence_log_path
+_TRADE_SETUP_RAG_NOT_APPLICABLE_STATUSES = frozenset(
+    {
+        "WAIT_FOR_PULLBACK",
+        "WAIT_FOR_CONFIRMATION",
+        "SHADOW_ONLY",
+        "NO_MOMENTUM",
+        "RR_TOO_LOW",
+        "STOP_INSIDE_NOISE",
+        "INSUFFICIENT_DATA",
+        "UNKNOWN_REJECT",
+    }
+)
+_PRE_CIO_RAG_NOT_APPLICABLE_CODES = frozenset(
+    {
+        "critical_risk_flag",
+        "exdate_imminent",
+        "counter_trend_defensive",
+    }
+)
+_BUDGET_RAG_NOT_APPLICABLE_CODE = "llm_budget_capacity_exhausted"
+_CANDIDATE_INTAKE_RAG_NOT_APPLICABLE_CODE = "candidate_intake_invalid"
+_RAG_ACTIVITY_METADATA_KEYS = frozenset(
+    {
+        "rag_selection_failure",
+        "rag_chunks_selected",
+        "rag_chunks_considered",
+        "rag_citation_ids",
+    }
+)
 
 
 def validate_artifacts(
@@ -95,6 +144,7 @@ def validate_artifacts(
     _validate_latest_ticker(latest_result, latest_path, batch_by_ticker, errors)
     _validate_markdown_tickers(top3_text, top3_path, batch_by_ticker, errors)
     _validate_batch_risk_governor(batch_by_ticker, errors, warnings)
+    _validate_recommendation_contexts(batch_by_ticker, errors)
     _validate_basic_run_scope(batch_results or [], top3_text, latest_result, errors)
 
     return ValidationReport(valid=not errors, errors=errors, warnings=warnings)
@@ -195,6 +245,11 @@ def reconcile_artifacts(
         [],
     )
     batch_results = batch_payload if isinstance(batch_payload, list) else []
+    rag_targets, rag_not_applicable = _rag_validation_plan(
+        batch_results,
+        latest_ticker=latest_ticker,
+        latest_run_id=latest_run_id,
+    )
     top3_text = _read_required_text(top3_path, "TOP_3_SWING_TRADES.md", [])
     telemetry_records = (
         _load_jsonl(telemetry_path, "telemetry_log.jsonl", warnings)
@@ -236,7 +291,6 @@ def reconcile_artifacts(
             issues,
             warnings,
         )
-        _reconcile_rag_log(rag_path, latest_ticker, latest_run_id, issues, warnings)
     else:
         message = (
             "latest_debate.json has no ticker; optional log surfaces cannot be linked."
@@ -251,6 +305,17 @@ def reconcile_artifacts(
             )
         )
 
+    if rag_targets:
+        rag_records = _load_jsonl(rag_path, "evidence_log.jsonl", warnings)
+        for ticker, run_id in rag_targets:
+            _reconcile_rag_records(
+                rag_records,
+                ticker,
+                run_id,
+                issues,
+                warnings,
+            )
+
     return ReconciliationReport(
         valid=not errors,
         errors=errors,
@@ -263,6 +328,7 @@ def reconcile_artifacts(
         latest_run_id=latest_run_id,
         surfaces=surfaces,
         corrupt_lines=len(corrupt_audit_lines),
+        rag_not_applicable=rag_not_applicable,
     )
 
 
@@ -425,6 +491,77 @@ def _validate_batch_risk_governor(
         if "upside_exhausted" in reason_codes:
             warnings.append(
                 f"upside_exhausted: {ticker} target_price is not above current_price."
+            )
+
+
+def _validate_recommendation_contexts(
+    batch_by_ticker: dict[str, dict[str, Any]],
+    errors: list[str],
+) -> None:
+    """Validate the display contract without granting it execution authority."""
+
+    from schemas.debate import RecommendationContext
+
+    for ticker, entry in batch_by_ticker.items():
+        metadata = entry.get("metadata")
+        metadata = metadata if isinstance(metadata, dict) else {}
+        top_level = entry.get("recommendation_context")
+        metadata_level = metadata.get("recommendation_context")
+        if top_level is not None and metadata_level is not None:
+            if top_level != metadata_level:
+                errors.append(
+                    f"recommendation_context_drift: {ticker} top-level and "
+                    "metadata projections differ."
+                )
+                continue
+        raw = top_level if top_level is not None else metadata_level
+        if raw is None:
+            continue
+        if not isinstance(raw, dict):
+            errors.append(
+                f"recommendation_context_malformed: {ticker} context is not an object."
+            )
+            continue
+        try:
+            context = RecommendationContext.model_validate(raw)
+        except Exception as exc:
+            errors.append(
+                f"recommendation_context_malformed: {ticker} failed schema: {exc}"
+            )
+            continue
+
+        decision = entry.get("execution_decision")
+        decision = decision if isinstance(decision, dict) else {}
+        if decision:
+            actionable = bool(decision.get("actionable"))
+            if context.execution_eligible is not actionable:
+                errors.append(
+                    f"recommendation_execution_mismatch: {ticker} context "
+                    "execution_eligible disagrees with execution_decision.actionable."
+                )
+            expected_actionability = "PASS" if actionable else (
+                "ABSTAIN"
+                if str(decision.get("execution_status") or "").upper()
+                == "INSUFFICIENT_DATA"
+                else "REJECT"
+            )
+            if context.actionability != expected_actionability:
+                errors.append(
+                    f"recommendation_actionability_mismatch: {ticker} context says "
+                    f"{context.actionability}, expected {expected_actionability}."
+                )
+            decision_source = str(decision.get("decision_source") or "")
+            if decision_source and context.decision_source != decision_source:
+                errors.append(
+                    f"recommendation_source_mismatch: {ticker} context source "
+                    f"{context.decision_source} != {decision_source}."
+                )
+
+        top_state = entry.get("recommendation_state")
+        if top_state is not None and top_state != context.recommendation_state:
+            errors.append(
+                f"recommendation_state_mismatch: {ticker} top-level state "
+                f"{top_state} != {context.recommendation_state}."
             )
 
 
@@ -672,6 +809,159 @@ def _extract_run_id(payload: dict[str, Any]) -> str | None:
     return None
 
 
+def _is_explicit_zero(value: Any) -> bool:
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and value == 0
+    )
+
+
+def _has_no_graph_activity(entry: dict[str, Any]) -> bool:
+    metadata = entry.get("metadata")
+    metadata = metadata if isinstance(metadata, dict) else {}
+    return (
+        entry.get("error") in (None, "")
+        and _is_explicit_zero(entry.get("debate_rounds"))
+        and not entry.get("agent_votes")
+        and not entry.get("debate_history")
+        and _is_explicit_zero(metadata.get("flash_calls"))
+        and _is_explicit_zero(metadata.get("pro_calls"))
+        and _is_explicit_zero(metadata.get("llm_calls"))
+        and not any(key in metadata for key in _RAG_ACTIVITY_METADATA_KEYS)
+    )
+
+
+def _rag_not_applicable_record(
+    entry: dict[str, Any],
+    *,
+    ticker: str,
+    run_id: str | None,
+) -> RagNotApplicableRecord | None:
+    if not _has_no_graph_activity(entry):
+        return None
+
+    metadata = entry.get("metadata")
+    metadata = metadata if isinstance(metadata, dict) else {}
+    verdict = entry.get("verdict")
+    verdict = verdict if isinstance(verdict, dict) else {}
+
+    snapshot = metadata.get("trade_setup_snapshot")
+    snapshot = snapshot if isinstance(snapshot, dict) else {}
+    snapshot_status = str(snapshot.get("status") or "").upper()
+    snapshot_reason = str(snapshot.get("reason_code") or "").strip()
+    if (
+        snapshot.get("debate_eligible") is False
+        and str(metadata.get("decision_source") or "").lower() == "preflight"
+        and str(verdict.get("decision_source") or "").lower() == "preflight"
+        and snapshot_status in _TRADE_SETUP_RAG_NOT_APPLICABLE_STATUSES
+        and bool(snapshot_reason)
+    ):
+        return RagNotApplicableRecord(
+            ticker=ticker,
+            run_id=run_id,
+            terminal_kind="trade_setup",
+            terminal_status=snapshot_status,
+            reason_code=snapshot_reason,
+        )
+
+    pre_cio = metadata.get("pre_cio_rejection")
+    pre_cio = pre_cio if isinstance(pre_cio, dict) else {}
+    pre_cio_code = str(pre_cio.get("reason_code") or "").strip()
+    if (
+        pre_cio_code in _PRE_CIO_RAG_NOT_APPLICABLE_CODES
+        and str(verdict.get("decision_source") or "").lower() == "risk_guard"
+    ):
+        return RagNotApplicableRecord(
+            ticker=ticker,
+            run_id=run_id,
+            terminal_kind="pre_cio",
+            terminal_status=str(entry.get("execution_status") or "NO_TRADE"),
+            reason_code=pre_cio_code,
+        )
+
+    budget = metadata.get("budget_capacity_rejection")
+    budget = budget if isinstance(budget, dict) else {}
+    budget_code = str(budget.get("reason_code") or "").strip()
+    if (
+        budget_code == _BUDGET_RAG_NOT_APPLICABLE_CODE
+        and entry.get("status") == "skipped"
+    ):
+        return RagNotApplicableRecord(
+            ticker=ticker,
+            run_id=run_id,
+            terminal_kind="budget_capacity",
+            terminal_status=str(
+                entry.get("execution_status") or "INSUFFICIENT_DATA"
+            ),
+            reason_code=budget_code,
+        )
+
+    candidate_intake = metadata.get("candidate_intake_rejection")
+    candidate_intake = candidate_intake if isinstance(candidate_intake, dict) else {}
+    candidate_intake_code = str(
+        candidate_intake.get("reason_code") or ""
+    ).strip()
+    if (
+        candidate_intake_code == _CANDIDATE_INTAKE_RAG_NOT_APPLICABLE_CODE
+        and metadata.get("artifact_scope") == "batch_only"
+    ):
+        return RagNotApplicableRecord(
+            ticker=ticker,
+            run_id=run_id,
+            terminal_kind="candidate_intake",
+            terminal_status=str(
+                entry.get("execution_status") or "INSUFFICIENT_DATA"
+            ),
+            reason_code=candidate_intake_code,
+        )
+
+    return None
+
+
+def _rag_validation_plan(
+    batch_results: list[Any],
+    *,
+    latest_ticker: str | None,
+    latest_run_id: str | None,
+) -> tuple[list[tuple[str, str | None]], list[RagNotApplicableRecord]]:
+    """Split batch targets into RAG-required and explicit terminal records."""
+    targets: list[tuple[str, str | None]] = []
+    not_applicable: list[RagNotApplicableRecord] = []
+    grouped: dict[tuple[str, str | None], list[dict[str, Any]]] = {}
+    for entry in batch_results:
+        if not isinstance(entry, dict):
+            continue
+        ticker = _extract_ticker(entry)
+        if ticker is None:
+            continue
+        run_id = _extract_run_id(entry)
+        if run_id is None and ticker == latest_ticker:
+            run_id = latest_run_id
+        target = (ticker, run_id)
+        grouped.setdefault(target, []).append(entry)
+
+    for (ticker, run_id), entries in grouped.items():
+        records = [
+            _rag_not_applicable_record(
+                entry,
+                ticker=ticker,
+                run_id=run_id,
+            )
+            for entry in entries
+        ]
+        if records and all(record is not None for record in records):
+            not_applicable.extend(
+                record for record in records if record is not None
+            )
+        else:
+            targets.append((ticker, run_id))
+
+    if not grouped and latest_ticker is not None:
+        targets.append((latest_ticker, latest_run_id))
+    return targets, not_applicable
+
+
 def _collect_batch_timestamps(entries: list[dict[str, Any]]) -> set[str]:
     return {
         str(value).strip()
@@ -907,14 +1197,13 @@ def _reconcile_telemetry_log(
     )
 
 
-def _reconcile_rag_log(
-    rag_path: Path | None,
+def _reconcile_rag_records(
+    records: list[dict[str, Any]],
     ticker: str,
     run_id: str | None,
     issues: list[ReconciliationIssue],
     warnings: list[str],
 ) -> None:
-    records = _load_jsonl(rag_path, "evidence_log.jsonl", warnings)
     if not records:
         _append_warning_issue(
             issues,

@@ -48,10 +48,18 @@ _AGENT_LABELS = {
     "sentiment_specialist": "Sentiment Specialist",
 }
 
+_DIRECTIONAL_AGENT_ROLES = {
+    "bull",
+    "bear",
+    "chartist",
+    "sentiment_specialist",
+}
+
 _METHOD_LABELS = {
     "voting": "Majority voting",
     "confidence_winner": "Confidence winner",
     "soft_hold": "Soft hold rule",
+    "quality_veto": "Fundamental quality veto",
 }
 
 
@@ -79,6 +87,144 @@ def _execution_contract(result: dict[str, Any]) -> dict[str, Any]:
             "actionable": result.get("actionable"),
         }
     return {}
+
+
+def _recommendation_context(result: dict[str, Any]) -> dict[str, Any]:
+    """Return the shared explanation projection used by API and reports."""
+
+    direct = _dict_or_empty(result.get("recommendation_context"))
+    if direct:
+        return direct
+    metadata = _dict_or_empty(result.get("metadata"))
+    persisted = _dict_or_empty(metadata.get("recommendation_context"))
+    if persisted:
+        return persisted
+    try:
+        from services.recommendation_context import project_recommendation_context
+
+        return project_recommendation_context(
+            result,
+            decision=_execution_contract(result) or None,
+        )
+    except Exception:
+        return {}
+
+
+def _model_opinion(
+    result: dict[str, Any],
+    verdict: dict[str, Any],
+    packet: AuditPacket | None = None,
+) -> str:
+    execution = _execution_contract(result)
+    explicit = execution.get("model_rating")
+    if explicit is None and _recommendation_process(result) == (
+        "DETERMINISTIC_PREFLIGHT"
+    ):
+        return "NOT_EVALUATED"
+    if explicit is not None:
+        return str(explicit).upper()
+    return _rating(result, packet)
+
+
+def _result_model_confidence(
+    result: dict[str, Any],
+    verdict: dict[str, Any],
+) -> float | None:
+    execution = _execution_contract(result)
+    if execution.get("model_rating") is None and _recommendation_process(result) == (
+        "DETERMINISTIC_PREFLIGHT"
+    ):
+        return None
+    explicit = execution.get("model_confidence")
+    if explicit is not None:
+        return _confidence(explicit)
+    return _model_confidence(verdict)
+
+
+def _gate_value(value: Any, unit: Any = None) -> str:
+    number = _safe_float(value)
+    unit_text = str(unit or "").strip()
+    if number is None:
+        return "not recorded" if value in (None, "") else str(value)
+    if unit_text == "IDR":
+        return _money(number)
+    if unit_text == "x":
+        return f"{number:.2f}x"
+    if unit_text == "%":
+        return f"{number:.2f}%"
+    if unit_text == "bars":
+        return f"{number:.0f} bars"
+    return f"{number:.3g}{(' ' + unit_text) if unit_text else ''}"
+
+
+def _blocker_rows(context: dict[str, Any]) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for raw_blocker in _list_or_empty(context.get("blockers")):
+        blocker = _dict_or_empty(raw_blocker)
+        observations = _list_or_empty(blocker.get("observations"))
+        if not observations:
+            rows.append(
+                {
+                    "gate": str(blocker.get("gate_id") or "unknown"),
+                    "class": str(blocker.get("hard_or_soft") or "unknown"),
+                    "observed": "not recorded",
+                    "threshold": "not recorded",
+                    "gap": "not recorded",
+                    "provenance": str(blocker.get("provenance") or "not recorded"),
+                    "trigger": str(
+                        blocker.get("next_observable_trigger") or "not recorded"
+                    ),
+                }
+            )
+            continue
+        for raw_metric in observations:
+            metric = _dict_or_empty(raw_metric)
+            unit = metric.get("unit")
+            absolute = metric.get("absolute_gap")
+            normalized = _safe_float(metric.get("percentage_gap"))
+            gap_parts = []
+            if absolute is not None:
+                gap_parts.append(_gate_value(absolute, unit))
+            if normalized is not None:
+                gap_parts.append(f"{normalized:.1%}")
+            rows.append(
+                {
+                    "gate": str(blocker.get("gate_id") or "unknown"),
+                    "class": str(blocker.get("hard_or_soft") or "unknown"),
+                    "observed": _gate_value(metric.get("observed"), unit),
+                    "threshold": (
+                        f"{metric.get('comparator') or ''} "
+                        f"{_gate_value(metric.get('threshold'), unit)}"
+                    ).strip(),
+                    "gap": " / ".join(gap_parts) or "not recorded",
+                    "provenance": str(blocker.get("provenance") or "not recorded"),
+                    "trigger": str(
+                        blocker.get("next_observable_trigger") or "not recorded"
+                    ),
+                }
+            )
+    return rows
+
+
+def _recommendation_process(result: dict[str, Any]) -> str:
+    metadata = _dict_or_empty(result.get("metadata"))
+    decision_source = str(
+        _execution_contract(result).get("decision_source") or ""
+    ).lower()
+    calls = _safe_float(metadata.get("llm_calls"))
+    if decision_source == "preflight" or calls == 0:
+        return "DETERMINISTIC_PREFLIGHT"
+    if calls is not None and calls > 0:
+        return "LLM_DEBATE_WITH_POLICY_REVIEW"
+    if decision_source == "cio":
+        return "LLM_DEBATE_WITH_POLICY_REVIEW"
+    if (
+        _list_or_empty(result.get("debate_history"))
+        or _list_or_empty(result.get("agent_votes"))
+        or (_safe_float(result.get("debate_rounds")) or 0) > 0
+    ):
+        return "LLM_DEBATE_WITH_POLICY_REVIEW"
+    return "UNRECORDED"
 
 
 def _list_or_empty(value: Any) -> list[Any]:
@@ -427,6 +573,14 @@ def _valuation_status(
     return "FAIR VALUE"
 
 
+def _fair_value_status(verdict: dict[str, Any]) -> str | None:
+    """Return only the explicit, schema-approved fair-value status."""
+    status = verdict.get("fair_value_status")
+    if status == "NOT_EVALUATED_PREFLIGHT":
+        return status
+    return None
+
+
 def _fair_value_range_text(fair_value_low: Any, fair_value_high: Any) -> str | None:
     low = _safe_float(fair_value_low)
     high = _safe_float(fair_value_high)
@@ -744,7 +898,7 @@ def _vote_distribution_summary(
     votes = [
         vote
         for vote in _agent_votes(result, packet)
-        if not _is_devils_advocate_agent(_vote_value(vote, "agent"))
+        if _canonical(_vote_value(vote, "agent")) in _DIRECTIONAL_AGENT_ROLES
     ]
     if not votes:
         return "voting data unavailable"
@@ -782,7 +936,7 @@ def _agent_choice_reason_lines(
     lines: list[str] = []
     for vote in _agent_votes(result, packet):
         agent = _vote_value(vote, "agent")
-        if _is_devils_advocate_agent(agent):
+        if _canonical(agent) not in _DIRECTIONAL_AGENT_ROLES:
             continue
         position = _canonical_position(_vote_value(vote, "position"))
         label = _agent_label(agent)
@@ -934,7 +1088,7 @@ def _voting_winner_agents(
     winners: list[str] = []
     for vote in _agent_votes(result, packet):
         agent = _vote_value(vote, "agent")
-        if _is_devils_advocate_agent(agent):
+        if _canonical(agent) not in _DIRECTIONAL_AGENT_ROLES:
             continue
         if _canonical_position(_vote_value(vote, "position")) != rating:
             continue
@@ -1156,9 +1310,11 @@ class RichFormatter:
             ticker = _ticker(data, packet)
             verdict = _verdict(data)
             rating = _rating(data, packet)
+            model_opinion = _model_opinion(data, verdict, packet)
             rating_style = self._rating_style(rating)
-            confidence = _model_confidence(verdict)
-            if confidence is None and packet:
+            process = _recommendation_process(data)
+            confidence = _result_model_confidence(data, verdict)
+            if confidence is None and packet and process == "UNRECORDED":
                 confidence = _confidence(packet.verdict_confidence)
             confidence_text = (
                 "Data unavailable"
@@ -1174,6 +1330,7 @@ class RichFormatter:
             )
             risk_overvalued = _optional_bool(verdict.get("risk_overvalued"))
             valuation_unverified = _valuation_gap_is_unverified(data, verdict)
+            fair_value_status = _fair_value_status(verdict)
             value_gap = _price_diff_pct(fair_value, current_price)
             value_status = _valuation_status(
                 fair_value,
@@ -1189,6 +1346,14 @@ class RichFormatter:
             downside = _downside_pct(stop, current_price)
             risk = _risk(data)
             regime = _regime_display(data)
+            execution = _execution_contract(data)
+            recommendation_context = _recommendation_context(data)
+            recommendation_state = str(
+                recommendation_context.get("recommendation_state") or "UNCLASSIFIED"
+            )
+            hypothetical = _dict_or_empty(
+                recommendation_context.get("hypothetical_setup")
+            )
 
             consensus = data.get("consensus_reached")
             if consensus is None:
@@ -1201,19 +1366,31 @@ class RichFormatter:
             header_table.add_column(justify="right")
             header_table.add_row(
                 Text.assemble(
-                    ("RATING: ", "bold cyan"),
-                    (f"{rating}  ", rating_style),
+                    ("ACTION: ", "bold cyan"),
+                    (
+                        f"{execution.get('execution_status') or rating}  ",
+                        rating_style,
+                    ),
+                    ("STATE: ", "bold cyan"),
+                    (f"{recommendation_state}  ", "yellow"),
+                    ("MODEL: ", "bold cyan"),
+                    (f"{model_opinion}  ", rating_style),
                     ("TRADE SETUP CONVICTION: ", "bold cyan"),
                     (confidence_text),
                 ),
-                Text.assemble(
-                    ("CONSENSUS: ", "bold cyan"),
-                    (
-                        _yes_no(consensus) + f" ({_method_indonesian(method)})",
-                        "green" if consensus else "yellow",
-                    ),
-                    ("   ROUND: ", "bold cyan"),
-                    (str(data.get("debate_rounds") or "N/A"), "magenta"),
+                (
+                    Text("ZERO-AGENT PREFLIGHT", style="bold yellow")
+                    if process == "DETERMINISTIC_PREFLIGHT"
+                    else Text.assemble(
+                        ("CONSENSUS: ", "bold cyan"),
+                        (
+                            _yes_no(consensus)
+                            + f" ({_method_indonesian(method)})",
+                            "green" if consensus else "yellow",
+                        ),
+                        ("   ROUND: ", "bold cyan"),
+                        (str(data.get("debate_rounds") or "N/A"), "magenta"),
+                    )
                 ),
             )
 
@@ -1222,7 +1399,10 @@ class RichFormatter:
             left_table.add_column(style="bold cyan", no_wrap=True)
             left_table.add_column(style="white")
             left_table.add_row("Current Price", _money(current_price))
-            if not valuation_unverified:
+            if fair_value_status:
+                left_table.add_row("Fair Value", "N/A")
+                left_table.add_row("Fair Value Status", fair_value_status)
+            elif not valuation_unverified:
                 left_table.add_row("Fair Value", _money(fair_value))
                 if fair_value_range:
                     left_table.add_row("FV Range", fair_value_range)
@@ -1232,29 +1412,87 @@ class RichFormatter:
                 "Valuation Gap",
                 Text(
                     (
-                        "unverified"
-                        if valuation_unverified
-                        else f"{_signed_pct(value_gap)} ({value_status})"
+                        fair_value_status
+                        or (
+                            "unverified"
+                            if valuation_unverified
+                            else f"{_signed_pct(value_gap)} ({value_status})"
+                        )
                     ),
-                    style="yellow" if valuation_unverified else value_style,
+                    style=(
+                        "yellow"
+                        if fair_value_status or valuation_unverified
+                        else value_style
+                    ),
                 ),
             )
-            left_table.add_row(
-                "Entry Zone", f"{_money(entry_low)} – {_money(entry_high)}"
-            )
-            left_table.add_row(
-                "Target Price", f"{_money(target)}  ({_signed_pct(upside)})"
-            )
-            left_table.add_row(
-                "Stop Loss",
-                f"{_money(stop)}  ({_signed_pct(-downside if downside is not None else None)})",
-            )
-            left_table.add_row("Risk/Reward", _ratio(verdict.get("risk_reward_ratio")))
-            left_table.add_row("Timeframe", str(verdict.get("timeframe") or "N/A"))
-            left_table.add_row("Execution Horizon", _execution_horizon(verdict))
+            if execution.get("actionable") is True:
+                left_table.add_row(
+                    "Entry Zone", f"{_money(entry_low)} – {_money(entry_high)}"
+                )
+                left_table.add_row(
+                    "Target Price", f"{_money(target)}  ({_signed_pct(upside)})"
+                )
+                left_table.add_row(
+                    "Stop Loss",
+                    f"{_money(stop)}  ({_signed_pct(-downside if downside is not None else None)})",
+                )
+                left_table.add_row(
+                    "Risk/Reward", _ratio(verdict.get("risk_reward_ratio"))
+                )
+                left_table.add_row(
+                    "Timeframe", str(verdict.get("timeframe") or "N/A")
+                )
+                left_table.add_row("Execution Horizon", _execution_horizon(verdict))
+            elif hypothetical:
+                left_table.add_row(
+                    "Trade Authority",
+                    Text("NO SIZING — HYPOTHETICAL ONLY", style="bold red"),
+                )
+                left_table.add_row(
+                    "Hypothetical Entry",
+                    f"{_money(hypothetical.get('entry_low'))} – "
+                    f"{_money(hypothetical.get('entry_high'))}",
+                )
+                left_table.add_row(
+                    "Hypothetical Target", _money(hypothetical.get("target_price"))
+                )
+                left_table.add_row(
+                    "Hypothetical Stop", _money(hypothetical.get("stop_loss"))
+                )
+                left_table.add_row(
+                    "Observed / Required R/R",
+                    f"{_ratio(hypothetical.get('risk_reward_ratio'))} / "
+                    f"{_ratio(hypothetical.get('required_rr'))}",
+                )
+            else:
+                left_table.add_row(
+                    "Trade Plan",
+                    Text("NO EXECUTABLE PLAN", style="bold red"),
+                )
 
-            # 3. Right Column: Agent Voting & Integration
-            vote_table = self._build_vote_table(data, packet)
+            # 3. Right Column: agent voting or the actual zero-agent gate path.
+            if process == "DETERMINISTIC_PREFLIGHT":
+                vote_table = Table.grid(padding=(0, 1))
+                vote_table.add_column(style="bold", no_wrap=True)
+                vote_table.add_column()
+                vote_table.add_row("Process", "Deterministic preflight; zero LLM calls")
+                for row in _blocker_rows(recommendation_context):
+                    vote_table.add_row(
+                        row["gate"],
+                        (
+                            f"observed {row['observed']}; required "
+                            f"{row['threshold']}; gap {row['gap']}"
+                        ),
+                    )
+                right_panel_title = "[bold yellow]GATE DIAGNOSTICS[/bold yellow]"
+                right_panel_style = "yellow"
+            else:
+                vote_table = self._build_vote_table(data, packet)
+                right_panel_title = (
+                    "[bold magenta]AGENT VOTING & INTEGRATION[/bold magenta]"
+                )
+                right_panel_style = "magenta"
 
             # Wrap columns in a parent grid table to show side-by-side
             columns_table = Table.grid(padding=(0, 4), expand=True)
@@ -1269,8 +1507,8 @@ class RichFormatter:
             )
             vote_panel = Panel(
                 vote_table,
-                title="[bold magenta]AGENT VOTING & INTEGRATION[/bold magenta]",
-                border_style="magenta",
+                title=right_panel_title,
+                border_style=right_panel_style,
                 expand=True,
             )
 
@@ -1281,32 +1519,48 @@ class RichFormatter:
             arg_table.add_column(style="bold", no_wrap=True, width=18)
             arg_table.add_column()
 
-            bull_arg = _key_argument_summary(data, packet, "bull", limit=800)
-            bear_arg = _key_argument_summary(data, packet, "bear", limit=800)
-            decision_summary = _debate_decision_summary(data, packet, limit=1200)
+            if process == "DETERMINISTIC_PREFLIGHT":
+                arg_table.add_row(
+                    Text("Decision Path", style="yellow"),
+                    Text(
+                        "No LLM debate or CIO opinion was produced. The deterministic "
+                        "gate evidence above caused the canonical no-trade decision."
+                    ),
+                )
+                trigger = recommendation_context.get("next_observable_trigger")
+                if trigger:
+                    arg_table.add_row(Text("Recheck Trigger", style="cyan"), str(trigger))
+                argument_title = "[bold yellow]DECISION EXPLANATION[/bold yellow]"
+            else:
+                bull_arg = _key_argument_summary(data, packet, "bull", limit=800)
+                bear_arg = _key_argument_summary(data, packet, "bear", limit=800)
+                decision_summary = _debate_decision_summary(data, packet, limit=1200)
 
-            arg_table.add_row(
-                Text("🟢 Bull (Optimistic)", style="green"), Text(bull_arg)
-            )
-            arg_table.add_row("", "")
-            arg_table.add_row(
-                Text("🔴 Bear (Pessimistic)", style="red"), Text(bear_arg)
-            )
-            da_arg = _key_argument_summary(data, packet, "devils_advocate", limit=800)
-            if da_arg and da_arg != "Data unavailable":
+                arg_table.add_row(
+                    Text("🟢 Bull (Optimistic)", style="green"), Text(bull_arg)
+                )
                 arg_table.add_row("", "")
                 arg_table.add_row(
-                    Text("⚔️  Devil's Advocate", style="dim"),
-                    Text(da_arg, style="dim"),
+                    Text("🔴 Bear (Pessimistic)", style="red"), Text(bear_arg)
                 )
-            arg_table.add_row("", "")
-            arg_table.add_row(
-                Text("Decision Summary", style="yellow"), Text(decision_summary)
-            )
+                da_arg = _key_argument_summary(
+                    data, packet, "devils_advocate", limit=800
+                )
+                if da_arg and da_arg != "Data unavailable":
+                    arg_table.add_row("", "")
+                    arg_table.add_row(
+                        Text("⚔️  Devil's Advocate", style="dim"),
+                        Text(da_arg, style="dim"),
+                    )
+                arg_table.add_row("", "")
+                arg_table.add_row(
+                    Text("Decision Summary", style="yellow"), Text(decision_summary)
+                )
+                argument_title = "[bold yellow]KEY DEBATE ARGUMENTS[/bold yellow]"
 
             arg_panel = Panel(
                 arg_table,
-                title="[bold yellow]KEY DEBATE ARGUMENTS[/bold yellow]",
+                title=argument_title,
                 border_style="yellow",
                 padding=(1, 2),
                 expand=True,
@@ -1332,6 +1586,18 @@ class RichFormatter:
             sys_table.add_column(style="bold cyan", no_wrap=True, width=18)
             sys_table.add_column(style="white")
             sys_table.add_row("Risk Governor", self._terminal_risk_governor_line(risk))
+            sys_table.add_row("Recommendation State", recommendation_state)
+            sys_table.add_row(
+                "Evidence Quality",
+                str(recommendation_context.get("evidence_quality") or "UNKNOWN"),
+            )
+            sys_table.add_row(
+                "Calibration",
+                str(
+                    recommendation_context.get("calibration_status")
+                    or "NOT_AVAILABLE"
+                ),
+            )
             sys_table.add_row("Execution Regime", regime["execution"])
             sys_table.add_row("Regime Reason", regime["reason"])
             sys_table.add_row(
@@ -1426,7 +1692,9 @@ class RichFormatter:
 
             table = Table(show_header=True, header_style="bold", expand=True)
             table.add_column("Ticker", style="bold", no_wrap=True)
-            table.add_column("Rating", no_wrap=True)
+            table.add_column("Execution", no_wrap=True)
+            table.add_column("Rec State", no_wrap=True)
+            table.add_column("Model", no_wrap=True)
             table.add_column("Setup Conviction", justify="right", no_wrap=True)
             table.add_column("R/R", justify="right", no_wrap=True)
             table.add_column("Current Price", justify="right", no_wrap=True)
@@ -1438,6 +1706,8 @@ class RichFormatter:
             for row in rows:
                 verdict = _verdict(row)
                 rating = "ERROR" if row.get("error") else _rating(row)
+                execution = _execution_contract(row)
+                context = _recommendation_context(row)
                 low, high = _entry_bounds(verdict)
                 risk = _risk(row)
                 regime = _regime_display(row)
@@ -1446,8 +1716,13 @@ class RichFormatter:
                 )
                 table.add_row(
                     _ticker(row),
-                    Text(rating, style=self._rating_style(rating)),
-                    _pct(_model_confidence(verdict)),
+                    Text(
+                        str(execution.get("execution_status") or rating),
+                        style=self._rating_style(rating),
+                    ),
+                    str(context.get("recommendation_state") or "UNCLASSIFIED"),
+                    _model_opinion(row, verdict),
+                    _pct(_result_model_confidence(row, verdict)),
                     _ratio(verdict.get("risk_reward_ratio")),
                     _money(current_price),
                     f"{_money(low, include_prefix=False)}-{_money(high, include_prefix=False)}",
@@ -1476,6 +1751,38 @@ class RichFormatter:
                     regime["volatility"],
                 )
 
+            diagnostic_table = Table(
+                show_header=True,
+                header_style="bold",
+                expand=True,
+            )
+            diagnostic_table.add_column("Ticker", style="bold", no_wrap=True)
+            diagnostic_table.add_column("State", no_wrap=True)
+            diagnostic_table.add_column("Gate")
+            diagnostic_table.add_column("Observed / Required / Gap")
+            diagnostic_table.add_column("Next Trigger")
+            for row in rows:
+                context = _recommendation_context(row)
+                state = str(context.get("recommendation_state") or "UNCLASSIFIED")
+                if state == "QUALIFIED":
+                    continue
+                blocker_rows = _blocker_rows(context)
+                blocker = blocker_rows[0] if blocker_rows else None
+                diagnostic_table.add_row(
+                    _ticker(row),
+                    state,
+                    blocker["gate"] if blocker else "not recorded",
+                    (
+                        f"{blocker['observed']} / {blocker['threshold']} / "
+                        f"{blocker['gap']}"
+                        if blocker
+                        else "not recorded"
+                    ),
+                    (
+                        str(context.get("next_observable_trigger") or "not recorded")
+                    ),
+                )
+
             duration_text = ""
             if duration_seconds is not None:
                 minutes, seconds = divmod(max(0, int(duration_seconds)), 60)
@@ -1491,6 +1798,8 @@ class RichFormatter:
                         table,
                         Rule("REGIME AUTHORITY", style="dim"),
                         regime_table,
+                        Rule("RECOMMENDATION DIAGNOSTICS", style="dim"),
+                        diagnostic_table,
                         footer,
                     ),
                     title="DEBATE RESULTS",
@@ -1582,8 +1891,10 @@ class MarkdownFormatter:
             verdict = _verdict(data)
             ticker = _ticker(data, packet)
             rating = _rating(data, packet)
-            confidence = _model_confidence(verdict)
-            if confidence is None and packet:
+            model_opinion = _model_opinion(data, verdict, packet)
+            confidence = _result_model_confidence(data, verdict)
+            process = _recommendation_process(data)
+            if confidence is None and packet and process == "UNRECORDED":
                 confidence = _confidence(packet.verdict_confidence)
             confidence_text = "N/A" if confidence is None else f"{confidence:.0%}"
             current_price = verdict.get("current_price")
@@ -1595,15 +1906,19 @@ class MarkdownFormatter:
             )
             risk_overvalued = _optional_bool(verdict.get("risk_overvalued"))
             valuation_unverified = _valuation_gap_is_unverified(data, verdict)
+            fair_value_status = _fair_value_status(verdict)
             value_gap = _price_diff_pct(fair_value, current_price)
             value_status = (
-                "unverified"
-                if valuation_unverified
-                else _valuation_status(
-                    fair_value,
-                    current_price,
-                    fair_value_low,
-                    fair_value_high,
+                fair_value_status
+                or (
+                    "unverified"
+                    if valuation_unverified
+                    else _valuation_status(
+                        fair_value,
+                        current_price,
+                        fair_value_low,
+                        fair_value_high,
+                    )
                 )
             )
             low, high = _entry_bounds(verdict)
@@ -1621,13 +1936,168 @@ class MarkdownFormatter:
             execution = _execution_contract(data)
             recommendation = execution.get("execution_status") or rating
             decision_source = execution.get("decision_source") or "legacy"
+            recommendation_context = _recommendation_context(data)
+            recommendation_state = (
+                recommendation_context.get("recommendation_state") or "UNCLASSIFIED"
+            )
+            blocker_rows = _blocker_rows(recommendation_context)
+            hypothetical = _dict_or_empty(
+                recommendation_context.get("hypothetical_setup")
+            )
+            mode = (
+                "Deterministic Preflight (zero LLM calls)"
+                if process == "DETERMINISTIC_PREFLIGHT"
+                else "Multi-Agent AI Debate + Policy Review"
+                if process == "LLM_DEBATE_WITH_POLICY_REVIEW"
+                else "Method not recorded"
+            )
+
+            if execution.get("actionable") is True:
+                trade_plan_lines = [
+                    "The canonical execution contract authorizes this setup.",
+                    "",
+                    "| Parameter | Value |",
+                    "|-----------|-------|",
+                    f"| **Entry Zone** | {_money(low)} - {_money(high)} |",
+                    f"| **Target Price** | {_money(target)} ({_signed_pct(upside)}) |",
+                    f"| **Stop Loss** | {_money(stop)} ({_signed_pct(-downside if downside is not None else None)}) |",
+                    f"| **Risk/Reward** | {_ratio(verdict.get('risk_reward_ratio'))} |",
+                    f"| **Timeframe** | {verdict.get('timeframe') or 'N/A'} |",
+                    f"| **Execution Horizon** | {_execution_horizon(verdict)} |",
+                ]
+            elif hypothetical:
+                h_entry_low = hypothetical.get("entry_low")
+                h_entry_high = hypothetical.get("entry_high")
+                trade_plan_lines = [
+                    "**No executable trade plan.**",
+                    "",
+                    "### Hypothetical Setup — NOT EXECUTABLE",
+                    "",
+                    (
+                        "> These levels preserve what the failed gate evaluated. "
+                        "They do not authorize entry or sizing; every gate must be "
+                        "recomputed after any trigger."
+                    ),
+                    "",
+                    "| Parameter | Recorded Value |",
+                    "|-----------|----------------|",
+                    f"| **Entry Zone** | {_money(h_entry_low)} - {_money(h_entry_high)} |",
+                    f"| **Target Price** | {_money(hypothetical.get('target_price'))} |",
+                    f"| **Stop Loss** | {_money(hypothetical.get('stop_loss'))} |",
+                    f"| **Observed R/R** | {_ratio(hypothetical.get('risk_reward_ratio'))} |",
+                    f"| **Required R/R** | {_ratio(hypothetical.get('required_rr'))} |",
+                    f"| **Timeframe** | {verdict.get('timeframe') or 'N/A'} |",
+                    f"| **Execution Horizon** | {_execution_horizon(verdict)} |",
+                    "| **Sizing Allowed** | **NO** |",
+                ]
+            else:
+                trade_plan_lines = [
+                    "**No executable trade plan.** Required geometry was not "
+                    "recorded or did not pass the actionability gates."
+                ]
+
+            diagnostic_lines = [
+                "## Gate Diagnostics",
+                "",
+                f"**Recommendation State**: `{recommendation_state}`",
+                "",
+            ]
+            if blocker_rows:
+                diagnostic_lines.extend(
+                    [
+                        "| Gate | Class | Observed | Required | Gap | Provenance |",
+                        "|------|-------|----------|----------|-----|------------|",
+                    ]
+                )
+                diagnostic_lines.extend(
+                    (
+                        f"| {row['gate']} | {row['class']} | {row['observed']} | "
+                        f"{row['threshold']} | {row['gap']} | {row['provenance']} |"
+                    )
+                    for row in blocker_rows
+                )
+                triggers = list(
+                    dict.fromkeys(
+                        row["trigger"]
+                        for row in blocker_rows
+                        if row["trigger"] != "not recorded"
+                    )
+                )
+                if triggers:
+                    diagnostic_lines.extend(
+                        ["", "**Observable recheck trigger(s):**", ""]
+                    )
+                    diagnostic_lines.extend(f"- {trigger}" for trigger in triggers)
+            else:
+                diagnostic_lines.append("No blocking gate is recorded.")
+
+            if process == "DETERMINISTIC_PREFLIGHT":
+                process_lines = [
+                    "## Decision Process",
+                    "",
+                    "**Path**: deterministic preflight / zero-agent policy decision",
+                    "",
+                    (
+                        "No LLM debate or CIO model opinion was produced. The result "
+                        "came from the recorded deterministic gate evidence above."
+                    ),
+                ]
+                methodology_lines = [
+                    "This result was generated by deterministic preflight rules. "
+                    "No AI agent debated the ticker and no model confidence should "
+                    "be interpreted from the policy rejection.",
+                    "",
+                    "The recommendation context is display-only; execution remains "
+                    "controlled by the canonical risk and sizing contract.",
+                ]
+            elif process == "LLM_DEBATE_WITH_POLICY_REVIEW":
+                process_lines = [
+                    "## Multi-Agent Debate Process",
+                    "",
+                    f"**Rounds**: {data.get('debate_rounds') or 'N/A'}",
+                    f"**Consensus**: {_yes_no(data.get('consensus_reached') or verdict.get('consensus_reached'))}",
+                    f"**Method**: {_method_indonesian(method)}",
+                    "",
+                    "### Agent Voting",
+                    "",
+                    *self._markdown_vote_table(data, packet),
+                    "",
+                    "### Key Arguments",
+                    "",
+                    "**Bull (Optimistic):**",
+                    f"> {_key_argument(data, packet, 'bull')}",
+                    "",
+                    "**Bear (Pessimistic):**",
+                    f"> {_key_argument(data, packet, 'bear')}",
+                    "",
+                    "**Decision Summary & Agent Rationale:**",
+                    f"> {_debate_decision_summary(data, packet, limit=900)}",
+                ]
+                methodology_lines = [
+                    "The multi-agent debate produced a model opinion, after which "
+                    "deterministic policy and sizing checks remained authoritative.",
+                    "",
+                    "A risk-guard veto never becomes a model probability and a "
+                    "model BUY never bypasses a failed execution gate.",
+                ]
+            else:
+                process_lines = [
+                    "## Decision Process",
+                    "",
+                    "The legacy artifact does not record enough telemetry to identify "
+                    "whether an LLM debate ran.",
+                ]
+                methodology_lines = [
+                    "Method telemetry is unavailable for this legacy artifact. No "
+                    "unrecorded agent activity is inferred.",
+                ]
 
             lines = [
                 "---",
                 f"# Analysis Report: {ticker}",
                 f"**Date**: {_date_wib()}",
                 f"**Run ID**: {_run_id(data, packet)}",
-                "**Mode**: Multi-Agent AI Debate",
+                f"**Mode**: {mode}",
                 "",
                 "---",
                 "",
@@ -1636,7 +2106,8 @@ class MarkdownFormatter:
                 "| Item | Detail |",
                 "|------|--------|",
                 f"| **Recommendation** | **{recommendation}** |",
-                f"| **Model Opinion** | {rating} |",
+                f"| **Recommendation State** | {recommendation_state} |",
+                f"| **Model Opinion** | {model_opinion} |",
                 f"| **Decision Source** | {decision_source} |",
                 f"| **Trade Setup Conviction** | {confidence_text} |",
                 f"| **Execution Regime** | {regime['execution']} |",
@@ -1652,25 +2123,36 @@ class MarkdownFormatter:
                 ),
                 f"| **Current Price** | {_money(current_price)} |",
                 *(
-                    []
-                    if valuation_unverified
-                    else [f"| **Fair Value** | {_money(fair_value)} |"]
+                    [
+                        "| **Fair Value** | N/A |",
+                        f"| **Fair Value Status** | {fair_value_status} |",
+                    ]
+                    if fair_value_status
+                    else (
+                        []
+                        if valuation_unverified
+                        else [f"| **Fair Value** | {_money(fair_value)} |"]
+                    )
                 ),
                 *(
                     []
-                    if valuation_unverified or not fair_value_range
+                    if fair_value_status
+                    or valuation_unverified
+                    or not fair_value_range
                     else [f"| **Fair Value Range** | {fair_value_range} |"]
                 ),
                 *(
                     []
-                    if valuation_unverified or risk_overvalued is None
+                    if fair_value_status
+                    or valuation_unverified
+                    or risk_overvalued is None
                     else [
                         f"| **Risk Overvalued** | {str(risk_overvalued)} |"
                     ]
                 ),
                 (
                     f"| **Gap** | {value_status} |"
-                    if valuation_unverified
+                    if fair_value_status or valuation_unverified
                     else f"| **Gap** | {_signed_pct(value_gap)} ({value_status}) |"
                 ),
                 "",
@@ -1678,39 +2160,17 @@ class MarkdownFormatter:
                 "",
                 "---",
                 "",
-                "## Trade Plan",
-                "",
-                "| Parameter | Value |",
-                "|-----------|-------|",
-                f"| **Entry Zone** | {_money(low)} - {_money(high)} |",
-                f"| **Target Price** | {_money(target)} ({_signed_pct(upside)}) |",
-                f"| **Stop Loss** | {_money(stop)} ({_signed_pct(-downside if downside is not None else None)}) |",
-                f"| **Risk/Reward** | {_ratio(verdict.get('risk_reward_ratio'))} |",
-                f"| **Timeframe** | {verdict.get('timeframe') or 'N/A'} |",
-                f"| **Execution Horizon** | {_execution_horizon(verdict)} |",
+                *diagnostic_lines,
                 "",
                 "---",
                 "",
-                "## Multi-Agent Debate Process",
+                "## Trade Plan",
                 "",
-                f"**Rounds**: {data.get('debate_rounds') or 'N/A'}",
-                f"**Consensus**: {_yes_no(data.get('consensus_reached') or verdict.get('consensus_reached'))}",
-                f"**Method**: {_method_indonesian(method)}",
+                *trade_plan_lines,
                 "",
-                "### Agent Voting",
+                "---",
                 "",
-                *self._markdown_vote_table(data, packet),
-                "",
-                "### Key Arguments",
-                "",
-                "**Bull (Optimistic):**",
-                f"> {_key_argument(data, packet, 'bull')}",
-                "",
-                "**Bear (Pessimistic):**",
-                f"> {_key_argument(data, packet, 'bear')}",
-                "",
-                "**Decision Summary & Agent Rationale:**",
-                f"> {_debate_decision_summary(data, packet, limit=900)}",
+                *process_lines,
                 "",
                 *(
                     [
@@ -1753,6 +2213,9 @@ class MarkdownFormatter:
                     "| Component | Result |",
                     "|----------|-------|",
                     f"| **Risk Governor** | {_risk_governor_label(risk)} |",
+                    f"| **Recommendation State** | {recommendation_state} |",
+                    f"| **Evidence Quality** | {recommendation_context.get('evidence_quality') or 'UNKNOWN'} |",
+                    f"| **Calibration** | {recommendation_context.get('calibration_status') or 'NOT_AVAILABLE'} |",
                     f"| **News Sentiment** | {news_sentiment} ({news_adj:+.2f}) |",
                     f"| **Available Data** | {', '.join(sources) if sources else 'None'} |",
                     f"| **Missing Fields** | {', '.join(missing) if missing else 'None'} |",
@@ -1764,15 +2227,15 @@ class MarkdownFormatter:
                     "",
                     "## Methodology",
                     "",
-                    "This analysis was generated by the",
-                    "**Multi-Agent AI Debate** system using",
-                    f"{_llm_provider_label()} as the LLM engine.",
-                    "Five AI agents with different perspectives",
-                    "(Bull, Bear, Chartist, Fundamental Scout,",
-                    "Sentiment Specialist) debated for",
-                    f"{data.get('debate_rounds') or 'N/A'} rounds before the CIO Agent",
-                    "made the final decision.",
-                    "",
+                    *methodology_lines,
+                    *(
+                        [
+                            "",
+                            f"Recorded LLM provider: {_llm_provider_label()}.",
+                        ]
+                        if process == "LLM_DEBATE_WITH_POLICY_REVIEW"
+                        else []
+                    ),
                     "Every decision can be audited",
                     "against the evidence available",
                     "at analysis time.",
@@ -1812,6 +2275,13 @@ class MarkdownFormatter:
                     or "UNCLASSIFIED"
                 ).upper()
                 execution_grouped.setdefault(status, []).append(row)
+            recommendation_grouped: dict[str, list[dict[str, Any]]] = {}
+            for row in rows:
+                state = str(
+                    _recommendation_context(row).get("recommendation_state")
+                    or "UNCLASSIFIED"
+                ).upper()
+                recommendation_grouped.setdefault(state, []).append(row)
             deployable = [
                 row
                 for row in rows
@@ -1825,9 +2295,22 @@ class MarkdownFormatter:
                 row
                 for row in rows
                 if str(
-                    _execution_contract(row).get("execution_status") or ""
+                    _recommendation_context(row).get("recommendation_state") or ""
                 ).upper()
-                == "WAITLIST"
+                == "WAIT_TRIGGER"
+            ]
+            near_misses = recommendation_grouped.get("NEAR_MISS", [])
+            rejected_or_abstained = [
+                row
+                for row in rows
+                if str(
+                    _recommendation_context(row).get("recommendation_state") or ""
+                ).upper()
+                in {
+                    "SINGLE_GATE_REJECT",
+                    "HARD_REJECT",
+                    "DATA_INSUFFICIENT",
+                }
             ]
             lines = [
                 "---",
@@ -1858,6 +2341,15 @@ class MarkdownFormatter:
                     for label, status_rows in sorted(execution_grouped.items())
                 ],
                 "",
+                "## Recommendation Information States",
+                "",
+                "| Recommendation State | Count | Stocks |",
+                "|----------------------|-------|--------|",
+                *[
+                    self._execution_summary_row(label, state_rows)
+                    for label, state_rows in sorted(recommendation_grouped.items())
+                ],
+                "",
                 "## Execution Regime Authority",
                 "",
                 "| Stock | Execution Regime | Reason | Trend (diagnostic) | Volatility (diagnostic) |",
@@ -1883,18 +2375,50 @@ class MarkdownFormatter:
             lines.extend(["## Watchlist Stocks", ""])
             if waiting:
                 for row in waiting:
-                    verdict = _verdict(row)
-                    low, high = _entry_bounds(verdict)
+                    context = _recommendation_context(row)
                     lines.extend(
                         [
                             f"### {_ticker(row)}",
-                            f"- Wait for pullback to: {_money(low)} - {_money(high)}",
+                            "- State: WAIT_TRIGGER (NO SIZING)",
+                            f"- Trigger: {context.get('next_observable_trigger') or 'not recorded'}",
                             "",
                         ]
                     )
             else:
                 lines.append("None.")
                 lines.append("")
+
+            lines.extend(["## Near-Miss Setups", ""])
+            if near_misses:
+                for row in near_misses:
+                    context = _recommendation_context(row)
+                    lines.extend(
+                        [
+                            f"### {_ticker(row)}",
+                            "- State: NEAR_MISS (presentation only; NO SIZING)",
+                            f"- Trigger: {context.get('next_observable_trigger') or 'not recorded'}",
+                            "",
+                        ]
+                    )
+            else:
+                lines.extend(["None.", ""])
+
+            lines.extend(
+                [
+                    "## Rejected / Abstained Setup Diagnostics",
+                    "",
+                    "| Stock | State | Gate | Observed | Required | Gap | Next Trigger |",
+                    "|-------|-------|------|----------|----------|-----|--------------|",
+                ]
+            )
+            if rejected_or_abstained:
+                lines.extend(
+                    self._rejection_diagnostic_row(row)
+                    for row in rejected_or_abstained
+                )
+            else:
+                lines.append("| - | - | - | - | - | - | - |")
+            lines.append("")
 
             lines.extend(["---", "*Generated by IDX Fundamental Analysis*"])
             return "\n".join(lines)
@@ -1952,6 +2476,27 @@ class MarkdownFormatter:
     def _snapshot_summary_row(self, result: dict[str, Any]) -> str:
         snapshot_id, data_hash = _snapshot_provenance(result)
         return f"| {_ticker(result)} | {snapshot_id} | {data_hash} |"
+
+    def _rejection_diagnostic_row(self, result: dict[str, Any]) -> str:
+        context = _recommendation_context(result)
+        state = str(context.get("recommendation_state") or "UNCLASSIFIED")
+        rows = _blocker_rows(context)
+        blocker = rows[0] if rows else {
+            "gate": "not recorded",
+            "observed": "not recorded",
+            "threshold": "not recorded",
+            "gap": "not recorded",
+            "trigger": "not recorded",
+        }
+
+        def cell(value: Any) -> str:
+            return str(value or "not recorded").replace("|", "/").replace("\n", " ")
+
+        return (
+            f"| {_ticker(result)} | {cell(state)} | {cell(blocker['gate'])} | "
+            f"{cell(blocker['observed'])} | {cell(blocker['threshold'])} | "
+            f"{cell(blocker['gap'])} | {cell(blocker['trigger'])} |"
+        )
 
     def _deployable_summary(self, result: dict[str, Any]) -> list[str]:
         verdict = _verdict(result)

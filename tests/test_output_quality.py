@@ -84,6 +84,19 @@ def test_key_risks_appended_when_fair_value_missing():
     assert any("fundamental" in r.lower() for r in v.key_risks)
 
 
+def test_preflight_fair_value_status_is_not_reported_as_data_unavailable():
+    v = CIOVerdict(
+        rating="HOLD",
+        confidence=0.0,
+        fair_value=None,
+        fair_value_status="NOT_EVALUATED_PREFLIGHT",
+        key_risks=[],
+    )
+
+    assert any("NOT_EVALUATED_PREFLIGHT" in risk for risk in v.key_risks)
+    assert not any("validasi fundamental" in risk.lower() for risk in v.key_risks)
+
+
 # ── Gate 7: check_verdict_quality flags empty narrative on actionable verdict ─
 
 def test_check_quality_flags_missing_narrative_on_buy():

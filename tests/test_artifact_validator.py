@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from core.artifact_validator import reconcile_artifacts, validate_artifacts
 
 
@@ -132,6 +134,223 @@ def _write_optional_logs(
         encoding="utf-8",
     )
     return audit_path, telemetry_path, rag_path
+
+
+def _terminal_entry(
+    ticker: str,
+    *,
+    terminal_status: str = "RR_TOO_LOW",
+    reason_code: str = "rr_too_low",
+    run_id: str = "run-1",
+) -> dict:
+    risk = _risk_governor(
+        status="reject",
+        sizing_allowed=False,
+        reason_codes=[reason_code],
+    )
+    risk["ticker"] = ticker
+    return {
+        "ticker": ticker,
+        "status": "success",
+        "execution_status": "NO_TRADE",
+        "verdict": {
+            "ticker": ticker,
+            "rating": "HOLD",
+            "decision_source": "preflight",
+        },
+        "risk_governor": risk,
+        "debate_rounds": 0,
+        "agent_votes": [],
+        "debate_history": [],
+        "metadata": {
+            "run_id": run_id,
+            "decision_source": "preflight",
+            "flash_calls": 0,
+            "pro_calls": 0,
+            "llm_calls": 0,
+            "trade_setup_snapshot": {
+                "status": terminal_status,
+                "reason_code": reason_code,
+                "debate_eligible": False,
+            },
+        },
+        "error": None,
+    }
+
+
+def _reconcile_single_entry(tmp_path: Path, entry: dict):
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    ticker = entry["ticker"]
+    run_id = entry["metadata"]["run_id"]
+    batch_path, top3_path, latest_path = _write_artifacts(
+        tmp_path,
+        batch=[entry],
+        markdown="# TOP 0\n",
+        latest={"ticker": ticker, "metadata": {"run_id": run_id}},
+    )
+    return reconcile_artifacts(
+        batch_path,
+        top3_path,
+        latest_path,
+        audit_log_path=tmp_path / "missing_audit.jsonl",
+        telemetry_log_path=tmp_path / "missing_telemetry.jsonl",
+        rag_evidence_log_path=tmp_path / "missing_evidence.jsonl",
+    )
+
+
+@pytest.mark.parametrize(
+    "terminal_status",
+    [
+        "WAIT_FOR_PULLBACK",
+        "WAIT_FOR_CONFIRMATION",
+        "SHADOW_ONLY",
+        "NO_MOMENTUM",
+        "RR_TOO_LOW",
+        "STOP_INSIDE_NOISE",
+        "INSUFFICIENT_DATA",
+    ],
+)
+def test_reconcile_artifacts_exempts_allowlisted_trade_setup_terminals(
+    tmp_path: Path,
+    terminal_status: str,
+) -> None:
+    report = _reconcile_single_entry(
+        tmp_path,
+        _terminal_entry("MAPA", terminal_status=terminal_status),
+    )
+
+    assert not any(issue.code == "missing_rag_evidence" for issue in report.issues)
+    assert len(report.rag_not_applicable) == 1
+    record = report.rag_not_applicable[0]
+    assert record.ticker == "MAPA"
+    assert record.status == "NOT_APPLICABLE"
+    assert record.terminal_kind == "trade_setup"
+    assert record.terminal_status == terminal_status
+    assert record.graph_activity is False
+
+
+@pytest.mark.parametrize(
+    "reason_code",
+    ["critical_risk_flag", "exdate_imminent", "counter_trend_defensive"],
+)
+def test_reconcile_artifacts_exempts_allowlisted_pre_cio_terminals(
+    tmp_path: Path,
+    reason_code: str,
+) -> None:
+    entry = _terminal_entry("AKRA", reason_code=reason_code)
+    entry["metadata"].pop("trade_setup_snapshot")
+    entry["metadata"].pop("decision_source")
+    entry["metadata"]["pre_cio_rejection"] = {"reason_code": reason_code}
+    entry["verdict"]["decision_source"] = "risk_guard"
+
+    report = _reconcile_single_entry(tmp_path, entry)
+
+    assert not any(issue.code == "missing_rag_evidence" for issue in report.issues)
+    assert report.rag_not_applicable[0].terminal_kind == "pre_cio"
+    assert report.rag_not_applicable[0].reason_code == reason_code
+
+
+def test_reconcile_artifacts_exempts_exact_budget_and_intake_markers(
+    tmp_path: Path,
+) -> None:
+    budget_entry = _terminal_entry("AKRA")
+    budget_entry["status"] = "skipped"
+    budget_entry["metadata"].pop("trade_setup_snapshot")
+    budget_entry["metadata"]["budget_capacity_rejection"] = {
+        "reason_code": "llm_budget_capacity_exhausted"
+    }
+    budget_report = _reconcile_single_entry(tmp_path / "budget", budget_entry)
+
+    intake_entry = _terminal_entry("MYOR")
+    intake_entry["metadata"].pop("trade_setup_snapshot")
+    intake_entry["metadata"]["candidate_intake_rejection"] = {
+        "reason_code": "candidate_intake_invalid"
+    }
+    intake_entry["metadata"]["artifact_scope"] = "batch_only"
+    intake_report = _reconcile_single_entry(tmp_path / "intake", intake_entry)
+
+    assert budget_report.rag_not_applicable[0].terminal_kind == "budget_capacity"
+    assert intake_report.rag_not_applicable[0].terminal_kind == "candidate_intake"
+
+
+def test_reconcile_artifacts_fails_closed_for_ambiguous_or_graph_activity(
+    tmp_path: Path,
+) -> None:
+    cases: list[tuple[str, dict]] = []
+
+    unknown_status = _terminal_entry("MAPA", terminal_status="FUTURE_TERMINAL")
+    cases.append(("unknown_status", unknown_status))
+
+    graph_eligible = _terminal_entry("MAPA")
+    graph_eligible["metadata"]["trade_setup_snapshot"]["debate_eligible"] = True
+    cases.append(("graph_eligible", graph_eligible))
+
+    rag_failure = _terminal_entry("MAPA")
+    rag_failure["metadata"]["rag_selection_failure"] = "evidence log locked"
+    cases.append(("rag_selection_failure", rag_failure))
+
+    missing_counter = _terminal_entry("MAPA")
+    missing_counter["metadata"].pop("llm_calls")
+    cases.append(("missing_counter", missing_counter))
+
+    for case_name, entry in cases:
+        report = _reconcile_single_entry(tmp_path / case_name, entry)
+        assert report.rag_not_applicable == []
+        assert any(
+            issue.code == "missing_rag_evidence" and issue.ticker == "MAPA"
+            for issue in report.issues
+        )
+
+
+def test_reconcile_artifacts_validates_all_required_batch_tickers(
+    tmp_path: Path,
+) -> None:
+    mapa = _terminal_entry("MAPA", run_id="batch-1")
+    akra = {
+        "ticker": "AKRA",
+        "status": "success",
+        "verdict": {"ticker": "AKRA", "rating": "HOLD"},
+        "risk_governor": {**_risk_governor(), "ticker": "AKRA"},
+        "metadata": {"run_id": "batch-1"},
+        "debate_rounds": 1,
+        "agent_votes": [{"agent": "bull"}],
+        "debate_history": [{"role": "bull"}],
+        "error": None,
+    }
+    myor = {
+        **akra,
+        "ticker": "MYOR",
+        "verdict": {"ticker": "MYOR", "rating": "HOLD"},
+        "risk_governor": {**_risk_governor(), "ticker": "MYOR"},
+    }
+    batch_path, top3_path, latest_path = _write_artifacts(
+        tmp_path,
+        batch=[mapa, akra, myor],
+        markdown="# TOP 0\n",
+        latest={"ticker": "MAPA", "metadata": {"run_id": "batch-1"}},
+    )
+    rag_path = tmp_path / "evidence_log.jsonl"
+    rag_path.write_text(
+        json.dumps({"ticker": "AKRA", "run_id": "batch-1"}) + "\n",
+        encoding="utf-8",
+    )
+
+    report = reconcile_artifacts(
+        batch_path,
+        top3_path,
+        latest_path,
+        audit_log_path=tmp_path / "missing_audit.jsonl",
+        telemetry_log_path=tmp_path / "missing_telemetry.jsonl",
+        rag_evidence_log_path=rag_path,
+    )
+
+    missing_rag_tickers = {
+        issue.ticker
+        for issue in report.issues
+        if issue.code == "missing_rag_evidence"
+    }
+    assert missing_rag_tickers == {"MYOR"}
+    assert [record.ticker for record in report.rag_not_applicable] == ["MAPA"]
 
 
 def test_reconcile_artifacts_all_valid(tmp_path: Path) -> None:

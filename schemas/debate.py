@@ -60,7 +60,13 @@ class DebateMessage(BaseDataClass):
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
-ConsensusMethod = Literal["voting", "confidence_winner", "soft_hold", "deadlock_hold"]
+ConsensusMethod = Literal[
+    "voting",
+    "confidence_winner",
+    "soft_hold",
+    "deadlock_hold",
+    "quality_veto",
+]
 ModelRating = Literal["STRONG_BUY", "BUY", "HOLD", "SELL", "AVOID"]
 DecisionSource = Literal["cio", "preflight", "risk_guard"]
 ExecutionStatus = Literal[
@@ -70,6 +76,170 @@ ExecutionStatus = Literal[
     "AVOID",
     "INSUFFICIENT_DATA",
 ]
+FairValueStatus = Literal["NOT_EVALUATED_PREFLIGHT"]
+
+
+class SignalPacket(BaseModel):
+    """Advisory pre-gate signal evidence persisted independently of execution.
+
+    ``execution_eligible`` is deliberately tri-state. ``None`` means the
+    deterministic setup may continue, but the Risk Governor and sizing path
+    have not issued their canonical execution decision yet. The packet never
+    grants execution authority by itself.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    signal_lean: Literal[
+        "BULLISH_SETUP",
+        "NEUTRAL",
+        "BEARISH",
+        "UNKNOWN",
+    ] = "UNKNOWN"
+    chart_strength: Literal[
+        "BULLISH",
+        "NEUTRAL",
+        "BEARISH",
+        "UNKNOWN",
+    ] = "UNKNOWN"
+    relative_strength: float | None = None
+    volume_confirmation: bool | None = None
+    fundamental_quality: Literal[
+        "STRONG",
+        "ADEQUATE",
+        "WEAK",
+        "UNKNOWN",
+    ] = "UNKNOWN"
+    valuation_state: Literal[
+        "UNDERVALUED",
+        "FAIR",
+        "OVERVALUED",
+        "UNKNOWN",
+    ] = "UNKNOWN"
+    forecast_state: str = "NOT_EVALUATED"
+    execution_eligible: bool | None = None
+    execution_rejection_reason: str | None = None
+    required_entry_trigger: str | None = None
+
+
+RecommendationState = Literal[
+    "QUALIFIED",
+    "WAIT_TRIGGER",
+    "NEAR_MISS",
+    "SINGLE_GATE_REJECT",
+    "HARD_REJECT",
+    "DATA_INSUFFICIENT",
+]
+ActionabilityState = Literal["PASS", "REJECT", "ABSTAIN", "PENDING"]
+BlockerClass = Literal["HARD", "SOFT", "DATA"]
+
+
+class GateMetric(BaseModel):
+    """One observed value compared with the policy value used by a gate.
+
+    ``percentage_gap`` is a non-negative fractional shortfall (``0.10`` means
+    ten percent), not a probability and not permission to relax the gate.
+    Values may be strings when a categorical policy is the actual comparison.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    observed: Any | None = None
+    threshold: Any | None = None
+    comparator: str | None = None
+    unit: str | None = None
+    absolute_gap: float | None = Field(default=None, ge=0.0)
+    percentage_gap: float | None = Field(default=None, ge=0.0)
+
+
+class RecommendationBlocker(BaseModel):
+    """Machine-readable explanation for one failed or waiting gate."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    gate_id: str
+    hard_or_soft: BlockerClass
+    reason_code: str
+    observations: list[GateMetric] = Field(default_factory=list)
+    provenance: str
+    detail: str | None = None
+    next_observable_trigger: str | None = None
+
+
+class HypotheticalSetup(BaseModel):
+    """Rejected/waiting setup geometry that can never authorize execution."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    entry_low: float | None = None
+    entry_high: float | None = None
+    target_price: float | None = None
+    target_basis: str | None = None
+    stop_loss: float | None = None
+    risk_reward_ratio: float | None = None
+    required_rr: float | None = None
+    explicitly_non_executable: Literal[True] = True
+    provenance: str
+
+
+class RecommendationContext(BaseModel):
+    """Versioned explanation layer kept separate from execution authority.
+
+    This context can make a rejection informative, but it cannot turn a failed
+    gate into a trade. Only the canonical post-risk execution decision can set
+    ``actionability=PASS`` and ``execution_eligible=True``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    contract_version: Literal["recommendation-context-v1"] = (
+        "recommendation-context-v1"
+    )
+    display_only: Literal[True] = True
+    full_pipeline_evaluated: bool = False
+    classification_basis: str = "trade_setup_snapshot"
+    recommendation_state: RecommendationState | None = None
+    actionability: ActionabilityState = "PENDING"
+    execution_eligible: bool | None = None
+    sizing_allowed: bool = False
+    opportunity_rank_eligible: bool = False
+    decision_source: str = "trade_setup"
+    blockers: list[RecommendationBlocker] = Field(default_factory=list)
+    hypothetical_setup: HypotheticalSetup | None = None
+    next_observable_trigger: str | None = None
+    evidence_quality: Literal[
+        "COMPLETE",
+        "DEGRADED",
+        "STALE",
+        "MISSING",
+        "UNKNOWN",
+    ] = "UNKNOWN"
+    calibration_status: Literal[
+        "NOT_AVAILABLE",
+        "SHADOW_UNCALIBRATED",
+        "VALIDATED",
+    ] = "NOT_AVAILABLE"
+
+    @model_validator(mode="after")
+    def _enforce_execution_separation(self) -> "RecommendationContext":
+        if self.actionability == "PASS":
+            if (
+                self.recommendation_state != "QUALIFIED"
+                or self.execution_eligible is not True
+                or self.sizing_allowed is not True
+                or self.blockers
+                or self.hypothetical_setup is not None
+            ):
+                raise ValueError(
+                    "actionability PASS requires a blocker-free QUALIFIED context "
+                    "with executable sizing and no hypothetical setup"
+                )
+        if self.execution_eligible is True and self.actionability != "PASS":
+            raise ValueError("execution_eligible=True requires actionability PASS")
+        if self.recommendation_state == "QUALIFIED" and self.actionability != "PASS":
+            raise ValueError("QUALIFIED requires actionability PASS")
+        return self
 
 
 # ---------------------------------------------------------------------------
@@ -164,6 +334,13 @@ class CIOVerdict(BaseDataClass):
     fair_value_high: float | None = Field(
         default=None,
         description="Optimistic high end of the fair value range.",
+    )
+    fair_value_status: FairValueStatus | None = Field(
+        default=None,
+        description=(
+            "Explicitly marks fair value as skipped because a deterministic "
+            "pre-debate gate returned before valuation ran. Null otherwise."
+        ),
     )
     # FIX: ISSUE 1 — Carry unverified valuation state into final artifacts.
     valuation_gap: str | None = Field(
@@ -456,7 +633,17 @@ class CIOVerdict(BaseDataClass):
         missing_fv = self.fair_value is None or self.fair_value <= 0
         if self.confidence < 0.60 or bad_rr:
             self.wait_and_see = True
-        if missing_fv and not any(
+        if missing_fv and self.fair_value_status == "NOT_EVALUATED_PREFLIGHT":
+            if not any(
+                "not_evaluated_preflight" in str(risk).lower()
+                for risk in self.key_risks
+            ):
+                self.key_risks = list(self.key_risks) + [
+                    "Fair value status: NOT_EVALUATED_PREFLIGHT — valuation "
+                    "was skipped because the deterministic pre-debate gate "
+                    "stopped the pipeline."
+                ]
+        elif missing_fv and not any(
             "fundamental" in s.lower() for s in self.key_risks
         ):
             self.key_risks = list(self.key_risks) + [
@@ -493,9 +680,7 @@ class CIOVerdict(BaseDataClass):
         # 9. Separate model opinion from deterministic policy output. Legacy
         # preflight paths used HOLD/0.40 placeholders even though no CIO model
         # ran; those values must not become model confidence.
-        normalized_codes = {
-            str(code).strip().lower() for code in self.reason_codes
-        }
+        normalized_codes = {str(code).strip().lower() for code in self.reason_codes}
         preflight_codes = {
             "rr_too_low",
             "stop_inside_noise",
@@ -633,6 +818,7 @@ class CIOVerdict(BaseDataClass):
             "fair_value_base": self.fair_value_base,
             "fair_value_low": self.fair_value_low,
             "fair_value_high": self.fair_value_high,
+            "fair_value_status": self.fair_value_status,
             "expected_return": self.expected_return,
             "risk_reward": self.risk_reward_ratio,
             "is_overvalued": self.is_overvalued,
@@ -838,7 +1024,9 @@ class DebateChamberState(TypedDict):
     dps_yield_pct: float | None
     dps_price_used: float | None
     risk_overvalued: bool
-    valuation_band_context: str | None  # C3: self-relative PE/PBV percentile vs own history
+    valuation_band_context: (
+        str | None
+    )  # C3: self-relative PE/PBV percentile vs own history
     range_52w_signal: str | None  # C4: price position in 52-week high/low range
     # Task I: Graham Number FV from the quant screener (candidates_by_ticker),
     # threaded in via run(graham_fv=...). None on paths without screener

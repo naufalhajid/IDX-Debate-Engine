@@ -70,6 +70,31 @@ def test_normalize_result_preserves_missing_fair_value_as_none() -> None:
     )
 
     assert result["scout_metrics"]["fundamental"]["fair_value"] is None
+    assert result["fair_value_status"] is None
+    assert result["scout_metrics"]["fundamental"]["fair_value_status"] is None
+
+
+def test_normalize_result_preserves_explicit_preflight_fair_value_status() -> None:
+    result = normalize_result(
+        {
+            "ticker": "MAPA",
+            "verdict": {
+                "ticker": "MAPA",
+                "rating": "HOLD",
+                "fair_value": None,
+                "fair_value_status": "NOT_EVALUATED_PREFLIGHT",
+            },
+            "risk_governor": {"entry_low": None, "entry_high": None},
+            "metadata": {"run_id": "20260716_141220"},
+        }
+    )
+
+    assert result["fair_value_status"] == "NOT_EVALUATED_PREFLIGHT"
+    assert (
+        result["scout_metrics"]["fundamental"]["fair_value_status"]
+        == "NOT_EVALUATED_PREFLIGHT"
+    )
+    assert result["scout_metrics"]["technical"]["entry"] == "-"
 
 
 def test_normalize_result_preserves_explicit_execution_regime_contract() -> None:
