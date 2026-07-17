@@ -1,4 +1,9 @@
-# Fundamental Recalibration Log
+# Fundamental Recalibration Log (IDX4-Inspired Characteristics)
+
+> Terminology correction (2026-07): this repository uses stock-level
+> OCF/Price and RNOA/ROA scoring inspired by the published IDX research. It
+> does **not** implement or validate the paper's factor-mimicking portfolios.
+> See `RESEARCH_LEDGER_2026-07.md` for the independently verified evidence.
 
 **Date:** 2026-06-23  
 **Scope:** IDX Debate Chamber fundamental, valuation, and Bull/Bear prompt calibration  
@@ -53,4 +58,3 @@
 ```bash
 uv run pytest tests/test_quant_filter_pipeline.py tests/test_fair_value_calculator.py tests/test_ara_arb_regression.py -q
 ```
-

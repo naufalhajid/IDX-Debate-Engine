@@ -67,7 +67,7 @@ TLKM: conv_flag=0, alpha=0.32, beta=0.39, gamma=-0.003, persist=0.71  GOOD FIT
 
 **The IC vs Direction-Accuracy gap:** XGBoost on BBCA achieves IC=0.43 but direction accuracy=0.356. Spearman rank IC rewards correctly ordering "more positive vs less positive" returns without penalizing for sign errors. In a period where most returns are positive, a model predicting "all positive but varying magnitudes" can achieve high IC while failing directional tests. **For swing trading, directional accuracy matters more than IC.**
 
-**Recommended action:** Add `directional_accuracy >= 0.45` as a filter alongside IC. Keep XGBoost as the sole active return model. The three-head design (return regressor + target classifier + stop classifier) is correct — the classifiers' p_target/p_stop outputs feed directly into the EV calculation.
+**Runtime status:** Keep XGBoost as the active return-only model and retain `directional_accuracy >= 0.45` beside IC. Target/stop classifier heads are not production-calibrated: the current symmetric path labels are intentionally disabled, so `p_target`/`p_stop` are derived from the H-day return forecast plus volatility instead of classifier outputs.
 
 **What helps XGBoost:** Multi-horizon momentum features (5d, 10d, 20d lagged returns — currently only log_return at lag-1). Sector relative strength. Fundamental features (PE, PB, OCF — currently all NaN due to missing DB wiring). The `ocf_missing` flag appears on every live prediction, meaning one-third of the intended feature signal is absent.
 
