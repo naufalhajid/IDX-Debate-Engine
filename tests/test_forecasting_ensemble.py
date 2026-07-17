@@ -45,6 +45,19 @@ class TestZeroWeightConditions:
 
         assert weights["model_a"] == pytest.approx(0.0)
 
+    def test_external_naive_brier_excludes_worse_model_when_naive_is_not_contributor(self):
+        """A failed Naive model remains the calibration benchmark only."""
+        scores = {
+            "xgboost": _scores(ic=0.05, brier=0.26252, bh_passed=True),
+        }
+
+        weights = compute_ensemble_weights(
+            scores,
+            naive_brier_benchmark=0.25,
+        )
+
+        assert weights["xgboost"] == pytest.approx(0.0)
+
     def test_all_zero_weight_when_all_disqualified(self):
         scores = {"model_a": _scores(ic=-0.01), "model_b": _scores(ic=-0.02)}
         weights = compute_ensemble_weights(scores)

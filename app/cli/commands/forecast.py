@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -156,9 +157,117 @@ def predict_command(
         console.print(f"  validation: status={vs.status} IC={vs.ic_mean} n={vs.n_observations}")
 
 
+def shadow_backfill_command(
+    source_results: Annotated[
+        Path,
+        typer.Option(
+            "--source-results",
+            help="Persisted full_batch_results.json to evaluate (offline only).",
+        ),
+    ],
+    snapshot_manifest: Annotated[
+        Path,
+        typer.Option(
+            "--snapshot-manifest",
+            help="Hash-verified market snapshot manifest containing outcome bars.",
+        ),
+    ],
+    as_of: Annotated[
+        str,
+        typer.Option(
+            "--as-of",
+            help="Signal/feature session date; must be explicit (YYYY-MM-DD).",
+        ),
+    ],
+    evaluation_as_of: Annotated[
+        str,
+        typer.Option(
+            "--evaluation-as-of",
+            help="Last complete outcome session allowed (YYYY-MM-DD).",
+        ),
+    ],
+    horizon: Annotated[
+        list[int] | None,
+        typer.Option(
+            "--horizon",
+            help="Trading-session horizon; repeat for 5/10/20.",
+        ),
+    ] = None,
+    output_dir: Annotated[
+        Path,
+        typer.Option(
+            "--output-dir",
+            help="Isolated directory for shadow records, outcomes, and report.",
+        ),
+    ] = Path("output/shadow_evaluation"),
+    tickers: Annotated[
+        str | None,
+        typer.Option(
+            "--tickers",
+            help="Optional comma-separated ticker filter.",
+        ),
+    ] = None,
+) -> None:
+    """Backfill advisory outcomes without provider or execution access."""
+
+    from core.forecasting.shadow_evaluation import (
+        DEFAULT_SHADOW_HORIZONS,
+        run_shadow_backfill,
+    )
+
+    try:
+        signal_date = date.fromisoformat(as_of)
+        evaluation_date = date.fromisoformat(evaluation_as_of)
+    except ValueError as exc:
+        raise typer.BadParameter("dates must use YYYY-MM-DD") from exc
+    if not source_results.is_file():
+        raise typer.BadParameter(f"source results not found: {source_results}")
+    if not snapshot_manifest.is_file():
+        raise typer.BadParameter(
+            f"snapshot manifest not found: {snapshot_manifest}"
+        )
+    selected_tickers = _ticker_list(tickers) if tickers else None
+    selected_horizons = tuple(horizon or DEFAULT_SHADOW_HORIZONS)
+
+    with console.status(
+        "[idx.muted]Evaluating persisted shadow signals offline...[/idx.muted]"
+    ):
+        try:
+            summary = run_shadow_backfill(
+                source_results_path=source_results,
+                snapshot_manifest_path=snapshot_manifest,
+                signal_as_of=signal_date,
+                evaluation_as_of=evaluation_date,
+                horizons=selected_horizons,
+                output_dir=output_dir,
+                tickers=selected_tickers,
+            )
+        except (OSError, ValueError) as exc:
+            console.print(f"[idx.error]Shadow backfill failed: {exc}[/idx.error]")
+            raise typer.Exit(code=1) from exc
+
+    console.print(
+        "[idx.ok]Shadow outcome packet written[/idx.ok] "
+        f"observations={summary['observations']} mature={summary['mature']} "
+        f"pending={summary['pending']} invalid={summary['invalid']} "
+        f"source_invalid={summary['source_invalid']}"
+    )
+    console.print(
+        "[idx.muted]Evaluation only; live_authority=false; "
+        f"output={summary['output_dir']}[/idx.muted]"
+    )
+
+
 app.command(name="build-dataset")(build_dataset_command)
 app.command(name="validate")(validate_command)
 app.command(name="predict")(predict_command)
+app.command(name="shadow-backfill")(shadow_backfill_command)
 
 
-__all__ = ["app", "build_dataset_command", "predict_command", "validate_command"]
+__all__ = [
+    "app",
+    "build_dataset_command",
+    "predict_command",
+    "shadow_backfill_command",
+    "validate_command",
+]

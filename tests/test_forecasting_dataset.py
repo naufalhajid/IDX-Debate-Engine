@@ -101,6 +101,79 @@ def test_injected_market_snapshot_prevents_second_ticker_download(monkeypatch):
     )
 
 
+def test_include_unlabeled_tail_keeps_latest_snapshot_bar(monkeypatch):
+    index = pd.date_range("2024-01-02", periods=400, freq="B")
+    raw = pd.DataFrame(
+        {
+            "Open": [1000.0 + i for i in range(len(index))],
+            "High": [1020.0 + i for i in range(len(index))],
+            "Low": [990.0 + i for i in range(len(index))],
+            "Close": [1010.0 + i for i in range(len(index))],
+            "Volume": [1_000_000.0] * len(index),
+        },
+        index=index,
+    )
+    snapshot = build_market_snapshot(
+        "BBCA",
+        raw,
+        requested_start=index[0].date(),
+        requested_end=index[-1].date(),
+    )
+    monkeypatch.setattr(dataset_module, "_fill_fundamentals", lambda frame, ticker: None)
+
+    result = DatasetBuilder()._build_ticker(
+        "BBCA",
+        index[0].date(),
+        index[-1].date(),
+        (5,),
+        None,
+        snapshot=snapshot,
+        include_unlabeled_tail=True,
+    )
+
+    assert result is not None
+    assert len(result) == 400
+    assert result.index[-1][1] == index[-1].date()
+    assert float(result["close"].iloc[-1]) == pytest.approx(float(raw["Close"].iloc[-1]))
+    assert result["close_t5"].iloc[-5:].isna().all()
+    assert result["close_t5"].notna().sum() == 395
+    assert float(result["close_t5"].iloc[-6]) == pytest.approx(
+        float(raw["Close"].iloc[-1])
+    )
+
+
+def test_include_unlabeled_tail_still_requires_minimum_labeled_rows(monkeypatch):
+    index = pd.date_range("2026-01-02", periods=64, freq="B")
+    raw = pd.DataFrame(
+        {
+            "High": [1020.0 + i for i in range(len(index))],
+            "Low": [990.0 + i for i in range(len(index))],
+            "Close": [1010.0 + i for i in range(len(index))],
+            "Volume": [1_000_000.0] * len(index),
+        },
+        index=index,
+    )
+    snapshot = build_market_snapshot(
+        "BBCA",
+        raw,
+        requested_start=index[0].date(),
+        requested_end=index[-1].date(),
+    )
+    monkeypatch.setattr(dataset_module, "_fill_fundamentals", lambda frame, ticker: None)
+
+    result = DatasetBuilder()._build_ticker(
+        "BBCA",
+        index[0].date(),
+        index[-1].date(),
+        (5,),
+        None,
+        snapshot=snapshot,
+        include_unlabeled_tail=True,
+    )
+
+    assert result is None
+
+
 def test_build_rejects_invalid_ticker_before_shared_market_download(monkeypatch):
     def unexpected_ihsg_download(*_args, **_kwargs):
         pytest.fail("invalid ticker reached shared market-data download")

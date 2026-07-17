@@ -16,7 +16,12 @@ _LABEL_COLS: frozenset[str] = frozenset(
 
 
 class XGBoostForecaster(ModelBase):
-    """Three-head XGBoost: return regressor + p_target classifier + p_stop classifier.
+    """Return-only XGBoost regressor for the selected H-day net return.
+
+    Runtime target/stop probabilities are deliberately derived by
+    ``ForecastingService`` from this H-day return and the volatility forecast.
+    The former classifier heads were removed because their symmetric path
+    labels are intentionally disabled and they were never fitted by runtime.
 
     Requires: xgboost >= 2.0.0, scikit-learn >= 1.4.0 (optional dependencies).
     """
@@ -27,8 +32,6 @@ class XGBoostForecaster(ModelBase):
         self._n_estimators = n_estimators
         self._max_depth = max_depth
         self._reg = None
-        self._clf_target = None
-        self._clf_stop = None
 
     def _xgb_params(self) -> dict:
         return dict(
@@ -40,6 +43,7 @@ class XGBoostForecaster(ModelBase):
             reg_alpha=0.1,
             reg_lambda=1.0,
             min_child_weight=3,
+            random_state=0,
             verbosity=0,
         )
 
@@ -49,31 +53,15 @@ class XGBoostForecaster(ModelBase):
 
     def fit(self, X: pd.DataFrame, y: pd.Series) -> None:
         try:
-            from xgboost import XGBClassifier, XGBRegressor  # noqa: PLC0415
+            from xgboost import XGBRegressor  # noqa: PLC0415
         except ImportError as e:
             raise ImportError("xgboost is required for XGBoostForecaster") from e
-
-        # Extract label arrays before building feature matrix to avoid leakage.
-        label_target = (
-            X["y_target_hit"].fillna(0).astype(int) if "y_target_hit" in X.columns else None
-        )
-        label_stop = (
-            X["y_stop_hit"].fillna(0).astype(int) if "y_stop_hit" in X.columns else None
-        )
 
         X_feat = self._feature_matrix(X)
         params = self._xgb_params()
 
         self._reg = XGBRegressor(**params)
         self._reg.fit(X_feat, y.fillna(0))
-
-        if label_target is not None:
-            self._clf_target = XGBClassifier(**params)
-            self._clf_target.fit(X_feat, label_target)
-
-        if label_stop is not None:
-            self._clf_stop = XGBClassifier(**params)
-            self._clf_stop.fit(X_feat, label_stop)
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         if self._reg is None:
@@ -83,21 +71,3 @@ class XGBoostForecaster(ModelBase):
         except Exception as e:
             logger.warning("[XGBoost] predict failed: %s", e)
             return np.zeros(len(X))
-
-    def predict_proba_target(self, X: pd.DataFrame) -> np.ndarray | None:
-        if self._clf_target is None:
-            return None
-        try:
-            return self._clf_target.predict_proba(self._feature_matrix(X))[:, 1]
-        except Exception as e:
-            logger.warning("[XGBoost] predict_proba_target failed: %s", e)
-            return None
-
-    def predict_proba_stop(self, X: pd.DataFrame) -> np.ndarray | None:
-        if self._clf_stop is None:
-            return None
-        try:
-            return self._clf_stop.predict_proba(self._feature_matrix(X))[:, 1]
-        except Exception as e:
-            logger.warning("[XGBoost] predict_proba_stop failed: %s", e)
-            return None

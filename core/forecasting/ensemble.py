@@ -1,15 +1,21 @@
 """Softmax ensemble weighting for forecasting models."""
 from __future__ import annotations
 
+import logging
 import math
 
 from core.forecasting.schemas import ModelVote
 
 ETA: float = 1.5  # softmax temperature
+BRIER_BORDERLINE_EPSILON: float = 0.0011
+
+logger = logging.getLogger(__name__)
 
 
 def compute_ensemble_weights(
     model_scores: dict[str, dict],
+    *,
+    naive_brier_benchmark: float | None = None,
 ) -> dict[str, float]:
     """Compute softmax ensemble weights.
 
@@ -19,12 +25,14 @@ def compute_ensemble_weights(
     Zero-weight conditions (model excluded):
       - IC_m < 0
       - BH q-value failed
-      - Brier_m >= naive Brier (when naive Brier is available)
+      - Brier_m is not better than naive Brier by more than the ambiguity band
     Weights are renormalized after zeroing.
 
     Args:
         model_scores: dict of {model_name: {"ic": float, "rmse": float,
             "brier": float, "dsr": float, "bh_passed": bool}}
+        naive_brier_benchmark: Optional Naive-model Brier retained as an
+            eligibility benchmark even when Naive itself is not a contributor.
 
     Returns:
         dict of {model_name: weight} summing to 1.0 (or all 0.0 if all zero-weighted).
@@ -32,7 +40,11 @@ def compute_ensemble_weights(
     if not model_scores:
         return {}
 
-    naive_brier = model_scores.get("naive", {}).get("brier")
+    naive_brier = naive_brier_benchmark
+    if naive_brier is None:
+        naive_brier = model_scores.get("naive", {}).get("brier")
+    if naive_brier is not None and not math.isfinite(float(naive_brier)):
+        naive_brier = None
 
     # Step 1: zero-weight disqualified models
     active: dict[str, dict] = {}
@@ -45,8 +57,20 @@ def compute_ensemble_weights(
             continue
         if not bh_passed:
             continue
-        if naive_brier is not None and brier is not None and brier >= naive_brier:
-            continue
+        if naive_brier is not None and brier is not None:
+            brier_delta = float(brier) - float(naive_brier)
+            if name != "naive" and abs(brier_delta) <= BRIER_BORDERLINE_EPSILON:
+                logger.warning(
+                    "borderline Brier: model=%s brier=%.8f naive=%.8f "
+                    "epsilon=%.4f; assigning fail-closed zero weight",
+                    name,
+                    float(brier),
+                    float(naive_brier),
+                    BRIER_BORDERLINE_EPSILON,
+                )
+                continue
+            if brier_delta >= 0:
+                continue
         dir_acc = scores.get("dir_acc")
         if dir_acc is not None and dir_acc < 0.45:
             continue

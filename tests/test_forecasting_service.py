@@ -102,6 +102,34 @@ class TestForecastReportSchema:
                 forecast_status="MODEL_FAILED",
             )
 
+    def test_forecast_report_serializes_training_and_inference_provenance(self):
+        from datetime import date
+
+        report = ForecastReport(
+            ticker="BBCA",
+            as_of=date(2026, 7, 15),
+            horizon_days=10,
+            feature_as_of=date(2026, 7, 15),
+            training_end_date=date(2026, 7, 1),
+        )
+
+        payload = report.model_dump(mode="json")
+
+        assert payload["feature_as_of"] == "2026-07-15"
+        assert payload["training_end_date"] == "2026-07-01"
+
+    def test_forecast_report_rejects_training_inference_overlap(self):
+        from datetime import date
+
+        with pytest.raises(ValueError, match="training_end_date must be earlier"):
+            ForecastReport(
+                ticker="BBCA",
+                as_of=date(2026, 7, 15),
+                horizon_days=10,
+                feature_as_of=date(2026, 7, 15),
+                training_end_date=date(2026, 7, 15),
+            )
+
 
 def test_predict_cli_renders_explicit_status_and_reason(monkeypatch) -> None:
     from datetime import date
@@ -385,6 +413,23 @@ class _FixedReturnModel(ModelBase):
         return np.full(len(X), self._value, dtype=float)
 
 
+class _RecordingReturnModel(ModelBase):
+    name = "naive"
+
+    def __init__(self) -> None:
+        self.fit_frame: pd.DataFrame | None = None
+        self.fit_target: pd.Series | None = None
+        self.predict_frame: pd.DataFrame | None = None
+
+    def fit(self, X: pd.DataFrame, y: pd.Series) -> None:
+        self.fit_frame = X.copy()
+        self.fit_target = y.copy()
+
+    def predict(self, X: pd.DataFrame) -> np.ndarray:
+        self.predict_frame = X.copy()
+        return np.full(len(X), 0.02, dtype=float)
+
+
 class _FailingReturnModel(ModelBase):
     name = "xgboost"
 
@@ -396,12 +441,25 @@ class _FailingReturnModel(ModelBase):
 
 
 class _FakeDatasetBuilder:
-    def build(self, tickers, start, end, horizons):
+    def build(
+        self,
+        tickers,
+        start,
+        end,
+        horizons,
+        snapshots=None,
+        *,
+        include_unlabeled_tail=False,
+    ):
+        assert include_unlabeled_tail is True
         dates = pd.date_range("2026-01-01", periods=100, freq="D")
         index = pd.MultiIndex.from_product([["BBCA"], dates], names=["ticker", "date"])
+        close = pd.Series(np.linspace(9000.0, 9900.0, len(index)))
+        horizon = int(horizons[0])
         return pd.DataFrame(
             {
-                "close": np.linspace(9000.0, 9900.0, len(index)),
+                "close": close.to_numpy(),
+                f"close_t{horizon}": close.shift(-horizon).to_numpy(),
                 "ocf_price_pct": np.full(len(index), 0.05),
             },
             index=index,
@@ -416,6 +474,7 @@ class _FakeTGarch:
 def _fake_labeled_frame() -> pd.DataFrame:
     dates = pd.date_range("2026-01-01", periods=100, freq="D")
     r_net = np.linspace(-0.02, 0.03, len(dates))
+    r_net[-1] = np.nan
     return pd.DataFrame(
         {
             "feature": np.linspace(0.0, 1.0, len(dates)),
@@ -427,6 +486,88 @@ def _fake_labeled_frame() -> pd.DataFrame:
         },
         index=dates,
     )
+
+
+def test_predict_fits_labeled_history_and_predicts_latest_unlabeled_row(
+    monkeypatch,
+) -> None:
+    from datetime import date
+
+    as_of = date(2026, 7, 15)
+    dates = pd.bdate_range(end=as_of, periods=100)
+    close = pd.Series(np.linspace(9000.0, 9900.0, len(dates)), index=dates)
+    frame = pd.DataFrame(
+        {
+            "close": close.to_numpy(),
+            "close_t10": close.shift(-10).to_numpy(),
+            "ocf_price_pct": np.full(len(dates), 0.05),
+            "feature_marker": np.arange(len(dates), dtype=float),
+        },
+        index=pd.MultiIndex.from_arrays(
+            [["BBCA"] * len(dates), dates.date],
+            names=["ticker", "date"],
+        ),
+    )
+
+    class LatestRowDatasetBuilder:
+        def build(
+            self,
+            tickers,
+            start,
+            end,
+            horizons,
+            snapshots=None,
+            *,
+            include_unlabeled_tail=False,
+        ):
+            assert tickers == ["BBCA"]
+            assert end == as_of
+            assert horizons == (10,)
+            assert include_unlabeled_tail is True
+            return frame
+
+    recorder = _RecordingReturnModel()
+    service = ForecastingService()
+    service._dataset_builder = LatestRowDatasetBuilder()
+    service._return_model_factories = lambda: {"naive": lambda: recorder}
+    monkeypatch.setattr(
+        "core.forecasting.service.walk_forward_splits",
+        lambda *_args, **_kwargs: [],
+    )
+
+    report = service.predict("BBCA", as_of=as_of, horizons=(10,), mode="naive")
+
+    assert recorder.fit_frame is not None
+    assert recorder.fit_target is not None
+    assert recorder.predict_frame is not None
+    assert len(recorder.fit_frame) == 90
+    assert len(recorder.predict_frame) == 1
+    assert recorder.fit_target.notna().all()
+    assert recorder.fit_frame.index.equals(recorder.fit_target.index)
+    assert recorder.fit_frame.columns.equals(recorder.predict_frame.columns)
+    assert pd.Timestamp(recorder.fit_frame.index[-1]).date() == dates[-11].date()
+    assert pd.Timestamp(recorder.predict_frame.index[-1]).date() == dates[-1].date()
+    assert recorder.predict_frame["feature_marker"].iloc[0] == pytest.approx(99.0)
+    assert set(recorder.fit_frame.index).isdisjoint(recorder.predict_frame.index)
+    assert report.as_of == as_of
+    assert report.feature_as_of == as_of
+    assert report.training_end_date == dates[-11].date()
+
+
+def test_predict_fails_closed_without_unlabeled_inference_row(monkeypatch) -> None:
+    service = _service_with_fakes(monkeypatch)
+    fully_labeled = _fake_labeled_frame()
+    fully_labeled.loc[fully_labeled.index[-1], "r_net_h"] = 0.01
+    monkeypatch.setattr(
+        "core.forecasting.service.build_labels",
+        lambda _df, _horizon: fully_labeled,
+    )
+
+    report = service.predict("BBCA", mode="ensemble")
+
+    assert report.forecast_status == "UNAVAILABLE"
+    assert report.decision == "AVOID"
+    assert report.failure_reason == "missing_unlabeled_inference_row"
 
 
 def _service_with_fakes(
@@ -612,6 +753,32 @@ def test_ensemble_reports_zero_weight_when_validated_models_are_disqualified(
     assert report.forecast_status == "ZERO_WEIGHT"
     assert report.failure_reason == "all_validated_return_models_disqualified"
     assert report.expected_return_net is None
+
+
+def test_failed_naive_still_benchmarks_production_xgboost_brier(monkeypatch) -> None:
+    """Historical BBCA metrics must retain Naive as a non-blended benchmark."""
+    service = _service_with_fakes(
+        monkeypatch,
+        status_map={"naive": "failed", "xgboost": "production"},
+        brier_map={"naive": 0.25, "xgboost": 0.26252},
+    )
+
+    report = service.predict("BBCA", mode="ensemble")
+    return_votes = {
+        vote.model_name: vote
+        for vote in report.model_votes
+        if vote.model_name in {"naive", "xgboost"}
+    }
+
+    assert return_votes["naive"].status == "validation_failed"
+    assert return_votes["naive"].weight == pytest.approx(0.0)
+    assert return_votes["xgboost"].status == "active"
+    assert return_votes["xgboost"].validation_passed is True
+    assert return_votes["xgboost"].weight == pytest.approx(0.0)
+    assert report.forecast_status == "ZERO_WEIGHT"
+    assert report.failure_reason == "all_validated_return_models_disqualified"
+    assert report.expected_return_net is None
+    assert "no_validated_return_model" in report.data_quality_flags
 
 
 def test_ensemble_reports_not_validated_when_walk_forward_is_unavailable(
