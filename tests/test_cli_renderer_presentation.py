@@ -7,7 +7,11 @@ from pathlib import Path
 import pandas as pd
 from rich.console import Console
 
-from app.cli.ui.tables import build_filter_results_table, build_verdict_summary_table
+from app.cli.ui.tables import (
+    build_filter_results_table,
+    build_recommendation_diagnostics_tables,
+    build_verdict_summary_table,
+)
 from core.dependency_validator import DependencyCheck, DependencyCheckResult
 
 sys.modules.setdefault("yfinance", types.SimpleNamespace())
@@ -295,6 +299,67 @@ def test_verdict_summary_table_shows_defensive_execution_guard() -> None:
     assert "Action" in output
     assert "No sizing: defensive market" in output
     assert "market_regime_defensive" not in output
+
+
+def test_recommendation_diagnostics_keep_reject_out_of_sizing() -> None:
+    console = _recording_console(width=220)
+    result = {
+        "ticker": "MYOR",
+        "execution_decision": {
+            "execution_status": "NO_TRADE",
+            "decision_source": "preflight",
+            "actionable": False,
+        },
+        "recommendation_context": {
+            "contract_version": "recommendation-context-v1",
+            "display_only": True,
+            "full_pipeline_evaluated": False,
+            "classification_basis": "trade_setup_snapshot",
+            "recommendation_state": "SINGLE_GATE_REJECT",
+            "actionability": "REJECT",
+            "execution_eligible": False,
+            "sizing_allowed": False,
+            "opportunity_rank_eligible": False,
+            "decision_source": "preflight",
+            "blockers": [
+                {
+                    "gate_id": "risk_reward_floor",
+                    "hard_or_soft": "SOFT",
+                    "reason_code": "rr_too_low",
+                    "observations": [
+                        {
+                            "name": "risk_reward_ratio",
+                            "observed": 1.5,
+                            "threshold": 2.0,
+                            "comparator": ">=",
+                            "unit": "x",
+                            "absolute_gap": 0.5,
+                            "percentage_gap": 0.25,
+                        }
+                    ],
+                    "provenance": "fixture",
+                    "detail": None,
+                    "next_observable_trigger": "Wait for Rp1,745; recompute.",
+                }
+            ],
+            "hypothetical_setup": None,
+            "next_observable_trigger": "Wait for Rp1,745; recompute.",
+            "evidence_quality": "COMPLETE",
+            "calibration_status": "NOT_AVAILABLE",
+        },
+    }
+
+    tables = build_recommendation_diagnostics_tables([result])
+    assert len(tables) == 1
+    console.print(tables[0])
+
+    output = console.export_text()
+    assert "Rejected Setups" in output
+    assert "SINGLE_GATE_REJECT" in output
+    assert "1.50x" in output
+    assert ">= 2.00x" in output
+    assert "0.50x / 25.0%" in output
+    assert "NO" in output
 
 
 def test_live_batch_progress_uses_compact_headers_and_summary_note() -> None:

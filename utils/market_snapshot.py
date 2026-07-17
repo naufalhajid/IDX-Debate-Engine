@@ -151,6 +151,61 @@ def history_data_hash(history: pd.DataFrame) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def validate_market_snapshot_integrity(
+    snapshot: "MarketSnapshot",
+    *,
+    expected_ticker: str | None = None,
+) -> None:
+    """Verify that an in-memory snapshot still matches its frozen identity."""
+
+    ticker = _normalise_ticker(snapshot.ticker)
+    if expected_ticker is not None and ticker != _normalise_ticker(expected_ticker):
+        raise ValueError("Snapshot ticker does not match expected ticker")
+    history = snapshot.history_copy()
+    missing = set(_OHLCV_COLUMNS) - set(history.columns)
+    if missing:
+        raise ValueError(f"Snapshot history missing columns: {sorted(missing)}")
+    if len(history) != snapshot.row_count:
+        raise ValueError("Snapshot row count does not match in-memory history")
+    dates = _canonical_index(history.index)
+    if dates.isna().any():
+        raise ValueError("Snapshot history contains invalid dates")
+    if dates.has_duplicates or not dates.is_monotonic_increasing:
+        raise ValueError("Snapshot history dates must be unique and ordered")
+    if not dates.equals(pd.DatetimeIndex(history.index)):
+        raise ValueError("Snapshot history dates are not canonical daily sessions")
+
+    actual_first = dates[0].date() if len(dates) else None
+    actual_last = dates[-1].date() if len(dates) else None
+    if actual_first != snapshot.first_date or actual_last != snapshot.last_date:
+        raise ValueError("Snapshot first/last date does not match in-memory history")
+    if actual_first is not None and actual_first < snapshot.requested_start:
+        raise ValueError("Snapshot contains bars before requested_start")
+    if actual_last is not None and actual_last > snapshot.requested_end:
+        raise ValueError("Snapshot contains bars after requested_end")
+
+    actual_hash = history_data_hash(history)
+    if actual_hash != snapshot.data_hash:
+        raise ValueError("Snapshot data hash does not match in-memory history")
+    identity = "|".join(
+        (
+            snapshot.contract_version,
+            ticker,
+            snapshot.requested_start.isoformat(),
+            snapshot.requested_end.isoformat(),
+            snapshot.interval,
+            str(snapshot.auto_adjust),
+            actual_hash,
+        )
+    )
+    expected_id = (
+        f"{ticker}-{actual_last.isoformat() if actual_last else 'empty'}-"
+        f"{hashlib.sha256(identity.encode('utf-8')).hexdigest()[:16]}"
+    )
+    if snapshot.snapshot_id != expected_id:
+        raise ValueError("Snapshot ID does not match frozen snapshot content")
+
+
 @dataclass(frozen=True)
 class MarketSnapshot:
     """One ticker's cleaned daily OHLCV and auditable provenance."""

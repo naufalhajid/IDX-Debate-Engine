@@ -189,7 +189,8 @@ CONFIG = {
     # docs/research/screener_signal_ic_2026-07-02.md
     # Harvey/Liu/Zhu bar (mean IC > 0.05, |t| >= 2.57): NO signal passed in
     # this crash-dominated window — it validates nothing, but flags harm:
-    #   weight_valuation (48)      → VALIDATED (literature: OCF/Price IDX4 model);
+    #   weight_valuation (48)      → IDX4-inspired characteristic only;
+    #                                 not a validated factor-model implementation.
     #                                 in-sample IC ~0 (neutral)
     #   weight_profitability (37)  → VALIDATED (literature: IDX quality premium);
     #                                 in-sample pbv_x_roe IC +0.018 (neutral)

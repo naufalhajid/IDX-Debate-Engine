@@ -1256,7 +1256,9 @@ def _compute_val_score(row: pd.Series, cfg: dict) -> float:
         return w * 0.10  # di atas fair_lo = tidak menarik
 
     # Non-finansial: OCF/Price (primary when available) plus Graham/PE blend.
-    # OCF/Price is the IDX4 value proxy; Graham/PE remains fallback when OCF is absent.
+    # OCF/Price is an IDX4-inspired stock characteristic. This scorer does not
+    # construct the paper's factor portfolios or estimate factor exposures.
+    # Graham/PE remains fallback when OCF is absent.
     ocf_yield = _ocf_price_ratio_from_row(row)
     ocf_tier = (
         _tier_score(

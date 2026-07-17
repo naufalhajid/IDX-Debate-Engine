@@ -314,7 +314,7 @@ class TestSentimentNodeDataVolume:
         )
 
         assert "INSUFFICIENT_DATA" in result["sentiment_data"]
-        assert signal["position"] == "HOLD"
+        assert signal["position"] == "UNKNOWN"
         assert signal["confidence"] == 0.0
 
     def test_verified_weight_field_added_to_posts(
@@ -462,7 +462,7 @@ class TestSentimentNodeDataVolume:
         assert all("comments" not in post for post in visible_posts)
         assert all(len(post["content"]) <= 283 for post in visible_posts)
 
-    def test_malformed_llm_json_falls_back_to_hold(
+    def test_malformed_llm_json_abstains_as_unknown(
         self,
         chamber: DebateChamber,
         monkeypatch,
@@ -497,5 +497,5 @@ class TestSentimentNodeDataVolume:
         )
 
         assert "PARSE_ERROR" in result["sentiment_data"]
-        assert signal["position"] == "HOLD"
+        assert signal["position"] == "UNKNOWN"
         assert signal["confidence"] == 0.0

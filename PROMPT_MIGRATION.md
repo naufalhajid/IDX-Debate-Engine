@@ -149,7 +149,7 @@ STEP 5 new quality gates:
 
 **`bear_r1.txt`** — DATA AUDIT includes OCF/Price and RNOA as risk metrics. OVERVALUATION CHECK adds: `Do not over-credit price momentum if OCF/Price or RNOA/ROA quality is weak.`
 
-**Why:** `core/fundamental_factors.py` (IDX4 factor model) introduced RNOA and OCF/Price as higher-fidelity signals than ROE and P/B, but the debate agents still cited legacy metrics. This wires the new signals into LLM context.
+**Why:** `core/fundamental_factors.py` introduced **IDX4-inspired stock characteristics** (RNOA/ROA and OCF/Price), not the published factor model. The debate agents still cited legacy metrics, so this wires the newer characteristics into LLM context without claiming factor-portfolio validation.
 
 ---
 

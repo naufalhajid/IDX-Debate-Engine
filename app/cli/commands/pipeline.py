@@ -15,7 +15,10 @@ from app.cli.mode_utils import (
     normalize_screener_mode,
 )
 from app.cli.ui.console import console
-from app.cli.ui.tables import build_verdict_summary_table
+from app.cli.ui.tables import (
+    build_recommendation_diagnostics_tables,
+    build_verdict_summary_table,
+)
 from utils.logger_config import logger
 from utils.ticker import InvalidIDXTicker, normalize_idx_tickers
 
@@ -341,6 +344,8 @@ def pipeline_command(
             results = json.loads(batch_file.read_text(encoding="utf-8"))
             if isinstance(results, list) and results:
                 console.print(build_verdict_summary_table(results))
+                for diagnostics in build_recommendation_diagnostics_tables(results):
+                    console.print(diagnostics)
         except Exception as exc:
             artifact_read_failed = True
             logger.warning(

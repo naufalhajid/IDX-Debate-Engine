@@ -56,7 +56,8 @@ def calculate_rnoa(data: Mapping[str, Any]) -> float:
 def calculate_profitability_score(data: dict) -> float:
     """Return a 0..1 quality score using RNOA first, then ROA fallback.
 
-    IDX4 research prefers RNOA over ROE for Indonesian profitability. When RNOA
+    IDX4-inspired research prefers operating profitability over ROE. This
+    stock-level helper is not the published factor model. When RNOA
     cannot be calculated from available data, ROA is used as the lower-fidelity
     approximation requested by the recalibration brief.
     """
