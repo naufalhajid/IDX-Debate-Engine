@@ -1,0 +1,32 @@
+╔══════════════════════════════════════════╗
+║  AUDIT REPORT: LSIP — HOLD       ║
+╚══════════════════════════════════════════╝
+
+Summary : LSIP→HOLD: unknown won by unknown (0.00) after 0 round(s). 0 agent(s) dissented. Fair value tidak tersedia — validasi fundamental secara manual sebelum entry.
+Run ID  : phase1_replay_20260715_154630
+Generated: 2026-07-16T05:21:09.606716+00:00
+
+VERDICT
+───────
+Rating     : HOLD (confidence: 0%)
+Method     : unknown
+Winner    : unknown
+Consensus  : no
+Rounds     : 0
+Dissent    : 0% (0 of 5 agents)
+
+AGENT VOTES
+───────────
+  none
+
+KEY ARGUMENTS
+─────────────
+Bull  : 
+Bear  : 
+Devil : 
+
+DATA QUALITY
+────────────
+Freshness OK : True
+Stale sources: none
+Missing      : none
