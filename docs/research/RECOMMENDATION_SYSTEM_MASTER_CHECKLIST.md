@@ -74,7 +74,7 @@ The finished system has four separate authority layers:
 |---|---|---|
 | Recommendation information contract | **DONE** | `recommendation-context-v1`, six states, exact blockers/gaps, non-executable hypothetical setup, API/CLI/Markdown/Rich parity, and validation exist. |
 | Live thresholds/actionability | **UNCHANGED** | The information refactor did not loosen R/R, momentum, SIDEWAYS, debate eligibility, liquidity, regime, or sizing. |
-| Generic paired shadow protocol | **RS-P2-014 PORTFOLIO-STATE/PAIRED-DECISION SUBSTRATE COMPLETE; RS-P2-015–025 OPEN** | The isolated package now adds a hash-bound frozen control portfolio state, manifest-v2 policy binding, immutable source/state/lineage artifacts, and a same-state paired candidate producer. Fixed-notional P&L, policy portfolios, daily NAV, common metrics, reporting, and collection remain unimplemented. |
+| Generic paired shadow protocol | **RS-P2-015 FIXED-NOTIONAL SUBSTRATE COMPLETE; RS-P2-016–025 OPEN** | The isolated package now includes the frozen control state/paired decision view plus exact integer-IDR, identical fixed-notional lifecycles, causal liquidity, immutable cash/holding records, semantic replay, and content-addressed lineage. Independent policy portfolios, daily NAV, common metrics, generic reporting, real component approval, and collection remain unimplemented. |
 | Existing forecasting shadow | **PARTIAL FOUNDATION** | It is non-authoritative, but defaults to 5/10/20-day horizons and lacks signed protocol IDs, paired control/challenger decisions, trial registry, and the 15-day primary estimand. |
 | C1 calibrated recommender | **PARTIAL FOUNDATION ONLY** | Some forecast probabilities exist; there is no promotion-grade competing-risk calibration or risk–coverage layer. |
 | C2 discount-rate decomposition | **PROPOSAL ONLY** | Live logic still uses SBN plus beta times total ERP; source decomposition/expiry/abstention is absent. |
@@ -407,7 +407,7 @@ components.
 
 - [x] **RS-P2-014:** Implement paired candidate-level decision view using frozen
   control portfolio state.
-- [ ] **RS-P2-015:** Implement identical fixed-notional view to isolate signal
+- [x] **RS-P2-015:** Implement identical fixed-notional view to isolate signal
   quality.
 - [ ] **RS-P2-016:** Implement independent policy-portfolio view from identical
   starting capital and risk/cost rules.
@@ -480,8 +480,101 @@ components.
     `5a124a40430e6745622e287ce11a9e4d7ef0204a82c9f9baf470aa9db17e0c77`
   - `docs/research/RS_P2_014_PORTFOLIO_STATE_DESIGN.md`:
     `66a6761859936b0c84fa83afb475952bc172759366752193475d6f4aabf7762c`
-- No A1 was granted, no collection/unblinding occurred, no baseline or live
-  authority changed, and RS-P2-015–018 remain open.
+- At the RS-P2-014 hard stop, no A1 was granted, no collection/unblinding
+  occurred, no baseline or live authority changed, and RS-P2-015–018 were
+  open. RS-P2-015 was subsequently implemented under separate owner approval;
+  RS-P2-016–018 remain open.
+
+### RS-P2-015 fixed-notional evidence — 2026-07-18
+
+- **Owner policy frozen exactly:** both sides receive one Rp13,000,000 gross
+  pre-cost sleeve against the same frozen RS-P2-014 state. Sizing uses planned
+  integer `entry_high`, whole lots of 100, residual cash remains idle, entry
+  and exit capacity are `ALL_OR_NONE`, and only the primary 15-day lifecycle
+  emits future-NAV-eligible holding/cash-flow records
+  (`core/shadow_protocol/fixed_notional.py:187-308, 677-1479`).
+- **FN1–FN8 and FN-N1–FN-N3 are executable:** the Rp130,000/one-lot boundary,
+  separate entry cost and potentially greater-than-Rp13m debit, explicit
+  sleeve/trade/risk denominators, no-action semantics, honest entry/exit
+  capacity exclusions, exit censoring, and the mandatory future RS-P2-018
+  censor-count note are literal/schema-bound. Participation remains
+  `DERIVED_NOT_CALIBRATED`; no empirical market-impact claim was introduced.
+- **Exact arithmetic:** persisted money, gross value, cost, debit/credit,
+  holding value, P&L, and cash flows are strict integer IDR. Applicable bps are
+  aggregated and ceiled adversely once. Ratios use the frozen 12-decimal
+  `ROUND_HALF_EVEN` rule. Exact semantic replay rejects coordinated arithmetic
+  drift, including a recomputed one-IDR risk-basis change
+  (`core/shadow_protocol/fixed_notional.py:1675-1715, 2700-2807`;
+  `core/shadow_protocol/fixed_notional_store.py:1476-1534`).
+- **Causal shared input:** `FixedNotionalPairInput` binds the exact manifest,
+  raw capture, candidate set/candidate, snapshot, portfolio state, paired
+  observation, fixed policy, causal liquidity, frozen calendar, integer bars,
+  label, cost, and corporate-action identities. Signal-time action hashes,
+  dividend convention, post-signal effective sessions, source vintages,
+  evaluation cutoffs, and lifecycle chronology fail closed
+  (`core/shadow_protocol/fixed_notional.py:733-858, 2067-2664`).
+- **Deterministic paired result:** control and challenger are derived directly
+  from the same hash-bound PairInput; there are no pluggable side callbacks.
+  Shared admission/exclusion must agree, while decision geometry and causal
+  outcomes may differ. Primary/secondary lifecycle identities and exact T+2
+  cash settlement are machine-validated
+  (`core/shadow_protocol/fixed_notional.py:2667-2832`).
+- **Immutable storage and lineage:** artifacts live under
+  `protocols/{protocol_id}/{manifest_sha256}/fixed_notional/{kind}/`
+  `{canonical_sha256}/{raw_sha256}.json`; references live under
+  `fixed_notional/refs/{kind}/{artifact_id}.json`. Exclusive create, dual
+  canonical/raw identity, byte length, canonical path, sorted named
+  predecessors, exact PairInput semantic replay, and orphan rejection are
+  enforced. The embedded RS-P2-014 lineage is not trusted: candidate and
+  portfolio predecessors are reconstructed through their strict stores
+  (`core/shadow_protocol/fixed_notional_store.py:517-1438`).
+- **Governance remains closed:** current approval/closure state is reloaded
+  using actual attempt time before fixed-notional maturation
+  (`core/shadow_protocol/governance.py:1166-1200`). The additive capability
+  literal is `RS_P2_015_IMPLEMENTED_NOT_A1_ELIGIBLE`; its existence does not
+  grant A1.
+- **Tests:** FN1–FN8/FN-N1–FN-N3, corporate-action causality, point-in-time
+  liquidity, high-price/entry/exit exclusions, exact T+2, chronology,
+  coordinated one-IDR drift, tamper, replay/idempotency, base-lineage
+  reconstruction, named predecessors, duplicate keys, byte/path identity,
+  authority literals, v1 non-reinterpretation, and cross-process hashes are
+  covered in `tests/test_shadow_protocol_p2_015.py:793-2113`.
+- **Verification:** RS-P2-015 file `57 passed`; focused five-file shadow suite
+  `216 passed`; full suite `1866 passed, 3 skipped`; repository-wide
+  `ruff check --fix .` passed and changed no files; `uv lock --check` passed.
+- **Protected SHA-256 remained byte-identical:**
+  - `core/shadow_protocol/contracts.py`:
+    `87b605fb9cc3cb3bee73d903110801699e06e63f4d41e9e8b94cdd48d0ee54b7`;
+  - `core/shadow_protocol/calendar.py`:
+    `fe27a4e5c964c26f3093921193f29ec45f4f4c09f620b52ca94806ab302c7151`;
+  - `core/shadow_protocol/outcome_engine.py`:
+    `b90d149df67d91f59408618e580c75f55d2de2257cf6e5f46f4265dffaaa27a8`.
+- **Final changed/new SHA-256:**
+  - `core/shadow_protocol/__init__.py`:
+    `213e021453fe67f45363f1a57d70aac3af6602ff5e12cabb01c884b12e82376c`;
+  - `core/shadow_protocol/governance.py`:
+    `b2cdb46e36f453ba10e28a76403ce1768947c7dcd9d5093c37f13ab4ad4be7c4`;
+  - `core/shadow_protocol/portfolio.py`:
+    `63f7150f04c362791841f618969beba81de3849feb778681264d028fc815ee10`;
+  - `core/shadow_protocol/fixed_notional.py`:
+    `485039d73f187e3b3092d5fbb733f2e9b5ee61617a2fa9e4dd0bef9e65bb0146`;
+  - `core/shadow_protocol/fixed_notional_store.py`:
+    `ff148c6a350025636342da113f8ff40cbc390049b9eb64c00610b564d50bfbcc`;
+  - `tests/test_shadow_protocol_p2_015.py`:
+    `3c90d9af8041ede84d9df59c4a382efda41acaff5be72e722631455fcfd6d06a`.
+- **Hard scope boundary:** no real component manifest/A1, approval-ledger event,
+  collection cohort, unblinding, threshold or decision-logic change,
+  `trade_math.py` change, baseline change, or live/ranking/sizing/execution
+  authority was created. Synthetic temporary governance fixtures are not a
+  granted A1 or collection cohort. `shadow-evaluation-v1` is unchanged and not
+  reinterpreted. RS-P2-016–018 and RS-P2-019–025 remain open; the
+  `rs_p2_017_eligible` marker is an input contract only, not a daily NAV
+  implementation, and RS-P2-018 aggregation/reporting does not yet exist.
+- Implementation commit:
+  `6e459c8a15b439f35e46d4791db1ddbbcb2d92af`.
+- The documentation commit is reported in the external handoff after this
+  checklist is committed; it is intentionally not embedded here to avoid
+  self-reference.
 
 ### Storage, validation, and reporting
 
@@ -1201,6 +1294,7 @@ artifact paths, not mutable aliases.
 | 2026-07-17 | Phase 2 / RS-P2-001…007 | CONTRACTS DONE; HARD STOP | Added isolated `core/shadow_protocol/` contracts and `tests/test_shadow_protocol.py`; no adapter, writer, engine, threshold, or live-authority change | Contract 20 passed; boundary 293 passed; full 1670 passed/3 skipped; Ruff and py_compile passed | `shadow-protocol-manifest-v1`; no collection protocol instantiated | RS-P2-008 (build only), then approval A1 before any collection |
 | 2026-07-17 | Phase 2 / RS-P2-008…013 | ENGINE/EVIDENCE DONE; HARD STOP | Added raw-first paired evidence, parity/lineage reconstruction, causal maturation, corporate-action handling, deterministic replay, and immutable backfill inside isolated `core/shadow_protocol/`; updated protocol/tests only | Focused 56 passed; cross-boundary 403 passed/1 skipped; full 1706 passed/3 skipped; Ruff and py_compile passed | No protocol instantiated; raw n=0, independent n=0, mature n=0 | RS-P2-014 build only after explicit approval; A1 required before collection |
 | 2026-07-18 | Phase 2 / RS-P2-014 | DONE; A1 CAPABILITY REMAINS CLOSED | Added evaluation-only frozen portfolio policy/source/state, manifest-v2 binding, immutable lineage/storage, paired candidate producer, governance reloads, exports, tests, and evidence; no legacy evaluator or live path changed | Focused 159 passed; full 1809 passed/3 skipped; py_compile, repo-wide Ruff (no edits), and lock check passed | Design commit `2b40802`; no component manifest/A1/cohort; raw n=0, independent n=0, mature n=0 | RS-P2-015 under separate approval |
+| 2026-07-18 | Phase 2 / RS-P2-015 | DONE; A1 CAPABILITY REMAINS CLOSED | Added exact integer-IDR fixed-notional policy/input/lifecycles, causal liquidity and bars, primary holding/cash-flow records, deterministic semantic replay, immutable graph references/lineage, additive governance reload, exports, tests, and evidence; no live path changed | RS-P2-015 57 passed; focused shadow 216 passed; full 1866 passed/3 skipped; repo-wide Ruff no edits; lock check passed | No real component manifest/A1/cohort; synthetic test fixtures only; implementation commit `6e459c8`; documentation commit reported in the external handoff | RS-P2-016 only under separate approval |
 
 ## 9. Handoff template
 
