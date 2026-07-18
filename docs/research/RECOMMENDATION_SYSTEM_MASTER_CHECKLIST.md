@@ -70,11 +70,11 @@ The finished system has four separate authority layers:
 
 ## 3. Current-state truth table
 
-| Area | Status on 2026-07-17 | What that means |
+| Area | Status on 2026-07-18 | What that means |
 |---|---|---|
 | Recommendation information contract | **DONE** | `recommendation-context-v1`, six states, exact blockers/gaps, non-executable hypothetical setup, API/CLI/Markdown/Rich parity, and validation exist. |
 | Live thresholds/actionability | **UNCHANGED** | The information refactor did not loosen R/R, momentum, SIDEWAYS, debate eligibility, liquidity, regime, or sizing. |
-| Generic paired shadow protocol | **POINT-IN-TIME ENGINE FOUNDATION** | The isolated package now has raw-first candidate persistence, exact parity proofs, 3/5/10/15-day maturation, frozen fill/cost/corporate-action semantics, deterministic replay, monotone backfill, and exact-artifact lineage verification. Orchestrator adapters, paper portfolios, reporting, and collection are not implemented. |
+| Generic paired shadow protocol | **RS-P2-014 PORTFOLIO-STATE/PAIRED-DECISION SUBSTRATE COMPLETE; RS-P2-015–025 OPEN** | The isolated package now adds a hash-bound frozen control portfolio state, manifest-v2 policy binding, immutable source/state/lineage artifacts, and a same-state paired candidate producer. Fixed-notional P&L, policy portfolios, daily NAV, common metrics, reporting, and collection remain unimplemented. |
 | Existing forecasting shadow | **PARTIAL FOUNDATION** | It is non-authoritative, but defaults to 5/10/20-day horizons and lacks signed protocol IDs, paired control/challenger decisions, trial registry, and the 15-day primary estimand. |
 | C1 calibrated recommender | **PARTIAL FOUNDATION ONLY** | Some forecast probabilities exist; there is no promotion-grade competing-risk calibration or risk–coverage layer. |
 | C2 discount-rate decomposition | **PROPOSAL ONLY** | Live logic still uses SBN plus beta times total ERP; source decomposition/expiry/abstention is absent. |
@@ -369,10 +369,12 @@ components.
 - A marketable entry that gaps through its planned stop is recorded as a
   same-open fill/stop with costs, not discarded. Intraday entry/target ordering
   uncertainty remains visible and never receives unproven target credit.
-- One frozen lot is used; source prices are accepted without engine-side tick
-  rounding and no liquidity model is claimed. Entry and exit fees/slippage are
-  calculated from their respective cash notionals. These limitations must be
-  replaced or explicitly retained before RS-P2-014…017 portfolio work.
+- At the 2026-07-17 engine checkpoint, one frozen lot was used; source prices
+  were accepted without engine-side tick rounding and no liquidity model was
+  claimed. Entry and exit fees/slippage were calculated from their respective
+  cash notionals. RS-P2-014 now freezes the future fixed-notional,
+  starting-capital, liquidity, and portfolio-risk policy/state assumptions,
+  but the legacy one-lot evaluator remains unchanged until RS-P2-015.
 - Every ledger insert/update requires deterministic replay from the exact
   `MaturationRequest`. Source-vintage chains preserve bar prefixes and immutable
   corporate-action records while allowing a later-published event with an
@@ -403,7 +405,7 @@ components.
 
 ### Paper portfolios and metrics substrate
 
-- [ ] **RS-P2-014:** Implement paired candidate-level decision view using frozen
+- [x] **RS-P2-014:** Implement paired candidate-level decision view using frozen
   control portfolio state.
 - [ ] **RS-P2-015:** Implement identical fixed-notional view to isolate signal
   quality.
@@ -413,6 +415,73 @@ components.
   Sharpe/drawdown from a list of closed trades.
 - [ ] **RS-P2-018:** Emit common metrics with explicit denominators and
   `NOT_ESTIMABLE`, never coerced zeroes.
+
+### RS-P2-014 portfolio-state/paired-view evidence — 2026-07-18
+
+- **Owner policy frozen exactly:** starting capital Rp100,000,000; fixed
+  notional Rp13,000,000; minimum ADTV20 Rp10,000,000,000; participation
+  `0.0013`; target deployment `0.65`; effective fixed-notional maximum
+  deployment `0.39`; minimum cash `0.05`; gross exposure `0.95`; position
+  limits `5` and `3/2/1/0`; loss budget `0.02`; heat `0.013`; daily realized
+  loss stop `0.03`; sector/cluster count limit 2; lot 100; and T+2.
+- **N1–N3 preserved:** participation is labeled
+  `DERIVED_NOT_CALIBRATED`; 65% is a `SIZING_BASIS`, not promised
+  utilization; and true NAV drawdown remains `NOT_ESTIMABLE` until RS-P2-017
+  plus a new protocol. `MAX_30D_DRAWDOWN` is not reinterpreted.
+- **Manifest-v2 sufficiency proven:** the same canonical policy CONFIG hash is
+  mandatory on both control/challenger sides, all portfolio scalar decisions
+  are exact `FrozenParameter`s, and costs/source/calendar/corporate-action/
+  methodology hashes are revalidated. Every reserved portfolio parameter and
+  the canonical CONFIG path fail closed against profile downgrade
+  (`core/shadow_protocol/portfolio.py:1204-1537`).
+- **No premature A1:** the frozen capability literal is
+  `RS_P2_014_ONLY_NOT_A1_ELIGIBLE`; approval append and authorization reload
+  reject the profile until later Phase-2 capability evidence is represented by
+  a new policy/manifest revision (`core/shadow_protocol/portfolio.py:1540-1551`;
+  `core/shadow_protocol/governance.py:1591-1607`).
+- **Hybrid identity is exact:** persisted money, positions, commitments, NAV,
+  applied costs, and cash are strict integer IDR; ratios are finite,
+  12-decimal `ROUND_HALF_EVEN`; applicable bps are aggregated and then
+  conservatively ceiled once (`core/shadow_protocol/portfolio.py:210-553,
+  1109-1144`).
+- **Frozen-state lineage:** source record, policy, baseline, manifest,
+  opportunity, chronology, positions/commitments, and state arithmetic are
+  verified before immutable persistence and again on load
+  (`core/shadow_protocol/portfolio.py:555-1050,1554-1887,1890-2520`).
+- **Paired view:** authorization is reloaded before the first evaluator; both
+  evaluators receive one immutable input and exact pre-batch state; role,
+  disposition, mutation, chronology, and observation identities are checked
+  (`core/shadow_protocol/paired_view.py:37-502`;
+  `core/shadow_protocol/governance.py:1095-1215`).
+- **Regression boundary:** `contracts.py`, `calendar.py`, and
+  `outcome_engine.py` are byte-identical to the prepass. The existing
+  `shadow-evaluation-v1` evaluator was not changed or silently reinterpreted.
+  Maturation/backfill portfolio-lineage wiring remains later Phase-2 work and
+  is unreachable for an authorized portfolio profile while the capability
+  gate is closed.
+- **Tests:** tamper, downgrade, replay/idempotency, exact integer arithmetic,
+  source/state chronology, baseline/opportunity binding, same-state parity,
+  evaluator mutation, authorization ordering, lineage-v2 reconstruction,
+  cross-process hash determinism, and authority literals are covered in
+  `tests/test_shadow_protocol_p2_014.py:632-1761`.
+- **Verification:** focused shadow suite `159 passed`; full suite `1809 passed,
+  3 skipped`; touched-file `py_compile` passed; repository-wide
+  `ruff check --fix` passed and changed no files; `uv lock --check` passed.
+- **Frozen content SHA-256:**
+  - `core/shadow_protocol/portfolio.py`:
+    `502ac2e1ca34f31c855da7d16a3834de1a7aa7524cac8705c6b3ce0719828d3e`
+  - `core/shadow_protocol/paired_view.py`:
+    `873e94fa8cb6ebaf50c127a32da6c86326c1a68989a1a4ec6f2d53d7d9fef684`
+  - `core/shadow_protocol/governance.py`:
+    `ae026aa3c4a4c46e98c1b662912cdd5075b62c7ec07966ad420cf7d12c3eb38c`
+  - `core/shadow_protocol/__init__.py`:
+    `7c0198e940c876f0d96bfd9fcc91a7bf8cf1ba6f7760c1f92219695b179e6ef1`
+  - `tests/test_shadow_protocol_p2_014.py`:
+    `5a124a40430e6745622e287ce11a9e4d7ef0204a82c9f9baf470aa9db17e0c77`
+  - `docs/research/RS_P2_014_PORTFOLIO_STATE_DESIGN.md`:
+    `66a6761859936b0c84fa83afb475952bc172759366752193475d6f4aabf7762c`
+- No A1 was granted, no collection/unblinding occurred, no baseline or live
+  authority changed, and RS-P2-015–018 remain open.
 
 ### Storage, validation, and reporting
 
@@ -1131,6 +1200,7 @@ artifact paths, not mutable aliases.
 | 2026-07-17 | Phase 0 / RS-P0-001…017 | BASELINE CAPTURED; HARD STOP | No source, threshold, schema, service, or live-authority edits; one read-only manifest added | Focused 113 passed; non-model 1605 passed/3 skipped; full 1650 passed/3 skipped with workspace SSL/TEMP workaround; Ruff and 126-file py_compile passed | `BASELINE_CONTROL_MANIFEST_2026-07-17.json`, `RS-CONTROL-20260717-01` | User approval of P0-009/P0-013, then RS-P2-001 |
 | 2026-07-17 | Phase 2 / RS-P2-001…007 | CONTRACTS DONE; HARD STOP | Added isolated `core/shadow_protocol/` contracts and `tests/test_shadow_protocol.py`; no adapter, writer, engine, threshold, or live-authority change | Contract 20 passed; boundary 293 passed; full 1670 passed/3 skipped; Ruff and py_compile passed | `shadow-protocol-manifest-v1`; no collection protocol instantiated | RS-P2-008 (build only), then approval A1 before any collection |
 | 2026-07-17 | Phase 2 / RS-P2-008…013 | ENGINE/EVIDENCE DONE; HARD STOP | Added raw-first paired evidence, parity/lineage reconstruction, causal maturation, corporate-action handling, deterministic replay, and immutable backfill inside isolated `core/shadow_protocol/`; updated protocol/tests only | Focused 56 passed; cross-boundary 403 passed/1 skipped; full 1706 passed/3 skipped; Ruff and py_compile passed | No protocol instantiated; raw n=0, independent n=0, mature n=0 | RS-P2-014 build only after explicit approval; A1 required before collection |
+| 2026-07-18 | Phase 2 / RS-P2-014 | DONE; A1 CAPABILITY REMAINS CLOSED | Added evaluation-only frozen portfolio policy/source/state, manifest-v2 binding, immutable lineage/storage, paired candidate producer, governance reloads, exports, tests, and evidence; no legacy evaluator or live path changed | Focused 159 passed; full 1809 passed/3 skipped; py_compile, repo-wide Ruff (no edits), and lock check passed | Design commit `2b40802`; no component manifest/A1/cohort; raw n=0, independent n=0, mature n=0 | RS-P2-015 under separate approval |
 
 ## 9. Handoff template
 

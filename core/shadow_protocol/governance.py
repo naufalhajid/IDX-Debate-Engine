@@ -38,6 +38,15 @@ from .contracts import (
     canonical_json_bytes,
     canonical_sha256,
 )
+from .portfolio import (
+    PORTFOLIO_BINDING_PROFILE,
+    FrozenPortfolioPolicy,
+    PortfolioArtifactStore,
+    PortfolioState,
+    PortfolioStateSourceRecord,
+    manifest_portfolio_profile,
+    verify_portfolio_a1_capability,
+)
 
 
 MANIFEST_REFERENCE_VERSION = "shadow-manifest-reference-v1"
@@ -659,6 +668,42 @@ class ProtocolGovernanceStore:
         )
         return self._exclusive_create(path, canonical_json_bytes(trusted))
 
+    def persist_portfolio_policy(
+        self,
+        manifest: ShadowProtocolManifest,
+        raw_file_bytes: bytes,
+    ) -> Path:
+        """Persist a profile-bound CONFIG without granting A1."""
+
+        return PortfolioArtifactStore(self.root).persist_policy(
+            manifest,
+            raw_file_bytes,
+        )
+
+    def persist_portfolio_state_source(
+        self,
+        manifest: ShadowProtocolManifest,
+        raw_file_bytes: bytes,
+    ) -> Path:
+        """Persist exact point-in-time portfolio source evidence."""
+
+        return PortfolioArtifactStore(self.root).persist_source_record(
+            manifest,
+            raw_file_bytes,
+        )
+
+    def persist_portfolio_state(
+        self,
+        manifest: ShadowProtocolManifest,
+        raw_file_bytes: bytes,
+    ) -> Path:
+        """Persist one exact read-only state after its dependencies."""
+
+        return PortfolioArtifactStore(self.root).persist_state(
+            manifest,
+            raw_file_bytes,
+        )
+
     def append_approval(self, approval_raw_file_bytes: bytes) -> ApprovalLedger:
         approval = load_approval_record_v1(approval_raw_file_bytes)
         manifest, manifest_raw, methodology = self._load_manifest_for_approval(
@@ -689,6 +734,10 @@ class ProtocolGovernanceStore:
             approval=approval,
             approval_raw_file_bytes=approval_raw_file_bytes,
             trading_calendar=calendar,
+        )
+        self._verify_portfolio_binding_if_declared(
+            manifest,
+            require_a1_capability=True,
         )
         ledger_reference = ApprovalLedgerReference(
             ledger_id=approval.approval_ledger_id,
@@ -946,6 +995,14 @@ class ProtocolGovernanceStore:
         trusted_candidate = ShadowObservation.model_validate(
             observation.model_dump(mode="python")
         )
+        if (
+            manifest_portfolio_profile(authorization.manifest)
+            == PORTFOLIO_BINDING_PROFILE
+        ):
+            PortfolioArtifactStore(self.root).verify_observation_state(
+                authorization.manifest,
+                trusted_candidate,
+            )
         observation_bytes = canonical_json_bytes(trusted_candidate)
         observation_hash = _sha256(observation_bytes)
         observation_path = self._record_path(
@@ -1034,6 +1091,101 @@ class ProtocolGovernanceStore:
         self._exclusive_create(observation_path, observation_bytes)
         self._append_event(event)
         return observation_path
+
+    def verify_paired_evaluation_authorization(
+        self,
+        *,
+        protocol_id: str,
+        manifest_canonical_sha256: str,
+        ledger_id: str,
+        signal_at: datetime,
+        attempted_at: datetime,
+    ) -> ProtocolAuthorizationBundle:
+        """Reload current A1/closure state before either evaluator runs."""
+
+        if signal_at.utcoffset() is None or attempted_at.utcoffset() is None:
+            raise ShadowContractError(
+                "paired-evaluation authorization times must be timezone-aware"
+            )
+        authorization = self.load_authorization(
+            protocol_id=protocol_id,
+            manifest_canonical_sha256=manifest_canonical_sha256,
+            ledger_id=ledger_id,
+        )
+        if authorization.approval_ledger.closure_event is not None:
+            raise ShadowContractError("protocol is closed to paired evaluation")
+        if attempted_at < signal_at:
+            raise ShadowContractError(
+                "paired evaluation cannot precede its signal"
+            )
+        if attempted_at < authorization.approval.decided_at:
+            raise ShadowContractError("paired evaluation precedes A1 decision")
+        if attempted_at < authorization.manifest.collection_start_not_before:
+            raise ShadowContractError(
+                "paired evaluation precedes collection window"
+            )
+        if signal_at < authorization.approval.decided_at:
+            raise ShadowContractError("paired signal predates A1 decision")
+        if signal_at < authorization.manifest.collection_start_not_before:
+            raise ShadowContractError(
+                "paired signal predates collection window"
+            )
+        terminal_close = session_close_at(
+            authorization.manifest.fixed_terminal_date
+        )
+        if attempted_at > terminal_close:
+            raise ShadowContractError(
+                "paired evaluation is after fixed terminal date"
+            )
+        signal_date = signal_at.astimezone(IDX_TIMEZONE).date()
+        if signal_date >= authorization.manifest.fixed_terminal_date:
+            raise ShadowContractError(
+                "paired signal leaves no post-signal terminal runway"
+            )
+        calendar = authorization.trading_calendar
+        if calendar is None or signal_date not in calendar.sessions:
+            raise ShadowContractError(
+                "paired signal date is not a frozen IDX session"
+            )
+        required_sessions = (
+            authorization.manifest.labels.entry_validity_trading_days + 15
+        )
+        post_signal_sessions = tuple(
+            session
+            for session in calendar.sessions
+            if signal_date
+            < session
+            <= authorization.manifest.fixed_terminal_date
+        )
+        if len(post_signal_sessions) < required_sessions:
+            raise ShadowContractError(
+                "paired evaluation lacks frozen terminal runway"
+            )
+        return authorization
+
+    def load_portfolio_observation_artifacts(
+        self,
+        manifest: ShadowProtocolManifest,
+        observation: ShadowObservation,
+    ) -> tuple[
+        FrozenPortfolioPolicy,
+        PortfolioStateSourceRecord,
+        PortfolioState,
+    ]:
+        """Reload every RS-P2-014 portfolio edge for replay/maturation."""
+
+        if manifest_portfolio_profile(manifest) != PORTFOLIO_BINDING_PROFILE:
+            raise ShadowContractError(
+                "manifest does not declare portfolio-binding-v1"
+            )
+        store = PortfolioArtifactStore(self.root)
+        policy = store.load_policy_for_manifest(manifest)
+        state = store.verify_observation_state(manifest, observation)
+        source, _ = store.load_source_record(
+            manifest,
+            state.portfolio_source_record_id,
+        )
+        return policy, source, state
 
     def load_authorization(
         self,
@@ -1126,6 +1278,10 @@ class ProtocolGovernanceStore:
         )
         calendar = self.load_trading_calendar(
             manifest.trading_calendar_sha256
+        )
+        self._verify_portfolio_binding_if_declared(
+            manifest,
+            require_a1_capability=True,
         )
         approval_path = self._record_path(
             protocol_id,
@@ -1431,6 +1587,23 @@ class ProtocolGovernanceStore:
             "methodology document",
         )
         return manifest, manifest_raw, methodology
+
+    def _verify_portfolio_binding_if_declared(
+        self,
+        manifest: ShadowProtocolManifest,
+        *,
+        require_a1_capability: bool = False,
+    ) -> None:
+        profile = manifest_portfolio_profile(manifest)
+        if profile is None:
+            return
+        if profile != PORTFOLIO_BINDING_PROFILE:
+            raise ShadowContractError("unsupported portfolio binding profile")
+        policy = PortfolioArtifactStore(self.root).load_policy_for_manifest(
+            manifest
+        )
+        if require_a1_capability:
+            verify_portfolio_a1_capability(manifest, policy)
 
     def _append_event(self, event: ApprovalLedgerEvent) -> Path:
         event_bytes = canonical_json_bytes(event)
