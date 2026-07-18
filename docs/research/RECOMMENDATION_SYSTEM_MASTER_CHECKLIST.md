@@ -74,7 +74,7 @@ The finished system has four separate authority layers:
 |---|---|---|
 | Recommendation information contract | **DONE** | `recommendation-context-v1`, six states, exact blockers/gaps, non-executable hypothetical setup, API/CLI/Markdown/Rich parity, and validation exist. |
 | Live thresholds/actionability | **UNCHANGED** | The information refactor did not loosen R/R, momentum, SIDEWAYS, debate eligibility, liquidity, regime, or sizing. |
-| Generic paired shadow protocol | **RS-P2-015 FIXED-NOTIONAL SUBSTRATE COMPLETE; RS-P2-016–025 OPEN** | The isolated package now includes the frozen control state/paired decision view plus exact integer-IDR, identical fixed-notional lifecycles, causal liquidity, immutable cash/holding records, semantic replay, and content-addressed lineage. Independent policy portfolios, daily NAV, common metrics, generic reporting, real component approval, and collection remain unimplemented. |
+| Generic paired shadow protocol | **RS-P2-015 FIXED-NOTIONAL SUBSTRATE COMPLETE; RS-P2-025 DONE; RS-P2-019/021/022 PARTIAL** | The isolated package now includes the frozen control state/paired decision view plus exact integer-IDR, identical fixed-notional lifecycles, causal liquidity, immutable cash/holding records, semantic replay, and content-addressed lineage. Independent policy portfolios, daily NAV, common metrics, generic reporting, real component approval, and collection remain unimplemented; family-level storage/tamper/replay gaps are tracked in the [status-reconciliation ledger](SHADOW_STATUS_RECONCILIATION_2026-07-18.md). |
 | Existing forecasting shadow | **PARTIAL FOUNDATION** | It is non-authoritative, but defaults to 5/10/20-day horizons and lacks signed protocol IDs, paired control/challenger decisions, trial registry, and the 15-day primary estimand. |
 | C1 calibrated recommender | **PARTIAL FOUNDATION ONLY** | Some forecast probabilities exist; there is no promotion-grade competing-risk calibration or risk–coverage layer. |
 | C2 discount-rate decomposition | **PROPOSAL ONLY** | Live logic still uses SBN plus beta times total ERP; source decomposition/expiry/abstention is absent. |
@@ -176,8 +176,13 @@ shadow collection, threshold changes, or live execution.
 
 - [ ] **RS-P0-008 (DRAFTED; APPROVAL PENDING):** Assign one protocol ID per component: C1, C2, C3, C4a,
   C4b1, C4b2, C5, C6, C7, and C8. Never combine C4a/b1/b2.
-- [ ] **RS-P0-009 (APPROVAL PENDING):** Assign owner, independent reviewer, rollback owner, and
-  approval reference for every protocol.
+- [ ] **RS-P0-009 (APPROVAL PENDING):** Assign owner, governance mode, rollback
+  owner, and approval reference for every protocol. For `INDEPENDENT_REVIEW`,
+  assign an independent reviewer distinct from the owner. For
+  `SOLO_SELF_REVIEW`, require `independent_reviewer=null` and predeclare the
+  same owner as approver and rollback owner; cooling-off requires 72 hours AND
+  2 completed IDX sessions, whichever completes later, with no waiver, and the
+  frozen self-adversarial review remains mandatory.
 - [ ] **RS-P0-010 (DRAFTED; APPROVAL PENDING):** Copy component-specific GO/CONTINUE/NO-GO rules verbatim
   into each manifest.
 - [ ] **RS-P0-011 (DRAFTED; APPROVAL PENDING):** Freeze the 15-day primary horizon, 3/5/10-day secondary
@@ -195,6 +200,13 @@ shadow collection, threshold changes, or live execution.
   C8 is described as reachable unless evidence proves otherwise. Active
   redesign/protocol wording is corrected; an older research artifact still
   contains the superseded dormancy claim and needs a pointer/archive decision.
+
+  **Known reconciliation boundary:** Active master/redesign/protocol authority
+  describes C8 as reachable. Historical dormancy wording, prevalence
+  measurement, and the exact frozen C8 control choice remain unresolved;
+  operational truth for new work is corrected, but Phase-0 research
+  reconciliation is not complete. See the
+  [status-reconciliation ledger](SHADOW_STATUS_RECONCILIATION_2026-07-18.md#5-known-phase-0--c8-inconsistency).
 - [x] **RS-P0-015:** Confirm C7 missingness semantics for `None`, zero,
   negative, non-numeric, `NaN`, infinity, stale data, and source failure. Current
   logic needs an explicit finite-number check. The matrix is captured in the
@@ -212,9 +224,13 @@ shadow collection, threshold changes, or live execution.
   ignored runtime fixtures still need an approved tracked/pinned copy).
 - [ ] Baseline test/artifact evidence is immutable and linked below (current
   output fixtures are versioned and hashed but git-ignored).
-- [x] C7 missingness and C8 reachability are unambiguous.
-- [ ] Every component has a unique protocol ID and approval owner (IDs are
-  drafted; reviewer/rollback owner still require user assignment).
+- [x] C7 missingness taxonomy and C8 reachability are stated correctly in the
+  active authority.
+- [ ] C8 prevalence, exact frozen control definition, and stale
+  historical-artifact pointer/archive reconciliation are complete.
+- [ ] Every component has a unique protocol ID, mode-valid governance identity
+  tuple, rollback owner, and approval binding (IDs are drafted; real component
+  manifests/A1 remain pending).
 - [x] No live threshold or actionability changed.
 
 **HARD STOP:** obtain approval of the manifests before collecting the first
@@ -252,6 +268,10 @@ whether it passes.
 
 ### Regression obligations for every later phase
 
+These are recurring obligations, not finish-once tasks. Keep their global
+checkboxes open and append one evidence entry for every relevant pass using the
+[recurring-evidence log](SHADOW_STATUS_RECONCILIATION_2026-07-18.md#3-rs-p1-r01--r05-recurring-evidence-log).
+
 - [ ] **RS-P1-R01:** A shadow field can never change `execution_decision`,
   `risk_governor`, rank, sizing, or Top-3 eligibility.
 - [ ] **RS-P1-R02:** `NEAR_MISS`, `WAIT_TRIGGER`, and hypothetical setups remain
@@ -264,8 +284,11 @@ whether it passes.
 
 ### Phase 1 Definition of Done
 
-Already met for the current checkpoint. Reconfirm all regression obligations
-after each later phase.
+The implementation checkpoint is met, but regression obligations are recurring
+and are not permanently closed. Reconfirm them after every later phase. The
+latest backfill reconfirms R01–R04 for RS-P2-015 and leaves R05 **PARTIAL**
+because no direct pre-C1 calibration-status guard test exists; see the
+[recurring-evidence log](SHADOW_STATUS_RECONCILIATION_2026-07-18.md#3-rs-p1-r01--r05-recurring-evidence-log).
 
 ---
 
@@ -275,7 +298,14 @@ after each later phase.
 turning the forecasting-only shadow module into authority for unrelated
 components.
 
-**Dependencies:** Phase 0 approved.
+**Dependencies:** Phase-0 baseline and governance design are approved for
+build-only, evaluation-only substrate work. RS-P2-001–015 were implemented
+under explicit scoped owner approvals while real component manifests and A1
+remained closed. This sequencing exception does not complete the Phase-0
+component-manifest tasks and does not authorize collection; an exact component
+manifest plus A1 remains mandatory before the first observation. The
+2026-07-18 reason and scope are recorded in the
+[status-reconciliation ledger](SHADOW_STATUS_RECONCILIATION_2026-07-18.md#4-phase-ordering-exception-record).
 
 **Live authority:** `false` by construction.
 
@@ -578,21 +608,37 @@ components.
 
 ### Storage, validation, and reporting
 
-- [ ] **RS-P2-019:** Use versioned immutable output paths; no sole reliance on
-  `latest_*` aliases.
+- [ ] **RS-P2-019 (PARTIAL):** Use versioned immutable output paths; no sole
+  reliance on `latest_*` aliases. Manifest, approval/ledger, closure,
+  portfolio-state, candidate-set, fixed-notional, observation, and calendar
+  paths exist; generic paired-input, snapshot/source-vintage, and
+  outcome-ledger storage remain incomplete. See the
+  [family coverage matrix](SHADOW_STATUS_RECONCILIATION_2026-07-18.md#2-rs-p2-019--rs-p2-021--rs-p2-022-coverage-matrix).
 - [ ] **RS-P2-020:** Add artifact-validator rules for schema, hashes, authority
   flags, paired opportunity sets, source lineage, and forbidden execution drift.
-- [ ] **RS-P2-021:** Add tamper tests: modified manifest, snapshot, decision,
-  source vintage, or outcome must be rejected.
-- [ ] **RS-P2-022:** Add replay/idempotency tests and deterministic canonical
-  JSON/hash tests.
+- [ ] **RS-P2-021 (PARTIAL):** Add tamper tests: modified manifest, snapshot,
+  decision, source vintage, or outcome must be rejected. Strong family-level
+  coverage exists, but stored ClosureRecord/closure-reference, paired-input,
+  observation maturation, generic outcome-storage, calendar, and generic
+  snapshot/source-vintage gaps remain. See the
+  [family coverage matrix](SHADOW_STATUS_RECONCILIATION_2026-07-18.md#2-rs-p2-019--rs-p2-021--rs-p2-022-coverage-matrix).
+- [ ] **RS-P2-022 (PARTIAL):** Add replay/idempotency tests and deterministic
+  canonical JSON/hash tests. Portfolio-state and fixed-notional are complete;
+  manifest, initial approval/ledger, paired-input, calendar, generic outcome
+  stored-byte replay, and stored-byte end-to-end replay remain incomplete. See the
+  [family coverage matrix](SHADOW_STATUS_RECONCILIATION_2026-07-18.md#2-rs-p2-019--rs-p2-021--rs-p2-022-coverage-matrix).
 - [ ] **RS-P2-023:** Produce separate daily integrity, weekly operational,
   monthly blinded data-quality, and fixed-terminal reports.
 - [ ] **RS-P2-024:** Make reports visibly label all results as shadow and reject
   any human-readable claim that the challenger is live/trusted.
-- [ ] **RS-P2-025:** Preserve the existing forecasting `shadow-evaluation-v1`
+- [x] **RS-P2-025:** Preserve the existing forecasting `shadow-evaluation-v1`
   contract or migrate it explicitly with backward-compatibility tests; do not
-  silently reinterpret old artifacts.
+  silently reinterpret old artifacts. The preservation branch is verified:
+  the original module is unchanged since
+  `ca105098b78ba8acfa08878c5d9fb0e9e642a2c2`, while manifest-v2 and
+  fixed-notional loaders explicitly reject reinterpretation. Exact tests,
+  commits, and residual hardening are recorded in the
+  [RS-P2-025 verdict](SHADOW_STATUS_RECONCILIATION_2026-07-18.md#1-rs-p2-025-preservation-verdict).
 
 ### Required tests
 
@@ -1295,6 +1341,7 @@ artifact paths, not mutable aliases.
 | 2026-07-17 | Phase 2 / RS-P2-008…013 | ENGINE/EVIDENCE DONE; HARD STOP | Added raw-first paired evidence, parity/lineage reconstruction, causal maturation, corporate-action handling, deterministic replay, and immutable backfill inside isolated `core/shadow_protocol/`; updated protocol/tests only | Focused 56 passed; cross-boundary 403 passed/1 skipped; full 1706 passed/3 skipped; Ruff and py_compile passed | No protocol instantiated; raw n=0, independent n=0, mature n=0 | RS-P2-014 build only after explicit approval; A1 required before collection |
 | 2026-07-18 | Phase 2 / RS-P2-014 | DONE; A1 CAPABILITY REMAINS CLOSED | Added evaluation-only frozen portfolio policy/source/state, manifest-v2 binding, immutable lineage/storage, paired candidate producer, governance reloads, exports, tests, and evidence; no legacy evaluator or live path changed | Focused 159 passed; full 1809 passed/3 skipped; py_compile, repo-wide Ruff (no edits), and lock check passed | Design commit `2b40802`; no component manifest/A1/cohort; raw n=0, independent n=0, mature n=0 | RS-P2-015 under separate approval |
 | 2026-07-18 | Phase 2 / RS-P2-015 | DONE; A1 CAPABILITY REMAINS CLOSED | Added exact integer-IDR fixed-notional policy/input/lifecycles, causal liquidity and bars, primary holding/cash-flow records, deterministic semantic replay, immutable graph references/lineage, additive governance reload, exports, tests, and evidence; no live path changed | RS-P2-015 57 passed; focused shadow 216 passed; full 1866 passed/3 skipped; repo-wide Ruff no edits; lock check passed | No real component manifest/A1/cohort; synthetic test fixtures only; implementation commit `6e459c8`; documentation commit reported in the external handoff | RS-P2-016 only under separate approval |
+| 2026-07-18 | Audit-only status reconciliation / RS-P2-019, 021, 022, 025; RS-P0-009; RS-P1-R01…R05 | RS-P2-025 DONE; RS-P2-019/021/022 PARTIAL; HARD STOP | Documentation/checklist/ledger only; no source or test changed. Added family coverage matrix, SOLO_SELF_REVIEW alignment, build-only phase-order exception, C8 inconsistency record, and recurring-evidence backfills | Full 1866 passed/3 skipped; repo-wide Ruff passed with no edits; all 10 `core/shadow_protocol/*` hashes byte-identical | `SHADOW_STATUS_RECONCILIATION_2026-07-18.md`; no protocol/A1/cohort; raw n=0, independent n=0, mature n=0 | RS-P2-016 only under separate approval |
 
 ## 9. Handoff template
 
