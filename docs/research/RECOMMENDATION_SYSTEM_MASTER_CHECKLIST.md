@@ -70,11 +70,11 @@ The finished system has four separate authority layers:
 
 ## 3. Current-state truth table
 
-| Area | Status on 2026-07-18 | What that means |
+| Area | Status on 2026-07-19 | What that means |
 |---|---|---|
 | Recommendation information contract | **DONE** | `recommendation-context-v1`, six states, exact blockers/gaps, non-executable hypothetical setup, API/CLI/Markdown/Rich parity, and validation exist. |
 | Live thresholds/actionability | **UNCHANGED** | The information refactor did not loosen R/R, momentum, SIDEWAYS, debate eligibility, liquidity, regime, or sizing. |
-| Generic paired shadow protocol | **RS-P2-015 FIXED-NOTIONAL SUBSTRATE COMPLETE; RS-P2-025 DONE; RS-P2-019/021/022 PARTIAL** | The isolated package now includes the frozen control state/paired decision view plus exact integer-IDR, identical fixed-notional lifecycles, causal liquidity, immutable cash/holding records, semantic replay, and content-addressed lineage. Independent policy portfolios, daily NAV, common metrics, generic reporting, real component approval, and collection remain unimplemented; family-level storage/tamper/replay gaps are tracked in the [status-reconciliation ledger](SHADOW_STATUS_RECONCILIATION_2026-07-18.md). |
+| Generic paired shadow protocol | **RS-P2-016 POLICY-PORTFOLIO SUBSTRATE COMPLETE; RS-P2-025 DONE; RS-P2-019/021/022 PARTIAL** | The isolated package now includes the frozen control state/paired decision view, exact fixed-notional signal-isolation lifecycles, and independently evolving control/challenger policy portfolios from one identical Rp100m genesis. Integer-IDR cash, commitments, positions, T+2 payables/receivables, deterministic session transitions, exact replay, and content-addressed lineage are implemented. Daily marked-to-market NAV, common metrics, generic reporting, completion of every family-level storage/tamper/replay gap, real component approval, and collection remain unimplemented; residual family coverage is tracked in the [status-reconciliation ledger](SHADOW_STATUS_RECONCILIATION_2026-07-18.md). |
 | Existing forecasting shadow | **PARTIAL FOUNDATION** | It is non-authoritative, but defaults to 5/10/20-day horizons and lacks signed protocol IDs, paired control/challenger decisions, trial registry, and the 15-day primary estimand. |
 | C1 calibrated recommender | **PARTIAL FOUNDATION ONLY** | Some forecast probabilities exist; there is no promotion-grade competing-risk calibration or risk–coverage layer. |
 | C2 discount-rate decomposition | **PROPOSAL ONLY** | Live logic still uses SBN plus beta times total ERP; source decomposition/expiry/abstention is absent. |
@@ -299,7 +299,7 @@ turning the forecasting-only shadow module into authority for unrelated
 components.
 
 **Dependencies:** Phase-0 baseline and governance design are approved for
-build-only, evaluation-only substrate work. RS-P2-001–015 were implemented
+build-only, evaluation-only substrate work. RS-P2-001–016 were implemented
 under explicit scoped owner approvals while real component manifests and A1
 remained closed. This sequencing exception does not complete the Phase-0
 component-manifest tasks and does not authorize collection; an exact component
@@ -439,7 +439,7 @@ manifest plus A1 remains mandatory before the first observation. The
   control portfolio state.
 - [x] **RS-P2-015:** Implement identical fixed-notional view to isolate signal
   quality.
-- [ ] **RS-P2-016:** Implement independent policy-portfolio view from identical
+- [x] **RS-P2-016:** Implement independent policy-portfolio view from identical
   starting capital and risk/cost rules.
 - [ ] **RS-P2-017:** Generate daily marked-to-market NAV; never derive portfolio
   Sharpe/drawdown from a list of closed trades.
@@ -512,8 +512,8 @@ manifest plus A1 remains mandatory before the first observation. The
     `66a6761859936b0c84fa83afb475952bc172759366752193475d6f4aabf7762c`
 - At the RS-P2-014 hard stop, no A1 was granted, no collection/unblinding
   occurred, no baseline or live authority changed, and RS-P2-015–018 were
-  open. RS-P2-015 was subsequently implemented under separate owner approval;
-  RS-P2-016–018 remain open.
+  open. RS-P2-015 and RS-P2-016 were subsequently implemented under separate
+  owner approvals; RS-P2-017–018 remain open.
 
 ### RS-P2-015 fixed-notional evidence — 2026-07-18
 
@@ -597,11 +597,110 @@ manifest plus A1 remains mandatory before the first observation. The
   `trade_math.py` change, baseline change, or live/ranking/sizing/execution
   authority was created. Synthetic temporary governance fixtures are not a
   granted A1 or collection cohort. `shadow-evaluation-v1` is unchanged and not
-  reinterpreted. RS-P2-016–018 and RS-P2-019–025 remain open; the
+  reinterpreted. RS-P2-016 was subsequently implemented under a separate
+  owner approval; RS-P2-017–018 remain open, and the global
+  RS-P2-019/021/022 family-coverage tasks remain partial. The
   `rs_p2_017_eligible` marker is an input contract only, not a daily NAV
   implementation, and RS-P2-018 aggregation/reporting does not yet exist.
 - Implementation commit:
   `6e459c8a15b439f35e46d4791db1ddbbcb2d92af`.
+- The documentation commit is reported in the external handoff after this
+  checklist is committed; it is intentionally not embedded here to avoid
+  self-reference.
+
+### RS-P2-016 policy-portfolio evidence — 2026-07-19
+
+- **PP1–PP14 are frozen as an evaluation-only policy:** control and
+  challenger begin from the same side-neutral, empty Rp100,000,000 economic
+  genesis and then evolve independently. Admission uses each side's
+  `recorded_position_fraction` and `recorded_rank`; missing or ambiguous values
+  fail closed without a Rp13m fallback. Candidate priority is
+  `recorded_rank ASC → source_row_number ASC → ticker ASC`; sector and cluster
+  limits are hard two-name caps with no soft overflow
+  (`core/shadow_protocol/policy_portfolio.py:177-318,319-380,593-701`).
+- **Risk and session semantics are executable, not prose-only:** every
+  admission records all ten gates in the owner-approved order; pending
+  commitments reserve worst-case gross plus exact entry cost and are rechecked
+  at fill. Regime changes take effect on the next frozen IDX session, do not
+  force-liquidate existing positions, and cancel lower-priority excess
+  commitments. The state tracks strict integer-IDR cash, positions,
+  reservations, T+2 purchase payables and sale receivables, realized P&L,
+  planned risk, exposure, and path status
+  (`core/shadow_protocol/policy_portfolio.py:702-1890,2615-4563`).
+- **PP-A1 is enforced at both policy and manifest boundaries:** portfolio heat
+  is `0.013` of starting capital and is labeled
+  `fraction_of_starting_capital`; a `fraction_of_NAV` heat label is rejected.
+  This is the approved semantic correction to the earlier V2 wording, not a
+  parameter change. Other true-NAV fields remain
+  `NOT_ESTIMABLE_UNTIL_RS_P2_017`
+  (`core/shadow_protocol/policy_portfolio.py:1915-2053`;
+  `tests/test_shadow_protocol_p2_016.py:703-754`).
+- **PP-N1–PP-N3 are explicit:** the view is a symmetric formalization of a
+  batch-only control, not a false claim that live control already had a
+  persistent portfolio engine. The documented deviations include hard
+  sector/cluster caps, pending-cancellation/reset behavior, regime-down
+  handling, and purchase-payable accounting. Phase-8 data production must
+  populate rank and position fraction for allocating decisions, while the
+  older `ShadowDecision` fields remain schema-compatible. The expected
+  approximately 17+ session terminal taper is deterministic and is not treated
+  as an activity anomaly
+  (`docs/research/RS_P2_016_POLICY_PORTFOLIO_DESIGN.md:477-536`).
+- **Deterministic independent evolution:** one hash-bound
+  `PolicyPortfolioSessionInput` carries the shared current opportunity-set
+  evidence plus active-cohort lineage. Control and challenger consume the same
+  frozen manifest, calendar, cost/risk rules, regime, and available inputs,
+  while their post-decision holdings and cash paths may diverge legitimately.
+  Session transitions are pure-derived and exact-replay verified; integer
+  resource journals, chronology, causal classification/liquidity, regime
+  timing, split handling, daily-stop behavior, terminal rules, and
+  `NOT_ESTIMABLE_FROM_SESSION` propagation fail closed
+  (`core/shadow_protocol/policy_portfolio.py:1349-1890,2615-4963`).
+- **Additive immutable artifact family:** new frozen policy, genesis, regime,
+  classification, session-liquidity, candidate/session-input, settlement-leg,
+  commitment, position, event, payload, state, transition, paired-session,
+  reference, and lineage artifacts live only in the isolated shadow package.
+  The store uses exclusive creation, exact manifest namespaces, canonical-model
+  and raw-file SHA-256 plus byte length, sorted predecessor hashes, strict
+  loaders, persisted RS-P2-014/015 predecessor reconstruction, and
+  deterministic bundle replay
+  (`core/shadow_protocol/policy_portfolio_store.py:142-1348`). Public exports
+  are additive (`core/shadow_protocol/__init__.py:243-317,660-708`).
+- **Validation coverage:** the 45-test RS-P2-016 file covers PP-A1 binding,
+  identical genesis, ten-gate order, duplicate priority, hard sector/cluster
+  caps, point-in-time fill rechecks, independent divergence, explicit empty
+  current sets with active older cohorts, recorded-size/rank failures, exact
+  T+2 payable/receivable timelines, supported splits, causal
+  classification/liquidity, regime downshifts and priority cancellation,
+  exact-threshold daily stop and pending cancellation, fail-closed frozen
+  paths, starting-capital heat, terminal runway, one-IDR drift,
+  transition-journal reconciliation, chronology, authority literals,
+  content-addressed tamper/replay, duplicate keys, explicit
+  `shadow-evaluation-v1` rejection, and cross-process hash determinism
+  (`tests/test_shadow_protocol_p2_016.py:703-1840`).
+- **Verification gate:** RS-P2-016 file `45 passed`; focused six-file shadow
+  suite `261 passed`; full suite `1911 passed, 3 skipped`; repository-wide
+  `ruff check --fix .` passed and changed no files; `uv lock --check` resolved
+  all 185 packages successfully. The first sandbox-only full-suite attempt
+  stopped during environment setup with seven `certifi` `PermissionError`s,
+  not test assertion failures; the authorized rerun outside that sandbox
+  passed `1911/3`.
+- **Compatibility and scope boundary:** the original forecasting
+  `shadow-evaluation-v1` implementation is unchanged and its artifacts are
+  rejected explicitly by P2-016 loaders rather than reinterpreted. No real
+  component manifest or A1 was granted, no approval-ledger collection event
+  was appended, no observation/outcome cohort was collected or unblinded, and
+  no threshold, live decision path, ranking, `trade_math.py`, baseline, or live
+  authority changed. All new artifacts remain `evaluation_only=true`,
+  `live_authority=false`, and `affects_execution/ranking/sizing=false`.
+- **Remaining work:** RS-P2-017 must create the actual daily marked-to-market
+  NAV series; RS-P2-018 must compute common metrics and explicit
+  `NOT_ESTIMABLE` denominators/censor counts. RS-P2-019, RS-P2-021, and
+  RS-P2-022 remain globally **PARTIAL** until every artifact family in the
+  coverage matrix has immutable-path, tamper, and replay/canonical-hash
+  evidence. RS-P2-023/024 reporting and the first real C7 manifest/A1 also
+  remain separate approval-gated work.
+- Feature implementation commit:
+  `9638762998626a372cf6e33851f4423937dd9584`.
 - The documentation commit is reported in the external handoff after this
   checklist is committed; it is intentionally not embedded here to avoid
   self-reference.
@@ -1342,6 +1441,7 @@ artifact paths, not mutable aliases.
 | 2026-07-18 | Phase 2 / RS-P2-014 | DONE; A1 CAPABILITY REMAINS CLOSED | Added evaluation-only frozen portfolio policy/source/state, manifest-v2 binding, immutable lineage/storage, paired candidate producer, governance reloads, exports, tests, and evidence; no legacy evaluator or live path changed | Focused 159 passed; full 1809 passed/3 skipped; py_compile, repo-wide Ruff (no edits), and lock check passed | Design commit `2b40802`; no component manifest/A1/cohort; raw n=0, independent n=0, mature n=0 | RS-P2-015 under separate approval |
 | 2026-07-18 | Phase 2 / RS-P2-015 | DONE; A1 CAPABILITY REMAINS CLOSED | Added exact integer-IDR fixed-notional policy/input/lifecycles, causal liquidity and bars, primary holding/cash-flow records, deterministic semantic replay, immutable graph references/lineage, additive governance reload, exports, tests, and evidence; no live path changed | RS-P2-015 57 passed; focused shadow 216 passed; full 1866 passed/3 skipped; repo-wide Ruff no edits; lock check passed | No real component manifest/A1/cohort; synthetic test fixtures only; implementation commit `6e459c8`; documentation commit reported in the external handoff | RS-P2-016 only under separate approval |
 | 2026-07-18 | Audit-only status reconciliation / RS-P2-019, 021, 022, 025; RS-P0-009; RS-P1-R01…R05 | RS-P2-025 DONE; RS-P2-019/021/022 PARTIAL; HARD STOP | Documentation/checklist/ledger only; no source or test changed. Added family coverage matrix, SOLO_SELF_REVIEW alignment, build-only phase-order exception, C8 inconsistency record, and recurring-evidence backfills | Full 1866 passed/3 skipped; repo-wide Ruff passed with no edits; all 10 `core/shadow_protocol/*` hashes byte-identical | `SHADOW_STATUS_RECONCILIATION_2026-07-18.md`; no protocol/A1/cohort; raw n=0, independent n=0, mature n=0 | RS-P2-016 only under separate approval |
+| 2026-07-19 | Phase 2 / RS-P2-016 | DONE; A1 CAPABILITY REMAINS CLOSED; HARD STOP | Added the isolated evaluation-only policy-portfolio engine, identical genesis, independently evolving paired paths, exact integer-IDR session state/journal, point-in-time gates and fill rechecks, T+2 payable/receivable accounting, fail-closed terminal/path rules, immutable store/lineage, additive exports, tests, design evidence, and checklist status; no live path changed | RS-P2-016 45 passed; focused six-file shadow 261 passed; full 1911 passed/3 skipped outside sandbox after the initial sandbox run hit seven certifi PermissionErrors; Ruff --fix passed with no edits; lock check resolved 185 | No real component manifest/A1/cohort or collection; feature commit `9638762998626a372cf6e33851f4423937dd9584`; PP1–PP14 and PP-A1/PP-N1–PP-N3 frozen | RS-P2-017 under separate approval, then RS-P2-018 and remaining RS-P2-019/021/022 family gaps |
 
 ## 9. Handoff template
 
