@@ -1163,6 +1163,42 @@ class ProtocolGovernanceStore:
             )
         return authorization
 
+    def verify_fixed_notional_maturation_authorization(
+        self,
+        *,
+        protocol_id: str,
+        manifest_canonical_sha256: str,
+        ledger_id: str,
+        observation: ShadowObservation,
+        attempted_at: datetime,
+    ) -> ProtocolAuthorizationBundle:
+        """Reload current A1/closure state for one RS-P2-015 maturation.
+
+        ``attempted_at`` is the actual local processing time, not the frozen
+        market-data cutoff. Owner-stop closure may still mature an exact
+        pre-closure observation; integrity closure remains fail-closed through
+        ``verify_maturation_authorization``.
+        """
+
+        if attempted_at.utcoffset() is None:
+            raise ShadowContractError(
+                "fixed-notional maturation time must be timezone-aware"
+            )
+        authorization = self.load_authorization(
+            protocol_id=protocol_id,
+            manifest_canonical_sha256=manifest_canonical_sha256,
+            ledger_id=ledger_id,
+        )
+        trusted = verify_maturation_authorization(
+            authorization,
+            observation,
+        )
+        if attempted_at < trusted.captured_at:
+            raise ShadowContractError(
+                "fixed-notional maturation predates observation capture"
+            )
+        return authorization
+
     def load_portfolio_observation_artifacts(
         self,
         manifest: ShadowProtocolManifest,

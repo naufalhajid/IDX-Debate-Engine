@@ -315,9 +315,7 @@ class FrozenPortfolioPolicy(_EvaluationOnlyPortfolioArtifact):
     same_timestamp_priority_rule: Literal[
         "SOURCE_ROW_NUMBER_ASC_THEN_TICKER_ASC"
     ] = "SOURCE_ROW_NUMBER_ASC_THEN_TICKER_ASC"
-    partial_fill_rule: Literal["TASK_GATED_TO_RS_P2_015"] = (
-        "TASK_GATED_TO_RS_P2_015"
-    )
+    partial_fill_rule: Literal["ALL_OR_NONE"] = "ALL_OR_NONE"
 
     portfolio_source_id: NonEmptyString
     portfolio_source_definition_sha256: Sha256
