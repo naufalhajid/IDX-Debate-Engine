@@ -74,7 +74,7 @@ The finished system has four separate authority layers:
 |---|---|---|
 | Recommendation information contract | **DONE** | `recommendation-context-v1`, six states, exact blockers/gaps, non-executable hypothetical setup, API/CLI/Markdown/Rich parity, and validation exist. |
 | Live thresholds/actionability | **UNCHANGED** | The information refactor did not loosen R/R, momentum, SIDEWAYS, debate eligibility, liquidity, regime, or sizing. |
-| Generic paired shadow protocol | **RS-P2-016 POLICY-PORTFOLIO SUBSTRATE COMPLETE; RS-P2-025 DONE; RS-P2-019/021/022 PARTIAL** | The isolated package now includes the frozen control state/paired decision view, exact fixed-notional signal-isolation lifecycles, and independently evolving control/challenger policy portfolios from one identical Rp100m genesis. Integer-IDR cash, commitments, positions, T+2 payables/receivables, deterministic session transitions, exact replay, and content-addressed lineage are implemented. Daily marked-to-market NAV, common metrics, generic reporting, completion of every family-level storage/tamper/replay gap, real component approval, and collection remain unimplemented; residual family coverage is tracked in the [status-reconciliation ledger](SHADOW_STATUS_RECONCILIATION_2026-07-18.md). |
+| Generic paired shadow protocol | **RS-P2-017 DAILY-NAV SUBSTRATE COMPLETE; RS-P2-025 DONE; RS-P2-019/021/022 PARTIAL** | The isolated package now includes the frozen control state/paired decision view, exact fixed-notional signal-isolation lifecycles, independently evolving control/challenger policy portfolios from one identical Rp100m genesis, and two non-interchangeable daily marked-to-market series: policy-portfolio NAV and per-opportunity fixed-notional sleeve equity. Integer-IDR accounting, point-in-time official marks, permanent explicit censoring, simple daily returns, deterministic local replay, and content-addressed lineage are implemented. Common metrics, generic reporting, an externally authenticated NAV-tail commitment, completion of every family-level storage/tamper/replay gap, real component approval, and collection remain unimplemented; residual family coverage is tracked in the [status-reconciliation ledger](SHADOW_STATUS_RECONCILIATION_2026-07-18.md). |
 | Existing forecasting shadow | **PARTIAL FOUNDATION** | It is non-authoritative, but defaults to 5/10/20-day horizons and lacks signed protocol IDs, paired control/challenger decisions, trial registry, and the 15-day primary estimand. |
 | C1 calibrated recommender | **PARTIAL FOUNDATION ONLY** | Some forecast probabilities exist; there is no promotion-grade competing-risk calibration or risk–coverage layer. |
 | C2 discount-rate decomposition | **PROPOSAL ONLY** | Live logic still uses SBN plus beta times total ERP; source decomposition/expiry/abstention is absent. |
@@ -441,10 +441,14 @@ manifest plus A1 remains mandatory before the first observation. The
   quality.
 - [x] **RS-P2-016:** Implement independent policy-portfolio view from identical
   starting capital and risk/cost rules.
-- [ ] **RS-P2-017:** Generate daily marked-to-market NAV; never derive portfolio
+- [x] **RS-P2-017:** Generate daily marked-to-market NAV; never derive portfolio
   Sharpe/drawdown from a list of closed trades.
 - [ ] **RS-P2-018:** Emit common metrics with explicit denominators and
-  `NOT_ESTIMABLE`, never coerced zeroes.
+  `NOT_ESTIMABLE`, never coerced zeroes. Per NV-N2, report suspension/
+  missing-official-mark censor counts and deterministic censored-session
+  durations by side and ticker, plus source/liquidity slices only where the
+  evidence is adequate; never silently remove censored paths from a
+  denominator.
 
 ### RS-P2-014 portfolio-state/paired-view evidence — 2026-07-18
 
@@ -512,8 +516,8 @@ manifest plus A1 remains mandatory before the first observation. The
     `66a6761859936b0c84fa83afb475952bc172759366752193475d6f4aabf7762c`
 - At the RS-P2-014 hard stop, no A1 was granted, no collection/unblinding
   occurred, no baseline or live authority changed, and RS-P2-015–018 were
-  open. RS-P2-015 and RS-P2-016 were subsequently implemented under separate
-  owner approvals; RS-P2-017–018 remain open.
+  open. RS-P2-015, RS-P2-016, and RS-P2-017 were subsequently implemented
+  under separate owner approvals; RS-P2-018 remains open.
 
 ### RS-P2-015 fixed-notional evidence — 2026-07-18
 
@@ -597,11 +601,12 @@ manifest plus A1 remains mandatory before the first observation. The
   `trade_math.py` change, baseline change, or live/ranking/sizing/execution
   authority was created. Synthetic temporary governance fixtures are not a
   granted A1 or collection cohort. `shadow-evaluation-v1` is unchanged and not
-  reinterpreted. RS-P2-016 was subsequently implemented under a separate
-  owner approval; RS-P2-017–018 remain open, and the global
+  reinterpreted. RS-P2-016 and RS-P2-017 were subsequently implemented under
+  separate owner approvals; RS-P2-018 remains open, and the global
   RS-P2-019/021/022 family-coverage tasks remain partial. The
-  `rs_p2_017_eligible` marker is an input contract only, not a daily NAV
-  implementation, and RS-P2-018 aggregation/reporting does not yet exist.
+  `rs_p2_017_eligible` marker remains the P2-015 intake boundary consumed by
+  the separate P2-017 daily-NAV family; RS-P2-018 aggregation/reporting does
+  not yet exist.
 - Implementation commit:
   `6e459c8a15b439f35e46d4791db1ddbbcb2d92af`.
 - The documentation commit is reported in the external handoff after this
@@ -692,8 +697,9 @@ manifest plus A1 remains mandatory before the first observation. The
   no threshold, live decision path, ranking, `trade_math.py`, baseline, or live
   authority changed. All new artifacts remain `evaluation_only=true`,
   `live_authority=false`, and `affects_execution/ranking/sizing=false`.
-- **Remaining work:** RS-P2-017 must create the actual daily marked-to-market
-  NAV series; RS-P2-018 must compute common metrics and explicit
+- **Subsequent status:** RS-P2-017 now creates the actual daily
+  marked-to-market series under a separate approved pass. RS-P2-018 must still
+  compute common metrics and explicit
   `NOT_ESTIMABLE` denominators/censor counts. RS-P2-019, RS-P2-021, and
   RS-P2-022 remain globally **PARTIAL** until every artifact family in the
   coverage matrix has immutable-path, tamper, and replay/canonical-hash
@@ -705,26 +711,111 @@ manifest plus A1 remains mandatory before the first observation. The
   checklist is committed; it is intentionally not embedded here to avoid
   self-reference.
 
+### RS-P2-017 daily-NAV evidence — 2026-07-19
+
+- **Two non-interchangeable series are executable:**
+  `POLICY_PORTFOLIO_NAV` is keyed by one independently evolving P2-016
+  portfolio path and may later supply portfolio metrics;
+  `FIXED_NOTIONAL_SLEEVE_EQUITY` is keyed by one P2-015 opportunity and side
+  and cannot be relabeled, summed, or netted across opportunities. The frozen
+  policy binds both families, parent policy hashes, exact official-mark
+  source, calendar, costs, labels, corporate-action policy, methodology, and
+  the identical control/challenger CONFIG hash
+  (`core/shadow_protocol/daily_nav.py:148-242,878-985`;
+  `tests/test_shadow_protocol_p2_017.py:420-476,862-895`).
+- **Point-in-time marks and exact accounting:** persisted marks are strict
+  integer-IDR official raw closes with source-record canonical/raw hashes,
+  byte identity, `available_at`, `captured_at`, calendar, and
+  corporate-action lineage. Policy NAV recomputes settled cash plus sale
+  receivable minus purchase payable plus marked holdings from exact P2-016
+  predecessors. Fixed sleeves separately account for idle/settled cash,
+  payable, receivable, marked holdings, and the explicit unfunded-cost
+  liability; no starting-capital, entry-price, previous-close, stale, or
+  future-mark fallback is allowed
+  (`core/shadow_protocol/daily_nav.py:257-566,1409-1810,1811-2166`;
+  `tests/test_shadow_protocol_p2_017.py:478-561,657-797,1101-1176`).
+- **Daily return and missingness semantics are honest:** genesis has
+  `NOT_ESTIMABLE_NO_PREDECESSOR`; later simple returns use only immediately
+  adjacent estimable points and the frozen 12-place quantization. A missing
+  official mark, suspension, predecessor failure, unresolved terminal, or
+  insolvency cannot be bridged or silently converted to zero. Canonical
+  missingness permanently poisons the primary chain. Each censor retains
+  ticker, first/current session, deterministic duration, source/reason
+  lineage, family, and side
+  (`core/shadow_protocol/daily_nav.py:354-566,684-838,2167-2331`;
+  `tests/test_shadow_protocol_p2_017.py:478-655,763-801`).
+- **NV-N2 remains an RS-P2-018 obligation:** the P2-017 point contract
+  preserves `censored_tickers` and `censor_duration_sessions`; P2-018 must
+  aggregate and report censor count and duration by side and ticker, with
+  source/liquidity slices only when supported. It must expose denominator
+  impact and cannot silently drop suspended or missing-mark paths
+  (`core/shadow_protocol/daily_nav.py:400-430`;
+  `docs/research/RS_P2_017_DAILY_NAV_DESIGN.md:271-285`).
+- **Immutable local evidence graph:** policy, mark-input, point, event, and
+  snapshot nodes use exact v1 loaders, duplicate-key rejection,
+  exclusive-create content-addressed paths, canonical-model and raw-file
+  SHA-256, byte length, immutable logical references, named predecessors,
+  local prior-snapshot prefix checks, and deterministic stored-byte replay
+  (`core/shadow_protocol/daily_nav_store.py:102-530,666-853,860-1003`;
+  `tests/test_shadow_protocol_p2_017.py:897-1099`).
+- **Local is not global completeness:** every snapshot is literally
+  `UNANCHORED_NOT_CERTIFIED_COMPLETE`. P2-017 does not invent the independently
+  authenticated expected-tail/run commitment needed to detect deletion of a
+  valid local tail. That external anchor and global stored-byte reconstruction
+  remain residual RS-P2-019/021/022 work; local discovery is never treated as
+  certification
+  (`core/shadow_protocol/daily_nav.py:630-838`;
+  `core/shadow_protocol/daily_nav_store.py:149-157,398-472`).
+- **Safety and compatibility:** all new artifacts/references remain
+  `evaluation_only=true`, `live_authority=false`, and
+  `affects_execution/ranking/sizing=false`. Exact-v1 loaders reject
+  `shadow-evaluation-v1`; no existing forecasting artifact is reinterpreted
+  (`tests/test_shadow_protocol_p2_017.py:803-860,920-974`).
+- **Verification:** RS-P2-017 file `28 passed`; focused seven-file shadow suite
+  `289 passed`; authorized unsandboxed full suite `1939 passed, 3 skipped`.
+  The initial sandboxed full run reached `1932 passed, 3 skipped` but the same
+  seven environment-sensitive `test_model_integration.py` tests seen in the
+  P2-016 pass failed there; all seven passed outside the sandbox.
+  Repository-wide Ruff `check --fix` passed with no edits; `uv lock --check`
+  resolved 185 packages; touched-file `py_compile` passed.
+- **Hard scope boundary:** no component manifest or A1 was granted, no
+  collection/unblinding occurred, and no threshold, recommendation,
+  decision, ranking, sizing, execution, baseline, or live authority changed.
+  RS-P2-018, RS-P2-019, RS-P2-021, RS-P2-022, RS-P2-023, and RS-P2-024 remain
+  separate work.
+- Feature implementation commit:
+  `d5ae02fddbb4ba070857e4d6281b2d33afe14b6d`.
+- The documentation commit is reported in the external handoff after this
+  checklist is committed; it is intentionally not embedded here to avoid
+  self-reference.
+
 ### Storage, validation, and reporting
 
 - [ ] **RS-P2-019 (PARTIAL):** Use versioned immutable output paths; no sole
   reliance on `latest_*` aliases. Manifest, approval/ledger, closure,
   portfolio-state, candidate-set, fixed-notional, observation, and calendar
-  paths exist; generic paired-input, snapshot/source-vintage, and
-  outcome-ledger storage remain incomplete. See the
+  paths exist. P2-017 daily-NAV nodes also have local dual-hash immutable
+  paths, but their snapshot chain is explicitly
+  `UNANCHORED_NOT_CERTIFIED_COMPLETE`; an authenticated expected-tail/run
+  commitment does not yet exist. Generic paired-input, snapshot/source-vintage,
+  and outcome-ledger storage remain incomplete. See the
   [family coverage matrix](SHADOW_STATUS_RECONCILIATION_2026-07-18.md#2-rs-p2-019--rs-p2-021--rs-p2-022-coverage-matrix).
 - [ ] **RS-P2-020:** Add artifact-validator rules for schema, hashes, authority
   flags, paired opportunity sets, source lineage, and forbidden execution drift.
 - [ ] **RS-P2-021 (PARTIAL):** Add tamper tests: modified manifest, snapshot,
   decision, source vintage, or outcome must be rejected. Strong family-level
-  coverage exists, but stored ClosureRecord/closure-reference, paired-input,
-  observation maturation, generic outcome-storage, calendar, and generic
-  snapshot/source-vintage gaps remain. See the
+  coverage exists, including local P2-017 NAV byte/reference tamper rejection,
+  but no external NAV-tail deletion proof exists. Stored
+  ClosureRecord/closure-reference, paired-input, observation maturation,
+  generic outcome-storage, calendar, and generic snapshot/source-vintage gaps
+  also remain. See the
   [family coverage matrix](SHADOW_STATUS_RECONCILIATION_2026-07-18.md#2-rs-p2-019--rs-p2-021--rs-p2-022-coverage-matrix).
 - [ ] **RS-P2-022 (PARTIAL):** Add replay/idempotency tests and deterministic
-  canonical JSON/hash tests. Portfolio-state and fixed-notional are complete;
-  manifest, initial approval/ledger, paired-input, calendar, generic outcome
-  stored-byte replay, and stored-byte end-to-end replay remain incomplete. See the
+  canonical JSON/hash tests. Portfolio-state, fixed-notional, and the local
+  P2-017 NAV graph are covered; manifest, initial approval/ledger,
+  paired-input, calendar, generic outcome stored-byte replay, externally
+  anchored NAV-tail replay, and stored-byte end-to-end replay remain
+  incomplete. See the
   [family coverage matrix](SHADOW_STATUS_RECONCILIATION_2026-07-18.md#2-rs-p2-019--rs-p2-021--rs-p2-022-coverage-matrix).
 - [ ] **RS-P2-023:** Produce separate daily integrity, weekly operational,
   monthly blinded data-quality, and fixed-terminal reports.
@@ -1442,6 +1533,8 @@ artifact paths, not mutable aliases.
 | 2026-07-18 | Phase 2 / RS-P2-015 | DONE; A1 CAPABILITY REMAINS CLOSED | Added exact integer-IDR fixed-notional policy/input/lifecycles, causal liquidity and bars, primary holding/cash-flow records, deterministic semantic replay, immutable graph references/lineage, additive governance reload, exports, tests, and evidence; no live path changed | RS-P2-015 57 passed; focused shadow 216 passed; full 1866 passed/3 skipped; repo-wide Ruff no edits; lock check passed | No real component manifest/A1/cohort; synthetic test fixtures only; implementation commit `6e459c8`; documentation commit reported in the external handoff | RS-P2-016 only under separate approval |
 | 2026-07-18 | Audit-only status reconciliation / RS-P2-019, 021, 022, 025; RS-P0-009; RS-P1-R01…R05 | RS-P2-025 DONE; RS-P2-019/021/022 PARTIAL; HARD STOP | Documentation/checklist/ledger only; no source or test changed. Added family coverage matrix, SOLO_SELF_REVIEW alignment, build-only phase-order exception, C8 inconsistency record, and recurring-evidence backfills | Full 1866 passed/3 skipped; repo-wide Ruff passed with no edits; all 10 `core/shadow_protocol/*` hashes byte-identical | `SHADOW_STATUS_RECONCILIATION_2026-07-18.md`; no protocol/A1/cohort; raw n=0, independent n=0, mature n=0 | RS-P2-016 only under separate approval |
 | 2026-07-19 | Phase 2 / RS-P2-016 | DONE; A1 CAPABILITY REMAINS CLOSED; HARD STOP | Added the isolated evaluation-only policy-portfolio engine, identical genesis, independently evolving paired paths, exact integer-IDR session state/journal, point-in-time gates and fill rechecks, T+2 payable/receivable accounting, fail-closed terminal/path rules, immutable store/lineage, additive exports, tests, design evidence, and checklist status; no live path changed | RS-P2-016 45 passed; focused six-file shadow 261 passed; full 1911 passed/3 skipped outside sandbox after the initial sandbox run hit seven certifi PermissionErrors; Ruff --fix passed with no edits; lock check resolved 185 | No real component manifest/A1/cohort or collection; feature commit `9638762998626a372cf6e33851f4423937dd9584`; PP1–PP14 and PP-A1/PP-N1–PP-N3 frozen | RS-P2-017 under separate approval, then RS-P2-018 and remaining RS-P2-019/021/022 family gaps |
+
+| 2026-07-19 | Phase 2 / RS-P2-017 | DONE; A1 CAPABILITY REMAINS CLOSED; HARD STOP | Added two non-interchangeable evaluation-only daily-NAV families, exact official mark input, integer-IDR policy/sleeve accounting, explicit fixed-sleeve cost liability, T+2 settlement tail, permanent censor/null propagation, daily return series, immutable local graph storage/replay, tests, design evidence, and PP1 wording erratum; no live path changed | RS-P2-017 28 passed; focused shadow 289 passed; authorized unsandboxed full suite 1939 passed/3 skipped; Ruff --fix no edits; lock check resolved 185 | No real component manifest/A1/cohort or collection; feature commit `d5ae02fddbb4ba070857e4d6281b2d33afe14b6d`; snapshots remain `UNANCHORED_NOT_CERTIFIED_COMPLETE` | RS-P2-018 under separate approval, plus remaining global RS-P2-019/021/022 gaps |
 
 ## 9. Handoff template
 

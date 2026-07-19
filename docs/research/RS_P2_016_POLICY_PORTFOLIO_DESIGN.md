@@ -147,9 +147,20 @@ Both sides start from:
 - no pending commitments;
 - realized P&L for the session equal to zero;
 - an inactive daily-loss latch;
-- the opening of the first frozen IDX session allowed by the protocol.
+- the close of the frozen IDX session immediately preceding the first
+  policy-transition session (`GENESIS_ANCHOR`).
 
 Observed live holdings are never imported into genesis.
+
+> **Documentation erratum — 2026-07-19 (NV-N1).** The former “opening of
+> the first frozen IDX session” wording contradicted the already implemented
+> and tested contract. Normative genesis is the close of the immediately
+> preceding frozen IDX session:
+> `genesis_at == session_close_at(genesis_session)`. This is a prose
+> correction only. It does not change `policy_portfolio.py`, any persisted
+> state identity, economics, decision logic, or authority. RS-P2-017 treats
+> this close as `GENESIS_ANCHOR`; its return is
+> `NOT_ESTIMABLE_NO_PREDECESSOR`.
 
 ### PP2 — recorded-position sizing authority
 
@@ -1166,6 +1177,8 @@ Confirmed for this implementation:
 - no collection or unblinding occurred;
 - no live authority or threshold changed;
 - baseline and `shadow-evaluation-v1` were untouched;
-- RS-P2-017/018 remain open;
+- at the P2-016 hard stop, RS-P2-017/018 remained open; RS-P2-017 was later
+  implemented in `d5ae02fddbb4ba070857e4d6281b2d33afe14b6d`, while RS-P2-018
+  remains open;
 - PP1–PP14, PP-A1, and PP-N1–PP-N3 were implemented without an undisclosed
   deviation.

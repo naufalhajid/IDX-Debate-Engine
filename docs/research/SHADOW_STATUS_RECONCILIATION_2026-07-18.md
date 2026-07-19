@@ -76,6 +76,9 @@ These are follow-up hardening items, not evidence of a silent migration.
 | Portfolio-state | COVERED | COVERED | COVERED |
 | Paired-view | PARTIAL | PARTIAL | PARTIAL |
 | Fixed-notional | COVERED | COVERED | COVERED |
+| NAV mark input | COVERED | COVERED | COVERED |
+| Fixed-notional sleeve-equity NAV | COVERED | PARTIAL | PARTIAL |
+| Policy-portfolio NAV | COVERED | PARTIAL | PARTIAL |
 | Observation | COVERED | PARTIAL | COVERED |
 | Outcome | MISSING | PARTIAL | PARTIAL |
 | Calendar | COVERED | PARTIAL | PARTIAL |
@@ -247,6 +250,86 @@ Implementation evidence:
 
 No residual gap was found for the three capabilities in this matrix.
 
+#### NAV mark input
+
+Path:
+
+```text
+protocols/{protocol_id}/{manifest_sha256}/daily_nav/
+  nav_mark_inputs/{canonical_sha256}/{raw_sha256}.json
+  refs/nav_mark_inputs/{mark_input_id}.json
+```
+
+Implementation evidence:
+
+- [`DailyNavArtifactStore`](../../core/shadow_protocol/daily_nav_store.py)
+  provides exclusive-create dual-hash storage, exact byte length, immutable
+  logical references, duplicate-key rejection, and strict exact-v1 reload.
+- `test_daily_nav_store_tamper_matrix_fails_closed` mutates the stored embedded
+  mark bytes and proves verified bundle reload fails closed; the same matrix
+  covers snapshot bytes, point bytes, reference length, and duplicate keys
+  ([`tests/test_shadow_protocol_p2_017.py`](../../tests/test_shadow_protocol_p2_017.py)).
+- `test_exact_v1_loaders_round_trip_and_reject_duplicate_json_keys`,
+  `test_nav_mark_timezone_identity_and_chronology_are_deterministic`, and the
+  two-family idempotent bundle test cover canonical reload, session chronology,
+  timezone-normalized identity, and exact retry.
+
+No local mark-input gap was found for the three capabilities in this matrix.
+The source record named by its canonical/raw hashes remains an external
+cross-store predecessor and is not claimed reloaded by RS-P2-017.
+
+#### Fixed-notional sleeve-equity NAV
+
+Path:
+
+```text
+protocols/{protocol_id}/{manifest_sha256}/daily_nav/
+  nav_points/{canonical_sha256}/{raw_sha256}.json
+  nav_series_events/{canonical_sha256}/{raw_sha256}.json
+  nav_series_snapshots/{canonical_sha256}/{raw_sha256}.json
+  refs/{nav_points|nav_series_events|nav_series_snapshots}/{artifact_id}.json
+```
+
+Implementation evidence:
+
+- `test_daily_nav_store_is_content_addressed_idempotent_and_replayable` runs
+  against `FIXED_NOTIONAL_SLEEVE_EQUITY` as well as policy NAV.
+- `test_daily_nav_snapshot_hash_is_identical_cross_process` proves the fixed
+  family snapshot hash in an independent Python process.
+- Fixed-sleeve T+2, explicit liability, settlement-only tail, real paired
+  union, terminal censor diagnostic, insolvency, and no-aggregation evidence
+  is in [`tests/test_shadow_protocol_p2_017.py`](../../tests/test_shadow_protocol_p2_017.py).
+
+Residual tamper/replay gap: local NAV-node mutation and replay are covered by
+the shared store tests, but the store does not traverse and reload every named
+P2-015 predecessor, and no independently authenticated expected-tail/run
+commitment detects deletion of an otherwise valid local tail. The snapshot is
+therefore literally `UNANCHORED_NOT_CERTIFIED_COMPLETE` and this family stays
+PARTIAL for global RS-P2-021/022.
+
+#### Policy-portfolio NAV
+
+The policy family uses the same immutable point/event/snapshot namespaces,
+with `series_kind=POLICY_PORTFOLIO_NAV` and a distinct policy-path identity.
+
+Implementation evidence:
+
+- The two-family store/idempotency and cross-process tests cover this family
+  directly.
+- `test_policy_nav_exact_formula_return_and_one_idr_mark_mismatch`,
+  `test_suspension_creates_permanent_null_without_return_bridge`, and
+  `test_policy_nav_consumes_split_adjusted_state_without_double_adjustment`
+  cover exact P2-016 reconciliation, one-IDR rejection, permanent censoring,
+  and no corporate-action double adjustment.
+- `test_no_public_fixed_sleeve_aggregation_surface_or_family_relabel` proves
+  the fixed family cannot be relabeled as policy NAV and that no implicit
+  cross-opportunity aggregation helper is exported.
+
+Residual tamper/replay gap: the local graph is verified, but P2-016 predecessor
+objects are represented by named hashes rather than reloaded across stores,
+and authenticated tail completeness remains absent. This family therefore
+also stays PARTIAL for global RS-P2-021/022.
+
 #### Observation
 
 Path:
@@ -348,6 +431,10 @@ Residual gaps:
    input -> observation -> outcome.
 9. Complete RS-P2-020's global artifact validator; distributed model/store
    validation is not equivalent to a family-complete validator.
+10. Add an independently authenticated daily-NAV run/tail commitment and a
+    cross-store reproducer that reloads every named P2-015/P2-016/source
+    predecessor before the two NAV-series families can be called globally
+    tamper-complete and replay-complete.
 
 ## 3. RS-P1-R01--R05 recurring-evidence log
 
@@ -463,6 +550,48 @@ This entry is historical context, not a post-Phase-1 reconfirmation.
 | R03 | RECONFIRMED | The shared context-drift validation passed. |
 | R04 | RECONFIRMED_WITH_COVERAGE_NOTE | Collective API/persistence/Markdown/Rich tests passed; the single-fixture end-to-end gap remains. |
 | R05 | PARTIAL | No direct pre-C1 calibration-status guard test exists. |
+
+### 3.6 Backfill: RS-P2-016
+
+- **Implementation commit:**
+  `9638762998626a372cf6e33851f4423937dd9584`
+- **Documentation commit:**
+  `078ba14745f0e95c92c9356199d1aec612c3751c`
+- **Phase-1 test origin:**
+  `a385ed1c4081ff79cbffc775c05c7d049c56f145`
+- **Recorded gate:** RS-P2-016 file `45 passed`; focused shadow
+  `261 passed`; full `1911 passed, 3 skipped`; Ruff and lock checks passed.
+
+| Obligation | Status | Evidence / limitation |
+|---|---|---|
+| R01 | RECONFIRMED | Shared R01 suite plus `test_common_input_parity_allows_independent_side_state_divergence`, `test_all_policy_portfolio_artifacts_are_evaluation_only`, and `test_store_references_and_lineage_preserve_evaluation_only_authority` ([`tests/test_shadow_protocol_p2_016.py`](../../tests/test_shadow_protocol_p2_016.py)); the policy view formalizes evaluation-only control/challenger paths and never becomes live authority. |
+| R02 | RECONFIRMED | Shared R02 tests passed; P2-016 froze an isolated policy evaluator and did not loosen any recommendation gate. |
+| R03 | RECONFIRMED | The shared context-drift validation passed. |
+| R04 | RECONFIRMED_WITH_COVERAGE_NOTE | Collective API/persistence/Markdown/Rich tests passed; the single-fixture end-to-end gap remains. |
+| R05 | PARTIAL | No direct pre-C1 calibration-status guard test exists. |
+
+### 3.7 RS-P2-017 daily-NAV pass
+
+- **Implementation commit:**
+  `d5ae02fddbb4ba070857e4d6281b2d33afe14b6d`
+- **Documentation commit:** reported in the external handoff after commit to
+  avoid self-reference.
+- **Phase-1 test origin:**
+  `a385ed1c4081ff79cbffc775c05c7d049c56f145`
+- **Recorded gate:** RS-P2-017 file `28 passed`; focused seven-file shadow
+  suite `289 passed`; authorized unsandboxed full suite `1939 passed,
+  3 skipped`; Ruff `check --fix` passed with no edits; lock check resolved
+  185 packages. The initial sandboxed full run had the same seven
+  environment-sensitive `test_model_integration.py` failures seen in P2-016;
+  all seven passed in the unsandboxed rerun.
+
+| Obligation | Status | Evidence / limitation |
+|---|---|---|
+| R01 | RECONFIRMED | Shared R01 suite plus `test_daily_nav_artifacts_are_evaluation_only_and_replay_deterministically` and `test_no_public_fixed_sleeve_aggregation_surface_or_family_relabel` ([`tests/test_shadow_protocol_p2_017.py`](../../tests/test_shadow_protocol_p2_017.py)); NAV artifacts cannot affect execution, ranking, or sizing and fixed sleeves cannot become policy NAV. |
+| R02 | RECONFIRMED | Shared R02 tests passed; RS-P2-017 computes evaluation-only measurement artifacts and changes no gate or recommendation state. |
+| R03 | RECONFIRMED | The shared context-drift validation passed; exact manifest/policy/family identity checks fail closed. |
+| R04 | RECONFIRMED_WITH_COVERAGE_NOTE | Existing presentation-parity tests passed, but RS-P2-017 intentionally adds no user-facing report; P2-023 owns report cadence and the existing single-fixture end-to-end gap remains. |
+| R05 | PARTIAL | No calibration status is promoted by P2-017, but the pre-C1 direct `VALIDATED` guard gap remains. |
 
 ## 4. Phase-ordering exception record
 
