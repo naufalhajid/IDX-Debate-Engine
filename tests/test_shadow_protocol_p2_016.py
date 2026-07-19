@@ -346,6 +346,7 @@ def _world(
     policy_entry_adtv_idr: int | None = None,
     terminal_date: date | None = None,
     action_events=(),
+    manifest_enricher=None,
 ) -> _World:
     (
         base_manifest,
@@ -394,6 +395,13 @@ def _world(
             ),
         }
     )
+    if manifest_enricher is not None:
+        final_manifest = manifest_enricher(
+            final_manifest,
+            portfolio_policy,
+            fixed_policy,
+            policy,
+        )
     verify_policy_portfolio_policy_binding(
         final_manifest,
         portfolio_policy,
